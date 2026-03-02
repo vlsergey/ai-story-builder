@@ -12,6 +12,19 @@ import PlanEditor from './PlanEditor'
 import AppMenu from './AppMenu'
 
 /**
+ * Shown in any empty group (including the center on startup).
+ * Not a panel — cannot be moved or closed.
+ * Disappears automatically when a real panel is added to the group.
+ */
+const WelcomeWatermark = () => (
+  <div className="flex items-center justify-center h-full bg-background select-none">
+    <span className="text-3xl font-bold text-muted-foreground/40 tracking-wide">
+      AI Story Builder
+    </span>
+  </div>
+)
+
+/**
  * Layout component provides the main 4-pane dock-like layout:
  * - Left (30%): Lore and Plan tree
  * - Center (40%): Story editor / MD editor
@@ -96,7 +109,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
       console.warn('[Layout] saveLayoutToDatabase: skipping empty layout')
       return
     }
-    
+
     try {
       console.log('[Layout] saveLayoutToDatabase: saving', { panelsCount, size: JSON.stringify(layout).length })
       await fetch('/api/settings/layout', {
@@ -127,36 +140,39 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
   const setupDefaultLayout = () => {
     if (!dockviewRef.current) return
 
-    // Clear any existing panels
     dockviewRef.current.clear()
 
-    // Add the main panels
-    const lorePanel = dockviewRef.current.addPanel({
+    // Editor panel anchors the center column. It is non-closable (no × button)
+    // and shows the welcome watermark content when nothing is selected.
+    // The WelcomeWatermark component renders in this group if it ever becomes empty.
+    dockviewRef.current.addPanel({
+      id: 'editor-panel',
+      component: 'editor',
+      tabComponent: 'nonClosableTab',
+      title: 'Editor',
+    })
+
+    // Left column: lore (top) and plan (bottom), referencing the editor panel
+    dockviewRef.current.addPanel({
       id: 'lore-panel',
       component: 'lore',
       tabComponent: 'nonClosableTab',
       title: 'Lore',
-      position: { direction: 'left' },
+      position: { direction: 'left', referencePanel: 'editor-panel' },
       minimumWidth: 200,
     })
 
-    const planPanel = dockviewRef.current.addPanel({
+    dockviewRef.current.addPanel({
       id: 'plan-panel',
       component: 'plan',
       tabComponent: 'nonClosableTab',
       title: 'Plan',
-      position: { direction: 'bottom', referencePanel: 'lore-panel' },
+      position: { direction: 'below', referencePanel: 'lore-panel' },
       minimumHeight: 150,
     })
 
-    const editorPanel = dockviewRef.current.addPanel({
-      id: 'editor-panel',
-      component: 'editor',
-      title: 'Editor',
-      position: { direction: 'right', referencePanel: 'lore-panel' },
-    })
-
-    const cardsPanel = dockviewRef.current.addPanel({
+    // Right column
+    dockviewRef.current.addPanel({
       id: 'cards-panel',
       component: 'cards',
       tabComponent: 'nonClosableTab',
@@ -222,8 +238,10 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
         ) : selectedPlanNode ? (
           <PlanEditor planNode={selectedPlanNode} />
         ) : (
-          <div className="text-muted-foreground flex items-center justify-center h-full">
-            Select a lore file or a plan node to edit.
+          <div className="flex items-center justify-center h-full select-none">
+            <span className="text-3xl font-bold text-muted-foreground/40 tracking-wide">
+              AI Story Builder
+            </span>
           </div>
         )}
       </div>
@@ -247,6 +265,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
         <DockviewReact
           components={components}
           tabComponents={tabComponents}
+          watermarkComponent={WelcomeWatermark}
           onReady={onReady}
           onDidLayoutChange={handleLayoutChange}
           disableFloatingGroups={false}

@@ -31,6 +31,7 @@ vi.mock('../components/DiffViewer', () => ({
 
 // Mock dockview components, capturing onReady API
 let mockPanels = {};
+let mockGroups = {};
 let mockApi = {
   fromJSON: vi.fn(),
   toJSON: vi.fn(() => ({
@@ -39,15 +40,21 @@ let mockApi = {
   })),
   clear: vi.fn(() => {
     mockPanels = {};
+    mockGroups = {};
   }),
   addPanel: vi.fn((conf) => {
     const panelId = conf.id || `panel-${Object.keys(mockPanels).length}`;
-    mockPanels[panelId] = { 
-      id: panelId, 
-      component: conf.component, 
-      title: conf.title 
+    mockPanels[panelId] = {
+      id: panelId,
+      component: conf.component,
+      title: conf.title
     };
-    return { /* return minimal panel object if needed */ };
+    return {};
+  }),
+  addGroup: vi.fn((conf) => {
+    const groupId = conf?.id || `group-${Object.keys(mockGroups).length}`;
+    mockGroups[groupId] = { id: groupId };
+    return { id: groupId };
   }),
 };
 
@@ -121,6 +128,8 @@ describe('Layout', () => {
   beforeEach(() => {
     // reset mock state
     mockPanels = {};
+    mockGroups = {};
+    mockApi.addGroup.mockClear();
     // stub global fetch for layout load/save
     vi.stubGlobal('fetch', (url, opts) => {
       if (opts && opts.method === 'POST') {
@@ -175,6 +184,50 @@ describe('Layout', () => {
       expect.objectContaining({ method: 'POST' })
     );
   });
+
+  it('default layout: editor anchors center, lore/plan in left column, cards on right', async () => {
+    mockApi.addPanel.mockClear()
+    // Return null so restoreLayout falls through to setupDefaultLayout
+    vi.stubGlobal('fetch', (url, opts) => {
+      if (opts && opts.method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ json: () => Promise.resolve(null) })
+    })
+
+    render(<Layout {...mockProps} />)
+
+    await waitFor(() => {
+      const ids = mockApi.addPanel.mock.calls.map(c => c[0].id)
+      expect(ids).toContain('plan-panel')
+    })
+
+    const calls = mockApi.addPanel.mock.calls
+    const editorCall = calls.find(c => c[0].id === 'editor-panel')
+    const loreCall = calls.find(c => c[0].id === 'lore-panel')
+    const planCall = calls.find(c => c[0].id === 'plan-panel')
+    const cardsCall = calls.find(c => c[0].id === 'cards-panel')
+
+    expect(editorCall).toBeTruthy()
+    expect(loreCall).toBeTruthy()
+    expect(planCall).toBeTruthy()
+    expect(cardsCall).toBeTruthy()
+
+    // Editor has no close button
+    expect(editorCall[0].tabComponent).toBe('nonClosableTab')
+
+    // Lore is to the left of editor (left column, full height)
+    expect(loreCall[0].position.direction).toBe('left')
+    expect(loreCall[0].position.referencePanel).toBe('editor-panel')
+
+    // Plan is split below lore within the left column, not as a tab
+    expect(planCall[0].position.direction).toBe('below')
+    expect(planCall[0].position.referencePanel).toBe('lore-panel')
+
+    // Cards are to the right of editor
+    expect(cardsCall[0].position.direction).toBe('right')
+    expect(cardsCall[0].position.referencePanel).toBe('editor-panel')
+  })
 
   it('normalizes panel keys when loading saved layout', async () => {
     // arrange: fetch returns layout with contentComponent names
