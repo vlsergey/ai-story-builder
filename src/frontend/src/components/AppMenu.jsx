@@ -9,15 +9,6 @@ const availableThemes = ['zinc', 'slate', 'neutral', 'obsidian', 'carbon']
 export default function AppMenu({ onResetLayouts, onClose }) {
   const { theme, setTheme } = useTheme()
 
-  function handleQuit() {
-    // Close the project first, then close the window
-    if (onClose) {
-      onClose()
-    }
-    // Attempt to close the window (won't work in most browsers, but useful for Electron)
-    window.close()
-  }
-
   return (
     <Menubar.Root className="flex relative bg-background border-b border-border text-sm">
       <Menubar.Menu>
@@ -31,13 +22,6 @@ export default function AppMenu({ onResetLayouts, onClose }) {
               onSelect={onClose}
             >
               Close Project
-            </Menubar.Item>
-            <Menubar.Separator className="h-px bg-border my-1" />
-            <Menubar.Item
-              className="px-2 py-1 rounded hover:bg-secondary/20 cursor-pointer text-destructive"
-              onSelect={handleQuit}
-            >
-              Quit
             </Menubar.Item>
           </Menubar.Group>
         </Menubar.Content>

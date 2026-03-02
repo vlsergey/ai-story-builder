@@ -256,20 +256,8 @@ export default function Layout({ localeStrings, onClose }) {
           className="dockview-theme"
         />
       </div>
-      <div className="flex h-12 border-t border-border p-2 items-center bg-background">
-        <div className="w-48 flex items-center space-x-2">
-          <button
-            className="px-3 py-1 rounded text-sm bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            onClick={onClose}
-          >
-            Close Project
-          </button>
-        </div>
-        <div className="flex-1 flex justify-center">
-        </div>
-        <div className="w-48 text-right">
-          <p className="text-muted-foreground text-sm">Project open</p>
-        </div>
+      <div className="flex h-12 border-t border-border p-2 items-center bg-background justify-center">
+        <p className="text-muted-foreground text-sm">Project open</p>
       </div>
     </div>
   )
