@@ -23,11 +23,6 @@ This project now uses npm workspaces to separate frontend and backend dependenci
 
 ### Application
 
-The top‑level menu bar provides quick access to global actions:
-
-* **View ▶ Reset layouts** – restore the default panel arrangement
-* **View ▶ [theme name]** – choose one of the supported color palettes
-
 
 ```bash
 npm install
