@@ -142,23 +142,39 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
 
     dockviewRef.current.clear()
 
-    // Editor panel anchors the center column. It is non-closable (no × button)
-    // and shows the welcome watermark content when nothing is selected.
-    // The WelcomeWatermark component renders in this group if it ever becomes empty.
-    dockviewRef.current.addPanel({
-      id: 'editor-panel',
-      component: 'editor',
-      tabComponent: 'nonClosableTab',
-      title: 'Editor',
+    // Step 1: create all groups first, then populate with panels.
+    // This ensures the empty center group is a valid grid node before
+    // left/right groups are positioned relative to it.
+
+    // Center: empty group — WelcomeWatermark renders here until a panel is added
+    const centerGroup = dockviewRef.current.addGroup({ id: 'center-group' })
+
+    // Left column: lore on top, plan below
+    const loreGroup = dockviewRef.current.addGroup({
+      id: 'lore-group',
+      direction: 'left',
+      referenceGroup: centerGroup,
+    })
+    const planGroup = dockviewRef.current.addGroup({
+      id: 'plan-group',
+      direction: 'below',
+      referenceGroup: loreGroup,
     })
 
-    // Left column: lore (top) and plan (bottom), referencing the editor panel
+    // Right column
+    const cardsGroup = dockviewRef.current.addGroup({
+      id: 'cards-group',
+      direction: 'right',
+      referenceGroup: centerGroup,
+    })
+
+    // Step 2: add panels into their pre-created groups
     dockviewRef.current.addPanel({
       id: 'lore-panel',
       component: 'lore',
       tabComponent: 'nonClosableTab',
       title: 'Lore',
-      position: { direction: 'left', referencePanel: 'editor-panel' },
+      position: { referenceGroup: loreGroup },
       minimumWidth: 200,
     })
 
@@ -167,17 +183,16 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
       component: 'plan',
       tabComponent: 'nonClosableTab',
       title: 'Plan',
-      position: { direction: 'below', referencePanel: 'lore-panel' },
+      position: { referenceGroup: planGroup },
       minimumHeight: 150,
     })
 
-    // Right column
     dockviewRef.current.addPanel({
       id: 'cards-panel',
       component: 'cards',
       tabComponent: 'nonClosableTab',
       title: 'Cards',
-      position: { direction: 'right', referencePanel: 'editor-panel' },
+      position: { referenceGroup: cardsGroup },
       minimumWidth: 200,
     })
   }

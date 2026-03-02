@@ -185,8 +185,9 @@ describe('Layout', () => {
     );
   });
 
-  it('default layout: editor anchors center, lore/plan in left column, cards on right', async () => {
+  it('default layout: center group is empty (watermark), lore/plan in left column, cards on right', async () => {
     mockApi.addPanel.mockClear()
+    mockApi.addGroup.mockClear()
     // Return null so restoreLayout falls through to setupDefaultLayout
     vi.stubGlobal('fetch', (url, opts) => {
       if (opts && opts.method === 'POST') {
@@ -202,31 +203,56 @@ describe('Layout', () => {
       expect(ids).toContain('plan-panel')
     })
 
-    const calls = mockApi.addPanel.mock.calls
-    const editorCall = calls.find(c => c[0].id === 'editor-panel')
-    const loreCall = calls.find(c => c[0].id === 'lore-panel')
-    const planCall = calls.find(c => c[0].id === 'plan-panel')
-    const cardsCall = calls.find(c => c[0].id === 'cards-panel')
+    // Verify groups created in correct order and direction
+    const groupCalls = mockApi.addGroup.mock.calls
+    const centerGroupCall = groupCalls.find(c => c[0]?.id === 'center-group')
+    const loreGroupCall = groupCalls.find(c => c[0]?.id === 'lore-group')
+    const planGroupCall = groupCalls.find(c => c[0]?.id === 'plan-group')
+    const cardsGroupCall = groupCalls.find(c => c[0]?.id === 'cards-group')
 
-    expect(editorCall).toBeTruthy()
+    expect(centerGroupCall).toBeTruthy()
+    expect(loreGroupCall).toBeTruthy()
+    expect(planGroupCall).toBeTruthy()
+    expect(cardsGroupCall).toBeTruthy()
+
+    // Center group has no direction (it's the root)
+    expect(centerGroupCall[0].direction).toBeUndefined()
+
+    // Lore group is to the left of center
+    expect(loreGroupCall[0].direction).toBe('left')
+    expect(loreGroupCall[0].referenceGroup).toEqual({ id: 'center-group' })
+
+    // Plan group is below lore group (left column only, not full screen)
+    expect(planGroupCall[0].direction).toBe('below')
+    expect(planGroupCall[0].referenceGroup).toEqual({ id: 'lore-group' })
+
+    // Cards group is to the right of center
+    expect(cardsGroupCall[0].direction).toBe('right')
+    expect(cardsGroupCall[0].referenceGroup).toEqual({ id: 'center-group' })
+
+    // Verify panels added into their respective groups
+    const panelCalls = mockApi.addPanel.mock.calls
+    const loreCall = panelCalls.find(c => c[0].id === 'lore-panel')
+    const planCall = panelCalls.find(c => c[0].id === 'plan-panel')
+    const cardsCall = panelCalls.find(c => c[0].id === 'cards-panel')
+
     expect(loreCall).toBeTruthy()
     expect(planCall).toBeTruthy()
     expect(cardsCall).toBeTruthy()
 
-    // Editor has no close button
-    expect(editorCall[0].tabComponent).toBe('nonClosableTab')
+    // No editor-panel in default layout (center shows watermark instead)
+    const editorCall = panelCalls.find(c => c[0].id === 'editor-panel')
+    expect(editorCall).toBeFalsy()
 
-    // Lore is to the left of editor (left column, full height)
-    expect(loreCall[0].position.direction).toBe('left')
-    expect(loreCall[0].position.referencePanel).toBe('editor-panel')
+    // All panels use nonClosableTab
+    expect(loreCall[0].tabComponent).toBe('nonClosableTab')
+    expect(planCall[0].tabComponent).toBe('nonClosableTab')
+    expect(cardsCall[0].tabComponent).toBe('nonClosableTab')
 
-    // Plan is split below lore within the left column, not as a tab
-    expect(planCall[0].position.direction).toBe('below')
-    expect(planCall[0].position.referencePanel).toBe('lore-panel')
-
-    // Cards are to the right of editor
-    expect(cardsCall[0].position.direction).toBe('right')
-    expect(cardsCall[0].position.referencePanel).toBe('editor-panel')
+    // Panels reference their pre-created groups
+    expect(loreCall[0].position.referenceGroup).toEqual({ id: 'lore-group' })
+    expect(planCall[0].position.referenceGroup).toEqual({ id: 'plan-group' })
+    expect(cardsCall[0].position.referenceGroup).toEqual({ id: 'cards-group' })
   })
 
   it('normalizes panel keys when loading saved layout', async () => {
