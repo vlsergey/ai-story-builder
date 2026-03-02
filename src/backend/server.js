@@ -4,9 +4,10 @@ const path = require('path')
 const app = express()
 // Use port 3001 for development, 3000 for production
 const port = process.env.NODE_ENV === 'development' ? 3001 : (process.env.PORT || 3000)
-// When running as a pkg executable, __dirname is a virtual snapshot path.
-// Use the directory containing the executable instead.
-const distPath = process.pkg
+// When running as a SEA executable, __dirname is a virtual snapshot path.
+// Use the directory containing the executable to find the shared dist/ folder.
+const isPackaged = (() => { try { return require('node:sea').isSea(); } catch (_) { return false; } })();
+const distPath = isPackaged
   ? path.resolve(path.dirname(process.execPath), 'dist')
   : path.resolve(__dirname, '..', '..', 'dist')
 

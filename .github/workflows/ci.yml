@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast job: runs on all three OS in parallel for every push and PR.
-  # Tests only need Node + frontend — no packaging required.
+  # ── 1. Tests ──────────────────────────────────────────────────────────────
+  # Fast, runs on all three OS in parallel for every push and PR.
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -37,11 +37,38 @@ jobs:
       - name: Run tests
         run: npm test --workspace=src/frontend
 
-  # Packaging job: builds frontend then creates platform executables.
-  # Runs only after all tests pass; each OS produces its own binary.
+  # ── 2. Build frontend ─────────────────────────────────────────────────────
+  # Runs once on Linux; the dist/ artifact is shared by all package jobs.
+  build-frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build --workspace=src/frontend
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+
+  # ── 3. Package binaries ───────────────────────────────────────────────────
+  # Each OS runner builds its own SEA binary; all three run in parallel.
   package:
     name: Package (${{ matrix.os }})
-    needs: test
+    needs: build-frontend
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -59,14 +86,54 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build frontend
-        run: npm run build --workspace=src/frontend
-
-      - name: Package backend
+      - name: Build SEA binary
         run: npm run package --workspace=src/backend
 
-      - name: Upload release artifacts
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
+          name: binary-${{ matrix.os }}
+          path: release/
+
+  # ── 4. Combine into single release artifact ───────────────────────────────
+  # Downloads all three binaries + the shared dist/ and packs them together.
+  combine:
+    name: Combine release artifact
+    needs: package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: release/dist/
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-ubuntu-latest
+          path: release/
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-windows-latest
+          path: release/
+
+      - name: Download macOS binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-macos-latest
+          path: release/
+
+      - name: Make Linux and macOS binaries executable
+        run: |
+          chmod +x release/ai-story-builder-linux  || true
+          chmod +x release/ai-story-builder-macos  || true
+
+      - name: Upload combined release
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
           path: release/
