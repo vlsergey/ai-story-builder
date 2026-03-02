@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [master]
 
+# Cancel an in-progress run when a newer commit arrives on the same branch/PR.
+# head_ref is set for pull_request events (branch name); ref is the fallback for pushes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     name: Test & Build (${{ matrix.os }})
