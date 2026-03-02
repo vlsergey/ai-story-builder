@@ -1,8 +1,17 @@
 AI Story Builder
 
-This project uses Tailwind CSS with a Shadcn/ui-inspired design system. Components follow Shadcn design principles and support dark/light theming. All user-facing text is stored in UTF-8 JSON files for internationalization.
+AI Story Builder is a comprehensive tool for creative writing that helps authors organize their story elements, generate content with AI assistance, and maintain consistency across their narrative.
 
-A desktop-style menu bar has been added to the application.  The **View** menu exposes commands for resetting the dock layout to defaults and selecting the current color theme (zinc, slate, neutral, obsidian, carbon).  Theme choice persists between sessions.
+Key capabilities include:
+* Project organization with folders for lore elements (locations, characters, etc.)
+* Story planning with hierarchical tree structure and version-controlled nodes
+* AI-assisted content generation for story parts with automatic card updates
+* Integrated lore management with AI synchronization (Yandex Cloud AI, Grok API)
+* Dockable UI panels for lore, plan, story editor, and cards
+* Multi-language support (English/Russian) with UTF-8 JSON files
+* Session-based project management with automatic backups
+* Visual diff tools for tracking changes in story elements
+* Theme customization with dark/light mode support
 
 ## Project Structure
 
