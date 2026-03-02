@@ -13,8 +13,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-and-build:
-    name: Test & Build (${{ matrix.os }})
+  # Fast job: runs on all three OS in parallel for every push and PR.
+  # Tests only need Node + frontend — no packaging required.
+  test:
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -35,5 +37,36 @@ jobs:
       - name: Run tests
         run: npm test --workspace=src/frontend
 
-      - name: Build
-        run: npm run build
+  # Packaging job: builds frontend then creates platform executables.
+  # Runs only after all tests pass; each OS produces its own binary.
+  package:
+    name: Package (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build --workspace=src/frontend
+
+      - name: Package backend
+        run: npm run package --workspace=src/backend
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: release/

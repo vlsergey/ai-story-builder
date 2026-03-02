@@ -4,10 +4,11 @@ const path = require('path')
 const app = express()
 // Use port 3001 for development, 3000 for production
 const port = process.env.NODE_ENV === 'development' ? 3001 : (process.env.PORT || 3000)
-// Determine frontend dist directory relative to project root.  
-// When running from backend directory (__dirname is src/backend), we need
-// to go up two levels to reach the workspace root before `dist`.
-const distPath = path.resolve(__dirname, '..', '..', 'dist')
+// When running as a pkg executable, __dirname is a virtual snapshot path.
+// Use the directory containing the executable instead.
+const distPath = process.pkg
+  ? path.resolve(path.dirname(process.execPath), 'dist')
+  : path.resolve(__dirname, '..', '..', 'dist')
 
 // ensure upload folders exist
 const fs = require('fs')

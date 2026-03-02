@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=src/backend\" \"wait-on http://localhost:3001/api/hello && npm run dev --workspace=src/frontend\"",
-    "build": "npm run build --workspace=src/frontend",
+    "build": "npm run build --workspace=src/frontend && npm run package --workspace=src/backend",
     "start": "npm start --workspace=src/backend",
     "package": "npm run package --workspace=src/backend"
   },

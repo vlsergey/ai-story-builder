@@ -2,10 +2,14 @@
   "name": "ai-story-builder-backend",
   "version": "0.1.0",
   "private": true,
+  "bin": "server.js",
+  "pkg": {
+    "targets": ["node18-linux-x64", "node18-win-x64", "node18-macos-x64", "node18-macos-arm64"]
+  },
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon server.js",
     "start": "node server.js",
-    "package": "pkg . --out-path release"
+    "package": "pkg . --out-path ../../release"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
