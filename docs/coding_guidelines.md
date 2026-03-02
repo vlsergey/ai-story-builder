@@ -11,4 +11,12 @@ To keep the project maintainable and scalable, follow these rules:
 * **Interactive docking** – Panels should be implemented with a docking/window library or custom drag/resize handlers. Users must be able to reposition and dock panels via drag‑drop.
 * **Dependency management** – Frontend and backend must have separate `package.json` files to maintain clear separation of concerns. Dependencies should be installed only in the relevant workspace.
 
+* **HTTP error codes** – Use the correct status code for each failure:
+  * `400 Bad Request` – missing or invalid parameters supplied by the client.
+  * `404 Not Found` – requested resource does not exist.
+  * `409 Conflict` – the operation conflicts with the current state (e.g. duplicate name).
+  * `500 Internal Server Error` – an unexpected server-side failure only (unhandled exception, I/O error, etc.).
+  Returning `500` because of wrong UI state or invalid user input is a **bug** and must be fixed, not accepted.
+* **Error logging** – The backend logs a stack trace for every 4xx/5xx response automatically. Never swallow exceptions silently; always surface them as the appropriate HTTP error code with a descriptive `{ error: "..." }` JSON body.
+
 These guidelines are part of the project's acceptance criteria and should be reviewed when adding new features.

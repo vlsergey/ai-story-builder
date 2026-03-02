@@ -7,13 +7,14 @@
     "src/backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\"",
+    "dev": "concurrently \"npm run dev --workspace=src/backend\" \"wait-on http://localhost:3001/api/hello && npm run dev --workspace=src/frontend\"",
     "build": "npm run build --workspace=src/frontend",
     "start": "npm start --workspace=src/backend",
     "package": "npm run package --workspace=src/backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.0",
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "wait-on": "^9.0.4"
   }
 }

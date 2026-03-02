@@ -15,6 +15,19 @@ fs.mkdirSync(path.join(process.cwd(), 'data', 'uploads'), { recursive: true })
 
 app.use(express.json())
 
+// Log all 4xx/5xx responses with stack trace
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res)
+  res.json = function (body) {
+    if (res.statusCode >= 400) {
+      const err = new Error(`${res.statusCode} ${req.method} ${req.url}`)
+      console.error(err.message, body, err.stack)
+    }
+    return originalJson(body)
+  }
+  next()
+})
+
 // API routes
 try {
   const projectRoutes = require('./projectRoutes')
@@ -27,22 +40,24 @@ app.get('/api/hello', (req, res) => {
   res.json({ message: 'hello from backend' })
 })
 
-// static frontend
-app.use(express.static(distPath))
+// static frontend (production only — in development Vite serves the frontend)
+if (process.env.NODE_ENV !== 'development') {
+  app.use(express.static(distPath))
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'))
-})
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
 
 app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`)
-  // try to auto-open browser (optional dependency)
-  // In dev mode, open frontend on port 3000 (Vite hot reload); in prod, open backend
-  try {
-    const open = require('open')
-    const urlToOpen = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : `http://localhost:${port}`
-    open(urlToOpen).catch(() => {})
-  } catch (e) {
-    // ignore if open not installed
+  // Open browser only in production — in development Vite handles this once on startup
+  if (process.env.NODE_ENV !== 'development') {
+    try {
+      const open = require('open')
+      open(`http://localhost:${port}`).catch(() => {})
+    } catch (e) {
+      // ignore if open not installed
+    }
   }
 })

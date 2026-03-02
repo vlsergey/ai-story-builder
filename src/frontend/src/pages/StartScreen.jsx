@@ -27,7 +27,7 @@ export default function StartScreen({ onOpenProject, localeStrings }) {
       .then(r => r.json())
       .then(j => {
         setStatus('done')
-        onOpenProject(j.path)
+        onOpenProject(j.path, j)
         navigate('/project')
       })
       .catch(err => { setStatus('error'); console.error(err) })
@@ -46,7 +46,7 @@ function CreateNewForm({ onCreated }) {
       const j = await res.json()
       if (res.ok) {
         if (j.reused) alert(localeStrings['start.existing_open'] || 'Project already existed – opening existing DB')
-        onCreated(j.path)
+        onCreated(j.path, j)
         navigate('/project')
       } else alert('Error creating project: ' + (j.error || JSON.stringify(j)))
     } catch (err) {
@@ -104,7 +104,7 @@ function CreateNewForm({ onCreated }) {
                       return
                     }
                     if (res.ok) {
-                      onOpenProject(data.path)
+                      onOpenProject(data.path, data)
                       navigate('/project')
                     } else {
                       alert('Failed to open project: ' + (data.error || 'Unknown error'))
@@ -124,7 +124,7 @@ function CreateNewForm({ onCreated }) {
 
       <section className="mb-6">
         <h3 className="text-xl font-semibold mb-2">{localeStrings['start.create'] || 'Create new project'}</h3>
-        <CreateNewForm onCreated={p => onOpenProject(p)} />
+        <CreateNewForm onCreated={(p, data) => onOpenProject(p, data)} />
       </section>
 
       {status && <div className="mt-2 text-muted-foreground">{status}</div>}

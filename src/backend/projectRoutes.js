@@ -26,10 +26,24 @@ function setCurrentDbPath(dbPath) {
 
 // modular subrouters
 router.use('/project', require('./routes/projects/recent'))
-router.use('/project', require('./routes/projects/upload'))
-router.use('/project', require('./routes/projects/create'))
-router.use('/folders', require('./routes/folders/tree'))
-router.use('/folders', require('./routes/folders/manage'))
+
+// Read layout and project title from an already-opened database
+function getProjectInitialData(dbPath) {
+  const Database = (() => { try { return require('better-sqlite3') } catch (e) { return null } })()
+  if (!Database) return {}
+  try {
+    const db = new Database(dbPath, { readonly: true })
+    const layoutRow = db.prepare("SELECT value FROM settings WHERE key = 'layout'").get()
+    const titleRow = db.prepare("SELECT value FROM settings WHERE key = 'project_title'").get()
+    db.close()
+    let layout = null
+    if (layoutRow) { try { layout = JSON.parse(layoutRow.value) } catch (e) {} }
+    return { layout, projectTitle: titleRow ? titleRow.value : null }
+  } catch (e) {
+    console.warn('[getProjectInitialData] failed to read initial data from', dbPath, e.message)
+    return {}
+  }
+}
 
 
 // `multer` is an optional dependency used for file uploads. In case it's not
@@ -96,7 +110,7 @@ router.post('/project/open', express.json(), (req, res) => {
   s.recent = [dbPath].concat(s.recent.filter(x => x !== dbPath)).slice(0, 10)
   writeSettings(s)
 
-  res.json({ path: dbPath, versionState })
+  res.json({ path: dbPath, versionState, ...getProjectInitialData(dbPath) })
 })
 
 // Return recent projects
@@ -153,7 +167,7 @@ router.post('/project/upload', upload.single('dbfile'), (req, res) => {
     }
   }
 
-  res.json({ path: dest, backup: backupName, versionState })
+  res.json({ path: dest, backup: backupName, versionState, ...getProjectInitialData(dest) })
 })
 
 // Create a new project (initialize sqlite DB with base schema and default folders)
@@ -289,7 +303,7 @@ router.post('/project/create', express.json(), (req, res) => {
     s.recent = [dbPath].concat(s.recent.filter(x => x !== dbPath)).slice(0, 10)
     writeSettings(s)
 
-    return res.json({ path: dbPath })
+    return res.json({ path: dbPath, layout: null, projectTitle: name })
   } catch (e) {
     return res.status(500).json({ error: String(e) })
   }

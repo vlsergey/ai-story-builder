@@ -16,6 +16,7 @@ import { ThemeProvider } from './lib/theme/theme-provider'
 export default function App() {
   const navigate = useNavigate()
   const [projectOpen, setProjectOpen] = useState(false)
+  const [initialLayout, setInitialLayout] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [locale, setLocale] = useState('en')
 
@@ -41,7 +42,8 @@ export default function App() {
     checkProjectStatus()
   }, [navigate])
 
-  function handleOpenProject(path) {
+  function handleOpenProject(path, data) {
+    setInitialLayout(data?.layout ?? null)
     setProjectOpen(true)
     navigate('/project')
   }
@@ -80,7 +82,7 @@ export default function App() {
           <Route path="/" element={<StartScreen onOpenProject={handleOpenProject} localeStrings={localeStrings} />} />
           <Route path="/project" element={
             projectOpen ? (
-              <Layout localeStrings={localeStrings} onClose={handleCloseProject} />
+              <Layout localeStrings={localeStrings} onClose={handleCloseProject} initialLayout={initialLayout} />
             ) : (
               <StartScreen onOpenProject={handleOpenProject} localeStrings={localeStrings} />
             )

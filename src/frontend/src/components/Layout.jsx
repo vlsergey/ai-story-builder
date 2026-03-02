@@ -21,7 +21,7 @@ import AppMenu from './AppMenu'
  * This implementation uses dockview for a fully dockable, resizable interface.
  * Each area is a placeholder component with descriptive comments to make extension straightforward.
  */
-export default function Layout({ localeStrings, onClose }) {
+export default function Layout({ localeStrings, onClose, initialLayout }) {
   // Use local state to track selected lore item and pass dbPath into child components
   const [selectedLoreItem, setSelectedLoreItem] = React.useState(null)
   const [selectedPlanNode, setSelectedPlanNode] = React.useState(null)
@@ -48,8 +48,7 @@ export default function Layout({ localeStrings, onClose }) {
       console.log('[Layout] restoreLayout: ref not ready, skipping')
       return
     }
-    console.log('[Layout] restoreLayout: loading from db')
-    const savedLayout = await loadLayoutFromDatabase()
+    const savedLayout = initialLayout != null ? initialLayout : await loadLayoutFromDatabase()
     console.log('[Layout] restoreLayout: loaded layout', {
       hasGrid: savedLayout?.grid ? 'yes' : 'no',
       panelsCount: savedLayout?.panels ? Object.keys(savedLayout.panels).length : 0,
