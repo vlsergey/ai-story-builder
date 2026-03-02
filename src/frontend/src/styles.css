@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ensure the page text uses the current theme's foreground color */
+html, body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+
+/*
+  * Theme variables for Shadcn/ui
+  * Using HSL format for better theme switching
+  *
+  * Default theme: Zinc
+  * Available themes: Zinc, Slate, Neutral, Obsidian, Carbon
+  */
+
+:root {
+  /* Zinc theme (default) - Light */
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 240 5.9% 10%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 240 5.9% 10%;
+  --radius: 0.5rem;
+}
+
+/* Theme classes for switching */
+[data-theme="zinc"] {
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 240 5.9% 10%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 240 5.9% 10%;
+}
+
+[data-theme="slate"] {
+  --background: 0 0% 100%;
+  --foreground: 215 25% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 25% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 25% 10%;
+  --primary: 215 25% 10%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 15% 95%;
+  --secondary-foreground: 215 25% 10%;
+  --muted: 215 15% 95%;
+  --muted-foreground: 215 10% 40%;
+  --accent: 215 15% 95%;
+  --accent-foreground: 215 25% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 15% 90%;
+  --input: 215 15% 90%;
+  --ring: 215 25% 10%;
+}
+
+[data-theme="neutral"] {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 9%;
+  --primary: 0 0% 9%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 96.1%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 0 0% 96.1%;
+  --muted-foreground: 0 0% 45.1%;
+  --accent: 0 0% 96.1%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 89.8%;
+  --input: 0 0% 89.8%;
+  --ring: 0 0% 9%;
+}
+
+[data-theme="obsidian"] {
+  --background: 0 0% 9%;
+  --foreground: 0 0% 98%; /* ensure text stays light on dark */
+  --card: 0 0% 9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 9%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 70%;
+  --accent: 0 0% 15%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 0 0% 85%;
+}
+
+[data-theme="carbon"] {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 5%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 5%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 5%;
+  --primary: 0 0% 5%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 95%;
+  --secondary-foreground: 0 0% 5%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 40%;
+  --accent: 0 0% 95%;
+  --accent-foreground: 0 0% 5%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --ring: 0 0% 5%;
+}
+
+/* Dockview theme fixes */
+.dockview-theme {
+  background: hsl(var(--background)) !important;
+  /* sync dockview internal variables to our theme palette */
+  --dv-group-view-background-color: hsl(var(--background));
+  --dv-tabs-and-actions-container-background-color: hsl(var(--background));
+  --dv-activegroup-visiblepanel-tab-background-color: hsl(var(--background));
+  --dv-activegroup-hiddenpanel-tab-background-color: hsl(var(--background));
+  --dv-inactivegroup-visiblepanel-tab-background-color: hsl(var(--background));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: hsl(var(--background));
+  --dv-activegroup-visiblepanel-tab-color: hsl(var(--foreground));
+  --dv-activegroup-hiddenpanel-tab-color: hsl(var(--muted-foreground));
+  --dv-inactivegroup-visiblepanel-tab-color: hsl(var(--muted-foreground));
+  --dv-inactivegroup-hiddenpanel-tab-color: hsl(var(--muted-foreground));
+  --dv-separator-border: hsl(var(--border));
+  --dv-paneview-header-border-color: hsl(var(--border));
+  --dv-scrollbar-background-color: rgba(0,0,0,0.25);
+}
+
+.dockview-part {
+  background: hsl(var(--background)) !important;
+}
+
+.dockview-group {
+  background: hsl(var(--background)) !important;
+}
+
+/* Basic layout styles for the dock-like interface
+   Keep selectors simple — these are small placeholders which will be replaced
+   with a proper component library when implementing dockable panels. */
+
+.app-root { 
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; 
+  height: 100vh; 
+  display: flex; 
+  flex-direction: column; 
+}
+
+.layout-root { flex: 1; display: flex; flex-direction: column; }
+.layout-top { display: flex; flex: 1; }
+.pane { padding: 12px; box-sizing: border-box; border-right: 1px solid hsl(var(--border)); overflow: auto; }
+.pane.left { width: 30%; min-width: 180px; background: hsl(var(--background)); }
+.pane.center { width: 40%; min-width: 300px; background: hsl(var(--background)); }
+.pane.right { width: 30%; min-width: 200px; background: hsl(var(--background)); }
+.layout-bottom { 
+  display: flex; 
+  height: 120px; 
+  border-top: 1px solid hsl(var(--border)); 
+  padding: 8px; 
+  align-items: center; 
+  background: hsl(var(--background));
+}
+.bottom-left { width: 200px; }
+.bottom-center { flex: 1; text-align: center; }
+.bottom-right { width: 200px; text-align: right; }
+.muted { color: hsl(var(--muted-foreground)); font-size: 0.95em; }
+
+/* small responsive tweak */
+@media (max-width: 800px) {
+  .layout-top { flex-direction: column; }
+  .pane.left, .pane.center, .pane.right { width: 100%; }
+  .layout-bottom { height: auto; flex-direction: column; align-items: stretch; }
+}

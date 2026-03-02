@@ -1,0 +1,19 @@
+{
+  "name": "ai-story-builder",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "src/frontend",
+    "src/backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\"",
+    "build": "npm run build --workspace=src/frontend",
+    "start": "npm start --workspace=src/backend",
+    "package": "npm run package --workspace=src/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "cross-env": "^7.0.3"
+  }
+}

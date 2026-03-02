@@ -1,0 +1,9 @@
+{
+  "start.title": "Open project",
+  "start.recent": "Recent projects",
+  "start.no_recent": "No recent projects",
+  "start.upload": "Upload project database",
+  "start.upload_btn": "Upload"
+  ,"start.create": "Create new project"
+  ,"start.existing_open": "Project already exists – opening existing"
+}
