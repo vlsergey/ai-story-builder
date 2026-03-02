@@ -203,34 +203,14 @@ describe('Layout', () => {
       expect(ids).toContain('plan-panel')
     })
 
-    // Verify groups created in correct order and direction
+    // Center group created with no arguments (passing any options object throws in dockview
+    // because it triggers the AbsolutePosition branch which requires a direction)
     const groupCalls = mockApi.addGroup.mock.calls
-    const centerGroupCall = groupCalls.find(c => c[0]?.id === 'center-group')
-    const loreGroupCall = groupCalls.find(c => c[0]?.id === 'lore-group')
-    const planGroupCall = groupCalls.find(c => c[0]?.id === 'plan-group')
-    const cardsGroupCall = groupCalls.find(c => c[0]?.id === 'cards-group')
+    expect(groupCalls.length).toBeGreaterThanOrEqual(1)
+    const centerGroupCall = groupCalls[0]
+    expect(centerGroupCall[0]).toBeUndefined() // no args
+    const centerGroup = mockApi.addGroup.mock.results[0].value
 
-    expect(centerGroupCall).toBeTruthy()
-    expect(loreGroupCall).toBeTruthy()
-    expect(planGroupCall).toBeTruthy()
-    expect(cardsGroupCall).toBeTruthy()
-
-    // Center group has no direction (it's the root)
-    expect(centerGroupCall[0].direction).toBeUndefined()
-
-    // Lore group is to the left of center
-    expect(loreGroupCall[0].direction).toBe('left')
-    expect(loreGroupCall[0].referenceGroup).toEqual({ id: 'center-group' })
-
-    // Plan group is below lore group (left column only, not full screen)
-    expect(planGroupCall[0].direction).toBe('below')
-    expect(planGroupCall[0].referenceGroup).toEqual({ id: 'lore-group' })
-
-    // Cards group is to the right of center
-    expect(cardsGroupCall[0].direction).toBe('right')
-    expect(cardsGroupCall[0].referenceGroup).toEqual({ id: 'center-group' })
-
-    // Verify panels added into their respective groups
     const panelCalls = mockApi.addPanel.mock.calls
     const loreCall = panelCalls.find(c => c[0].id === 'lore-panel')
     const planCall = panelCalls.find(c => c[0].id === 'plan-panel')
@@ -241,18 +221,24 @@ describe('Layout', () => {
     expect(cardsCall).toBeTruthy()
 
     // No editor-panel in default layout (center shows watermark instead)
-    const editorCall = panelCalls.find(c => c[0].id === 'editor-panel')
-    expect(editorCall).toBeFalsy()
+    expect(panelCalls.find(c => c[0].id === 'editor-panel')).toBeFalsy()
 
     // All panels use nonClosableTab
     expect(loreCall[0].tabComponent).toBe('nonClosableTab')
     expect(planCall[0].tabComponent).toBe('nonClosableTab')
     expect(cardsCall[0].tabComponent).toBe('nonClosableTab')
 
-    // Panels reference their pre-created groups
-    expect(loreCall[0].position.referenceGroup).toEqual({ id: 'lore-group' })
-    expect(planCall[0].position.referenceGroup).toEqual({ id: 'plan-group' })
-    expect(cardsCall[0].position.referenceGroup).toEqual({ id: 'cards-group' })
+    // Lore is to the left of the center group
+    expect(loreCall[0].position.direction).toBe('left')
+    expect(loreCall[0].position.referenceGroup).toBe(centerGroup)
+
+    // Plan is below lore (stays in left column)
+    expect(planCall[0].position.direction).toBe('below')
+    expect(planCall[0].position.referencePanel).toBe('lore-panel')
+
+    // Cards are to the right of the center group
+    expect(cardsCall[0].position.direction).toBe('right')
+    expect(cardsCall[0].position.referenceGroup).toBe(centerGroup)
   })
 
   it('normalizes panel keys when loading saved layout', async () => {

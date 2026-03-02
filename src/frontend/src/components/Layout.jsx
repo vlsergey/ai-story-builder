@@ -142,39 +142,17 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
 
     dockviewRef.current.clear()
 
-    // Step 1: create all groups first, then populate with panels.
-    // This ensures the empty center group is a valid grid node before
-    // left/right groups are positioned relative to it.
+    // Create the center group with no arguments — passing any options object (even just {id})
+    // triggers the AbsolutePosition branch which requires a direction and throws without one.
+    // The empty group shows WelcomeWatermark; panels added with a direction create their own groups.
+    const centerGroup = dockviewRef.current.addGroup()
 
-    // Center: empty group — WelcomeWatermark renders here until a panel is added
-    const centerGroup = dockviewRef.current.addGroup({ id: 'center-group' })
-
-    // Left column: lore on top, plan below
-    const loreGroup = dockviewRef.current.addGroup({
-      id: 'lore-group',
-      direction: 'left',
-      referenceGroup: centerGroup,
-    })
-    const planGroup = dockviewRef.current.addGroup({
-      id: 'plan-group',
-      direction: 'below',
-      referenceGroup: loreGroup,
-    })
-
-    // Right column
-    const cardsGroup = dockviewRef.current.addGroup({
-      id: 'cards-group',
-      direction: 'right',
-      referenceGroup: centerGroup,
-    })
-
-    // Step 2: add panels into their pre-created groups
     dockviewRef.current.addPanel({
       id: 'lore-panel',
       component: 'lore',
       tabComponent: 'nonClosableTab',
       title: 'Lore',
-      position: { referenceGroup: loreGroup },
+      position: { referenceGroup: centerGroup, direction: 'left' },
       minimumWidth: 200,
     })
 
@@ -183,7 +161,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
       component: 'plan',
       tabComponent: 'nonClosableTab',
       title: 'Plan',
-      position: { referenceGroup: planGroup },
+      position: { referencePanel: 'lore-panel', direction: 'below' },
       minimumHeight: 150,
     })
 
@@ -192,7 +170,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
       component: 'cards',
       tabComponent: 'nonClosableTab',
       title: 'Cards',
-      position: { referenceGroup: cardsGroup },
+      position: { referenceGroup: centerGroup, direction: 'right' },
       minimumWidth: 200,
     })
   }
