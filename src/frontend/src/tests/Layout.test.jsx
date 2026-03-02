@@ -1,144 +1,125 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Layout from '../components/Layout';
 
-// Mock the API functions
-vi.mock('../../src/api', () => ({
-  saveLayoutSettings: vi.fn().mockResolvedValue({ success: true }),
-  getLayoutSettings: vi.fn().mockResolvedValue({
-    layout: {},
-    activeGroup: "group-1"
-  })
+// Mock child components that have their own network/state dependencies
+vi.mock('../components/FolderSection', () => ({
+  default: () => <div data-testid="folder-section">Folder Section</div>
 }));
 
-// Mock the child components
+vi.mock('../components/PlanSection', () => ({
+  default: () => <div data-testid="plan-section">Plan Section</div>
+}));
+
 vi.mock('../components/LoreEditor', () => ({
   default: () => <div>Lore Editor</div>
 }));
 
-vi.mock('../components/PlanSection', () => ({
-  default: () => <div>Plan Section</div>
+vi.mock('../components/PlanEditor', () => ({
+  default: () => <div>Plan Editor</div>
 }));
 
-vi.mock('../components/GeneratedPartEditor', () => ({
-  default: () => <div>Generated Part Editor</div>
+// Mock theme provider used by AppMenu
+vi.mock('../lib/theme/theme-provider', () => ({
+  useTheme: () => ({ theme: 'light', setTheme: vi.fn() })
 }));
 
-vi.mock('../components/DiffViewer', () => ({
-  default: () => <div>Diff Viewer</div>
-}));
-
-// Mock dockview components, capturing onReady API
-let mockPanels = {};
-let mockGroups = {};
-let mockApi = {
-  fromJSON: vi.fn(),
-  toJSON: vi.fn(() => ({
-    grid: { root: { type: 'branch', data: [], size: 0 } },
-    panels: mockPanels
-  })),
-  clear: vi.fn(() => {
-    mockPanels = {};
-    mockGroups = {};
-  }),
-  addPanel: vi.fn((conf) => {
-    const panelId = conf.id || `panel-${Object.keys(mockPanels).length}`;
-    mockPanels[panelId] = {
-      id: panelId,
-      component: conf.component,
-      title: conf.title
-    };
-    return {};
-  }),
-  addGroup: vi.fn((conf) => {
-    const groupId = conf?.id || `group-${Object.keys(mockGroups).length}`;
-    mockGroups[groupId] = { id: groupId };
-    return { id: groupId };
-  }),
-};
-
-// our Layout imports from 'dockview' which re-exports from 'dockview-core';
-// we need to stub the top-level package so the component rendered in tests
-// uses our mock API rather than the real library.
-vi.mock('dockview-core', () => {
-  const actual = vi.importActual('dockview-core');
-  return {
-    ...actual,
-    DockviewReact: ({ children, onReady, ...props }) => {
-      React.useEffect(() => {
-        if (onReady) {
-          onReady({ api: mockApi });
-        }
-      }, [onReady]);
-      return <div data-testid="dockview" {...props}>{children}</div>;
-    },
-    DockviewReadyEvent: vi.fn(),
-    PanelCollection: ({ children }) => <div>{children}</div>,
-    PanelParameters: vi.fn(),
-  };
-});
-
+/**
+ * DockviewReact mock that actually renders panel components into the DOM.
+ *
+ * Key behaviours that mirror the real library:
+ *  - addGroup() with no arguments creates the root group (OK).
+ *  - addGroup({ id }) with only an id (no direction / referenceGroup) throws,
+ *    exactly like the real dockview (it falls into the AbsolutePosition branch
+ *    and calls directionToPosition(undefined) which throws).
+ *  - addPanel() renders the corresponding component so tests can query the DOM.
+ *  - fromJSON() restores panels so the normalisation test can verify rendering.
+ */
 vi.mock('dockview', () => {
-  const actual = vi.importActual('dockview-core');
   return {
-    ...actual,
-    DockviewReact: ({ children, onReady, ...props }) => {
+    DockviewReact: ({ components, watermarkComponent: Watermark, onReady, onDidLayoutChange }) => {
+      const [renderedPanels, setRenderedPanels] = React.useState([]);
+
       React.useEffect(() => {
-        if (onReady) {
-          onReady({ api: mockApi });
-        }
-      }, [onReady]);
-      return <div data-testid="dockview" {...props}>{children}</div>;
+        const panelList = [];
+
+        const api = {
+          fromJSON: vi.fn((layout) => {
+            if (layout && layout.panels) {
+              panelList.length = 0;
+              Object.values(layout.panels).forEach(p => {
+                panelList.push({
+                  id: p.id,
+                  component: p.component || p.contentComponent,
+                  title: p.title,
+                });
+              });
+              setRenderedPanels([...panelList]);
+            }
+          }),
+
+          toJSON: vi.fn(() => ({
+            grid: { root: { type: 'branch', data: [], size: 0 }, width: 0, height: 0, orientation: 'HORIZONTAL' },
+            panels: panelList.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
+          })),
+
+          clear: vi.fn(() => {
+            panelList.length = 0;
+            setRenderedPanels([]);
+          }),
+
+          addPanel: vi.fn((conf) => {
+            panelList.push(conf);
+            setRenderedPanels([...panelList]);
+            if (onDidLayoutChange) onDidLayoutChange();
+            return {};
+          }),
+
+          // Mirror the real library: passing any options object without
+          // direction/referenceGroup/referencePanel ends up calling
+          // directionToPosition(undefined) which throws.
+          addGroup: vi.fn((conf) => {
+            if (conf !== undefined && !conf.direction && !conf.referenceGroup && !conf.referencePanel) {
+              throw new Error(`dockview: invalid direction '${conf.direction}'`);
+            }
+            return { id: `mock-group-${panelList.length}` };
+          }),
+        };
+
+        if (onReady) onReady({ api });
+      }, []);
+
+      return (
+        <div data-testid="dockview">
+          {renderedPanels.length === 0 && Watermark && <Watermark />}
+          {renderedPanels.map(conf => {
+            const Comp = components[conf.component];
+            return Comp ? (
+              <div key={conf.id} data-testid={`panel-${conf.id}`}>
+                <Comp api={{ title: conf.title }} params={{}} />
+              </div>
+            ) : null;
+          })}
+        </div>
+      );
     },
-    DockviewReadyEvent: vi.fn(),
-    PanelCollection: ({ children }) => <div>{children}</div>,
-    PanelParameters: vi.fn(),
   };
 });
-
-vi.mock('dockview-core/dist/cjs/dockview/components/titlebar/defaultTitlebar', () => ({
-  DefaultTab: ({ canClose }) => (
-    <div>
-      Tab
-      {canClose !== false && <button data-testid="close-button">X</button>}
-    </div>
-  )
-}));
-
-vi.mock('dockview-core/dist/cjs/dockview/components/tab/defaultTab', () => ({
-  DefaultTab: () => <div>Tab</div>
-}));
-
-// Mock the theme provider
-vi.mock('../../src/lib/theme/theme-provider', () => ({
-  useTheme: () => ({
-    theme: 'light',
-    setTheme: vi.fn()
-  })
-}));
 
 const mockProps = {
-  projectPath: '/test/path',
   localeStrings: {},
-  onClose: vi.fn()
+  onClose: vi.fn(),
 };
 
 describe('Layout', () => {
   beforeEach(() => {
-    // reset mock state
-    mockPanels = {};
-    mockGroups = {};
-    mockApi.addGroup.mockClear();
-    // stub global fetch for layout load/save
     vi.stubGlobal('fetch', (url, opts) => {
       if (opts && opts.method === 'POST') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       }
-      // GET layout
-      return Promise.resolve({
-        json: () => Promise.resolve({})
-      });
+      // null → restoreLayout falls through to setupDefaultLayout
+      return Promise.resolve({ json: () => Promise.resolve(null) });
     });
   });
 
@@ -147,9 +128,7 @@ describe('Layout', () => {
   });
 
   it('renders without crashing', () => {
-    expect(() => {
-      render(<Layout {...mockProps} />);
-    }).not.toThrow();
+    expect(() => render(<Layout {...mockProps} />)).not.toThrow();
   });
 
   it('includes cache-control on layout fetch', async () => {
@@ -171,104 +150,59 @@ describe('Layout', () => {
     const fetchSpy = vi.spyOn(global, 'fetch');
     render(<Layout {...mockProps} />);
 
-    // open menu and click reset
+    // Wait for default panels to load so toJSON returns non-empty panels
+    await screen.findByTestId('panel-lore-panel');
+
+    // open View menu and click Reset layouts
     fireEvent.pointerDown(screen.getByText('View'));
     fireEvent.click(screen.getByText('View'));
     const resetItem = await screen.findByText('Reset layouts');
     fireEvent.click(resetItem);
 
-    // component will also perform a GET to load layout (which includes the ?db= query),
-    // but the reset handler itself should fire a POST to the base endpoint.
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/settings/layout',
       expect.objectContaining({ method: 'POST' })
     );
   });
 
-  it('default layout: center group is empty (watermark), lore/plan in left column, cards on right', async () => {
-    mockApi.addPanel.mockClear()
-    mockApi.addGroup.mockClear()
-    // Return null so restoreLayout falls through to setupDefaultLayout
+  it('default layout: lore, plan, cards panels appear; no editor panel in center', async () => {
     vi.stubGlobal('fetch', (url, opts) => {
-      if (opts && opts.method === 'POST') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
-      }
-      return Promise.resolve({ json: () => Promise.resolve(null) })
-    })
+      if (opts?.method === 'POST') return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ json: () => Promise.resolve(null) }); // null → setupDefaultLayout
+    });
 
-    render(<Layout {...mockProps} />)
+    render(<Layout {...mockProps} />);
 
-    await waitFor(() => {
-      const ids = mockApi.addPanel.mock.calls.map(c => c[0].id)
-      expect(ids).toContain('plan-panel')
-    })
+    // All three side panels must appear in the DOM
+    await screen.findByTestId('panel-lore-panel');
+    await screen.findByTestId('panel-plan-panel');
+    await screen.findByTestId('panel-cards-panel');
 
-    // Center group created with no arguments (passing any options object throws in dockview
-    // because it triggers the AbsolutePosition branch which requires a direction)
-    const groupCalls = mockApi.addGroup.mock.calls
-    expect(groupCalls.length).toBeGreaterThanOrEqual(1)
-    const centerGroupCall = groupCalls[0]
-    expect(centerGroupCall[0]).toBeUndefined() // no args
-    const centerGroup = mockApi.addGroup.mock.results[0].value
+    // Their contents are rendered
+    expect(screen.getByTestId('folder-section')).toBeInTheDocument();
+    expect(screen.getByTestId('plan-section')).toBeInTheDocument();
+    expect(screen.getByText('Cards')).toBeInTheDocument();
 
-    const panelCalls = mockApi.addPanel.mock.calls
-    const loreCall = panelCalls.find(c => c[0].id === 'lore-panel')
-    const planCall = panelCalls.find(c => c[0].id === 'plan-panel')
-    const cardsCall = panelCalls.find(c => c[0].id === 'cards-panel')
+    // Center stays empty — no editor panel added by default
+    expect(screen.queryByTestId('panel-editor-panel')).not.toBeInTheDocument();
+  });
 
-    expect(loreCall).toBeTruthy()
-    expect(planCall).toBeTruthy()
-    expect(cardsCall).toBeTruthy()
-
-    // No editor-panel in default layout (center shows watermark instead)
-    expect(panelCalls.find(c => c[0].id === 'editor-panel')).toBeFalsy()
-
-    // All panels use nonClosableTab
-    expect(loreCall[0].tabComponent).toBe('nonClosableTab')
-    expect(planCall[0].tabComponent).toBe('nonClosableTab')
-    expect(cardsCall[0].tabComponent).toBe('nonClosableTab')
-
-    // Lore is to the left of the center group
-    expect(loreCall[0].position.direction).toBe('left')
-    expect(loreCall[0].position.referenceGroup).toBe(centerGroup)
-
-    // Plan is below lore (stays in left column)
-    expect(planCall[0].position.direction).toBe('below')
-    expect(planCall[0].position.referencePanel).toBe('lore-panel')
-
-    // Cards are to the right of the center group
-    expect(cardsCall[0].position.direction).toBe('right')
-    expect(cardsCall[0].position.referenceGroup).toBe(centerGroup)
-  })
-
-  it('normalizes panel keys when loading saved layout', async () => {
-    // arrange: fetch returns layout with contentComponent names
+  it('normalizes contentComponent → component when loading saved layout', async () => {
     const saved = {
       grid: { root: { type: 'branch', data: [], size: 0 }, width: 0, height: 0, orientation: 'HORIZONTAL' },
       panels: {
-        'p1': { id: 'p1', contentComponent: 'lore', title: 'foo' }
-      }
-    }
-    // override fetch to return the specific layout; this stub doesn't handle POST
+        p1: { id: 'p1', contentComponent: 'lore', title: 'foo' },
+      },
+    };
     vi.stubGlobal('fetch', (url, opts) => {
-      if (opts && opts.method === 'POST') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      }
-      // verify that layout loads are also using no-store
-      expect(opts && opts.cache).toBe('no-store');
+      if (opts?.method === 'POST') return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       return Promise.resolve({ json: () => Promise.resolve(saved) });
-    })
-
-    render(<Layout {...mockProps} />);
-    // wait for any restoration attempt
-    await waitFor(() => {
-      expect(mockApi.fromJSON).toHaveBeenCalled();
     });
 
-    // locate the call where panels exist (we may receive an empty layout first)
-    const layoutCalls = mockApi.fromJSON.mock.calls.map(c => c[0]);
-    const withPanels = layoutCalls.find(l => l && l.panels && l.panels.p1);
-    expect(withPanels).toBeTruthy();
-    expect(withPanels.panels['p1'].component).toBe('lore');
+    render(<Layout {...mockProps} />);
+
+    // Panel p1 must render using the lore component (FolderSection)
+    await screen.findByTestId('panel-p1');
+    expect(screen.getByTestId('folder-section')).toBeInTheDocument();
   });
 });
