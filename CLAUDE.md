@@ -17,4 +17,7 @@
 ## Git Commits
 
 - Never add AI name (e.g. "Co-Authored-By: Claude") to commit messages or descriptions.
+- Before every commit, run the full test suite for both workspaces and ensure all tests pass:
+  - `npm run test --workspace=src/backend`
+  - `npm run test --workspace=src/frontend`
 - After any significant change (new feature, bug fix, refactor, doc update), create a git commit before moving on.
