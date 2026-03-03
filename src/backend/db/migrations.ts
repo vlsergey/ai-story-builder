@@ -77,7 +77,7 @@ const MIGRATIONS: Array<(db: Database) => void> = [
         card_definition_id INTEGER NOT NULL REFERENCES card_definitions(id) ON DELETE CASCADE,
         story_part_id      INTEGER NOT NULL REFERENCES story_parts(id) ON DELETE CASCADE,
         version            INTEGER NOT NULL,
-        values             JSON NOT NULL,
+        data               JSON NOT NULL,
         parent_version_id  INTEGER NULL REFERENCES card_values(id),
         is_obsolete        BOOLEAN DEFAULT FALSE,
         created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
