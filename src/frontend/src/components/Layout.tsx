@@ -73,7 +73,11 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     if (!dockviewRef.current) return
     for (const group of dockviewRef.current.groups) {
       if (group.panels.length === 0) {
+        // Prevent the group from being a drag/drop target
         group.locked = 'no-drop-target'
+        // Hide the tab bar entirely — it contains dv-void-container/dv-draggable
+        // which lets the user drag the group even when there are no panels
+        group.header.hidden = true
       }
     }
   }

@@ -80,17 +80,20 @@ describe('Layout', () => {
     expect(screen.getByText('AI Story Builder')).toBeInTheDocument();
   });
 
-  it('watermark group has dv-locked-groupview class so it cannot be dragged', async () => {
+  it('watermark group is locked and its tab bar is hidden to prevent dragging', async () => {
     const { container } = render(<Layout {...mockProps} />);
 
     // Wait for dockview to fully apply the default layout
     await screen.findByTestId('folder-section');
 
-    // dockview sets 'dv-locked-groupview' on the group container element when
-    // group.locked = 'no-drop-target'. The watermark React component is rendered
-    // via a React portal so closest() from the text node won't traverse to the
-    // group element — query the container directly instead.
+    // group.locked = 'no-drop-target' adds dv-locked-groupview to the group container
     expect(container.querySelector('.dv-locked-groupview')).toBeInTheDocument();
+
+    // group.header.hidden = true sets display:none on dv-tabs-and-actions-container,
+    // hiding the dv-void-container/dv-draggable handle that allows dragging the group
+    const tabBar = container.querySelector('.dv-locked-groupview .dv-tabs-and-actions-container') as HTMLElement | null;
+    expect(tabBar).toBeInTheDocument();
+    expect(tabBar?.style.display).toBe('none');
   });
 
   it('saves layout to database when reset action is invoked', async () => {
