@@ -14,12 +14,12 @@ export default function FolderTree({ onSelectLoreItem }: { onSelectLoreItem: (it
   useEffect(() => { fetchTree() }, [])
 
   function fetchTree() {
-    fetch('/api/folders/tree').then(r => r.json()).then(setTree).catch(() => setTree([]))
+    fetch('/api/lore_folders/tree').then(r => r.json()).then(setTree).catch(() => setTree([]))
   }
 
   function fetchItems(folderId: number) {
     setSelectedFolder(folderId)
-    fetch(`/api/folders/${folderId}/lore_items`).then(r => r.json()).then(setItems).catch(() => setItems([]))
+    fetch(`/api/lore_folders/${folderId}/lore_items`).then(r => r.json()).then(setItems).catch(() => setItems([]))
   }
 
   // Drag-and-drop handlers for moving folders
@@ -35,7 +35,7 @@ export default function FolderTree({ onSelectLoreItem }: { onSelectLoreItem: (it
     const data = e.dataTransfer.getData('application/x-folder-id')
     if (!data) return
     const sourceId = data
-    fetch('/api/folders/' + sourceId + '/move', {
+    fetch('/api/lore_folders/' + sourceId + '/move', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: targetNode.id })
     }).then(r => r.json()).then(() => fetchTree()).catch(err => console.error(err))
   }
