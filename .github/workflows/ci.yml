@@ -35,7 +35,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test --workspace=src/frontend
+        run: npm test
 
   # ── 2. Build frontend ─────────────────────────────────────────────────────
   # Runs once on Linux; the dist/ artifact is shared by all package jobs.
