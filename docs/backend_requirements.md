@@ -28,10 +28,11 @@
 
 ### Development Workflow
 - `npm run dev` starts three processes concurrently via `concurrently`:
-  1. Express backend with nodemon on port 3001
+  1. Express backend with nodemon on port 3001 (system Node.js)
   2. Vite frontend dev server on port 3000 (proxies `/api` to port 3001)
   3. Electron, loading `http://localhost:3000` with DevTools open
-- After `npm install`, run `npm run rebuild` once to recompile `better-sqlite3` for Electron's Node.js ABI.
+- Before starting, `npm run dev` automatically rebuilds `better-sqlite3` for the system Node.js ABI (`predev` hook). This is necessary because `npm run package` (via electron-builder) compiles it for Electron's Node.js, which has a different ABI.
+- `npm run package` rebuilds native modules for Electron automatically via electron-builder.
 
 ### Build Output
 The build process (`npm run package`) produces platform-specific installers in `release/`:
