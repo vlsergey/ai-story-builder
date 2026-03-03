@@ -49,6 +49,19 @@ function findNode(id: number, nodes: LoreNode[]): LoreNode | null {
   return null
 }
 
+/**
+ * Icon rules (independent of depth/root status):
+ *   - No children              → ScrollText  (a single scroll / leaf)
+ *   - All children are leaves  → BookOpen    (a book containing scrolls)
+ *   - Some children have kids  → Library     (a bookshelf / collection)
+ */
+function nodeIcon(node: LoreNode): typeof Library {
+  const children = node.children ?? []
+  if (children.length === 0) return ScrollText
+  const allLeaves = children.every(c => (c.children?.length ?? 0) === 0)
+  return allLeaves ? BookOpen : Library
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode: (node: LoreNode) => void }) {
@@ -252,8 +265,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     const isSelected = selectedNodeIds.has(node.id)
     const isDeleted = node.status === 'TO_BE_DELETED'
 
-    // Icon: Library for root, BookOpen for nodes with children, ScrollText for leaves
-    const Icon = node.parent_id === null ? Library : hasChildren ? BookOpen : ScrollText
+    const Icon = node.parent_id === null ? Library : nodeIcon(node)
 
     return (
       <li key={node.id} draggable onDragStart={e => handleDragStart(e, node)} onDragOver={handleDragOver} onDrop={e => handleDrop(e, node)}>
