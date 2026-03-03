@@ -249,6 +249,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   // ── Drag-and-drop ─────────────────────────────────────────────────────────────
 
   function handleDragStart(e: React.DragEvent<HTMLLIElement>, node: LoreNode) {
+    if (node.parent_id === null) { e.preventDefault(); return } // root is not draggable
     e.dataTransfer.setData('application/x-node-id', String(node.id))
     e.dataTransfer.effectAllowed = 'move'
   }
@@ -259,6 +260,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     e.preventDefault()
     const data = e.dataTransfer.getData('application/x-node-id')
     if (!data) return
+    if (data === String(targetNode.id)) return // drop onto self — ignore
     fetch(`/api/lore_nodes/${data}/move`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -278,7 +280,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     const Icon = node.parent_id === null ? Library : nodeIcon(node)
 
     return (
-      <li key={node.id} draggable onDragStart={e => handleDragStart(e, node)} onDragOver={handleDragOver} onDrop={e => handleDrop(e, node)}>
+      <li key={node.id} draggable={node.parent_id !== null} onDragStart={e => handleDragStart(e, node)} onDragOver={handleDragOver} onDrop={e => handleDrop(e, node)}>
         <div className="flex items-center">
           <button
             className="flex items-center justify-center w-4 h-4 shrink-0 text-muted-foreground hover:text-foreground"

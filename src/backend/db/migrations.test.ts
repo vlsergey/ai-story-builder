@@ -38,8 +38,7 @@ describe('migrateDatabase', () => {
       db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[]
     ).map((r) => r.name)
 
-    expect(tables).toContain('lore_folders')
-    expect(tables).toContain('lore_items')
+    expect(tables).toContain('lore_nodes')
     expect(tables).toContain('lore_versions')
     expect(tables).toContain('plan_nodes')
     expect(tables).toContain('plan_node_versions')

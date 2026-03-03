@@ -205,7 +205,39 @@ router.post('/:id/move', express.json(), (req: Request, res: Response) => {
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   try {
     const db = new Database(dbPath)
-    db.prepare('UPDATE lore_nodes SET parent_id = ? WHERE id = ?').run(parent_id ?? null, req.params.id)
+    const nodeId = Number(req.params.id)
+    const newParentId = parent_id ?? null
+
+    // Root node cannot be moved
+    const node = db
+      .prepare('SELECT parent_id FROM lore_nodes WHERE id = ?')
+      .get(nodeId) as { parent_id: number | null } | undefined
+    if (!node) { db.close(); return res.status(404).json({ error: 'node not found' }) }
+    if (node.parent_id === null) { db.close(); return res.status(403).json({ error: 'root node cannot be moved' }) }
+
+    // Cannot move to self
+    if (newParentId === nodeId) { db.close(); return res.status(400).json({ error: 'cannot move node to itself' }) }
+
+    // Target parent must exist
+    if (newParentId !== null) {
+      const target = db.prepare('SELECT id FROM lore_nodes WHERE id = ?').get(newParentId)
+      if (!target) { db.close(); return res.status(400).json({ error: 'target parent does not exist' }) }
+    }
+
+    // Cannot move to a descendant (would create a cycle)
+    if (newParentId !== null) {
+      const getParent = db.prepare('SELECT parent_id FROM lore_nodes WHERE id = ?')
+      let cur: number | null = newParentId
+      while (cur !== null) {
+        if (cur === nodeId) {
+          db.close()
+          return res.status(400).json({ error: 'cannot move node into its own descendant' })
+        }
+        cur = (getParent.get(cur) as { parent_id: number | null } | undefined)?.parent_id ?? null
+      }
+    }
+
+    db.prepare('UPDATE lore_nodes SET parent_id = ? WHERE id = ?').run(newParentId, nodeId)
     db.close()
     res.json({ ok: true })
   } catch (e) {
