@@ -13,6 +13,10 @@
 ## Workflow
 
 - Before adding new functionality (not bug fixes), update the relevant requirements documents in `/docs/`, including the feature/capabilities list.
+- When fixing a bug, follow this order:
+  1. Write a failing test that reproduces the bug.
+  2. Fix the bug.
+  3. Confirm the test now passes.
 
 ## Git Commits
 
