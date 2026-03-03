@@ -2,48 +2,67 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 
 const ThemeContext = createContext()
 
-export function ThemeProvider({ children, defaultTheme = 'zinc', storageKey = 'vite-ui-theme' }) {
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem(storageKey);
-    return savedTheme || defaultTheme;
-  });
+const VALID_PREFERENCES = ['auto', 'obsidian', 'github']
+const STORAGE_KEY = 'ai-story-builder-theme'
 
+/** Returns the concrete theme name to apply given the user preference and the OS dark-mode state. */
+function resolve(preference, systemDark) {
+  if (preference === 'auto') return systemDark ? 'obsidian' : 'github'
+  return preference
+}
+
+export function ThemeProvider({ children, defaultPreference = 'auto' }) {
+  const [preference, setPreferenceState] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    return VALID_PREFERENCES.includes(saved) ? saved : defaultPreference
+  })
+
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  )
+
+  // Track OS-level dark/light changes
   useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e) => setSystemDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  // Apply resolved theme to <html>
+  useEffect(() => {
+    const resolved = resolve(preference, systemDark)
     const root = window.document.documentElement
-
-    // handle light/dark mode class used by Tailwind
-    const darkThemes = ['obsidian', 'carbon'];
+    root.setAttribute('data-theme', resolved)
     root.classList.remove('light', 'dark')
-    root.classList.add(darkThemes.includes(theme) ? 'dark' : 'light')
-    
-    // Remove all theme classes
-    const themes = ['zinc', 'slate', 'neutral', 'obsidian', 'carbon'];
-    themes.forEach(t => root.classList.remove(t));
-    
-    // Add current theme class and data attribute
-    root.classList.add(theme);
-    root.setAttribute('data-theme', theme);
-  }, [theme])
+    root.classList.add(resolved === 'obsidian' ? 'dark' : 'light')
+  }, [preference, systemDark])
 
-  const value = {
-    theme,
-    setTheme: (newTheme) => {
-      localStorage.setItem(storageKey, newTheme)
-      setTheme(newTheme)
-    }
+  /** Persists preference to localStorage and tries to sync to the open project (silent fail). */
+  const setPreference = (pref) => {
+    if (!VALID_PREFERENCES.includes(pref)) return
+    localStorage.setItem(STORAGE_KEY, pref)
+    setPreferenceState(pref)
+    fetch('/api/settings/ui_theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: pref }),
+    }).catch(() => {})
   }
 
   return (
-    <ThemeContext.Provider value={value}>
+    <ThemeContext.Provider value={{
+      preference,
+      resolvedTheme: resolve(preference, systemDark),
+      setPreference,
+    }}>
       {children}
     </ThemeContext.Provider>
   )
 }
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext)
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider')
-  }
-  return context
+export function useTheme() {
+  const ctx = useContext(ThemeContext)
+  if (!ctx) throw new Error('useTheme must be used within a ThemeProvider')
+  return ctx
 }

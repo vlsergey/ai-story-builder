@@ -605,6 +605,32 @@ router.put('/generated_parts/:id', express.json(), (req, res) => {
   } catch (e) { res.status(500).json({ error: String(e) }) }
 })
 
+// Generic project settings read/write
+router.get('/settings/:key', (req, res) => {
+  const dbPath = getCurrentDbPath(req)
+  if (!dbPath) return res.status(400).json({ error: 'db not open' })
+  try {
+    const Database = require('better-sqlite3')
+    const db = new Database(dbPath, { readonly: true })
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(req.params.key)
+    db.close()
+    res.json({ value: row ? row.value : null })
+  } catch (e) { res.status(500).json({ error: String(e) }) }
+})
+
+router.post('/settings/:key', express.json(), (req, res) => {
+  const { value } = req.body
+  const dbPath = getCurrentDbPath(req)
+  if (!dbPath || value === undefined) return res.status(400).json({ error: 'value required, db must be open' })
+  try {
+    const Database = require('better-sqlite3')
+    const db = new Database(dbPath)
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(req.params.key, String(value))
+    db.close()
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: String(e) }) }
+})
+
 // Save layout settings to database
 router.post('/settings/layout', express.json(), (req, res) => {
   const { layout } = req.body

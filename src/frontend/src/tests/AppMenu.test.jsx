@@ -10,11 +10,9 @@ vi.mock('../../src/lib/theme/theme-provider', () => ({
 import { useTheme } from '../../src/lib/theme/theme-provider'
 
 describe('AppMenu', () => {
-  const themes = ['zinc', 'slate', 'neutral', 'obsidian', 'carbon']
-
   it('renders view menu and calls handlers', async () => {
-    const setTheme = vi.fn()
-    useTheme.mockReturnValue({ theme: 'zinc', setTheme })
+    const setPreference = vi.fn()
+    useTheme.mockReturnValue({ preference: 'auto', setPreference })
     const onReset = vi.fn()
 
     render(<AppMenu onResetLayouts={onReset} />)
@@ -30,10 +28,9 @@ describe('AppMenu', () => {
     // options should now be visible (use findBy to wait)
     const resetItem = await screen.findByText('Reset layouts')
     expect(resetItem).toBeInTheDocument()
-    themes.forEach(t => {
-      const label = t[0].toUpperCase() + t.slice(1)
-      expect(screen.getByText(label)).toBeInTheDocument()
-    })
+    expect(screen.getByText('Auto')).toBeInTheDocument()
+    expect(screen.getByText('Obsidian (dark)')).toBeInTheDocument()
+    expect(screen.getByText('GitHub (light)')).toBeInTheDocument()
 
     // click reset item
     fireEvent.click(resetItem)
@@ -42,8 +39,8 @@ describe('AppMenu', () => {
     // reopen menu to change theme
     fireEvent.pointerDown(viewTrigger)
     fireEvent.click(viewTrigger)
-    const slateOption = await screen.findByText('Slate')
-    fireEvent.click(slateOption)
-    expect(setTheme).toHaveBeenCalledWith('slate')
+    const obsidianOption = await screen.findByText('Obsidian (dark)')
+    fireEvent.click(obsidianOption)
+    expect(setPreference).toHaveBeenCalledWith('obsidian')
   })
 })

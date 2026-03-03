@@ -67,7 +67,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <ThemeProvider defaultTheme="zinc" storageKey="ai-story-builder-theme">
+      <ThemeProvider>
         <div className="app-root h-full flex items-center justify-center">
           <div className="text-muted-foreground">Loading...</div>
         </div>
@@ -76,7 +76,7 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider defaultTheme="zinc" storageKey="ai-story-builder-theme">
+    <ThemeProvider>
       <div className="app-root h-full">
         <Routes>
           <Route path="/" element={<StartScreen onOpenProject={handleOpenProject} localeStrings={localeStrings} />} />

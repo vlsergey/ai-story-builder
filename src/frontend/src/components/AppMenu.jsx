@@ -2,12 +2,16 @@ import React from 'react'
 import * as Menubar from '@radix-ui/react-menubar'
 import { useTheme } from '../lib/theme/theme-provider'
 
-const availableThemes = ['zinc', 'slate', 'neutral', 'obsidian', 'carbon']
+const THEME_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'obsidian', label: 'Obsidian (dark)' },
+  { value: 'github', label: 'GitHub (light)' },
+]
 
 // NOTE: Radix menus require the user to click the trigger to open the content.
 // We apply simple tailwind classes to keep styling in line with the rest of the application.
 export default function AppMenu({ onResetLayouts, onClose }) {
-  const { theme, setTheme } = useTheme()
+  const { preference, setPreference } = useTheme()
 
   return (
     <Menubar.Root className="flex relative bg-background border-b border-border text-sm">
@@ -42,14 +46,14 @@ export default function AppMenu({ onResetLayouts, onClose }) {
           </Menubar.Group>
           <Menubar.Separator className="h-px bg-border my-1" />
           <Menubar.Group className="py-1">
-            <Menubar.RadioGroup value={theme} onValueChange={setTheme}>
-              {availableThemes.map(t => (
+            <Menubar.RadioGroup value={preference} onValueChange={setPreference}>
+              {THEME_OPTIONS.map(({ value, label }) => (
                 <Menubar.RadioItem
-                  key={t}
-                  value={t}
+                  key={value}
+                  value={value}
                   className="px-2 py-1 rounded hover:bg-secondary/20 cursor-pointer"
                 >
-                  {t[0].toUpperCase() + t.slice(1)}
+                  {label}
                 </Menubar.RadioItem>
               ))}
             </Menubar.RadioGroup>

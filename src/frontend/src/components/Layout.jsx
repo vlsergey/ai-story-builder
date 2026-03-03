@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react'
 import { DockviewReact } from 'dockview'
+import { useTheme } from '../lib/theme/theme-provider'
 
 // Import the dockview styles
 import 'dockview/dist/styles/dockview.css'
@@ -39,6 +40,15 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
   const [selectedLoreItem, setSelectedLoreItem] = React.useState(null)
   const [selectedPlanNode, setSelectedPlanNode] = React.useState(null)
   const dockviewRef = useRef(null)
+  const { setPreference } = useTheme()
+
+  // Load saved theme preference from the project settings
+  useEffect(() => {
+    fetch('/api/settings/ui_theme')
+      .then(res => res.json())
+      .then(data => { if (data.value) setPreference(data.value) })
+      .catch(() => {})
+  }, [])
 
   // helper to massage storage format into the version expected by dockview
   const normalizeLayout = (layout) => {

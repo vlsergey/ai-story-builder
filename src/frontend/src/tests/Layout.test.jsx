@@ -20,9 +20,9 @@ vi.mock('../components/PlanEditor', () => ({
   default: () => <div>Plan Editor</div>
 }));
 
-// Mock theme provider used by AppMenu
+// Mock theme provider used by AppMenu and Layout
 vi.mock('../lib/theme/theme-provider', () => ({
-  useTheme: () => ({ theme: 'light', setTheme: vi.fn() })
+  useTheme: () => ({ preference: 'auto', resolvedTheme: 'github', setPreference: vi.fn() })
 }));
 
 const mockProps = {
