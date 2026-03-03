@@ -31,7 +31,29 @@ function createWindow() {
   })
 }
 
+// In production Electron requires better-sqlite3 directly.
+// If it was compiled for a different Node.js ABI, show a clear error
+// instead of crashing with a cryptic native-module message.
+function checkNativeDeps() {
+  if (isDev) return // dev: backend runs in system Node.js via nodemon, not here
+  try {
+    require('better-sqlite3')
+  } catch (e) {
+    const { dialog } = require('electron')
+    dialog.showErrorBox(
+      'Native module needs rebuild',
+      'better-sqlite3 was compiled for a different version of Node.js.\n\n' +
+      'Run the following command and restart the application:\n\n' +
+      '    npm run rebuild\n\n' +
+      `Details: ${e.message}`
+    )
+    app.exit(1)
+  }
+}
+
 app.whenReady().then(async () => {
+  checkNativeDeps()
+
   if (isDev) {
     // In dev, Vite and Express are started externally by the dev script.
     serverUrl = 'http://localhost:3000'
