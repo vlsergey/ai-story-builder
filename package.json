@@ -11,7 +11,9 @@
     "predev": "npm rebuild better-sqlite3",
     "dev": "concurrently \"npm run dev --workspace=src/backend\" \"wait-on http://localhost:3001/api/hello && npm run dev --workspace=src/frontend\" \"wait-on tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "build": "npm run build --workspace=src/frontend",
-    "package": "npm run build && electron-builder"
+    "build:backend": "npm run build --workspace=src/backend",
+    "typecheck": "npm run typecheck --workspace=src/backend && tsc -p src/frontend/tsconfig.json",
+    "package": "npm run build:backend && npm run build && electron-builder"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.6.0",

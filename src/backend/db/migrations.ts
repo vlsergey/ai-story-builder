@@ -1,8 +1,8 @@
-'use strict'
+import type { Database } from 'better-sqlite3'
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
-const MIGRATIONS = [
+const MIGRATIONS: Array<(db: Database) => void> = [
   // version 0 → 1: initial schema
   (db) => {
     db.exec(`
@@ -106,17 +106,16 @@ const MIGRATIONS = [
   },
 ]
 
-const CURRENT_VERSION = MIGRATIONS.length
+export const CURRENT_VERSION = MIGRATIONS.length
 
 /**
  * Runs all pending migrations on an open database connection.
  * foreign_keys is disabled during migration and re-enabled after.
  * Each migration step runs in a transaction that also updates user_version.
- * @param {import('better-sqlite3').Database} db
  */
-function migrateDatabase(db) {
+export function migrateDatabase(db: Database): void {
   db.pragma('foreign_keys = OFF')
-  const fromVersion = db.pragma('user_version', { simple: true })
+  const fromVersion = db.pragma('user_version', { simple: true }) as number
 
   for (let v = fromVersion; v < CURRENT_VERSION; v++) {
     db.transaction(() => {
@@ -128,5 +127,3 @@ function migrateDatabase(db) {
 
   db.pragma('foreign_keys = ON')
 }
-
-module.exports = { migrateDatabase, CURRENT_VERSION }

@@ -1,6 +1,7 @@
 {
   "watch": ["."],
-  "ext": "js",
+  "ext": "ts,json",
+  "exec": "tsx server.ts",
   "ignore": ["data/"],
   "verbose": true
 }
