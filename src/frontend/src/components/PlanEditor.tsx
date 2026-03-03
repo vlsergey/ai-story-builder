@@ -4,22 +4,23 @@ import GeneratedPartEditor from './GeneratedPartEditor'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { Label } from './ui/label'
+import { PlanNodeTree, PlanNodeVersion, StoryPart } from '../types/models'
 
-export default function PlanEditor({ planNode }) {
-  const [versions, setVersions] = useState([])
-  const [summary, setSummary] = useState('')
-  const [notes, setNotes] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [diffTarget, setDiffTarget] = useState(null)
-  const [selectedVersion, setSelectedVersion] = useState(null)
-  const [generatedParts, setGeneratedParts] = useState([])
-  const [error, setError] = useState(null)
+export default function PlanEditor({ planNode }: { planNode: PlanNodeTree }) {
+  const [versions, setVersions] = useState<PlanNodeVersion[]>([])
+  const [instruction, setInstruction] = useState<string>('')
+  const [result, setResult] = useState<string>('')
+  const [busy, setBusy] = useState<boolean>(false)
+  const [diffTarget, setDiffTarget] = useState<PlanNodeVersion | null>(null)
+  const [selectedVersion, setSelectedVersion] = useState<PlanNodeVersion | null>(null)
+  const [generatedParts, setGeneratedParts] = useState<StoryPart[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { if (planNode) loadVersions() }, [planNode])
 
-  async function loadGenerated(versionId) {
-    const res = await fetch(`/api/plan_node_version/${versionId}/generated_parts`)
-    const j = await res.json()
+  async function loadGenerated(versionId: number) {
+    const res = await fetch(`/api/plan_node_versions/${versionId}/generated_parts`)
+    const j = await res.json() as StoryPart[]
     setGeneratedParts(j)
   }
 
@@ -27,26 +28,26 @@ export default function PlanEditor({ planNode }) {
     fetch(`/api/plan/nodes/${planNode.id}/versions`).then(r => r.json()).then(setVersions).catch(() => setVersions([]))
   }
 
-  async function createVersion(e) {
+  async function createVersion(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      const res = await fetch(`/api/plan/nodes/${planNode.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary, notes }) })
-      const j = await res.json()
+      const res = await fetch(`/api/plan/nodes/${planNode.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ instruction, result }) })
+      const j = await res.json() as { id: number; error?: string }
       if (res.ok) {
-        loadVersions(); setSummary(''); setNotes('');
-        const gen = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_node_version_id: j.id, prompt: summary }) })
+        loadVersions(); setInstruction(''); setResult('');
+        const gen = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_node_version_id: j.id, prompt: instruction }) })
         await gen.text()
       } else setError('Create version error: ' + (j.error || JSON.stringify(j)))
-    } catch (e) { setError('Create failed: ' + e.message) }
+    } catch (e) { setError('Create failed: ' + (e as Error).message) }
     setBusy(false)
   }
 
   if (!planNode) return <div className="p-4 text-muted-foreground">Select a plan node to edit</div>
 
-  function restoreVersion(id) {
-    fetch('/api/restore/plan_node_version/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+  function restoreVersion(id: number) {
+    fetch('/api/plan/restore/node_version/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
       .then(r => r.json()).then(() => loadVersions())
   }
 
@@ -57,18 +58,18 @@ export default function PlanEditor({ planNode }) {
       <div className="mb-4">
         <form onSubmit={createVersion} className="space-y-3">
           <div>
-            <Label className="mb-1">Summary</Label>
+            <Label className="mb-1">Instruction</Label>
             <Textarea
-              value={summary}
-              onChange={e => setSummary(e.target.value)}
+              value={instruction}
+              onChange={e => setInstruction(e.target.value)}
               className="h-20"
             />
           </div>
           <div>
-            <Label className="mb-1">Notes</Label>
+            <Label className="mb-1">Result</Label>
             <Textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
+              value={result}
+              onChange={e => setResult(e.target.value)}
               className="h-20"
             />
           </div>
@@ -82,7 +83,7 @@ export default function PlanEditor({ planNode }) {
       <ul className="list-disc pl-5 space-y-1">
         {versions.map(v => (
           <li key={v.id} className="text-sm">
-            <strong>v{v.version}</strong> — {v.summary || '(no summary)'} <em className="text-muted-foreground">({v.created_at})</em>
+            <strong>v{v.version}</strong> — {v.instruction || '(no instruction)'} <em className="text-muted-foreground">({v.created_at})</em>
             <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => setDiffTarget(v)}>
               diff
             </Button>
@@ -98,7 +99,7 @@ export default function PlanEditor({ planNode }) {
       {diffTarget && (
         <div className="mt-4">
           <h5 className="font-semibold mb-2">Diff (v{diffTarget.version})</h5>
-          <DiffViewer oldText={versions.find(x=>x.version===diffTarget.version-1)?.notes || ''} newText={diffTarget.notes} />
+          <DiffViewer oldText={versions.find(x=>x.version===diffTarget.version-1)?.result || ''} newText={diffTarget.result || ''} />
         </div>
       )}
       {selectedVersion && (

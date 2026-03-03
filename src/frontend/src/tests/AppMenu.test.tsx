@@ -4,18 +4,18 @@ import { describe, it, expect, vi } from 'vitest'
 import AppMenu from '../components/AppMenu'
 
 // mock theme hook
-vi.mock('../../src/lib/theme/theme-provider', () => ({
+vi.mock('../lib/theme/theme-provider', () => ({
   useTheme: vi.fn()
 }))
-import { useTheme } from '../../src/lib/theme/theme-provider'
+import { useTheme } from '../lib/theme/theme-provider'
 
 describe('AppMenu', () => {
   it('renders view menu and calls handlers', async () => {
     const setPreference = vi.fn()
-    useTheme.mockReturnValue({ preference: 'auto', setPreference })
+    vi.mocked(useTheme).mockReturnValue({ preference: 'auto', resolvedTheme: 'github', setPreference })
     const onReset = vi.fn()
 
-    render(<AppMenu onResetLayouts={onReset} />)
+    render(<AppMenu onResetLayouts={onReset} onClose={vi.fn()} />)
 
     // the trigger should exist
     const viewTrigger = screen.getByText('View')

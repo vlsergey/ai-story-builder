@@ -2,16 +2,17 @@ import React, { useEffect, useState } from 'react'
 import DiffViewer from './DiffViewer'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
+import { LoreItem, LoreVersion } from '../types/models'
 
 // Minimal markdown editor for lore versions. Props:
 // - `loreItem` - selected lore item object { id, slug, title }
-export default function LoreEditor({ loreItem }) {
-  const [latest, setLatest] = useState(null)
-  const [content, setContent] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [versions, setVersions] = useState([])
-  const [diffTarget, setDiffTarget] = useState(null)
-  const [error, setError] = useState(null)
+export default function LoreEditor({ loreItem }: { loreItem: LoreItem }) {
+  const [latest, setLatest] = useState<LoreVersion | null>(null)
+  const [content, setContent] = useState<string>('')
+  const [saving, setSaving] = useState<boolean>(false)
+  const [versions, setVersions] = useState<LoreVersion[]>([])
+  const [diffTarget, setDiffTarget] = useState<LoreVersion | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { if (loreItem) { loadLatest(); loadVersions() } }, [loreItem])
 
@@ -20,7 +21,7 @@ export default function LoreEditor({ loreItem }) {
   }
 
   function loadLatest() {
-    fetch(`/api/lore_items/${loreItem.id}/latest`).then(r => r.json()).then(j => { setLatest(j); setContent(j ? j.content : '') }).catch(() => { setLatest(null); setContent('') })
+    fetch(`/api/lore_items/${loreItem.id}/latest`).then(r => r.json()).then((j: LoreVersion | null) => { setLatest(j); setContent(j ? j.content : '') }).catch(() => { setLatest(null); setContent('') })
   }
 
   async function saveNewVersion() {
@@ -28,18 +29,18 @@ export default function LoreEditor({ loreItem }) {
     setError(null)
     try {
       const res = await fetch(`/api/lore_items/${loreItem.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
-      const j = await res.json()
+      const j = await res.json() as { error?: string }
       if (res.ok) {
         loadLatest()
         loadVersions()
       } else setError('Save error: ' + (j.error || JSON.stringify(j)))
-    } catch (e) { setError('Save failed: ' + e.message) }
+    } catch (e) { setError('Save failed: ' + (e as Error).message) }
     setSaving(false)
   }
 
   if (!loreItem) return <div className="p-4 text-muted-foreground">Select a lore file to edit</div>
 
-  function restoreVersion(id) {
+  function restoreVersion(id: number) {
     fetch('/api/restore/lore_version/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
       .then(r => r.json()).then(() => { loadLatest(); loadVersions(); })
   }

@@ -5,7 +5,7 @@ import App from './App'
 import './styles.css'
 
 // Entry point: render the root React App
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />

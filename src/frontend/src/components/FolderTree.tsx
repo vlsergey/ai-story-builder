@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react'
 import { Button } from './ui/button'
+import { LoreFolderNode, LoreItem } from '../types/models'
 
 // Simple folder tree. Props:
 // - `onSelectLoreItem(loreItem)` callback invoked when a lore item is selected
-export default function FolderTree({ onSelectLoreItem }) {
+export default function FolderTree({ onSelectLoreItem }: { onSelectLoreItem: (item: LoreItem) => void }) {
   console.log('FolderTree rendered')
-  const [tree, setTree] = useState([])
-  const [selectedFolder, setSelectedFolder] = useState(null)
-  const [items, setItems] = useState([])
-  const [importError, setImportError] = useState(null)
+  const [tree, setTree] = useState<LoreFolderNode[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<number | null>(null)
+  const [items, setItems] = useState<LoreItem[]>([])
+  const [importError, setImportError] = useState<string | null>(null)
 
   useEffect(() => { fetchTree() }, [])
 
@@ -16,20 +17,20 @@ export default function FolderTree({ onSelectLoreItem }) {
     fetch('/api/folders/tree').then(r => r.json()).then(setTree).catch(() => setTree([]))
   }
 
-  function fetchItems(folderId) {
+  function fetchItems(folderId: number) {
     setSelectedFolder(folderId)
     fetch(`/api/folders/${folderId}/lore_items`).then(r => r.json()).then(setItems).catch(() => setItems([]))
   }
 
   // Drag-and-drop handlers for moving folders
-  function handleDragStart(e, node) {
+  function handleDragStart(e: React.DragEvent<HTMLLIElement>, node: LoreFolderNode) {
     e.dataTransfer.setData('application/x-folder-id', String(node.id))
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
+  function handleDragOver(e: React.DragEvent<HTMLElement>) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
 
-  function handleDrop(e, targetNode) {
+  function handleDrop(e: React.DragEvent<HTMLElement>, targetNode: LoreFolderNode) {
     e.preventDefault()
     const data = e.dataTransfer.getData('application/x-folder-id')
     if (!data) return
@@ -39,7 +40,7 @@ export default function FolderTree({ onSelectLoreItem }) {
     }).then(r => r.json()).then(() => fetchTree()).catch(err => console.error(err))
   }
 
-  function renderNode(node) {
+  function renderNode(node: LoreFolderNode) {
     return (
       <li key={node.id} draggable
         onDragStart={e => handleDragStart(e, node)}
@@ -81,12 +82,12 @@ export default function FolderTree({ onSelectLoreItem }) {
           type="file"
           className="text-sm"
           onChange={e => {
-            const f = e.target.files[0]
+            const f = e.target.files?.[0]
             setImportError(null)
             if (!f || !selectedFolder) { setImportError('Select a folder first'); return }
             const fd = new FormData()
             fd.append('file', f)
-            fd.append('folder_id', selectedFolder)
+            fd.append('folder_id', String(selectedFolder))
             fetch('/api/lore_items/import', { method: 'POST', body: fd })
               .then(r => r.json())
               .then(() => fetchItems(selectedFolder))

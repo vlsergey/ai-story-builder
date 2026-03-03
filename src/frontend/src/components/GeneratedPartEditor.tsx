@@ -1,20 +1,21 @@
 import React, { useState } from 'react'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
+import { StoryPart } from '../types/models'
 
-export default function GeneratedPartEditor({ part }) {
-  const [content, setContent] = useState(part.content || '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+export default function GeneratedPartEditor({ part }: { part: StoryPart }) {
+  const [content, setContent] = useState<string>(part.content || '')
+  const [saving, setSaving] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function save() {
     setSaving(true)
     setError(null)
     try {
       const res = await fetch('/api/generated_parts/' + part.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
-      const j = await res.json()
+      const j = await res.json() as { error?: string }
       if (!res.ok) setError('Save error: ' + (j.error || JSON.stringify(j)))
-    } catch (e) { setError('Save failed: ' + e.message) }
+    } catch (e) { setError('Save failed: ' + (e as Error).message) }
     setSaving(false)
   }
 

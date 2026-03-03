@@ -8,6 +8,9 @@ export default defineConfig({
     fastRefresh: false,
     jsxRuntime: 'automatic'
   })],
+  resolve: {
+    alias: { '@': path.resolve(__dirname, './src') }
+  },
   server: {
     port: 3000,
     host: true,
@@ -33,7 +36,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    setupFiles: ['./src/tests/test-setup.js'],
+    setupFiles: ['./src/tests/test-setup.ts'],
     include: ['src/tests/**/*.test.{js,jsx,ts,tsx}'],
     globals: true,
     coverage: {
@@ -41,8 +44,8 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       exclude: [
         'src/tests/**',
-        'src/main.jsx',
-        'src/App.jsx'
+        'src/main.tsx',
+        'src/App.tsx'
       ]
     }
   }

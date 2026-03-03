@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
+import { PlanNodeTree } from '../types/models'
 
 // Simple plan tree viewer. Props:
-// - `onSelect` - callback for node selection
-export default function PlanTree({ onSelect }) {
-  const [tree, setTree] = useState([])
+// - `onSelectNode` - callback for node selection
+export default function PlanTree({ onSelectNode }: { onSelectNode: (node: PlanNodeTree) => void }) {
+  const [tree, setTree] = useState<PlanNodeTree[]>([])
 
   useEffect(() => { fetchTree() }, [])
 
@@ -11,11 +12,11 @@ export default function PlanTree({ onSelect }) {
     fetch('/api/plan/nodes').then(r => r.json()).then(setTree).catch(() => setTree([]))
   }
 
-  function renderNode(node) {
+  function renderNode(node: PlanNodeTree) {
     return (
       <li key={node.id} className="pl-2">
         <div className="cursor-pointer hover:bg-secondary rounded px-1 py-1 text-sm"
-             onClick={() => onSelect && onSelect(node)}>{node.title}</div>
+             onClick={() => onSelectNode && onSelectNode(node)}>{node.title}</div>
         {node.children && node.children.length > 0 && (
           <ul className="ml-4 mt-1">{node.children.map(renderNode)}</ul>
         )}

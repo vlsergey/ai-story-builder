@@ -1,8 +1,9 @@
 import React from 'react'
 import * as Menubar from '@radix-ui/react-menubar'
 import { useTheme } from '../lib/theme/theme-provider'
+import { ThemePreference } from '../types/models'
 
-const THEME_OPTIONS = [
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'auto', label: 'Auto' },
   { value: 'obsidian', label: 'Obsidian (dark)' },
   { value: 'github', label: 'GitHub (light)' },
@@ -10,7 +11,7 @@ const THEME_OPTIONS = [
 
 // NOTE: Radix menus require the user to click the trigger to open the content.
 // We apply simple tailwind classes to keep styling in line with the rest of the application.
-export default function AppMenu({ onResetLayouts, onClose }) {
+export default function AppMenu({ onResetLayouts, onClose }: { onResetLayouts: () => void; onClose: () => void }) {
   const { preference, setPreference } = useTheme()
 
   return (

@@ -44,7 +44,7 @@ vi.mock('../components/PlanEditor', () => ({
 
 // Mock the actual Layout component with a simplified version
 vi.mock('../components/Layout', () => ({
-  default: function MockLayout({ projectPath, localeStrings, onClose }) {
+  default: function MockLayout({ projectPath, onClose }: { projectPath?: string; localeStrings?: unknown; onClose?: () => void }) {
     return (
       <div>
         <div data-testid="dockview">Dockview Container</div>
@@ -61,7 +61,8 @@ describe('Layout Minimal Test', () => {
   const mockProps = {
     projectPath: '/test/path',
     localeStrings: {},
-    onClose: vi.fn()
+    onClose: vi.fn(),
+    initialLayout: null,
   };
 
   test('renders without crashing', () => {

@@ -1,20 +1,32 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import type { ThemePreference, ResolvedTheme } from '../../types/models'
 
-const ThemeContext = createContext()
+interface ThemeContextValue {
+  preference: ThemePreference
+  resolvedTheme: ResolvedTheme
+  setPreference: (pref: string) => void
+}
 
-const VALID_PREFERENCES = ['auto', 'obsidian', 'github']
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
+
+const VALID_PREFERENCES: ThemePreference[] = ['auto', 'obsidian', 'github']
 const STORAGE_KEY = 'ai-story-builder-theme'
 
 /** Returns the concrete theme name to apply given the user preference and the OS dark-mode state. */
-function resolve(preference, systemDark) {
+function resolve(preference: ThemePreference, systemDark: boolean): ResolvedTheme {
   if (preference === 'auto') return systemDark ? 'obsidian' : 'github'
   return preference
 }
 
-export function ThemeProvider({ children, defaultPreference = 'auto' }) {
-  const [preference, setPreferenceState] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return VALID_PREFERENCES.includes(saved) ? saved : defaultPreference
+interface ThemeProviderProps {
+  children: React.ReactNode
+  defaultPreference?: ThemePreference
+}
+
+export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemeProviderProps) {
+  const [preference, setPreferenceState] = useState<ThemePreference>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY) as ThemePreference | null
+    return saved && VALID_PREFERENCES.includes(saved) ? saved : defaultPreference
   })
 
   const [systemDark, setSystemDark] = useState(
@@ -24,7 +36,7 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }) {
   // Track OS-level dark/light changes
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = (e) => setSystemDark(e.matches)
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
@@ -39,10 +51,10 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }) {
   }, [preference, systemDark])
 
   /** Persists preference to localStorage and tries to sync to the open project (silent fail). */
-  const setPreference = (pref) => {
-    if (!VALID_PREFERENCES.includes(pref)) return
+  const setPreference = (pref: string) => {
+    if (!VALID_PREFERENCES.includes(pref as ThemePreference)) return
     localStorage.setItem(STORAGE_KEY, pref)
-    setPreferenceState(pref)
+    setPreferenceState(pref as ThemePreference)
     fetch('/api/settings/ui_theme', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -61,7 +73,7 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }) {
   )
 }
 
-export function useTheme() {
+export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext)
   if (!ctx) throw new Error('useTheme must be used within a ThemeProvider')
   return ctx

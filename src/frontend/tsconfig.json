@@ -8,7 +8,8 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src"]
 }

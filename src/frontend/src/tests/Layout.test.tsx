@@ -28,16 +28,17 @@ vi.mock('../lib/theme/theme-provider', () => ({
 const mockProps = {
   localeStrings: {},
   onClose: vi.fn(),
+  initialLayout: null,
 };
 
 describe('Layout', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', (url, opts) => {
-      if (opts && opts.method === 'POST') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    vi.stubGlobal('fetch', (_url: unknown, opts?: unknown) => {
+      if (opts && (opts as RequestInit).method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       }
       // null → restoreLayout falls through to setupDefaultLayout
-      return Promise.resolve({ json: () => Promise.resolve(null) });
+      return Promise.resolve({ json: () => Promise.resolve(null) } as Response);
     });
   });
 
@@ -50,7 +51,7 @@ describe('Layout', () => {
   });
 
   it('includes cache-control on layout fetch', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ json: () => Promise.resolve(null) });
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ json: () => Promise.resolve(null) } as unknown as Response);
     render(<Layout {...mockProps} />);
     await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
     expect(fetchSpy).toHaveBeenCalledWith(

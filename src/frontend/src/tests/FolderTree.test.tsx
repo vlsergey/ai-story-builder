@@ -1,14 +1,13 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FolderTree from '../components/FolderTree';
 
 // Mock the fetch API
-global.fetch = vi.fn();
+global.fetch = vi.fn() as unknown as typeof fetch;
 
 describe('FolderTree', () => {
   const mockProps = {
-    dbPath: '/test/db/path',
     onSelectLoreItem: vi.fn()
   };
 
@@ -17,7 +16,7 @@ describe('FolderTree', () => {
   });
 
   it('renders without crashing when tree data is an array', () => {
-    global.fetch.mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       json: () => Promise.resolve([{ id: 1, name: 'Folder 1', children: [] }])
     });
 
@@ -27,7 +26,7 @@ describe('FolderTree', () => {
   });
 
   it('handles non-array tree data gracefully', () => {
-    global.fetch.mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       json: () => Promise.resolve({ error: 'Invalid response' })
     });
 
@@ -37,7 +36,7 @@ describe('FolderTree', () => {
   });
 
   it('handles null tree data gracefully', () => {
-    global.fetch.mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       json: () => Promise.resolve(null)
     });
 

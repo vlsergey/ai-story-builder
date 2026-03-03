@@ -11,6 +11,7 @@ import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
 import AppMenu from './AppMenu'
+import { LoreItem, PlanNodeTree, LocaleStrings } from '../types/models'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -35,26 +36,26 @@ const WelcomeWatermark = () => (
  * This implementation uses dockview for a fully dockable, resizable interface.
  * Each area is a placeholder component with descriptive comments to make extension straightforward.
  */
-export default function Layout({ localeStrings, onClose, initialLayout }) {
+export default function Layout({ localeStrings, onClose, initialLayout }: { localeStrings: LocaleStrings; onClose: () => void; initialLayout: unknown | null }) {
   // Use local state to track selected lore item and pass dbPath into child components
-  const [selectedLoreItem, setSelectedLoreItem] = React.useState(null)
-  const [selectedPlanNode, setSelectedPlanNode] = React.useState(null)
-  const dockviewRef = useRef(null)
+  const [selectedLoreItem, setSelectedLoreItem] = React.useState<LoreItem | null>(null)
+  const [selectedPlanNode, setSelectedPlanNode] = React.useState<PlanNodeTree | null>(null)
+  const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
 
   // Load saved theme preference from the project settings
   useEffect(() => {
     fetch('/api/settings/ui_theme')
       .then(res => res.json())
-      .then(data => { if (data.value) setPreference(data.value) })
+      .then((data: { value?: string }) => { if (data.value) setPreference(data.value) })
       .catch(() => {})
   }, [])
 
   // helper to massage storage format into the version expected by dockview
-  const normalizeLayout = (layout) => {
+  const normalizeLayout = (layout: any) => {
     if (!layout || typeof layout !== 'object') return layout
     if (layout.panels) {
-      Object.values(layout.panels).forEach(p => {
+      Object.values(layout.panels).forEach((p: any) => {
         // dockview.toJSON currently emits "contentComponent"; fromJSON
         // expects "component". copy over if missing.
         if (p.contentComponent && !p.component) {
@@ -73,8 +74,8 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
     }
     const savedLayout = initialLayout != null ? initialLayout : await loadLayoutFromDatabase()
     console.log('[Layout] restoreLayout: loaded layout', {
-      hasGrid: savedLayout?.grid ? 'yes' : 'no',
-      panelsCount: savedLayout?.panels ? Object.keys(savedLayout.panels).length : 0,
+      hasGrid: (savedLayout as any)?.grid ? 'yes' : 'no',
+      panelsCount: (savedLayout as any)?.panels ? Object.keys((savedLayout as any).panels).length : 0,
       rawSize: JSON.stringify(savedLayout).length
     })
     if (savedLayout) {
@@ -112,7 +113,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
   }
 
   // Save layout to database
-  const saveLayoutToDatabase = async (layout) => {
+  const saveLayoutToDatabase = async (layout: any) => {
     // guard: don't save empty layouts (can happen during React cleanup or Strict Mode double-invoke)
     const panelsCount = layout?.panels ? Object.keys(layout.panels).length : 0
     if (panelsCount === 0) {
@@ -185,9 +186,11 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
     })
   }
 
-  const onReady = (event) => {
+  const onReady = (event: any) => {
     console.log('[Layout] onReady: dockview api available')
     dockviewRef.current = event.api
+    // Subscribe to layout changes via the api (not a JSX prop)
+    event.api.onDidLayoutChange(handleLayoutChange)
     // try to restore a saved layout once the api is available
     restoreLayout()
   }
@@ -211,7 +214,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
   }
 
   // Custom tab components without close buttons for non-closable panels
-  const NonClosableTab = (props) => {
+  const NonClosableTab = (props: any) => {
     return (
       <div className="dv-default-tab">
         <div className="dv-default-tab-content">{props.params?.title || props.api?.title}</div>
@@ -270,10 +273,8 @@ export default function Layout({ localeStrings, onClose, initialLayout }) {
           tabComponents={tabComponents}
           watermarkComponent={WelcomeWatermark}
           onReady={onReady}
-          onDidLayoutChange={handleLayoutChange}
           disableFloatingGroups={false}
           disableDnd={false}
-          disableResizing={false}
           className="dockview-theme"
         />
       </div>

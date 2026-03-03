@@ -6,6 +6,7 @@ import en from './i18n/en.json'
 import ru from './i18n/ru.json'
 import './styles.css'
 import { ThemeProvider } from './lib/theme/theme-provider'
+import { ProjectData } from './types/models'
 
 /**
  * Root application component
@@ -15,10 +16,10 @@ import { ThemeProvider } from './lib/theme/theme-provider'
  */
 export default function App() {
   const navigate = useNavigate()
-  const [projectOpen, setProjectOpen] = useState(false)
-  const [initialLayout, setInitialLayout] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [locale, setLocale] = useState('en')
+  const [projectOpen, setProjectOpen] = useState<boolean>(false)
+  const [initialLayout, setInitialLayout] = useState<unknown | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [locale, setLocale] = useState<string>('en')
 
   // Simple locale resolver
   const localeStrings = useMemo(() => (locale === 'ru' ? ru : en), [locale])
@@ -28,7 +29,7 @@ export default function App() {
     const checkProjectStatus = async () => {
       try {
         const res = await fetch('/api/project/status')
-        const data = await res.json()
+        const data = await res.json() as { isOpen: boolean }
         setProjectOpen(data.isOpen)
         if (data.isOpen) {
           navigate('/project', { replace: true })
@@ -42,7 +43,7 @@ export default function App() {
     checkProjectStatus()
   }, [navigate])
 
-  function handleOpenProject(path, data) {
+  function handleOpenProject(path: string, data: ProjectData) {
     setInitialLayout(data?.layout ?? null)
     setProjectOpen(true)
     navigate('/project')
