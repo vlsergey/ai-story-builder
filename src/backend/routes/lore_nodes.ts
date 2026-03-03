@@ -117,7 +117,7 @@ router.post('/restore/:version_id', (_req: Request, res: Response) => {
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-// POST /lore_nodes — create a node
+// POST /lore_nodes — create a node (appended at the end of the parent's children)
 router.post('/', express.json(), (req: Request, res: Response) => {
   const { parent_id, name } = req.body as { parent_id?: number | null; name?: string }
   const dbPath = getCurrentDbPath()
@@ -125,9 +125,13 @@ router.post('/', express.json(), (req: Request, res: Response) => {
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   try {
     const db = new Database(dbPath)
+    const pid = parent_id ?? null
+    const { m } = db
+      .prepare('SELECT COALESCE(MAX(position), -1) AS m FROM lore_nodes WHERE parent_id IS ?')
+      .get(pid) as { m: number }
     const info = db
-      .prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
-      .run(parent_id ?? null, name.trim())
+      .prepare('INSERT INTO lore_nodes (parent_id, name, position) VALUES (?, ?, ?)')
+      .run(pid, name.trim(), m + 1)
     db.close()
     res.json({ id: info.lastInsertRowid })
   } catch (e) {
@@ -169,6 +173,25 @@ router.delete('/:id', (req: Request, res: Response) => {
     db.prepare("UPDATE lore_nodes SET status = 'TO_BE_DELETED' WHERE id = ?").run(req.params.id)
     db.close()
     res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: String(e) })
+  }
+})
+
+// POST /lore_nodes/:id/sort-children — sort direct children alphabetically by name
+router.post('/:id/sort-children', (req: Request, res: Response) => {
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) return res.status(400).json({ error: 'no project open' })
+  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  try {
+    const db = new Database(dbPath)
+    const children = db
+      .prepare('SELECT id FROM lore_nodes WHERE parent_id = ? ORDER BY name COLLATE NOCASE ASC')
+      .all(req.params.id) as { id: number }[]
+    const update = db.prepare('UPDATE lore_nodes SET position = ? WHERE id = ?')
+    db.transaction(() => { children.forEach((c, i) => update.run(i, c.id)) })()
+    db.close()
+    res.json({ ok: true, sorted: children.length })
   } catch (e) {
     res.status(500).json({ error: String(e) })
   }

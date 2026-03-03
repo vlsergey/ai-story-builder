@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   ChevronRight, ChevronDown,
   Library, BookOpen, ScrollText,
-  Plus, CopyPlus, Pencil, Upload, Download, Trash2, CloudUpload,
+  Plus, CopyPlus, Pencil, Upload, Download, Trash2, CloudUpload, ArrowUpAZ,
 } from 'lucide-react'
 import { LoreNode } from '../types/models'
 
@@ -175,6 +175,15 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     }
   }
 
+  async function handleSortChildren() {
+    await Promise.all(
+      [...selectedNodeIds].map(id =>
+        fetch(`/api/lore_nodes/${id}/sort-children`, { method: 'POST' })
+      )
+    )
+    fetchTree()
+  }
+
   async function handleDelete() {
     const toDelete = [...selectedNodeIds].filter(id => findNode(id, tree)?.parent_id !== null)
     if (toDelete.length === 0) return
@@ -203,6 +212,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     { id: 'create',    label: 'Create child node',  icon: <Plus size={15} />,        enabled: oneSelected,  execute: handleCreate },
     { id: 'duplicate', label: 'Duplicate',           icon: <CopyPlus size={15} />,    enabled: oneSelected && !onlyRootSelected, execute: handleDuplicate },
     { id: 'rename',    label: 'Rename',              icon: <Pencil size={15} />,      enabled: oneSelected, shortcut: 'F2', execute: handleRename },
+    { id: 'sort-asc',  label: 'Sort children A→Z',  icon: <ArrowUpAZ size={15} />,   enabled: anySelected,  execute: handleSortChildren },
     'separator',
     { id: 'import', label: 'Import file as child', icon: <Upload size={15} />,   enabled: oneSelected, execute: handleImport },
     { id: 'export', label: 'Export selected',      icon: <Download size={15} />, enabled: hasContent,  execute: handleExport },
