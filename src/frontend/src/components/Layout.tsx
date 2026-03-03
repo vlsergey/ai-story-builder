@@ -157,6 +157,9 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     // triggers the AbsolutePosition branch which requires a direction and throws without one.
     // The empty group shows WelcomeWatermark; panels added with a direction create their own groups.
     const centerGroup = dockviewRef.current.addGroup()
+    // Disable all drop zones on the watermark group so it can't be accidentally moved or
+    // used as a drop target. 'no-drop-target' is stronger than true: it kills edge zones too.
+    centerGroup.locked = 'no-drop-target'
 
     dockviewRef.current.addPanel({
       id: 'lore-panel',
