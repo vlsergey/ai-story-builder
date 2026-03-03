@@ -1,12 +1,12 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import FolderTree from '../components/FolderTree';
+import LoreFolderTree from '../components/LoreFolderTree';
 
 // Mock the fetch API
 global.fetch = vi.fn() as unknown as typeof fetch;
 
-describe('FolderTree', () => {
+describe('LoreFolderTree', () => {
   const mockProps = {
     onSelectLoreItem: vi.fn()
   };
@@ -21,7 +21,7 @@ describe('FolderTree', () => {
     });
 
     expect(() => {
-      render(<FolderTree {...mockProps} />);
+      render(<LoreFolderTree {...mockProps} />);
     }).not.toThrow();
   });
 
@@ -31,7 +31,7 @@ describe('FolderTree', () => {
     });
 
     expect(() => {
-      render(<FolderTree {...mockProps} />);
+      render(<LoreFolderTree {...mockProps} />);
     }).not.toThrow();
   });
 
@@ -41,7 +41,7 @@ describe('FolderTree', () => {
     });
 
     expect(() => {
-      render(<FolderTree {...mockProps} />);
+      render(<LoreFolderTree {...mockProps} />);
     }).not.toThrow();
   });
 });

@@ -4,8 +4,7 @@ import { LoreFolderNode, LoreItem } from '../types/models'
 
 // Simple folder tree. Props:
 // - `onSelectLoreItem(loreItem)` callback invoked when a lore item is selected
-export default function FolderTree({ onSelectLoreItem }: { onSelectLoreItem: (item: LoreItem) => void }) {
-  console.log('FolderTree rendered')
+export default function LoreFolderTree({ onSelectLoreItem }: { onSelectLoreItem: (item: LoreItem) => void }) {
   const [tree, setTree] = useState<LoreFolderNode[]>([])
   const [selectedFolder, setSelectedFolder] = useState<number | null>(null)
   const [items, setItems] = useState<LoreItem[]>([])

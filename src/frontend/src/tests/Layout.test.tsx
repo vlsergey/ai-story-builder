@@ -1,10 +1,10 @@
-import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import React from 'react'
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Layout from '../components/Layout';
 
 // Mock child components that have their own network/state dependencies
-vi.mock('../components/FolderSection', () => ({
+vi.mock('../components/LoreFolderSection', () => ({
   default: () => <div data-testid="folder-section">Folder Section</div>
 }));
 
@@ -20,7 +20,7 @@ vi.mock('../components/PlanEditor', () => ({
   default: () => <div>Plan Editor</div>
 }));
 
-// Mock theme provider used by AppMenu and Layout
+// Mock theme provider used by Layout
 vi.mock('../lib/theme/theme-provider', () => ({
   useTheme: () => ({ preference: 'auto', resolvedTheme: 'github', setPreference: vi.fn() })
 }));
@@ -32,7 +32,16 @@ const mockProps = {
 };
 
 describe('Layout', () => {
+  // Capture the IPC handler registered by the component
+  let menuActionHandler: ((action: string) => void) | null = null
+
   beforeEach(() => {
+    menuActionHandler = null
+    window.electronAPI = {
+      onMenuAction: vi.fn((cb) => { menuActionHandler = cb }),
+      removeMenuActionListeners: vi.fn(),
+    }
+
     vi.stubGlobal('fetch', (_url: unknown, opts?: unknown) => {
       if (opts && (opts as RequestInit).method === 'POST') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
@@ -44,6 +53,7 @@ describe('Layout', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    delete (window as any).electronAPI
   });
 
   it('renders without crashing', () => {
@@ -58,11 +68,6 @@ describe('Layout', () => {
       expect.stringContaining('/api/settings/layout'),
       expect.objectContaining({ cache: 'no-store' })
     );
-  });
-
-  it('includes the View menu trigger', () => {
-    render(<Layout {...mockProps} />);
-    expect(screen.getByText('View')).toBeInTheDocument();
   });
 
   it('default layout: lore, plan and cards panels render; center stays as watermark', async () => {
@@ -96,17 +101,22 @@ describe('Layout', () => {
     expect(tabBar?.style.display).toBe('none');
   });
 
-  it('saves layout to database when reset action is invoked', async () => {
+  it('registers an IPC menu-action listener on mount', async () => {
+    render(<Layout {...mockProps} />);
+    await waitFor(() => expect(screen.getByTestId('folder-section')).toBeInTheDocument());
+    expect(window.electronAPI!.onMenuAction).toHaveBeenCalled();
+  });
+
+  it('saves layout to database when reset-layouts IPC action fires', async () => {
     const fetchSpy = vi.spyOn(global, 'fetch');
     render(<Layout {...mockProps} />);
 
-    // Wait for panels to render before resetting
+    // Wait for panels to render and handler to be registered
     await waitFor(() => expect(screen.getByTestId('folder-section')).toBeInTheDocument());
+    expect(menuActionHandler).not.toBeNull();
 
-    fireEvent.pointerDown(screen.getByText('View'));
-    fireEvent.click(screen.getByText('View'));
-    const resetItem = await screen.findByText('Reset layouts');
-    fireEvent.click(resetItem);
+    // Trigger 'reset-layouts' as the native menu would
+    act(() => { menuActionHandler!('reset-layouts') });
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith(

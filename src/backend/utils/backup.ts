@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { getDataDir } from '../db/state.js'
 
 /**
  * Creates a backup of a project database file
@@ -8,7 +9,7 @@ import path from 'path'
  */
 export function createBackup(dbPath: string): string {
   // Ensure backups directory exists
-  const backupsDir = path.join(process.cwd(), 'data', 'backups')
+  const backupsDir = path.join(getDataDir(), 'backups')
   fs.mkdirSync(backupsDir, { recursive: true })
 
   // Get the filename without extension for the backup name
@@ -50,7 +51,7 @@ export function trimBackups(filename: string, backupsDir: string): void {
  * @returns Path to the most recent backup or null if none found
  */
 export function getLatestBackup(dbPath: string): string | null {
-  const backupsDir = path.join(process.cwd(), 'data', 'backups')
+  const backupsDir = path.join(getDataDir(), 'backups')
   if (!fs.existsSync(backupsDir)) return null
 
   const filename = path.basename(dbPath)

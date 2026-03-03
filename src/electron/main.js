@@ -1,12 +1,75 @@
 'use strict'
 
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, Menu, shell } = require('electron')
 const path = require('path')
 
 const isDev = process.env.NODE_ENV === 'development'
 
 // Stored once the server (or dev Vite) is ready, reused on macOS re-activate.
 let serverUrl = null
+
+/**
+ * Sends a menu action string to the focused BrowserWindow's renderer process.
+ * The renderer listens via window.electronAPI.onMenuAction().
+ */
+function sendMenuAction(action) {
+  BrowserWindow.getFocusedWindow()?.webContents.send('menu-action', action)
+}
+
+/**
+ * Builds and registers the native application menu.
+ * Structure: [appMenu (macOS only)] File | Edit | View | Window
+ */
+function buildApplicationMenu() {
+  const viewSubmenu = [
+    {
+      label: 'Reset layouts',
+      click: () => sendMenuAction('reset-layouts'),
+    },
+    { type: 'separator' },
+    {
+      label: 'Theme',
+      submenu: [
+        { label: 'Auto',            click: () => sendMenuAction('set-theme:auto') },
+        { label: 'Obsidian (dark)', click: () => sendMenuAction('set-theme:obsidian') },
+        { label: 'GitHub (light)',  click: () => sendMenuAction('set-theme:github') },
+      ],
+    },
+  ]
+
+  if (isDev) {
+    viewSubmenu.push({ type: 'separator' })
+    viewSubmenu.push({ role: 'toggleDevTools' })
+  }
+
+  const template = [
+    // macOS: first entry is always the app menu (app name, About, Quit, etc.)
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Close Project',
+          click: () => sendMenuAction('close-project'),
+        },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+
+    { role: 'editMenu' },
+
+    {
+      label: 'View',
+      submenu: viewSubmenu,
+    },
+
+    { role: 'windowMenu' },
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -15,6 +78,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   })
 
@@ -53,6 +117,7 @@ function checkNativeDeps() {
 
 app.whenReady().then(async () => {
   checkNativeDeps()
+  buildApplicationMenu()
 
   if (isDev) {
     // In dev, Vite and Express are started externally by the dev script.

@@ -29,9 +29,6 @@
 * Translations stored in separate JSON files
 
 ### Additional Technical Requirements
-* Desktop-style menu bar (Shadcn Menubar) with a **View** menu containing:
-  * **Reset layouts** – restores the dockview panels to the default arrangement
-  * **Theme selection** – radio list of available color palettes (zinc, slate, neutral, obsidian, carbon)
 * Centralized API client with easy backend switching (Grok / Yandex / Local / Mock)
 * Comprehensive error boundaries
 * Keyboard shortcuts support

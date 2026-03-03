@@ -8,6 +8,7 @@ import loreRouter from './routes/lore.js'
 import plansRouter from './routes/plans.js'
 import generationRouter from './routes/generation.js'
 import settingsRouter from './routes/settings.js'
+import { getDataDir } from './db/state.js'
 
 const app = express()
 // Use port 3001 for development (Vite dev server takes 3000), 3000 for production
@@ -27,7 +28,7 @@ function getDistPath(): string {
 }
 
 // Ensure upload folder exists
-fs.mkdirSync(path.join(process.cwd(), 'data', 'uploads'), { recursive: true })
+fs.mkdirSync(path.join(getDataDir(), 'uploads'), { recursive: true })
 
 app.use(express.json())
 

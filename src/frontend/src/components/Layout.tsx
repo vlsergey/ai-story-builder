@@ -6,12 +6,11 @@ import { useTheme } from '../lib/theme/theme-provider'
 import 'dockview/dist/styles/dockview.css'
 
 // Local small wrappers to keep import cycles simple
-import FolderSection from './FolderSection'
+import LoreFolderSection from './LoreFolderSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
-import AppMenu from './AppMenu'
-import { LoreItem, PlanNodeTree, LocaleStrings } from '../types/models'
+import { LoreItem, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -212,7 +211,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     restoreLayout()
   }
 
-  // reset the layout back to defaults (used by the View menu)
+  // reset the layout back to defaults (invoked by native menu via IPC)
   const handleResetLayouts = () => {
     if (dockviewRef.current) {
       setupDefaultLayout()
@@ -230,6 +229,26 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     }
   }
 
+  // Native-menu IPC listener.
+  // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
+  // A ref keeps the latest function references accessible inside the one-time effect.
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference })
+  menuActionsRef.current = { handleResetLayouts, onClose, setPreference }
+
+  useEffect(() => {
+    if (!window.electronAPI) return
+    window.electronAPI.onMenuAction((action: string) => {
+      if (action === 'reset-layouts') {
+        menuActionsRef.current.handleResetLayouts()
+      } else if (action === 'close-project') {
+        menuActionsRef.current.onClose()
+      } else if (action.startsWith('set-theme:')) {
+        menuActionsRef.current.setPreference(action.slice(10) as ThemePreference)
+      }
+    })
+    return () => { window.electronAPI?.removeMenuActionListeners() }
+  }, [])
+
   // Custom tab components without close buttons for non-closable panels
   const NonClosableTab = (props: any) => {
     return (
@@ -242,7 +261,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const components = {
     lore: () => (
       <div className="p-2 h-full">
-        <FolderSection
+        <LoreFolderSection
           onSelectLoreItem={node => { setSelectedPlanNode(null); setSelectedLoreItem(node) }}
         />
       </div>
@@ -283,8 +302,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
 
   return (
     <div className="flex flex-col h-full">
-      <AppMenu onResetLayouts={handleResetLayouts} onClose={onClose} />
-      <div className="flex-1 bg-background">
+      <div className="flex-1 min-h-0 bg-background overflow-hidden">
         <DockviewReact
           components={components}
           tabComponents={tabComponents}

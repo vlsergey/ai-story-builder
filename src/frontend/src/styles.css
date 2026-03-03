@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 html, body {
+  height: 100%;
+  overflow: hidden; /* prevent page-level scrollbar when window is resized */
   color: hsl(var(--foreground));
   background: hsl(var(--background));
 }

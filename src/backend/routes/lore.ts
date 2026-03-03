@@ -1,7 +1,7 @@
 import express, { Request, Response, Router } from 'express'
 import fs from 'fs'
 import path from 'path'
-import { getCurrentDbPath } from '../db/state.js'
+import { getCurrentDbPath, getDataDir } from '../db/state.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -17,7 +17,7 @@ let upload: {
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const multer = require('multer') as typeof import('multer')
-  upload = multer({ dest: path.join(process.cwd(), 'data', 'uploads') })
+  upload = multer({ dest: path.join(getDataDir(), 'uploads') })
 } catch (_) {
   upload = {
     single: () => (_req: Request, res: Response) => {

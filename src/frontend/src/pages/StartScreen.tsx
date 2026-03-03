@@ -6,6 +6,12 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { ProjectData, LocaleStrings } from '../types/models'
 
+/** Returns the project display name from a full filesystem path: basename without extension. */
+function projectDisplayName(fullPath: string): string {
+  const base = fullPath.split(/[/\\]/).pop() ?? fullPath
+  return base.replace(/\.[^.]+$/, '')
+}
+
 export default function StartScreen({ onOpenProject, localeStrings }: { onOpenProject: (path: string, data: ProjectData) => void; localeStrings: LocaleStrings }) {
   const navigate = useNavigate()
   const [recent, setRecent] = useState<string[]>([])
@@ -119,7 +125,7 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
           {recent.map(r => (
             <li key={r}>
               <Button variant="link" className="p-0 h-auto" onClick={() => openRecent(r)}>
-                {r}
+                {projectDisplayName(r)}
               </Button>
             </li>
           ))}

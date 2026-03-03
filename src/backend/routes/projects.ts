@@ -7,6 +7,7 @@ import {
   setCurrentDbPath,
   readAppSettings,
   writeAppSettings,
+  getDataDir,
 } from '../db/state.js'
 
 // openProjectDatabase is a CommonJS module; use require to load it at runtime
@@ -31,7 +32,7 @@ let upload: {
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const multer = require('multer') as typeof import('multer')
-  upload = multer({ dest: path.join(process.cwd(), 'data', 'uploads') })
+  upload = multer({ dest: path.join(getDataDir(), 'uploads') })
 } catch (_) {
   upload = {
     single: () => (_req: Request, res: Response) => {
@@ -94,24 +95,16 @@ router.post('/open', express.json(), (req: Request, res: Response) => {
     return res.status(404).json({ error: 'database file not found' })
   }
 
-  setCurrentDbPath(dbPath)
-
-  let versionState = 'unknown'
-  if (Database) {
-    try {
-      const db = new Database(dbPath, { readonly: true })
-      const row = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
-        .get()
-      versionState = row ? 'ok' : 'old'
-      db.close()
-    } catch (e) {
-      return res.status(500).json({ error: 'failed to open database: ' + String(e) })
-    }
+  try {
+    const db = openProjectDatabase(dbPath) // runs any pending migrations
+    db.close()
+  } catch (e) {
+    return res.status(500).json({ error: 'failed to open database: ' + String(e) })
   }
 
+  setCurrentDbPath(dbPath)
   updateRecent(dbPath)
-  res.json({ path: dbPath, versionState, ...getProjectInitialData(dbPath) })
+  res.json({ path: dbPath, ...getProjectInitialData(dbPath) })
 })
 
 // GET /project/recent
@@ -124,7 +117,7 @@ router.get('/recent', (_req: Request, res: Response) => {
 router.post('/upload', upload.single('dbfile'), (req: Request, res: Response) => {
   if (!req.file) return res.status(400).json({ error: 'No file' })
 
-  const projectsDir = path.join(process.cwd(), 'data', 'projects')
+  const projectsDir = path.join(getDataDir(), 'projects')
   fs.mkdirSync(projectsDir, { recursive: true })
   const dest = path.join(projectsDir, req.file.originalname)
   fs.renameSync(req.file.path, dest)
@@ -132,7 +125,7 @@ router.post('/upload', upload.single('dbfile'), (req: Request, res: Response) =>
   setCurrentDbPath(dest)
 
   // create backup
-  const backupsDir = path.join(process.cwd(), 'data', 'backups')
+  const backupsDir = path.join(getDataDir(), 'backups')
   fs.mkdirSync(backupsDir, { recursive: true })
   const ts = new Date().toISOString().replace(/[:.]/g, '-')
   const backupName = `${req.file.originalname}.${ts}.bak`
@@ -173,11 +166,26 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
       ? (req.body as { name: string }).name
       : `project-${Date.now()}`
   const safeName = name.replace(/[^a-zA-Z0-9\-_.]/g, '_')
-  const projectsDir = path.join(process.cwd(), 'data', 'projects')
+  const projectsDir = path.join(getDataDir(), 'projects')
   fs.mkdirSync(projectsDir, { recursive: true })
   const dbPath = path.join(projectsDir, `${safeName}.sqlite`)
 
   if (fs.existsSync(dbPath)) {
+    try {
+      const db = openProjectDatabase(dbPath) // runs migrations on any existing DB
+      // Insert default folders if none exist yet (e.g. DB was empty from a failed migration)
+      const hasRoot = db.prepare('SELECT id FROM lore_folders WHERE parent_id IS NULL LIMIT 1').get()
+      if (!hasRoot) {
+        const insertFolder = db.prepare('INSERT INTO lore_folders (parent_id, name) VALUES (?, ?)')
+        const root = insertFolder.run(null, 'Story Lore')
+        const rootId = root.lastInsertRowid
+        const defaults = ['locations', 'abilities', 'spells', 'bestiary', 'characters']
+        for (const f of defaults) insertFolder.run(rootId, f)
+      }
+      db.close()
+    } catch (e) {
+      return res.status(500).json({ error: String(e) })
+    }
     setCurrentDbPath(dbPath)
     updateRecent(dbPath)
     return res.json({ path: dbPath, reused: true, ...getProjectInitialData(dbPath) })

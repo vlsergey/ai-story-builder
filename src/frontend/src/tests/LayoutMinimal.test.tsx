@@ -18,8 +18,8 @@ vi.mock('../lib/theme/theme-provider', () => ({
 }));
 
 // Mock child components
-vi.mock('../components/FolderSection', () => ({
-  default: function MockFolderSection() {
+vi.mock('../components/LoreFolderSection', () => ({
+  default: function MockLoreFolderSection() {
     return <div data-testid="folder-section">Folder Section</div>;
   }
 }));
