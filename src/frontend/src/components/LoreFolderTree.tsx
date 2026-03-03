@@ -254,10 +254,11 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  function handleDragOver(e: React.DragEvent<HTMLElement>) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
+  function handleDragOver(e: React.DragEvent<HTMLElement>) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move' }
 
   function handleDrop(e: React.DragEvent<HTMLElement>, targetNode: LoreNode) {
     e.preventDefault()
+    e.stopPropagation()
     const data = e.dataTransfer.getData('application/x-node-id')
     if (!data) return
     if (data === String(targetNode.id)) return // drop onto self — ignore
