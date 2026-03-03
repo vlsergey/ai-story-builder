@@ -4,13 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon server.js",
-    "start": "node server.js",
-    "bundle": "node scripts/bundle.js",
-    "package": "node scripts/bundle.js && node scripts/build-sea.js"
+    "start": "node server.js"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
-    "esbuild": "^0.25.0",
     "nodemon": "^3.0.1"
   },
   "dependencies": {
@@ -18,7 +15,6 @@
   },
   "optionalDependencies": {
     "better-sqlite3": "^12.6.2",
-    "multer": "^1.4.5",
-    "open": "^8.4.0"
+    "multer": "^1.4.5"
   }
 }

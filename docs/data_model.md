@@ -3,7 +3,7 @@
 ## Notes and high-level constraints
 - One project = one SQLite database file. Each project stores a single work (no multi-work per DB).
 - This application is local-only: there is no user authentication or multi-user support.
-- We use Liquibase to manage schema migrations between versions of the database.
+- Schema version is tracked via SQLite's built-in `PRAGMA user_version`. Migrations run automatically on database open.
 - All layouts, UI settings and AI configuration are stored inside the project database.
 
 ## Database Compression
@@ -123,14 +123,14 @@ Lore is organized in a folder hierarchy. Folders can contain other folders and l
 - All versioned entities (`plan_node_versions`, `story_parts`, `card_values`) support tree-like history via `parent_version_id` and `is_obsolete` flag.
 - Visual diff and version restore is possible for: plan node instructions, plan node result, story part instructions, story part result, and card actual values.
 - When a story part is regenerated or edited, all dependent card versions after it are marked as obsolete.
-- Liquibase manages schema migrations. Its internal `DATABASECHANGELOG` table is used to detect current schema version.
+- Schema version is tracked via `PRAGMA user_version` stored in the SQLite file header.
 
 This data model fully supports all described use cases including dockable UI, multiple AI backends, version history with visual diff, lore synchronization per engine, and project-level settings.
 
-Liquibase and migrations
-------------------------
-- We will use Liquibase to manage schema changes. Store Liquibase changelogs in a `db/changelogs` folder in the project repository.
-- Each changelog should be additive and idempotent; for local development use SQLite-specific changesets where needed.
-- Keep a `databaseChangeLog` master file that includes sequential changesets. Track the currently applied changelog in Liquibase's own `DATABASECHANGELOG` table.
-- When running the app, migrate the database up to the latest changelog before opening the application data (this step is mandatory to preserve schema compatibility).
+Migrations
+----------
+- Migration logic lives in `src/backend/db/migrations.js` as an ordered array of functions (one per version step).
+- Each migration function receives an open `better-sqlite3` Database instance and runs inside a transaction; `PRAGMA user_version` is updated atomically within the same transaction.
+- A backup of the database file is created before migrations run (keep last 7 backups).
+- When running the app, migrate the database to the latest version before opening the application data (mandatory to preserve schema compatibility).
 

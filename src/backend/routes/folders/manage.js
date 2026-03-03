@@ -8,7 +8,7 @@ router.post('/', express.json(), (req, res) => {
   if (!dbPath || !name) return res.status(400).json({ error: 'db and name required' })
   try {
     const db = new Database(dbPath)
-    const stmt = db.prepare('INSERT INTO folders (parent_id, name) VALUES (?, ?)')
+    const stmt = db.prepare('INSERT INTO lore_folders (parent_id, name) VALUES (?, ?)')
     const info = stmt.run(parent_id || null, name)
     db.close()
     res.json({ id: info.lastInsertRowid })
@@ -20,7 +20,7 @@ router.delete('/:id', (req, res) => {
   if (!dbPath) return res.status(400).json({ error: 'db required' })
   try {
     const db = new Database(dbPath)
-    const stmt = db.prepare('DELETE FROM folders WHERE id = ?')
+    const stmt = db.prepare('DELETE FROM lore_folders WHERE id = ?')
     stmt.run(req.params.id)
     db.close()
     res.json({ ok: true })
@@ -33,7 +33,7 @@ router.post('/:id/move', express.json(), (req, res) => {
   if (!dbPath) return res.status(400).json({ error: 'db required' })
   try {
     const db = new Database(dbPath)
-    db.prepare('UPDATE folders SET parent_id = ? WHERE id = ?').run(parent_id || null, id)
+    db.prepare('UPDATE lore_folders SET parent_id = ? WHERE id = ?').run(parent_id || null, id)
     db.close()
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: String(e) }) }

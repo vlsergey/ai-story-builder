@@ -2,19 +2,48 @@
   "name": "ai-story-builder",
   "version": "0.1.0",
   "private": true,
+  "main": "src/electron/main.js",
   "workspaces": [
     "src/frontend",
     "src/backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=src/backend\" \"wait-on http://localhost:3001/api/hello && npm run dev --workspace=src/frontend\"",
+    "dev": "concurrently \"npm run dev --workspace=src/backend\" \"wait-on http://localhost:3001/api/hello && npm run dev --workspace=src/frontend\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "build": "npm run build --workspace=src/frontend",
-    "start": "npm start --workspace=src/backend",
-    "package": "npm run package --workspace=src/backend"
+    "package": "npm run build && electron-builder",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "concurrently": "^8.2.0",
     "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
     "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.example.ai-story-builder",
+    "productName": "AI Story Builder",
+    "directories": {
+      "output": "release"
+    },
+    "asar": false,
+    "files": [
+      "src/electron/**/*",
+      "src/backend/**/*",
+      "dist/**/*",
+      "!src/backend/scripts/**/*",
+      "!src/backend/dist-sea/**/*",
+      "!src/frontend/**/*"
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "linux": {
+      "target": [{ "target": "AppImage", "arch": ["x64"] }]
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }]
+    }
   }
 }

@@ -13,7 +13,7 @@ router.get('/tree', (req, res) => {
   try {
     const db = new Database(dbPath, { readonly: true })
     db.pragma('foreign_keys = ON')
-    const folders = db.prepare('SELECT id, parent_id, name, created_at FROM folders ORDER BY id').all()
+    const folders = db.prepare('SELECT id, parent_id, name, created_at FROM lore_folders ORDER BY id').all()
     db.close()
     const map = new Map(); folders.forEach(f => map.set(f.id, { ...f, children: [] }))
     const roots = []
