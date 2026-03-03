@@ -3,7 +3,7 @@
 // Run after scripts/bundle.js has already produced dist-sea/bundle.js.
 
 const { execSync, spawnSync } = require('child_process');
-const { copyFileSync, mkdirSync } = require('fs');
+const { copyFileSync, mkdirSync, writeFileSync, chmodSync } = require('fs');
 const path = require('path');
 
 const platform = process.platform;
@@ -47,3 +47,35 @@ if (platform === 'darwin') {
 }
 
 console.log(`Done: ${outputPath}`);
+
+// 6. Write wrapper scripts for all platforms
+const wrappers = {
+  'run.sh': [
+    '#!/usr/bin/env bash',
+    'cd "$(dirname "$0")"',
+    'exec ./ai-story-builder-linux "$@"',
+    '',
+  ].join('\n'),
+
+  'run.command': [
+    '#!/usr/bin/env bash',
+    'cd "$(dirname "$0")"',
+    'exec ./ai-story-builder-macos',
+    '',
+  ].join('\n'),
+
+  'run.bat': [
+    '@echo off',
+    'cd /d "%~dp0"',
+    'ai-story-builder-win.exe %*',
+    'pause',
+    '',
+  ].join('\r\n'),
+};
+
+for (const [name, content] of Object.entries(wrappers)) {
+  const wrapperPath = path.join(releaseDir, name);
+  writeFileSync(wrapperPath, content);
+  if (name !== 'run.bat') chmodSync(wrapperPath, 0o755);
+  console.log(`Written: ${wrapperPath}`);
+}
