@@ -1,24 +1,28 @@
-export interface LoreFolderNode {
+/**
+ * Unified lore tree node.
+ * - A node with children acts as a folder/section.
+ * - A node with latest_version_status !== null has content (acts as an item).
+ * - A node can be both (section with its own overview text).
+ */
+export interface LoreNode {
   id: number
   parent_id: number | null
   name: string
+  position: number
+  /** Node deletion status: 'ACTIVE' | 'TO_BE_DELETED' */
+  status: string
+  /** Status of the latest lore_version, null if no versions exist */
+  latest_version_status: string | null
   created_at: string
-  children: LoreFolderNode[]
-}
-
-export interface LoreItem {
-  id: number
-  folder_id: number
-  slug: string
-  title: string | null
-  created_at: string
+  children: LoreNode[]
 }
 
 export interface LoreVersion {
   id: number
-  lore_item_id: number
+  lore_node_id: number
   version: number
   content: string
+  status: string
   created_at: string
 }
 

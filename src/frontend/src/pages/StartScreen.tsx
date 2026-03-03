@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import api from '../api'
 
+import { FolderOpen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -15,31 +16,15 @@ function projectDisplayName(fullPath: string): string {
 export default function StartScreen({ onOpenProject, localeStrings }: { onOpenProject: (path: string, data: ProjectData) => void; localeStrings: LocaleStrings }) {
   const navigate = useNavigate()
   const [recent, setRecent] = useState<string[]>([])
-  const [file, setFile] = useState<File | null>(null)
-  const [status, setStatus] = useState<string | null>(null)
+  const [projectsData, setProjectsData] = useState<{ dir: string; files: string[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.get<string[]>('/project/recent').then(r => setRecent(r)).catch(() => setRecent([]))
+    api.get<{ dir: string; files: string[] }>('/project/files')
+      .then(r => setProjectsData(r))
+      .catch(() => setProjectsData(null))
   }, [])
-
-  function upload(e: React.FormEvent) {
-    e.preventDefault()
-    if (!file) return
-    setStatus('uploading')
-    setError(null)
-
-    const fd = new FormData()
-    fd.append('dbfile', file)
-    fetch('/api/project/upload', { method: 'POST', body: fd })
-      .then(r => r.json())
-      .then((j: ProjectData) => {
-        setStatus('done')
-        onOpenProject(j.path, j)
-        navigate('/project')
-      })
-      .catch((err: Error) => { setStatus('error'); setError(err.message); console.error(err) })
-  }
 
 
 function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectData) => void }) {
@@ -80,6 +65,10 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
     </div>
   )
 }
+
+  function openFolder() {
+    api.post('/project/open-folder').catch(console.error)
+  }
 
   async function openRecent(path: string) {
     setError(null)
@@ -133,24 +122,34 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
       </section>
 
       <section className="mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="text-xl font-semibold">{localeStrings['start.projects_folder'] || 'Projects folder'}</h3>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openFolder} title="Open in file manager">
+            <FolderOpen className="h-4 w-4" />
+          </Button>
+        </div>
+        {projectsData && (
+          <p className="text-xs text-muted-foreground mb-2 break-all">{projectsData.dir}</p>
+        )}
+        <ul className="list-disc pl-5 space-y-1">
+          {(!projectsData || projectsData.files.length === 0) && (
+            <li className="text-muted-foreground">{localeStrings['start.no_files'] || 'No project files found'}</li>
+          )}
+          {projectsData?.files.map(f => (
+            <li key={f}>
+              <Button variant="link" className="p-0 h-auto" onClick={() => openRecent(f)}>
+                {projectDisplayName(f)}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mb-6">
         <h3 className="text-xl font-semibold mb-2">{localeStrings['start.create'] || 'Create new project'}</h3>
         <CreateNewForm onCreated={(p, data) => onOpenProject(p, data)} />
       </section>
 
-      <section>
-        <h3 className="text-xl font-semibold mb-2">{localeStrings['start.upload'] || 'Upload project DB'}</h3>
-        <form onSubmit={upload} className="flex items-center space-x-2">
-          <Input
-            type="file"
-            accept=".sqlite,.db"
-            onChange={e => setFile(e.target.files?.[0] ?? null)}
-          />
-          <Button type="submit">
-            {localeStrings['start.upload_btn'] || 'Upload'}
-          </Button>
-        </form>
-        {status && <p className="mt-2 text-sm text-muted-foreground">Status: {status}</p>}
-      </section>
     </div>
   )
 }

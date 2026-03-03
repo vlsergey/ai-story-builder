@@ -10,7 +10,7 @@ import LoreFolderSection from './LoreFolderSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
-import { LoreItem, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
+import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -37,7 +37,7 @@ const WelcomeWatermark = () => (
  */
 export default function Layout({ localeStrings, onClose, initialLayout }: { localeStrings: LocaleStrings; onClose: () => void; initialLayout: unknown | null }) {
   // Use local state to track selected lore item and pass dbPath into child components
-  const [selectedLoreItem, setSelectedLoreItem] = React.useState<LoreItem | null>(null)
+  const [selectedLoreNode, setSelectedLoreNode] = React.useState<LoreNode | null>(null)
   const [selectedPlanNode, setSelectedPlanNode] = React.useState<PlanNodeTree | null>(null)
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
@@ -262,21 +262,21 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     lore: () => (
       <div className="p-2 h-full">
         <LoreFolderSection
-          onSelectLoreItem={node => { setSelectedPlanNode(null); setSelectedLoreItem(node) }}
+          onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
         />
       </div>
     ),
     plan: () => (
       <div className="p-2 h-full">
         <PlanSection
-          onSelectNode={node => { setSelectedLoreItem(null); setSelectedPlanNode(node) }}
+          onSelectNode={node => { setSelectedLoreNode(null); setSelectedPlanNode(node) }}
         />
       </div>
     ),
     editor: () => (
       <div className="p-2 h-full">
-        {selectedLoreItem ? (
-          <LoreEditor loreItem={selectedLoreItem} />
+        {selectedLoreNode ? (
+          <LoreEditor loreNode={selectedLoreNode} />
         ) : selectedPlanNode ? (
           <PlanEditor planNode={selectedPlanNode} />
         ) : (

@@ -1,25 +1,20 @@
 // Database row types matching the schema defined in db/migrations.ts
 
-export interface LoreFolderRow {
+export interface LoreNodeRow {
   id: number
   parent_id: number | null
   name: string
-  created_at: string
-}
-
-export interface LoreItemRow {
-  id: number
-  folder_id: number
-  slug: string
-  title: string | null
+  position: number
+  status: string
   created_at: string
 }
 
 export interface LoreVersionRow {
   id: number
-  lore_item_id: number
+  lore_node_id: number
   version: number
   content: string
+  status: string
   created_at: string
 }
 
@@ -93,8 +88,11 @@ export interface SettingRow {
 
 // Composite / derived types
 
-export interface LoreFolderNode extends LoreFolderRow {
-  children: LoreFolderNode[]
+/** Full lore tree node (returned by GET /lore_nodes/tree) */
+export interface LoreTreeNode extends LoreNodeRow {
+  /** Status of the latest lore_version, or null if no versions exist */
+  latest_version_status: string | null
+  children: LoreTreeNode[]
 }
 
 export interface PlanNodeTree extends PlanNodeRow {

@@ -1,15 +1,15 @@
 import React from 'react'
 import LoreFolderTree from './LoreFolderTree'
-import type { LoreItem } from '../types/models'
+import type { LoreNode } from '../types/models'
 
 interface LoreFolderSectionProps {
-  onSelectLoreItem: (loreItem: LoreItem) => void
+  onSelectLoreNode: (node: LoreNode) => void
 }
 
-export default function LoreFolderSection({ onSelectLoreItem }: LoreFolderSectionProps) {
+export default function LoreFolderSection({ onSelectLoreNode }: LoreFolderSectionProps) {
   return (
     <div>
-      <LoreFolderTree onSelectLoreItem={onSelectLoreItem} />
+      <LoreFolderTree onSelectLoreNode={onSelectLoreNode} />
     </div>
   )
 }

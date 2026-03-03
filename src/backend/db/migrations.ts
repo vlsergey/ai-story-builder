@@ -6,30 +6,27 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   // version 0 → 1: initial schema
   (db) => {
     db.exec(`
-      CREATE TABLE lore_folders (
-        id        INTEGER PRIMARY KEY,
-        parent_id INTEGER NULL REFERENCES lore_folders(id) ON DELETE CASCADE,
-        name      TEXT NOT NULL,
+      -- Unified lore tree.
+      -- A node with children acts as a folder; a node with versions holds content.
+      -- There is no separate node_type — behaviour emerges from usage.
+      CREATE TABLE lore_nodes (
+        id         INTEGER PRIMARY KEY,
+        parent_id  INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
+        name       TEXT NOT NULL,
+        position   INTEGER DEFAULT 0,
+        status     TEXT NOT NULL DEFAULT 'ACTIVE',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (parent_id, name)
       );
 
-      CREATE TABLE lore_items (
-        id        INTEGER PRIMARY KEY,
-        folder_id INTEGER NOT NULL REFERENCES lore_folders(id) ON DELETE CASCADE,
-        slug      TEXT NOT NULL,
-        title     TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (folder_id, slug)
-      );
-
       CREATE TABLE lore_versions (
         id           INTEGER PRIMARY KEY,
-        lore_item_id INTEGER NOT NULL REFERENCES lore_items(id) ON DELETE CASCADE,
+        lore_node_id INTEGER NOT NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
         version      INTEGER NOT NULL,
         content      TEXT NOT NULL,
+        status       TEXT NOT NULL DEFAULT 'ACTIVE',
         created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (lore_item_id, version)
+        UNIQUE (lore_node_id, version)
       );
 
       CREATE TABLE plan_nodes (

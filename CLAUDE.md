@@ -17,3 +17,4 @@
 ## Git Commits
 
 - Never add AI name (e.g. "Co-Authored-By: Claude") to commit messages or descriptions.
+- After any significant change (new feature, bug fix, refactor, doc update), create a git commit before moving on.

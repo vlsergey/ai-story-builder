@@ -55,8 +55,7 @@
   * If no database is open, the UI displays the Start screen for project selection
 * On startup user can select to:
     * open one of 3-5 recent used projects (databases)
-    * open some other database, which SQLite file is present in work directory of backend
-    * import db file using file upload functionality
+    * open any SQLite project file present in the projects folder (listed on the Start screen)
 * When a project is opened, the server state is updated to track that database as the current session
 * Before opening database file a backup should be created. System should maintain up to 7 file backups (may be changed in app config)
 * On opening file version check should be performed (i.e. Liquibase schema version check). If old version is detected confirmation should be asked to upgrade file to latest (current) version of db schema. On decline database should be closed and UI returned to project selection
@@ -74,10 +73,18 @@ Lore of story is stable collection of text organized in folders. Some folders wi
 * rename folder
 * delete folder (ask for confirmation)
 * create new file in folder (open MD editor automatically)
-* import (upload) files to directory
+* import (upload) files to directory (via Import button in toolbar)
+* export one or more lore items as text files (via Export button in toolbar)
 * rename file
 * select multiple files to do batch operations: move/delete/export/drop
-* the most important operation: sync lore to AI engine. Actual behavior depends on engine:
+
+The Lore panel has a toolbar with the following icon buttons:
+* **Create folder** — active when exactly one folder is selected; creates a subfolder inside it
+* **Create item** — active when exactly one folder is selected; creates a new lore item in it
+* **Import** — active when exactly one folder is selected; imports a file as a new lore item (modal in future)
+* **Export** — active when at least one lore item is selected; downloads selected items as text files
+* **Delete** — active when at least one element is selected; marks selected items/folders as `TO_BE_DELETED` in the database (soft-delete). Items and folders with this status are displayed with a strikethrough until the next AI Engine sync removes them permanently. If an item has no versions yet (never saved), it is hard-deleted immediately.
+* **Sync with AI Engine** — always active; synchronises all lore with the selected AI Engine and permanently removes items/folders marked as `TO_BE_DELETED`. Actual behavior depends on engine:
   * Yandex Cloud AI: upload files to collection / vector storage (replacing existing, so we can refer to those files as single Yandex Cloud AI vector ID)
   * Grok AI: group/concatenate files up to 10 files (usually by folders) and upload as files (remembering IDs)
 * Each lore item should have status: DRAFT (not uploaded to AI engine) / UPLOADED. This status will be different to each supported AI engine (stored separately).

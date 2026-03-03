@@ -3,8 +3,7 @@ import path from 'path'
 import fs from 'fs'
 
 import projectsRouter from './routes/projects.js'
-import loreFoldersRouter from './routes/lore_folders.js'
-import loreRouter from './routes/lore.js'
+import loreNodesRouter from './routes/lore_nodes.js'
 import plansRouter from './routes/plans.js'
 import generationRouter from './routes/generation.js'
 import settingsRouter from './routes/settings.js'
@@ -47,8 +46,7 @@ app.use((req, res, next) => {
 
 // API routes
 app.use('/api/project', projectsRouter)
-app.use('/api/lore_folders', loreFoldersRouter)
-app.use('/api/lore_items', loreRouter)
+app.use('/api/lore_nodes', loreNodesRouter)
 app.use('/api/plan', plansRouter)
 app.use('/api', generationRouter)
 app.use('/api/settings', settingsRouter)

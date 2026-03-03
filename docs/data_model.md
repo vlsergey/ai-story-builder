@@ -29,31 +29,28 @@ Important keys:
   - `ui_layout` → JSON with saved dockable layout
   - `last_opened_at`, `project_title`, etc.
 
-## Lore (Folder hierarchy and persistent texts)
-Lore is organized in a folder hierarchy. Folders can contain other folders and lore items.
+## Lore (Unified tree of nodes and persistent texts)
+Lore is a unified tree of nodes. A node with children acts as a section/folder; a node with
+versions holds content; a node may be both. There is no separate node type field — behaviour
+emerges from usage.
 
-- `lore_folders`
+- `lore_nodes`
   - `id` INTEGER PRIMARY KEY
-  - `parent_id` INTEGER NULL REFERENCES `lore_folders`(`id`) ON DELETE CASCADE
+  - `parent_id` INTEGER NULL REFERENCES `lore_nodes`(`id`) ON DELETE CASCADE
   - `name` TEXT NOT NULL
+  - `position` INTEGER DEFAULT 0
+  - `status` TEXT NOT NULL DEFAULT 'ACTIVE'   -- ACTIVE | TO_BE_DELETED
   - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
   - Unique constraint on (`parent_id`, `name`)
 
-- `lore_items`
-  - `id` INTEGER PRIMARY KEY
-  - `folder_id` INTEGER NOT NULL REFERENCES `lore_folders`(`id`) ON DELETE CASCADE
-  - `slug` TEXT NOT NULL
-  - `title` TEXT
-  - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-  - Unique constraint on (`folder_id`, `slug`)
-
 - `lore_versions`
   - `id` INTEGER PRIMARY KEY
-  - `lore_item_id` INTEGER NOT NULL REFERENCES `lore_items`(`id`) ON DELETE CASCADE
+  - `lore_node_id` INTEGER NOT NULL REFERENCES `lore_nodes`(`id`) ON DELETE CASCADE
   - `version` INTEGER NOT NULL
   - `content` TEXT NOT NULL
+  - `status` TEXT NOT NULL DEFAULT 'ACTIVE'   -- ACTIVE | TO_BE_DELETED | UPLOADED
   - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-  - Unique constraint on (`lore_item_id`, `version`)
+  - Unique constraint on (`lore_node_id`, `version`)
 
 ## Story Plan (hierarchical tree)
 - `plan_nodes`

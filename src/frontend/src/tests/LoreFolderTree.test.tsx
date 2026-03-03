@@ -8,7 +8,7 @@ global.fetch = vi.fn() as unknown as typeof fetch;
 
 describe('LoreFolderTree', () => {
   const mockProps = {
-    onSelectLoreItem: vi.fn()
+    onSelectLoreNode: vi.fn()
   };
 
   beforeEach(() => {
@@ -17,7 +17,7 @@ describe('LoreFolderTree', () => {
 
   it('renders without crashing when tree data is an array', () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      json: () => Promise.resolve([{ id: 1, name: 'Folder 1', children: [] }])
+      json: () => Promise.resolve([{ id: 1, name: 'Story Lore', parent_id: null, status: 'ACTIVE', latest_version_status: null, children: [] }])
     });
 
     expect(() => {

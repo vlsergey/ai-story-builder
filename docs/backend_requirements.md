@@ -23,7 +23,7 @@
 - Shared utilities (database connection, settings, helpers) should be factored into reusable modules.
 - The main `server.js` should mostly wire up middleware and import route modules rather than containing business logic.
 - Each project is stored in its own SQLite database file (.sqlite). The application works with only one open project at a time.
-- All user data (project databases, backups, uploads, application settings) is stored in the OS-standard user data directory via Electron's `app.getPath('userData')`. In development (plain Node.js), falls back to `<cwd>/data`.
+- All user data (project databases, backups, application settings) is stored in the OS-standard user data directory via Electron's `app.getPath('userData')`. In development (plain Node.js), falls back to `<cwd>/data`.
 - Automatic database backup is created before opening any project and before schema migrations (keep last 7 backups).
 - Full support for multiple AI backends: Grok API, Yandex Cloud AI, Local LLM (via OpenAI-compatible HTTP endpoint), and Mock mode.
 

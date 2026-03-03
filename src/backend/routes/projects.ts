@@ -25,22 +25,6 @@ try {
   Database = null
 }
 
-// multer is an optional dependency
-let upload: {
-  single: (field: string) => express.RequestHandler
-}
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const multer = require('multer') as typeof import('multer')
-  upload = multer({ dest: path.join(getDataDir(), 'uploads') })
-} catch (_) {
-  upload = {
-    single: () => (_req: Request, res: Response) => {
-      res.status(501).json({ error: 'file upload not available (multer missing)' })
-    },
-  }
-}
-
 function getProjectInitialData(dbPath: string): ProjectInitialData {
   if (!Database) return { layout: null, projectTitle: null }
   try {
@@ -113,50 +97,39 @@ router.get('/recent', (_req: Request, res: Response) => {
   res.json(s.recent || [])
 })
 
-// POST /project/upload
-router.post('/upload', upload.single('dbfile'), (req: Request, res: Response) => {
-  if (!req.file) return res.status(400).json({ error: 'No file' })
+// GET /project/files — list all supported project files in the projects directory
+router.get('/files', (_req: Request, res: Response) => {
+  const projectsDir = path.join(getDataDir(), 'projects')
+  if (!fs.existsSync(projectsDir)) return res.json({ dir: projectsDir, files: [] })
+  const files = fs
+    .readdirSync(projectsDir)
+    .filter((f) => f.endsWith('.sqlite') || f.endsWith('.db'))
+    .map((f) => path.join(projectsDir, f))
+  res.json({ dir: projectsDir, files })
+})
 
+// POST /project/open-folder — open the projects directory in the OS file manager
+router.post('/open-folder', (_req: Request, res: Response) => {
   const projectsDir = path.join(getDataDir(), 'projects')
   fs.mkdirSync(projectsDir, { recursive: true })
-  const dest = path.join(projectsDir, req.file.originalname)
-  fs.renameSync(req.file.path, dest)
-
-  setCurrentDbPath(dest)
-
-  // create backup
-  const backupsDir = path.join(getDataDir(), 'backups')
-  fs.mkdirSync(backupsDir, { recursive: true })
-  const ts = new Date().toISOString().replace(/[:.]/g, '-')
-  const backupName = `${req.file.originalname}.${ts}.bak`
-  fs.copyFileSync(dest, path.join(backupsDir, backupName))
-
-  // trim backups to last 7
-  const prefix = req.file.originalname + '.'
-  const all = fs.readdirSync(backupsDir).filter((f) => f.startsWith(prefix))
-  all.sort()
-  while (all.length > 7) {
-    const rm = all.shift()!
-    try { fs.unlinkSync(path.join(backupsDir, rm)) } catch (_) {}
+  try {
+    // In production, the backend runs inside Electron — use shell.openPath()
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { shell } = require('electron') as typeof import('electron')
+    shell.openPath(projectsDir)
+  } catch {
+    // In dev, fall back to a platform-specific CLI command
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { exec } = require('child_process') as typeof import('child_process')
+    const cmd =
+      process.platform === 'win32'
+        ? `explorer "${projectsDir}"`
+        : process.platform === 'darwin'
+          ? `open "${projectsDir}"`
+          : `xdg-open "${projectsDir}"`
+    exec(cmd)
   }
-
-  updateRecent(dest)
-
-  let versionState = 'unknown'
-  if (Database) {
-    try {
-      const db = new Database(dest, { readonly: true })
-      const row = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
-        .get()
-      versionState = row ? 'ok' : 'old'
-      db.close()
-    } catch (_) {
-      versionState = 'error'
-    }
-  }
-
-  res.json({ path: dest, backup: backupName, versionState, ...getProjectInitialData(dest) })
+  res.json({ ok: true })
 })
 
 // POST /project/create
@@ -173,14 +146,14 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
   if (fs.existsSync(dbPath)) {
     try {
       const db = openProjectDatabase(dbPath) // runs migrations on any existing DB
-      // Insert default folders if none exist yet (e.g. DB was empty from a failed migration)
-      const hasRoot = db.prepare('SELECT id FROM lore_folders WHERE parent_id IS NULL LIMIT 1').get()
+      // Insert default nodes if none exist yet (e.g. DB was empty from a failed migration)
+      const hasRoot = db.prepare('SELECT id FROM lore_nodes WHERE parent_id IS NULL LIMIT 1').get()
       if (!hasRoot) {
-        const insertFolder = db.prepare('INSERT INTO lore_folders (parent_id, name) VALUES (?, ?)')
-        const root = insertFolder.run(null, 'Story Lore')
+        const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
+        const root = insertNode.run(null, 'Story Lore')
         const rootId = root.lastInsertRowid
-        const defaults = ['locations', 'abilities', 'spells', 'bestiary', 'characters']
-        for (const f of defaults) insertFolder.run(rootId, f)
+        const defaults = ['Characters', 'Locations', 'Abilities', 'Spells', 'Bestiary', 'Quests']
+        for (const f of defaults) insertNode.run(rootId, f)
       }
       db.close()
     } catch (e) {
@@ -194,12 +167,12 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
   try {
     const db: import('better-sqlite3').Database = openProjectDatabase(dbPath)
 
-    // Insert root folder and default children into lore_folders table
-    const insertFolder = db.prepare('INSERT INTO lore_folders (parent_id, name) VALUES (?, ?)')
-    const root = insertFolder.run(null, 'Story Lore')
+    // Insert root node and default children into lore_nodes table
+    const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
+    const root = insertNode.run(null, 'Story Lore')
     const rootId = root.lastInsertRowid
-    const defaults = ['locations', 'abilities', 'spells', 'bestiary', 'characters']
-    for (const f of defaults) insertFolder.run(rootId, f)
+    const defaults = ['Characters', 'Locations', 'Abilities', 'Spells', 'Bestiary', 'Quests']
+    for (const f of defaults) insertNode.run(rootId, f)
 
     // Store basic settings
     const setSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
