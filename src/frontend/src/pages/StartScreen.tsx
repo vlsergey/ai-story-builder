@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import api from '../api'
 
-import { FolderOpen } from 'lucide-react'
+import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -13,21 +13,8 @@ function projectDisplayName(fullPath: string): string {
   return base.replace(/\.[^.]+$/, '')
 }
 
-export default function StartScreen({ onOpenProject, localeStrings }: { onOpenProject: (path: string, data: ProjectData) => void; localeStrings: LocaleStrings }) {
-  const navigate = useNavigate()
-  const [recent, setRecent] = useState<string[]>([])
-  const [projectsData, setProjectsData] = useState<{ dir: string; files: string[] } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.get<string[]>('/project/recent').then(r => setRecent(r)).catch(() => setRecent([]))
-    api.get<{ dir: string; files: string[] }>('/project/files')
-      .then(r => setProjectsData(r))
-      .catch(() => setProjectsData(null))
-  }, [])
-
-
 function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectData) => void }) {
+  const navigate = useNavigate()
   const [name, setName] = React.useState('MyProject')
   const [busy, setBusy] = React.useState(false)
   const [createError, setCreateError] = React.useState<string | null>(null)
@@ -37,12 +24,18 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
     setBusy(true)
     setCreateError(null)
     try {
-      const res = await fetch('/api/project/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
-      const j = await res.json() as ProjectData & { error?: string }
+      const res = await fetch('/api/project/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const j = (await res.json()) as ProjectData & { error?: string }
       if (res.ok) {
         onCreated(j.path, j)
         navigate('/project')
-      } else setCreateError('Error creating project: ' + (j.error || JSON.stringify(j)))
+      } else {
+        setCreateError('Error creating project: ' + (j.error || JSON.stringify(j)))
+      }
     } catch (err) {
       setCreateError('Create failed: ' + (err as Error).message)
     } finally {
@@ -52,19 +45,40 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
 
   return (
     <div>
-      <form onSubmit={submit} className="flex items-center space-x-2">
+      <form onSubmit={submit} className="flex items-center gap-2">
         <Input
           value={name}
           onChange={e => setName(e.target.value)}
+          className="h-8 text-sm"
+          placeholder="Project name"
         />
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Creating...' : 'Create'}
+        <Button type="submit" disabled={busy} size="sm" className="flex-shrink-0">
+          {busy ? 'Creating…' : 'Create'}
         </Button>
       </form>
-      {createError && <p className="mt-1 text-sm text-destructive">{createError}</p>}
+      {createError && <p className="mt-2 text-xs text-destructive">{createError}</p>}
     </div>
   )
 }
+
+export default function StartScreen({
+  onOpenProject,
+  localeStrings,
+}: {
+  onOpenProject: (path: string, data: ProjectData) => void
+  localeStrings: LocaleStrings
+}) {
+  const [recent, setRecent] = useState<string[]>([])
+  const [projectsData, setProjectsData] = useState<{ dir: string; files: string[] } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.get<string[]>('/project/recent').then(r => setRecent(r)).catch(() => setRecent([]))
+    api
+      .get<{ dir: string; files: string[] }>('/project/files')
+      .then(r => setProjectsData(r))
+      .catch(() => setProjectsData(null))
+  }, [])
 
   function openFolder() {
     api.post('/project/open-folder').catch(console.error)
@@ -76,80 +90,157 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
       const res = await fetch('/api/project/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path })
+        body: JSON.stringify({ path }),
       })
       const text = await res.text()
       let data: ProjectData & { error?: string }
       try {
         data = JSON.parse(text)
-      } catch (e) {
-        console.error('Failed to parse response:', text)
+      } catch {
         setError('Error opening project: Invalid response from server')
         return
       }
       if (res.ok) {
         onOpenProject(data.path, data)
-        navigate('/project')
       } else {
         setError('Failed to open project: ' + (data.error || 'Unknown error'))
       }
     } catch (err) {
       setError('Error opening project: ' + (err as Error).message)
-      console.error(err)
     }
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto bg-background text-foreground min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">{localeStrings['start.title'] || 'Open project'}</h2>
-      </div>
+    <div className="min-h-screen flex bg-background text-foreground">
 
-      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+      {/* ── Left panel: branding + recent projects ── */}
+      <aside className="w-64 flex-shrink-0 flex flex-col border-r border-border bg-muted/20">
 
-      <section className="mb-6">
-        <h3 className="text-xl font-semibold mb-2">{localeStrings['start.recent'] || 'Recent projects'}</h3>
-        <ul className="list-disc pl-5 space-y-1">
-          {recent.length === 0 && <li className="text-muted-foreground">{localeStrings['start.no_recent'] || 'No recent projects'}</li>}
-          {recent.map(r => (
-            <li key={r}>
-              <Button variant="link" className="p-0 h-auto" onClick={() => openRecent(r)}>
-                {projectDisplayName(r)}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <h3 className="text-xl font-semibold">{localeStrings['start.projects_folder'] || 'Projects folder'}</h3>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openFolder} title="Open in file manager">
-            <FolderOpen className="h-4 w-4" />
-          </Button>
+        {/* App identity */}
+        <div className="px-5 pt-8 pb-5 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+              <BookOpen className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold leading-tight">AI Story Builder</p>
+              <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                creative writing companion
+              </p>
+            </div>
+          </div>
         </div>
-        {projectsData && (
-          <p className="text-xs text-muted-foreground mb-2 break-all">{projectsData.dir}</p>
-        )}
-        <ul className="list-disc pl-5 space-y-1">
-          {(!projectsData || projectsData.files.length === 0) && (
-            <li className="text-muted-foreground">{localeStrings['start.no_files'] || 'No project files found'}</li>
+
+        {/* Recent projects list */}
+        <div className="flex-1 overflow-y-auto py-4">
+          <p className="px-5 mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {localeStrings['start.recent'] || 'Recent'}
+          </p>
+
+          {error && (
+            <div className="mx-3 mb-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">
+              {error}
+            </div>
           )}
-          {projectsData?.files.map(f => (
-            <li key={f}>
-              <Button variant="link" className="p-0 h-auto" onClick={() => openRecent(f)}>
-                {projectDisplayName(f)}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </section>
 
-      <section className="mb-6">
-        <h3 className="text-xl font-semibold mb-2">{localeStrings['start.create'] || 'Create new project'}</h3>
-        <CreateNewForm onCreated={(p, data) => onOpenProject(p, data)} />
-      </section>
+          {recent.length === 0 ? (
+            <p className="px-5 py-2 text-xs text-muted-foreground">
+              {localeStrings['start.no_recent'] || 'No recent projects'}
+            </p>
+          ) : (
+            <ul className="space-y-0.5 px-2">
+              {recent.map(r => (
+                <li key={r}>
+                  <button
+                    onClick={() => openRecent(r)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors text-left group"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                    <span className="truncate flex-1">{projectDisplayName(r)}</span>
+                    <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </aside>
 
+      {/* ── Right panel: create new + projects folder ── */}
+      <main className="flex-1 flex flex-col overflow-y-auto">
+
+        {/* Page header */}
+        <div className="px-10 pt-10 pb-8">
+          <h2 className="text-2xl font-bold tracking-tight">
+            {localeStrings['start.title'] || 'Open project'}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Start a new story or continue an existing one.
+          </p>
+        </div>
+
+        <div className="px-10 pb-10 flex flex-col gap-8 max-w-lg">
+
+          {/* ── Create new project ── */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Plus className="h-4 w-4 text-primary flex-shrink-0" />
+              <h3 className="text-sm font-semibold">
+                {localeStrings['start.create'] || 'New project'}
+              </h3>
+            </div>
+            <CreateNewForm onCreated={(p, data) => onOpenProject(p, data)} />
+          </section>
+
+          <div className="border-t border-border" />
+
+          {/* ── Projects folder ── */}
+          <section>
+            <div className="flex items-center gap-2 mb-1">
+              <FolderOpen className="h-4 w-4 text-primary flex-shrink-0" />
+              <h3 className="text-sm font-semibold">
+                {localeStrings['start.projects_folder'] || 'Projects folder'}
+              </h3>
+              <button
+                onClick={openFolder}
+                title="Open in file manager"
+                className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Show in explorer
+              </button>
+            </div>
+
+            {projectsData && (
+              <p className="text-[11px] text-muted-foreground mb-3 pl-6 break-all">
+                {projectsData.dir}
+              </p>
+            )}
+
+            {!projectsData || projectsData.files.length === 0 ? (
+              <p className="pl-6 text-sm text-muted-foreground">
+                {localeStrings['start.no_files'] || 'No project files found'}
+              </p>
+            ) : (
+              <ul className="space-y-0.5">
+                {projectsData.files.map(f => (
+                  <li key={f}>
+                    <button
+                      onClick={() => openRecent(f)}
+                      className="w-full flex items-center gap-2.5 pl-6 pr-2 py-1.5 rounded-md text-sm hover:bg-accent transition-colors text-left group"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                      <span className="truncate flex-1">{projectDisplayName(f)}</span>
+                      <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+        </div>
+      </main>
     </div>
   )
 }
