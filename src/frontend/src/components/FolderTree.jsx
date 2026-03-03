@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Button } from './ui/button'
 
 // Simple folder tree. Props:
 // - `onSelectLoreItem(loreItem)` callback invoked when a lore item is selected
@@ -7,6 +8,7 @@ export default function FolderTree({ onSelectLoreItem }) {
   const [tree, setTree] = useState([])
   const [selectedFolder, setSelectedFolder] = useState(null)
   const [items, setItems] = useState([])
+  const [importError, setImportError] = useState(null)
 
   useEffect(() => { fetchTree() }, [])
 
@@ -32,7 +34,6 @@ export default function FolderTree({ onSelectLoreItem }) {
     const data = e.dataTransfer.getData('application/x-folder-id')
     if (!data) return
     const sourceId = data
-    // call API to move folder
     fetch('/api/folders/' + sourceId + '/move', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: targetNode.id })
     }).then(r => r.json()).then(() => fetchTree()).catch(err => console.error(err))
@@ -65,12 +66,9 @@ export default function FolderTree({ onSelectLoreItem }) {
         <ul className="space-y-1">
           {items.map(it => (
             <li key={it.id}>
-              <button 
-                className="text-primary hover:underline text-sm"
-                onClick={() => onSelectLoreItem(it)}
-              >
+              <Button variant="link" className="p-0 h-auto text-sm" onClick={() => onSelectLoreItem(it)}>
                 {it.title || it.slug}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -78,17 +76,22 @@ export default function FolderTree({ onSelectLoreItem }) {
 
       <div className="mt-3">
         <h5 className="font-medium mb-1">Import file to selected folder</h5>
-        <input 
-          type="file" 
+        {importError && <p className="mb-1 text-sm text-destructive">{importError}</p>}
+        <input
+          type="file"
           className="text-sm"
           onChange={e => {
             const f = e.target.files[0]
-            if (!f || !selectedFolder) return alert('Select a folder first')
+            setImportError(null)
+            if (!f || !selectedFolder) { setImportError('Select a folder first'); return }
             const fd = new FormData()
             fd.append('file', f)
             fd.append('folder_id', selectedFolder)
-            fetch('/api/lore_items/import', { method: 'POST', body: fd }).then(r => r.json()).then(j => { fetchItems(selectedFolder); alert('Imported') }).catch(err => { alert('Import failed'); console.error(err) })
-          }} 
+            fetch('/api/lore_items/import', { method: 'POST', body: fd })
+              .then(r => r.json())
+              .then(() => fetchItems(selectedFolder))
+              .catch(err => { setImportError('Import failed'); console.error(err) })
+          }}
         />
       </div>
     </div>

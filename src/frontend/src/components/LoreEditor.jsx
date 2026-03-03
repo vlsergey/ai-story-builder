@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import DiffViewer from './DiffViewer'
+import { Button } from './ui/button'
+import { Textarea } from './ui/textarea'
 
 // Minimal markdown editor for lore versions. Props:
 // - `loreItem` - selected lore item object { id, slug, title }
@@ -9,6 +11,7 @@ export default function LoreEditor({ loreItem }) {
   const [saving, setSaving] = useState(false)
   const [versions, setVersions] = useState([])
   const [diffTarget, setDiffTarget] = useState(null)
+  const [error, setError] = useState(null)
 
   useEffect(() => { if (loreItem) { loadLatest(); loadVersions() } }, [loreItem])
 
@@ -22,15 +25,15 @@ export default function LoreEditor({ loreItem }) {
 
   async function saveNewVersion() {
     setSaving(true)
+    setError(null)
     try {
       const res = await fetch(`/api/lore_items/${loreItem.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
       const j = await res.json()
       if (res.ok) {
         loadLatest()
         loadVersions()
-        alert('Saved version ' + j.version)
-      } else alert('Save error: ' + (j.error || JSON.stringify(j)))
-    } catch (e) { alert('Save failed: ' + e.message) }
+      } else setError('Save error: ' + (j.error || JSON.stringify(j)))
+    } catch (e) { setError('Save failed: ' + e.message) }
     setSaving(false)
   }
 
@@ -44,43 +47,31 @@ export default function LoreEditor({ loreItem }) {
   return (
     <div className="p-4 bg-background">
       <h3 className="text-xl font-semibold mb-2">{loreItem.title || loreItem.slug}</h3>
+      {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
       <div className="mb-4 flex space-x-2">
-        <button 
-          className="text-sm text-primary hover:underline"
-          onClick={loadLatest}
-        >
+        <Button variant="link" className="p-0 h-auto" onClick={loadLatest}>
           Reload latest
-        </button>
-        <button 
-          className="text-sm text-primary hover:underline"
-          onClick={saveNewVersion} 
-          disabled={saving}
-        >
+        </Button>
+        <Button variant="link" className="p-0 h-auto" onClick={saveNewVersion} disabled={saving}>
           {saving ? 'Saving...' : 'Save new version'}
-        </button>
+        </Button>
       </div>
-      <textarea 
-        value={content} 
-        onChange={e => setContent(e.target.value)} 
-        className="w-full h-48 border border-border p-2 mb-4 bg-background text-foreground rounded"
+      <Textarea
+        value={content}
+        onChange={e => setContent(e.target.value)}
+        className="h-48 mb-4"
       />
       <h4 className="font-semibold mb-2">History</h4>
       <ul className="list-disc pl-5 space-y-1">
         {versions.map(v => (
           <li key={v.id} className="text-sm">
             <strong>v{v.version}</strong> <em className="text-muted-foreground">{v.created_at}</em>
-            <button 
-              className="ml-2 text-primary hover:underline"
-              onClick={() => setDiffTarget(v)}
-            >
+            <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => setDiffTarget(v)}>
               diff
-            </button>
-            <button 
-              className="ml-2 text-primary hover:underline"
-              onClick={() => restoreVersion(v.id)}
-            >
+            </Button>
+            <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => restoreVersion(v.id)}>
               restore
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

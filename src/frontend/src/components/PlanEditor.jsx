@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import DiffViewer from './DiffViewer'
 import GeneratedPartEditor from './GeneratedPartEditor'
+import { Button } from './ui/button'
+import { Textarea } from './ui/textarea'
+import { Label } from './ui/label'
 
 export default function PlanEditor({ planNode }) {
   const [versions, setVersions] = useState([])
@@ -10,6 +13,8 @@ export default function PlanEditor({ planNode }) {
   const [diffTarget, setDiffTarget] = useState(null)
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [generatedParts, setGeneratedParts] = useState([])
+  const [error, setError] = useState(null)
+
   useEffect(() => { if (planNode) loadVersions() }, [planNode])
 
   async function loadGenerated(versionId) {
@@ -25,17 +30,16 @@ export default function PlanEditor({ planNode }) {
   async function createVersion(e) {
     e.preventDefault()
     setBusy(true)
+    setError(null)
     try {
       const res = await fetch(`/api/plan/nodes/${planNode.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary, notes }) })
       const j = await res.json()
       if (res.ok) {
         loadVersions(); setSummary(''); setNotes('');
-        // Optionally regenerate plan result by calling /api/generate with the new plan_node_version_id
         const gen = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_node_version_id: j.id, prompt: summary }) })
-        // ignore response for now
         await gen.text()
-      } else alert('Create version error: ' + (j.error || JSON.stringify(j)))
-    } catch (e) { alert('Create failed: ' + e.message) }
+      } else setError('Create version error: ' + (j.error || JSON.stringify(j)))
+    } catch (e) { setError('Create failed: ' + e.message) }
     setBusy(false)
   }
 
@@ -49,31 +53,28 @@ export default function PlanEditor({ planNode }) {
   return (
     <div className="p-4 bg-background">
       <h3 className="text-xl font-semibold mb-2">{planNode.title}</h3>
+      {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
       <div className="mb-4">
         <form onSubmit={createVersion} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Summary</label>
-            <textarea 
-              value={summary} 
-              onChange={e => setSummary(e.target.value)} 
-              className="w-full h-20 border border-border p-2 bg-background text-foreground rounded"
+            <Label className="mb-1">Summary</Label>
+            <Textarea
+              value={summary}
+              onChange={e => setSummary(e.target.value)}
+              className="h-20"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Notes</label>
-            <textarea 
-              value={notes} 
-              onChange={e => setNotes(e.target.value)} 
-              className="w-full h-20 border border-border p-2 bg-background text-foreground rounded"
+            <Label className="mb-1">Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="h-20"
             />
           </div>
-          <button 
-            className="px-3 py-1 rounded text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            type="submit" 
-            disabled={busy}
-          >
+          <Button type="submit" disabled={busy}>
             {busy ? 'Creating...' : 'Create version and regenerate'}
-          </button>
+          </Button>
         </form>
       </div>
 
@@ -82,24 +83,15 @@ export default function PlanEditor({ planNode }) {
         {versions.map(v => (
           <li key={v.id} className="text-sm">
             <strong>v{v.version}</strong> — {v.summary || '(no summary)'} <em className="text-muted-foreground">({v.created_at})</em>
-            <button 
-              className="ml-2 text-primary hover:underline"
-              onClick={() => setDiffTarget(v)}
-            >
+            <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => setDiffTarget(v)}>
               diff
-            </button>
-            <button 
-              className="ml-2 text-primary hover:underline"
-              onClick={() => restoreVersion(v.id)}
-            >
+            </Button>
+            <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => restoreVersion(v.id)}>
               restore
-            </button>
-            <button 
-              className="ml-2 text-primary hover:underline"
-              onClick={() => { setSelectedVersion(v); loadGenerated(v.id) }}
-            >
+            </Button>
+            <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => { setSelectedVersion(v); loadGenerated(v.id) }}>
               view parts
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
@@ -115,12 +107,9 @@ export default function PlanEditor({ planNode }) {
           <ul className="list-disc pl-5 space-y-1">
             {generatedParts.map(p => (
               <li key={p.id}>
-                <button 
-                  className="text-primary hover:underline"
-                  onClick={() => setGeneratedParts([p])}
-                >
+                <Button variant="link" className="p-0 h-auto" onClick={() => setGeneratedParts([p])}>
                   {p.title || `Part ${p.id}`}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

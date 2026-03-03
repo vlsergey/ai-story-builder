@@ -1,34 +1,35 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
+import { Button } from './ui/button'
+import { Textarea } from './ui/textarea'
 
 export default function GeneratedPartEditor({ part }) {
   const [content, setContent] = useState(part.content || '')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
 
   async function save() {
     setSaving(true)
+    setError(null)
     try {
       const res = await fetch('/api/generated_parts/' + part.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
       const j = await res.json()
-      if (!res.ok) alert('Save error: ' + (j.error || JSON.stringify(j)))
-    } catch (e) { alert('Save failed: ' + e.message) }
+      if (!res.ok) setError('Save error: ' + (j.error || JSON.stringify(j)))
+    } catch (e) { setError('Save failed: ' + e.message) }
     setSaving(false)
   }
 
   return (
     <div className="p-4 bg-background border border-border rounded">
       <h5 className="font-semibold mb-2">{part.title || `Part ${part.id}`}</h5>
-      <textarea 
-        value={content} 
-        onChange={e => setContent(e.target.value)} 
-        className="w-full h-40 border border-border p-2 mb-2 bg-background text-foreground rounded"
+      {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
+      <Textarea
+        value={content}
+        onChange={e => setContent(e.target.value)}
+        className="h-40 mb-2"
       />
-      <button 
-        className="px-3 py-1 rounded text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        onClick={save} 
-        disabled={saving}
-      >
+      <Button onClick={save} disabled={saving}>
         {saving ? 'Saving...' : 'Save'}
-      </button>
+      </Button>
     </div>
   )
 }
