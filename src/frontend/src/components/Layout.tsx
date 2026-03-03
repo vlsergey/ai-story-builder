@@ -66,6 +66,18 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     return layout
   }
 
+  // Lock every group that has no panels (watermark groups).
+  // Called after any layout application — both fromJSON() and setupDefaultLayout() —
+  // so old saved layouts without the locked flag are also covered.
+  const lockWatermarkGroups = () => {
+    if (!dockviewRef.current) return
+    for (const group of dockviewRef.current.groups) {
+      if (group.panels.length === 0) {
+        group.locked = 'no-drop-target'
+      }
+    }
+  }
+
   // helper used after ready or when project is loaded
   const restoreLayout = async () => {
     if (!dockviewRef.current) {
@@ -90,6 +102,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
       console.log('[Layout] restoreLayout: no saved layout, using defaults')
       setupDefaultLayout()
     }
+    lockWatermarkGroups()
   }
 
   // Load layout only once when component mounts (project is already open in server)
@@ -157,9 +170,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     // triggers the AbsolutePosition branch which requires a direction and throws without one.
     // The empty group shows WelcomeWatermark; panels added with a direction create their own groups.
     const centerGroup = dockviewRef.current.addGroup()
-    // Disable all drop zones on the watermark group so it can't be accidentally moved or
-    // used as a drop target. 'no-drop-target' is stronger than true: it kills edge zones too.
-    centerGroup.locked = 'no-drop-target'
 
     dockviewRef.current.addPanel({
       id: 'lore-panel',
