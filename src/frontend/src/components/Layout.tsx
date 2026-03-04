@@ -372,6 +372,21 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     loreEditorTab: LoreEditorTab,
   };
 
+  // Prevent non-lore-editor panels from being dropped into the editor group.
+  // The editor group is identified by already containing at least one lore-editor panel.
+  const handleWillDrop = (event: any) => {
+    const targetGroup = event.group
+    if (!targetGroup) return
+    const isEditorGroup = targetGroup.panels.some(
+      (p: any) => p.id.startsWith('lore-editor-')
+    )
+    if (!isEditorGroup) return
+    const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
+    if (!draggedPanelId?.startsWith('lore-editor-')) {
+      event.preventDefault()
+    }
+  }
+
   return (
     <EditorSettingsContext.Provider value={{ wordWrap }}>
       <div className="flex flex-col h-full">
@@ -381,6 +396,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
             tabComponents={tabComponents}
             watermarkComponent={WelcomeWatermark}
             onReady={onReady}
+            onWillDrop={handleWillDrop}
             disableFloatingGroups={false}
             disableDnd={false}
             className="dockview-theme"
