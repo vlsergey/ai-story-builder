@@ -51,7 +51,7 @@ A dockview panel (`id='lore-wizard-{nodeId}'`) opened from the Lore toolbar via 
 
 **Layout (flex-col, full height):**
 - Prompt `<textarea>` (h-1/4) with placeholder text
-- Toolbar row: "Include existing lore" checkbox + "Generate" button
+- Toolbar row: "Include existing lore" checkbox (always enabled, **checked by default**) + "Generate" button; the backend decides how lore is grounded based on engine capabilities
 - CodeMirror Markdown editor (flex-1) displaying and allowing editing of the AI response
 - Footer row: name `<input>` + "Save" button
 

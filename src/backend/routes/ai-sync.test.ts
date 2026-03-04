@@ -487,7 +487,45 @@ describe('POST /ai/sync-lore', () => {
     expect(config.yandex.search_index_id).toBeUndefined()
   })
 
-  // ─── 11. 500 if file upload fails ─────────────────────────────────────────
+  // ─── 11. Files uploaded first, then vector store created (Yandex) ─────────
+
+  it('uploads all files first, then creates the vector store with those file IDs (Yandex)', async () => {
+    testDbPath = setupDb({
+      apiKey: 'AQVN-key',
+      folderId: 'b1g123',
+      nodes: [
+        { id: 1, name: 'Characters', content: 'Hero is brave', word_count: 3, to_be_deleted: 0, ai_sync_info: null },
+        { id: 2, name: 'Locations', content: 'Dark forest', word_count: 2, to_be_deleted: 0, ai_sync_info: null },
+      ],
+    })
+
+    const callOrder: string[] = []
+    const uploadedFileIds: string[] = []
+
+    mockFilesCreate
+      .mockImplementationOnce(async () => { callOrder.push('files.create:1'); uploadedFileIds.push('fid-1'); return { id: 'fid-1' } })
+      .mockImplementationOnce(async () => { callOrder.push('files.create:2'); uploadedFileIds.push('fid-2'); return { id: 'fid-2' } })
+    mockVsCreate.mockImplementationOnce(async (params: { file_ids?: string[] }) => {
+      callOrder.push('vectorStores.create')
+      expect(params.file_ids).toEqual(expect.arrayContaining(['fid-1', 'fid-2']))
+      return { id: 'vs-result', status: 'completed' }
+    })
+
+    const res = await request(app).post('/ai/sync-lore')
+    expect(res.status).toBe(200)
+    expect(res.body.uploaded).toBe(2)
+    expect(res.body.search_index_id).toBe('vs-result')
+
+    // Both file uploads must precede the vector store creation
+    expect(callOrder).toEqual(['files.create:1', 'files.create:2', 'vectorStores.create'])
+
+    // Vector store received both file IDs
+    expect(mockVsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ file_ids: expect.arrayContaining(['fid-1', 'fid-2']) })
+    )
+  })
+
+  // ─── 13. 500 if file upload fails ─────────────────────────────────────────
 
   it('returns 500 when file upload fails', async () => {
     testDbPath = setupDb({
@@ -512,7 +550,7 @@ describe('POST /ai/sync-lore', () => {
     expect(res.body.error).toContain('Upload failed')
   })
 
-  // ─── 12. 500 if VectorStore polling times out ─────────────────────────────
+  // ─── 14. 500 if VectorStore polling times out ─────────────────────────────
 
   it('returns 500 when VectorStore polling exceeds timeout', async () => {
     testDbPath = setupDb({

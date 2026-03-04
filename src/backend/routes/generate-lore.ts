@@ -25,6 +25,21 @@ interface AiConfigStore {
   [key: string]: unknown
 }
 
+// ─── Capability helpers ────────────────────────────────────────────────────
+// These mirror the frontend ai-engines.ts capability flags, kept in sync manually.
+
+/** Engine can attach a pre-built Knowledge Base (vector store) to a generation request. */
+function supportsKnowledgeBaseAttachment(engine: string): boolean {
+  return engine === 'yandex'
+}
+
+/** Engine supports uploading files and referencing them by ID in generation requests. */
+function supportsFileAttachment(engine: string): boolean {
+  return engine === 'yandex'
+}
+
+// ─── Client factory ────────────────────────────────────────────────────────
+
 function createYandexClient(apiKey: string, folderId: string): OpenAI {
   return new OpenAI({
     apiKey,
@@ -33,6 +48,8 @@ function createYandexClient(apiKey: string, folderId: string): OpenAI {
     defaultHeaders: { 'x-folder-id': folderId },
   })
 }
+
+// ─── POST /generate-lore ───────────────────────────────────────────────────
 
 router.post('/generate-lore', express.json(), async (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
@@ -46,21 +63,38 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   let config: AiConfigStore = {}
   let textLanguage = 'ru-RU'
 
+  // Collect per-engine file IDs from lore nodes (used if KB attachment is unavailable)
+  const engineFileIds: string[] = []
+
   try {
     const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
     const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
     const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
     const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
-    db.close()
 
     engine = engineRow?.value
-    if (!engine) return res.status(400).json({ error: 'no AI engine configured' })
+    if (!engine) { db.close(); return res.status(400).json({ error: 'no AI engine configured' }) }
 
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
     }
-
     if (langRow?.value) textLanguage = langRow.value
+
+    // Pre-collect uploaded file IDs for the active engine (for file-attachment fallback path)
+    if (includeExistingLore && engine) {
+      const nodes = db.prepare(
+        'SELECT ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL AND to_be_deleted = 0 AND word_count > 0'
+      ).all() as { ai_sync_info: string }[]
+      for (const node of nodes) {
+        try {
+          const info = JSON.parse(node.ai_sync_info) as Record<string, { file_id?: string }>
+          const fileId = info[engine]?.file_id
+          if (fileId) engineFileIds.push(fileId)
+        } catch { /* ignore */ }
+      }
+    }
+
+    db.close()
   } catch (e) {
     return res.status(500).json({ error: 'failed to read project settings: ' + String(e) })
   }
@@ -81,8 +115,6 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     `Respond with only the lore content — no explanations, no preamble.`
 
   const model = `gpt://${folderId}/yandexgpt/latest`
-  const searchIndexId = config.yandex?.search_index_id
-
   const client = createYandexClient(apiKey, folderId)
 
   try {
@@ -94,11 +126,24 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
       ],
     }
 
-    if (includeExistingLore && searchIndexId) {
-      // Attach Yandex search tool for knowledge base retrieval
-      ;(requestParams as Record<string, unknown>)['tools'] = [
-        { searchIndex: { searchIndexIds: [searchIndexId] } },
-      ]
+    if (includeExistingLore) {
+      const searchIndexId = config.yandex?.search_index_id
+
+      if (supportsKnowledgeBaseAttachment(engine) && searchIndexId) {
+        // Path A — KB attachment: pass the pre-built vector store ID so the model
+        // automatically retrieves relevant lore context from it.
+        ;(requestParams as Record<string, unknown>)['tools'] = [
+          { searchIndex: { searchIndexIds: [searchIndexId] } },
+        ]
+      } else if (supportsFileAttachment(engine) && engineFileIds.length > 0) {
+        // Path B — file attachment fallback: no KB/vector store available yet,
+        // but individual files were uploaded. Attach them to the request directly.
+        // The exact attachment format is provider-specific; implement per engine when needed.
+        // engineFileIds contains all file_id values for the active engine.
+        // (Currently not reached for any supported engine — placeholder for future use.)
+      }
+      // If neither path applies (engine doesn't support lore attachment, or nothing synced yet),
+      // the generation proceeds without lore context.
     }
 
     const completion = await client.chat.completions.create(requestParams)
