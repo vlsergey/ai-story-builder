@@ -3,6 +3,57 @@
 const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell } = require('electron')
 const path = require('path')
 
+/** Native menu label translations. */
+const MENU_STRINGS = {
+  en: {
+    file: 'File',
+    closeProject: 'Close Project',
+    view: 'View',
+    settings: 'Settings',
+    resetLayouts: 'Reset layouts',
+    wordWrap: 'Word Wrap in Editors',
+    showInLoreTree: 'Show in Lore Tree',
+    loreStat_none: 'Nothing',
+    loreStat_words: 'Words',
+    loreStat_chars: 'Characters',
+    loreStat_bytes: 'Bytes',
+    theme: 'Theme',
+    theme_auto: 'Auto',
+    theme_obsidian: 'Obsidian (dark)',
+    theme_github: 'GitHub (light)',
+    language: 'Language',
+    language_en: 'English',
+    language_ru: 'Русский',
+  },
+  ru: {
+    file: 'Файл',
+    closeProject: 'Закрыть проект',
+    view: 'Вид',
+    settings: 'Настройки',
+    resetLayouts: 'Сбросить разметку',
+    wordWrap: 'Перенос строк в редакторах',
+    showInLoreTree: 'Показывать в дереве',
+    loreStat_none: 'Ничего',
+    loreStat_words: 'Слова',
+    loreStat_chars: 'Символы',
+    loreStat_bytes: 'Байты',
+    theme: 'Тема',
+    theme_auto: 'Авто',
+    theme_obsidian: 'Obsidian (тёмная)',
+    theme_github: 'GitHub (светлая)',
+    language: 'Язык',
+    language_en: 'English',
+    language_ru: 'Русский',
+  },
+}
+
+// Current toggle/radio states — kept in sync via set-menu-state IPC from the renderer.
+// Used when rebuilding the menu (e.g. on locale change) so checked states are preserved.
+let currentWordWrap = true
+let currentLoreStat = 'words'
+let currentTheme = 'auto'
+let currentLocale = 'en'
+
 /** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
 let wordWrapMenuItem = null
 
@@ -30,67 +81,85 @@ function sendMenuAction(action) {
 
 /**
  * Builds and registers the native application menu.
- * Structure: [appMenu (macOS only)] File | Edit | View | Window
+ * Uses currentLocale for labels and current* state for checked values.
+ * Call again after a locale change to rebuild with translated labels.
  */
 function buildApplicationMenu() {
+  const s = MENU_STRINGS[currentLocale] ?? MENU_STRINGS.en
+
   wordWrapMenuItem = {
     type: 'checkbox',
-    label: 'Word Wrap in Editors',
-    checked: true, // default; renderer syncs the real value on startup
+    label: s.wordWrap,
+    checked: currentWordWrap,
     click: (item) => sendMenuAction(`set-word-wrap:${item.checked}`),
   }
 
-  for (const [mode, label] of [['none', 'Nothing'], ['words', 'Words'], ['chars', 'Characters'], ['bytes', 'Bytes']]) {
+  loreStatMenuItems = {}
+  for (const [mode, key] of [
+    ['none', 'loreStat_none'],
+    ['words', 'loreStat_words'],
+    ['chars', 'loreStat_chars'],
+    ['bytes', 'loreStat_bytes'],
+  ]) {
     loreStatMenuItems[mode] = {
       type: 'radio',
-      label,
-      checked: mode === 'words', // default; renderer syncs the real value on startup
+      label: s[key],
+      checked: mode === currentLoreStat,
       click: () => sendMenuAction(`set-lore-stat:${mode}`),
     }
   }
 
-  for (const [theme, label] of [['auto', 'Auto'], ['obsidian', 'Obsidian (dark)'], ['github', 'GitHub (light)']]) {
+  themeMenuItems = {}
+  for (const [theme, key] of [
+    ['auto', 'theme_auto'],
+    ['obsidian', 'theme_obsidian'],
+    ['github', 'theme_github'],
+  ]) {
     themeMenuItems[theme] = {
       type: 'radio',
-      label,
-      checked: theme === 'auto', // default; renderer syncs the real value on startup
+      label: s[key],
+      checked: theme === currentTheme,
       click: () => sendMenuAction(`set-theme:${theme}`),
     }
   }
 
-  for (const [locale, label] of [['en', 'English'], ['ru', 'Русский']]) {
+  localeMenuItems = {}
+  for (const [locale, key] of [
+    ['en', 'language_en'],
+    ['ru', 'language_ru'],
+  ]) {
     localeMenuItems[locale] = {
       type: 'radio',
-      label,
-      checked: locale === 'en', // default; renderer syncs the real value on startup
+      label: s[key],
+      checked: locale === currentLocale,
       click: () => sendMenuAction(`set-locale:${locale}`),
     }
   }
 
   const viewSubmenu = [
     {
-      label: 'Settings',
+      label: s.settings,
       click: () => sendMenuAction('open-settings'),
     },
     { type: 'separator' },
     {
-      label: 'Reset layouts',
+      label: s.resetLayouts,
       click: () => sendMenuAction('reset-layouts'),
     },
     { type: 'separator' },
     wordWrapMenuItem,
     { type: 'separator' },
     {
-      label: 'Show in Lore Tree',
+      label: s.showInLoreTree,
       submenu: Object.values(loreStatMenuItems),
     },
     { type: 'separator' },
     {
-      label: 'Theme',
+      label: s.theme,
       submenu: Object.values(themeMenuItems),
     },
     {
-      label: 'Language',
+      label: s.language,
       submenu: Object.values(localeMenuItems),
     },
   ]
@@ -101,14 +170,14 @@ function buildApplicationMenu() {
   }
 
   const template = [
-    // macOS: first entry is always the app menu (app name, About, Quit, etc.)
+    // macOS: first entry is always the app menu (app name, About, Quit, etc.)\
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
 
     {
-      label: 'File',
+      label: s.file,
       submenu: [
         {
-          label: 'Close Project',
+          label: s.closeProject,
           click: () => sendMenuAction('close-project'),
         },
         { type: 'separator' },
@@ -119,7 +188,7 @@ function buildApplicationMenu() {
     { role: 'editMenu' },
 
     {
-      label: 'View',
+      label: s.view,
       submenu: viewSubmenu,
     },
 
@@ -191,24 +260,29 @@ ipcMain.handle('show-error-dialog', async (event, { title, message }) => {
 
 // Renderer sends this to keep menu checkbox/radio in sync with localStorage state
 ipcMain.on('set-menu-state', (_event, { key, value }) => {
-  if (key === 'word-wrap' && wordWrapMenuItem) {
-    wordWrapMenuItem.checked = value
+  if (key === 'word-wrap') {
+    currentWordWrap = value
+    if (wordWrapMenuItem) wordWrapMenuItem.checked = value
   } else if (key === 'lore-stat') {
+    currentLoreStat = value
     for (const [mode, item] of Object.entries(loreStatMenuItems)) {
       item.checked = mode === value
     }
   } else if (key === 'theme') {
+    currentTheme = value
     for (const [theme, item] of Object.entries(themeMenuItems)) {
       item.checked = theme === value
     }
-    // Sync native window chrome (title bar, menu bar) to the selected theme
+    // Sync native window chrome (title bar, menu bar) to the selected theme.
+    // Note: on Linux the window frame is controlled by the window manager and
+    // nativeTheme.themeSource may not visually change the title bar.
     if (value === 'obsidian') nativeTheme.themeSource = 'dark'
     else if (value === 'github') nativeTheme.themeSource = 'light'
     else nativeTheme.themeSource = 'system'
   } else if (key === 'locale') {
-    for (const [locale, item] of Object.entries(localeMenuItems)) {
-      item.checked = locale === value
-    }
+    currentLocale = value
+    // Rebuild entire menu so all labels appear in the new language.
+    buildApplicationMenu()
   }
 })
 
