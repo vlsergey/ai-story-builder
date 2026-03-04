@@ -3,9 +3,10 @@ export const LORE_NODE_SAVED_EVENT = 'lore-node-saved'
 
 export interface LoreNodeSavedDetail {
   id: number
-  wordCount: number
-  charCount: number
-  byteCount: number
+  name?: string
+  wordCount?: number
+  charCount?: number
+  byteCount?: number
 }
 
 /** Dispatch a lore-node-saved event on window so other panels can react. */

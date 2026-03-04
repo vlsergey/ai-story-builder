@@ -249,6 +249,29 @@ describe('LoreTree', () => {
     expect(badges).toHaveLength(2);
   });
 
+  it('updates node name in tree when lore-node-saved event fires with name', async () => {
+    mockFetchTree([{
+      id: 1, parent_id: null, name: 'Old Name', status: 'ACTIVE', latest_version_status: null,
+      word_count: 0, char_count: 0, byte_count: 0,
+      to_be_deleted: 0, content: null, ai_sync_info: null, children: [],
+    }]);
+
+    render(
+      <LoreSettingsContext.Provider value={{ statMode: 'words', currentAiEngine: null }}>
+        <LoreTree onSelectLoreNode={vi.fn()} />
+      </LoreSettingsContext.Provider>
+    );
+
+    await screen.findByText('Old Name');
+
+    window.dispatchEvent(new CustomEvent('lore-node-saved', {
+      detail: { id: 1, name: 'New Name' },
+    }));
+
+    await screen.findByText('New Name');
+    expect(screen.queryByText('Old Name')).toBeNull();
+  });
+
   // ── Keyboard interception ──────────────────────────────────────────────────
 
   it('does not intercept Enter key when focus is outside the lore tree', async () => {

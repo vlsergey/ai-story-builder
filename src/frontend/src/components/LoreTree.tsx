@@ -102,12 +102,12 @@ function uniqueName(base: string, existingNames: string[]): string {
   return `${base} ${n}`
 }
 
-function patchNodeStats(
-  nodes: LoreNode[], id: number, wordCount: number, charCount: number, byteCount: number
+function patchNode(
+  nodes: LoreNode[], id: number, patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count'>>
 ): LoreNode[] {
   return nodes.map(n => {
-    if (n.id === id) return { ...n, word_count: wordCount, char_count: charCount, byte_count: byteCount }
-    if (n.children?.length) return { ...n, children: patchNodeStats(n.children, id, wordCount, charCount, byteCount) }
+    if (n.id === id) return { ...n, ...patch }
+    if (n.children?.length) return { ...n, children: patchNode(n.children, id, patch) }
     return n
   })
 }
@@ -181,8 +181,13 @@ export default function LoreTree({
   // Update a node's stats locally when LoreEditor saves content, without re-fetching the whole tree.
   useEffect(() => {
     function onNodeSaved(e: Event) {
-      const { id, wordCount, charCount, byteCount } = (e as CustomEvent<LoreNodeSavedDetail>).detail
-      const next = patchNodeStats(treeDataRef.current, id, wordCount, charCount, byteCount)
+      const { id, name, wordCount, charCount, byteCount } = (e as CustomEvent<LoreNodeSavedDetail>).detail
+      const patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count'>> = {}
+      if (name !== undefined) patch.name = name
+      if (wordCount !== undefined) patch.word_count = wordCount
+      if (charCount !== undefined) patch.char_count = charCount
+      if (byteCount !== undefined) patch.byte_count = byteCount
+      const next = patchNode(treeDataRef.current, id, patch)
       setTree(next)
       setItems(buildItemsMap(next))
     }

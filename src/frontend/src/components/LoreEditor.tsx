@@ -52,13 +52,15 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     if (nameTimerRef.current) clearTimeout(nameTimerRef.current)
     nameTimerRef.current = setTimeout(() => {
       if (!value.trim()) { setNameDirty(false); return }
+      const trimmed = value.trim()
       fetch(`/api/lore/${nodeId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: value.trim() }),
+        body: JSON.stringify({ name: trimmed }),
       }).then(() => {
-        panelApi?.setTitle(value.trim())
+        panelApi?.setTitle(trimmed)
         setNameDirty(false)
+        dispatchLoreNodeSaved({ id: nodeId, name: trimmed })
       }).catch(() => setNameDirty(false))
     }, 1000)
   }
