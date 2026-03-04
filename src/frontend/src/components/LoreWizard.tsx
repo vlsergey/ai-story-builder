@@ -12,12 +12,19 @@ interface LoreWizardProps {
   panelApi?: { setTitle: (title: string) => void }
 }
 
+/** Strips the `gpt://folder_id/` prefix from Yandex model URIs for display. */
+function shortModelName(modelId: string): string {
+  return modelId.replace(/^gpt:\/\/[^/]+\//, '')
+}
+
 export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: LoreWizardProps) {
   const { resolvedTheme } = useTheme()
   const { wordWrap } = useEditorSettings()
 
   const [prompt, setPrompt] = useState('')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [selectedModel, setSelectedModel] = useState('')
   const [content, setContent] = useState('')
   const [name, setName] = useState('New lore item')
   const [generating, setGenerating] = useState(false)
@@ -28,6 +35,21 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
     panelApi?.setTitle(`AI Wizard → ${parentNodeName}`)
   }, [parentNodeName])
 
+  // Load the cached model list for the active engine
+  useEffect(() => {
+    fetch('/api/ai/config')
+      .then(r => r.json())
+      .then((data: { current_engine?: string | null; [key: string]: unknown }) => {
+        const engine = data.current_engine
+        if (!engine) return
+        const engineData = data[engine] as { available_models?: string[] } | undefined
+        const models = engineData?.available_models ?? []
+        setAvailableModels(models)
+        if (models.length > 0) setSelectedModel(models[0])
+      })
+      .catch(() => {})
+  }, [])
+
   async function handleGenerate() {
     if (!prompt.trim()) return
     setGenerating(true)
@@ -36,7 +58,11 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
       const res = await fetch('/api/ai/generate-lore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, includeExistingLore }),
+        body: JSON.stringify({
+          prompt,
+          includeExistingLore,
+          ...(selectedModel ? { model: selectedModel } : {}),
+        }),
       })
       const data = await res.json() as { content?: string; error?: string }
       if (res.ok) {
@@ -86,8 +112,8 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
       />
 
       {/* Controls row */}
-      <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0">
-        <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer">
+      <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap">
+        <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
           <input
             type="checkbox"
             checked={includeExistingLore}
@@ -96,10 +122,24 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
           />
           Include existing lore
         </label>
+
+        {availableModels.length > 0 && (
+          <select
+            value={selectedModel}
+            onChange={e => setSelectedModel(e.target.value)}
+            className="text-sm border border-border rounded px-2 py-0.5 bg-background max-w-[200px]"
+            title="Model"
+          >
+            {availableModels.map(m => (
+              <option key={m} value={m}>{shortModelName(m)}</option>
+            ))}
+          </select>
+        )}
+
         <button
           onClick={() => void handleGenerate()}
           disabled={generating || !prompt.trim()}
-          className="ml-auto px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="ml-auto px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
         >
           {generating ? 'Generating…' : 'Generate'}
         </button>

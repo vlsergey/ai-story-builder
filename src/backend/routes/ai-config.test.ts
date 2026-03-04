@@ -278,3 +278,96 @@ describe('POST /ai/:engine/test', () => {
     expect(res.status).toBe(400)
   })
 })
+
+// ── GET /ai/:engine/models ────────────────────────────────────────────────────
+
+describe('GET /ai/:engine/models', () => {
+  it('returns empty array when no models cached', async () => {
+    const res = await request(app).get('/ai/yandex/models')
+    expect(res.status).toBe(200)
+    expect(res.body.models).toEqual([])
+  })
+
+  it('returns cached models after they are saved', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath)
+    const models = ['gpt://b1g999/yandexgpt/latest', 'gpt://b1g999/yandexgpt-lite/latest']
+    db.prepare("INSERT INTO settings (key, value) VALUES ('ai_config', ?)").run(
+      JSON.stringify({ yandex: { api_key: 'k', folder_id: 'b1g999', available_models: models } })
+    )
+    db.close()
+
+    const res = await request(app).get('/ai/yandex/models')
+    expect(res.status).toBe(200)
+    expect(res.body.models).toEqual(models)
+  })
+})
+
+// ── POST /ai/:engine/models/refresh ──────────────────────────────────────────
+
+describe('POST /ai/:engine/models/refresh', () => {
+  it('returns 400 when credentials are missing', async () => {
+    const res = await request(app).post('/ai/yandex/models/refresh')
+    expect(res.status).toBe(400)
+  })
+
+  it('fetches and saves yandex models (mocked fetch)', async () => {
+    await request(app).post('/ai/config').send({
+      engine: 'yandex',
+      fields: { api_key: 'AQVN-valid', folder_id: 'b1g999' },
+    })
+
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'gpt://b1g999/yandexgpt/latest' },
+          { id: 'gpt://b1g999/yandexgpt-lite/latest' },
+          { id: 'some-other-model' },   // non-gpt:// prefix — filtered out
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const res = await request(app).post('/ai/yandex/models/refresh')
+    expect(res.status).toBe(200)
+    expect(res.body.models).toEqual([
+      'gpt://b1g999/yandexgpt/latest',
+      'gpt://b1g999/yandexgpt-lite/latest',
+    ])
+
+    // Verify persisted in config
+    const cfg = await request(app).get('/ai/config')
+    expect(cfg.body.yandex.available_models).toEqual([
+      'gpt://b1g999/yandexgpt/latest',
+      'gpt://b1g999/yandexgpt-lite/latest',
+    ])
+
+    vi.unstubAllGlobals()
+  })
+
+  it('fetches and saves grok models (mocked fetch)', async () => {
+    await request(app).post('/ai/config').send({
+      engine: 'grok',
+      fields: { api_key: 'xai-valid' },
+    })
+
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [{ id: 'grok-2' }, { id: 'grok-3-mini' }] }),
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const res = await request(app).post('/ai/grok/models/refresh')
+    expect(res.status).toBe(200)
+    expect(res.body.models).toEqual(['grok-2', 'grok-3-mini'])
+
+    vi.unstubAllGlobals()
+  })
+
+  it('returns 400 for unsupported engine', async () => {
+    const res = await request(app).post('/ai/unknown/models/refresh')
+    expect(res.status).toBe(400)
+  })
+})

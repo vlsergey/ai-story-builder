@@ -32,7 +32,11 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore } = req.body as { prompt?: string; includeExistingLore?: boolean }
+  const { prompt, includeExistingLore, model: requestedModel } = req.body as {
+    prompt?: string
+    includeExistingLore?: boolean
+    model?: string
+  }
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
   let engine: string | undefined
@@ -90,7 +94,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     `Write the result in Markdown format. Language: ${textLanguage}.\n` +
     `Respond with only the lore content — no explanations, no preamble.`
 
-  const model = `gpt://${folderId}/yandexgpt/latest`
+  const model = requestedModel?.trim() || `gpt://${folderId}/yandexgpt/latest`
   const client = createYandexClient(apiKey, folderId)
 
   try {

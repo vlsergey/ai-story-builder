@@ -47,6 +47,11 @@
   "capability.knowledgeBaseAttachment.label": "Knowledge Base Attachment",
   "capability.knowledgeBaseAttachment.description": "Attach a pre-built Knowledge Base (vector store / search index) to a generation request so the model automatically retrieves relevant context from it. Also called: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).",
 
+  "settings.models.title": "Available Models",
+  "settings.models.refresh": "Refresh",
+  "settings.models.refreshing": "Refreshing…",
+  "settings.models.none": "No models cached",
+
   "settings.debug.title": "Debug",
   "settings.debug.verboseAiLogging": "Verbose AI request logging",
   "settings.debug.verboseAiLoggingDescription": "Prints full request headers (API key masked) and body to the server console for every AI API call. Use when diagnosing AI integration issues.",

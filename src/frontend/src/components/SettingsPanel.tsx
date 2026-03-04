@@ -12,8 +12,8 @@ import { useTheme } from '../lib/theme/theme-provider'
 
 interface ConfigData {
   current_engine: string | null
-  grok: { api_key: string }
-  yandex: { api_key: string; folder_id: string }
+  grok: { api_key: string; available_models: string[] }
+  yandex: { api_key: string; folder_id: string; available_models: string[] }
 }
 
 interface TestState {
@@ -29,6 +29,7 @@ export default function SettingsPanel() {
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [engineError, setEngineError] = useState<string | null>(null)
   const [testStates, setTestStates] = useState<Record<string, TestState>>({})
+  const [refreshingModels, setRefreshingModels] = useState<Record<string, boolean>>({})
   const [showField, setShowField] = useState<Record<string, boolean>>({})
   const [textLanguage, setTextLanguage] = useState('ru-RU')
   const [verboseAiLogging, setVerboseAiLogging] = useState(false)
@@ -102,6 +103,25 @@ export default function SettingsPanel() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ engine: engineId, fields: { [fieldKey]: value } }),
     })
+  }
+
+  async function handleRefreshModels(engineId: string) {
+    setRefreshingModels(prev => ({ ...prev, [engineId]: true }))
+    try {
+      const res = await fetch(`/api/ai/${engineId}/models/refresh`, { method: 'POST' })
+      const data = await res.json() as { models?: string[]; error?: string }
+      if (res.ok && data.models) {
+        setConfig(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            [engineId]: { ...(prev[engineId as keyof ConfigData] as object), available_models: data.models! },
+          } as ConfigData
+        })
+      }
+    } finally {
+      setRefreshingModels(prev => ({ ...prev, [engineId]: false }))
+    }
   }
 
   async function handleTest(engine: AiEngineDefinition) {
@@ -209,6 +229,8 @@ export default function SettingsPanel() {
           const supportedRatings = AGE_RATING_ORDER.slice(0, maxRatingIdx + 1)
           const testState = testStates[engine.id]
           const isActive = currentEngine === engine.id
+          const engineModels: string[] = (config?.[engine.id as keyof ConfigData] as { available_models?: string[] })?.available_models ?? []
+          const isRefreshing = refreshingModels[engine.id] ?? false
           const engineNotes = t(`engine.${engine.id}.notes`, '')
 
           return (
@@ -300,6 +322,26 @@ export default function SettingsPanel() {
                     </div>
                   )
                 })}
+              </div>
+
+              {/* Models */}
+              <div className="flex items-start gap-2 mb-3">
+                <span className="text-xs text-muted-foreground shrink-0 mt-0.5">
+                  {t('settings.models.title')}:
+                </span>
+                <span className="text-xs text-muted-foreground flex-1 leading-relaxed">
+                  {engineModels.length > 0
+                    ? engineModels.map(m => m.replace(/^gpt:\/\/[^/]+\//, '')).join(', ')
+                    : t('settings.models.none')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleRefreshModels(engine.id)}
+                  disabled={isRefreshing}
+                  className="text-xs px-2 py-0.5 border border-border rounded hover:bg-muted disabled:opacity-50 shrink-0"
+                >
+                  {isRefreshing ? t('settings.models.refreshing') : t('settings.models.refresh')}
+                </button>
               </div>
 
               {/* Test button + result */}
