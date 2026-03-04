@@ -1,6 +1,6 @@
 import path from 'path'
 import express, { Request, Response, Router } from 'express'
-import OpenAI from 'openai'
+import OpenAI, { toFile } from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
 
 let Database: typeof import('better-sqlite3') | null = null
@@ -108,9 +108,27 @@ function buildFileContent(
 
 function formatApiError(e: unknown): string {
   if (e != null && typeof e === 'object' && 'status' in e && 'message' in e) {
-    const apiErr = e as { status: number; message: string; error?: unknown }
-    const detail = apiErr.error ? '\n' + JSON.stringify(apiErr.error) : ''
-    return `HTTP ${apiErr.status} ${apiErr.message}${detail}`
+    const apiErr = e as { status: number; message: string; error?: unknown; headers?: unknown }
+    const parts: string[] = [`HTTP ${apiErr.status} ${apiErr.message}`]
+    if (apiErr.headers) {
+      // headers can be a Fetch API Headers object or a plain object
+      const entries: [string, string][] = []
+      const h = apiErr.headers as Record<string, string> & { entries?: () => Iterable<[string, string]> }
+      if (typeof h.entries === 'function') {
+        for (const [k, v] of h.entries()) entries.push([k, v])
+      } else {
+        entries.push(...Object.entries(h) as [string, string][])
+      }
+      const safeHeaders = entries
+        .filter(([k]) => !['authorization', 'api-key', 'x-api-key'].includes(k.toLowerCase()))
+        .map(([k, v]) => `  ${k}: ${v}`)
+        .join('\n')
+      if (safeHeaders) parts.push(`Response headers:\n${safeHeaders}`)
+    }
+    if (apiErr.error != null) {
+      parts.push(`Body: ${typeof apiErr.error === 'string' ? apiErr.error : JSON.stringify(apiErr.error, null, 2)}`)
+    }
+    return parts.join('\n')
   }
   return String(e)
 }
@@ -245,7 +263,8 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       try {
         const fileContent = buildFileContent(row, projectName, pathMap, idToRow)
         const uploaded = await client.files.create({
-          file: new File([fileContent], `${node.name}.md`, { type: 'text/plain' }),
+          // Use ASCII-safe filename (node name is in the YAML frontmatter content)
+          file: await toFile(Buffer.from(fileContent, 'utf-8'), `lore-${node.id}.md`, { type: 'text/plain' }),
           purpose: 'assistants',
         })
         newFileIds.set(node.id, uploaded.id)

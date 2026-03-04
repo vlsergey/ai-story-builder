@@ -36,14 +36,6 @@ router.get('/layout', (_req: Request, res: Response) => {
         layout = null
       }
     }
-    console.log(`[Layout GET] from ${dbPath}`, {
-      found: !!row,
-      panelsCount:
-        layout && typeof layout === 'object' && 'panels' in layout
-          ? Object.keys((layout as { panels: Record<string, unknown> }).panels).length
-          : 0,
-      size: layout ? JSON.stringify(layout).length : 0,
-    })
     res.json(layout)
   } catch (e) {
     console.error('[Layout GET] error:', (e as Error).message)
@@ -61,19 +53,9 @@ router.post('/layout', express.json(), (req: Request, res: Response) => {
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   try {
     const serialised = JSON.stringify(layout)
-    console.log(`[Layout POST] saving to ${dbPath}`, {
-      panelsCount:
-        layout && typeof layout === 'object' && 'panels' in layout
-          ? Object.keys((layout as { panels: Record<string, unknown> }).panels).length
-          : 0,
-      size: serialised.length,
-    })
     const db = new Database(dbPath)
-    const result = db
-      .prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('layout', ?)")
-      .run(serialised)
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('layout', ?)").run(serialised)
     db.close()
-    console.log(`[Layout POST] saved successfully, changes: ${result.changes}`)
     res.json({ ok: true })
   } catch (e) {
     console.error('[Layout POST] error:', (e as Error).message)

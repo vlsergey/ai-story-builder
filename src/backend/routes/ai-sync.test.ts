@@ -18,12 +18,13 @@ vi.mock('../db/state.js', () => ({
 
 // ─── OpenAI mock ──────────────────────────────────────────────────────────────
 
-const { mockFilesCreate, mockFilesDel, mockVsCreate, mockVsDel, mockVsRetrieve } = vi.hoisted(() => ({
+const { mockFilesCreate, mockFilesDel, mockVsCreate, mockVsDel, mockVsRetrieve, mockToFile } = vi.hoisted(() => ({
   mockFilesCreate: vi.fn(),
   mockFilesDel: vi.fn(),
   mockVsCreate: vi.fn(),
   mockVsDel: vi.fn(),
   mockVsRetrieve: vi.fn(),
+  mockToFile: vi.fn(async () => ({})),
 }))
 
 vi.mock('openai', () => ({
@@ -33,6 +34,7 @@ vi.mock('openai', () => ({
       vectorStores: { create: mockVsCreate, del: mockVsDel, retrieve: mockVsRetrieve },
     }
   },
+  toFile: mockToFile,
 }))
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -124,7 +126,8 @@ function setupDb(opts?: {
 
 beforeEach(() => {
   testDbPath = ''
-  vi.clearAllMocks()
+  vi.resetAllMocks()
+  mockToFile.mockResolvedValue({}) // restore default after reset
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -248,16 +251,19 @@ describe('POST /ai/sync-lore', () => {
     const syncInfo = JSON.parse(row.ai_sync_info) as { yandex: { file_id: string } }
     expect(syncInfo.yandex.file_id).toBe('remote-file-1')
 
-    // Verify file was uploaded as .md with correct fields
-    expect(mockFilesCreate).toHaveBeenCalledOnce()
-    const [uploadArg] = mockFilesCreate.mock.calls[0]
-    expect(uploadArg.file.name).toBe('Dragon Lore.md')
-    expect(uploadArg.purpose).toBe('assistants')
+    // Verify toFile was called with .md filename and correct content
+    expect(mockToFile).toHaveBeenCalledOnce()
+    const [toFileBuffer, toFileName, toFileOpts] = mockToFile.mock.calls[0] as [Buffer, string, { type: string }]
+    expect(toFileName).toBe('lore-42.md')
+    expect(toFileOpts.type).toBe('text/plain')
     // Verify YAML frontmatter in file content
-    const content = await (uploadArg.file as File).text()
+    const content = toFileBuffer.toString('utf-8')
     expect(content).toContain('---')
     expect(content).toContain('path: /Dragon Lore')
     expect(content).toContain('Dragons are ancient creatures')
+    // Verify files.create was called with purpose: 'assistants'
+    expect(mockFilesCreate).toHaveBeenCalledOnce()
+    expect(mockFilesCreate.mock.calls[0][0].purpose).toBe('assistants')
   })
 
   // ─── 5. Skips unchanged node ──────────────────────────────────────────────

@@ -129,26 +129,16 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
 
   // helper used after ready or when project is loaded
   const restoreLayout = async () => {
-    if (!dockviewRef.current) {
-      console.log('[Layout] restoreLayout: ref not ready, skipping')
-      return
-    }
+    if (!dockviewRef.current) return
     const savedLayout = initialLayout != null ? initialLayout : await loadLayoutFromDatabase()
-    console.log('[Layout] restoreLayout: loaded layout', {
-      hasGrid: (savedLayout as any)?.grid ? 'yes' : 'no',
-      panelsCount: (savedLayout as any)?.panels ? Object.keys((savedLayout as any).panels).length : 0,
-      rawSize: JSON.stringify(savedLayout).length
-    })
     if (savedLayout) {
       try {
         dockviewRef.current.fromJSON(normalizeLayout(savedLayout))
-        console.log('[Layout] restoreLayout: applied to dockview')
       } catch (e) {
         console.warn('Failed to restore layout', e)
         setupDefaultLayout()
       }
     } else {
-      console.log('[Layout] restoreLayout: no saved layout, using defaults')
       setupDefaultLayout()
     }
     lockWatermarkGroups()
@@ -156,7 +146,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
 
   // Load layout only once when component mounts (project is already open in server)
   useEffect(() => {
-    console.log('[Layout] component mounted, restoring layout')
     restoreLayout()
   }, [])
 
@@ -178,13 +167,9 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const saveLayoutToDatabase = async (layout: any) => {
     // guard: don't save empty layouts (can happen during React cleanup or Strict Mode double-invoke)
     const panelsCount = layout?.panels ? Object.keys(layout.panels).length : 0
-    if (panelsCount === 0) {
-      console.warn('[Layout] saveLayoutToDatabase: skipping empty layout')
-      return
-    }
+    if (panelsCount === 0) return
 
     try {
-      console.log('[Layout] saveLayoutToDatabase: saving', { panelsCount, size: JSON.stringify(layout).length })
       await fetch('/api/settings/layout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -249,7 +234,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   }
 
   const onReady = (event: any) => {
-    console.log('[Layout] onReady: dockview api available')
     dockviewRef.current = event.api
     // Subscribe to layout changes via the api (not a JSX prop)
     event.api.onDidLayoutChange(handleLayoutChange)
