@@ -145,11 +145,12 @@ The Lore panel has a toolbar with the following icon buttons:
 * **Export** — active when at least one lore item with content is selected; downloads selected items as text files
 * **Delete / Restore** — active when at least one element is selected; marks selected items as `to_be_deleted = 1` (soft-delete, shown as strikethrough). When all selected items are already marked for deletion, the button switches to **Restore** which clears the flag. Cascades to all descendants.
 * **Sync with AI Engine** — always active; synchronises all lore with the selected AI Engine and permanently removes items marked for deletion. Actual behavior depends on engine:
-  * Yandex Cloud AI: upload files to collection / vector storage (replacing existing)
-  * Grok AI: group/concatenate files up to 10 files (usually by folders) and upload as files (remembering IDs)
-* Each lore item should have status: DRAFT (not uploaded to AI engine) / UPLOADED. This status will be different to each supported AI engine (stored separately).
-* When folder or file is deleted locally, it is removed from AI server (Grok/Yandex) during the next lore synchronization.
-* All lore files will be added to all requests to AI (usually using references).
+  * **Yandex Cloud AI**: upload new/changed non-empty nodes as plain-text files (one file per lore node) to the Yandex Files API; delete remote files for nodes that became empty or are marked `to_be_deleted`; after uploads/deletions, recreate the SearchIndex from all current file IDs (Yandex SearchIndex does not support removing individual files; the index must be fully recreated when any file is removed); store the new `search_index_id` in project settings.
+  * **Grok AI**: group/concatenate files up to 10 files (usually by folders) and upload as files (remembering IDs).
+* Each lore node tracks per-engine sync state via `ai_sync_info[engine]`: `last_synced_at` (ISO timestamp), `file_id` (remote file if uploaded as its own file), `uploaded_as_parent` (true if content was bundled into the parent's file). The `content_updated_at` field tracks when the node's content was last edited; comparing it with `last_synced_at` determines if a sync is needed.
+* Lore tree sync status icon shows per-subtree: ✓ (synced), ○ (needs sync), spinner (in progress), or no icon (no content to sync).
+* When folder or file is deleted locally, it is removed from the AI engine's remote storage during the next lore synchronization.
+* All lore files will be added to all requests to AI (usually using file references/SearchIndex).
 
 ### Story plan
 * Story plan is also a tree. Each node defines story at some level. Root node describes story as a whole.

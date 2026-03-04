@@ -31,7 +31,13 @@
   - `POST /api/ai/config` — saves per-engine credential fields (merged into existing JSON)
   - `POST /api/ai/current-engine` — sets the active engine; validates required fields before accepting; body: `{ engine: string | null }`
   - `POST /api/ai/:engine/test` — tests credentials against the real AI provider API; accepts credentials in request body (unsaved values allowed); uses Node.js native `fetch` (Node 18+)
-- AI engine connection tests use the real provider APIs (not mocked): Grok uses `GET https://api.x.ai/v1/models`; Yandex uses `GET https://llm.api.cloud.yandex.net/foundationModels/v1/listModels`
+- AI engine connection tests use the real provider APIs (not mocked): Grok uses `GET https://api.x.ai/v1/models`; Yandex uses `POST https://llm.api.cloud.yandex.net/foundationModels/v1/tokenize` (the listModels endpoint does not exist in Yandex Foundation Models API)
+- Yandex lore sync API (`POST /api/ai/yandex/sync-lore`):
+  - Uploads changed/new non-empty lore nodes as plain-text files to Yandex Files API; stores `file_id` in each node's `ai_sync_info.yandex`
+  - Deletes remote files for nodes that became empty (`word_count=0`) or are marked `to_be_deleted` and had a previously recorded `file_id`
+  - After all file changes, recreates the SearchIndex from scratch with all current `file_id`s (adding files is possible incrementally, but removing is not — full recreation is required when any file is removed)
+  - Stores the new `search_index_id` in `ai_config.yandex.search_index_id` in the project settings
+  - Returns a progress summary: `{ uploaded, deleted, unchanged, search_index_id }`
 
 ### Development Workflow
 - `npm run dev` starts three processes concurrently via `concurrently`:

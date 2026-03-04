@@ -37,7 +37,9 @@ Important keys:
   },
   "yandex": {
     "api_key": "AQVN...",
-    "folder_id": "b1gXXXXXXXXXX"
+    "folder_id": "b1gXXXXXXXXXX",
+    "models": "yandexgpt/latest\nyandexgpt/rc\nyandexgpt-lite",
+    "search_index_id": "fvtXXXXXXXXXX"
   },
   "custom": {
     "{engine-id}": {
@@ -47,6 +49,8 @@ Important keys:
   }
 }
 ```
+
+`search_index_id` (Yandex only): ID of the current SearchIndex containing all uploaded lore files. Stored here (not in lore nodes) because it is a project-level resource. Created/recreated by the sync operation. Since Yandex SearchIndex does not support removing individual files, the index is fully recreated on every sync that involves deletions.
 
 **Note:** Model selection is NOT stored in the engine config. The specific model used for each operation (generation, plan, cards) is configured per-operation, not per-engine. This allows different operations to use different models on the same engine.
 
@@ -64,6 +68,7 @@ emerges from usage.
   - `content` TEXT — direct editable markdown text for the node (nullable; edited via the lore editor tab)
   - `word_count` INTEGER NOT NULL DEFAULT 0 — whitespace-separated word count of `content`; updated automatically by the PATCH endpoint whenever content changes; the tree view aggregates subtree totals from this field
   - `ai_sync_info` TEXT NULL — JSON object keyed by AI engine code (e.g. `"grok"`, `"yandex"`); each value is an `AiEngineSyncRecord` (see below); NULL means never synced with any engine
+  - `content_updated_at` DATETIME NULL — set to `CURRENT_TIMESTAMP` whenever `content` is written via the PATCH endpoint; used to detect whether content was changed after the last AI engine sync (compare with `ai_sync_info[engine].last_synced_at`)
   - `position` INTEGER DEFAULT 0
   - `status` TEXT NOT NULL DEFAULT 'ACTIVE'   -- ACTIVE
   - `to_be_deleted` INTEGER NOT NULL DEFAULT 0   -- 1 = pending removal after next AI sync

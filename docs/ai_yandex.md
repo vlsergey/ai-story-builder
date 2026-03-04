@@ -124,9 +124,50 @@ The SearchIndex is referenced as a tool in the assistant configuration. See [Yan
 
 ---
 
+## Files API
+
+The Yandex Foundation Models Files API (`/files/v1/files`) provides flat object storage scoped to a Yandex Cloud organizational folder.
+
+**No directory/folder hierarchy** — The `folder_id` in file requests refers to the Yandex Cloud billing/organizational unit, not a filesystem subdirectory. There is no way to create sub-directories. Grouping is only possible via `labels` (key-value tags).
+
+### File metadata fields
+| Field | Type | Notes |
+|---|---|---|
+| `folder_id` | string | Required — Yandex Cloud org folder |
+| `name` | string | Human-readable display name |
+| `description` | string | Optional |
+| `mime_type` | string | e.g. `text/plain`, `application/pdf` |
+| `content` | bytes | Binary file content |
+| `labels` | map<string,string> | Key-value tags for grouping |
+| `expiration_config` | ExpirationConfig | Optional TTL (`ttl_days` + policy) |
+
+### Limits
+| Limit | Value |
+|---|---|
+| Max file size | 128 MB |
+| Files per upload batch | 100 |
+| Total files per account | 10,000 |
+| Files per SearchIndex | 10,000 |
+| Max SearchIndexes | 1,000 per account |
+
+## SearchIndex (Knowledge Base) — Mutability
+
+The SearchIndex is **partially mutable**:
+- **Add files**: `SearchIndexFileService.BatchCreate` — incremental, can add files to an existing index at any time.
+- **Remove files**: **Not supported** — there is no delete-file-from-index operation. To remove files, the entire SearchIndex must be deleted and recreated.
+- **Update metadata only**: `SearchIndexService.Update` — accepts only `name`, `description`, `expiration_config`, `labels`. Cannot change the file set or index type via Update.
+- **Index type** (text/vector/hybrid) and chunking configuration are **immutable** after creation.
+
+### Sync strategy implication
+Because file removal requires full index recreation:
+1. Upload new/changed lore files to Files API.
+2. Delete remote files for nodes that are now empty or marked `to_be_deleted`.
+3. If any file was deleted (step 2 had results), delete the old SearchIndex and create a new one.
+4. If only additions occurred, use `SearchIndexFileService.BatchCreate` to add to the existing index.
+5. Store the `search_index_id` in `ai_config.yandex.search_index_id` in project settings.
+
 ## What We're Missing
 
-- **JavaScript/TypeScript SDK** — Yandex has a Python SDK but the JS SDK is less mature. We use raw HTTP calls with `fetch` for the connection test; full integration will require either the REST API directly or the JS SDK.
+- **JavaScript/TypeScript SDK** — Yandex has a Python SDK but the JS SDK is less mature. We use raw HTTP calls with `fetch`; full integration uses the REST API directly.
 - **Async index creation** — The SearchIndex creation is asynchronous. We need to poll for completion before using the index. This adds complexity to the lore sync flow.
-- **Incremental sync** — There is no way to update individual files in an existing SearchIndex. Full re-upload and re-indexing is required when lore changes.
 - **Billing API** — Yandex Cloud has a billing API, but it requires additional IAM roles (`billing.accounts.get`). The "AI & Billing" panel integration is deferred.
