@@ -12,7 +12,7 @@ declare global {
       /** Remove all registered menu-action listeners (call on component unmount). */
       removeMenuActionListeners: () => void
       /** Sync a UI setting back to the main process (e.g. 'word-wrap', true). */
-      sendMenuState: (key: string, value: boolean) => void
+      sendMenuState: (key: string, value: boolean | string) => void
     }
   }
 }

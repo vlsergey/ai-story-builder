@@ -16,7 +16,8 @@ import {
   Plus, CopyPlus, Pencil, SquarePen, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
   CheckCircle2, Circle, Loader2,
 } from 'lucide-react'
-import { LoreNode, LoreStatMode } from '../types/models'
+import { LoreNode } from '../types/models'
+import { useLoreSettings } from '../lib/lore-settings'
 
 // ── Command system ────────────────────────────────────────────────────────────
 
@@ -136,16 +137,14 @@ function subtreeIsSynced(node: LoreNode, engine: string): boolean {
 export default function LoreTree({
   onSelectLoreNode,
   onOpenLoreNode,
-  statMode = 'none',
-  currentAiEngine = null,
   syncingNodeIds,
 }: {
   onSelectLoreNode: (node: LoreNode) => void
   onOpenLoreNode?: (node: LoreNode) => void
-  statMode?: LoreStatMode
-  currentAiEngine?: string | null
   syncingNodeIds?: ReadonlySet<number>
 }) {
+  const { statMode, currentAiEngine } = useLoreSettings()
+
   const [tree, setTree] = useState<LoreNode[]>([])
   const [items, setItems] = useState<Record<TreeItemIndex, TreeItem<ItemData>>>({
     root: { index: 'root', isFolder: true, children: [], canMove: false, data: null },

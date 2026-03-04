@@ -10,8 +10,9 @@ import LoreSection from './LoreSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
-import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference, LoreStatMode } from '../types/models'
-import { EditorSettingsContext } from '../lib/editor-settings'
+import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
+import { EditorSettingsProvider } from '../lib/editor-settings'
+import { LoreSettingsProvider } from '../lib/lore-settings'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -43,17 +44,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
 
-  const WORD_WRAP_KEY = 'ai-story-builder-word-wrap'
-  const [wordWrap, setWordWrap] = React.useState<boolean>(() => {
-    const saved = localStorage.getItem(WORD_WRAP_KEY)
-    return saved === null ? true : saved === 'true'
-  })
-
-  const LORE_STAT_KEY = 'ai-story-builder-lore-stat'
-  const [loreStatMode, setLoreStatMode] = React.useState<LoreStatMode>(() => {
-    return (localStorage.getItem(LORE_STAT_KEY) as LoreStatMode | null) ?? 'words'
-  })
-
   /** Opens (or activates) a lore-editor tab for the given node in the center group. */
   function openLoreEditor(node: LoreNode) {
     const api = dockviewRef.current
@@ -83,16 +73,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
       .then((data: { value?: string }) => { if (data.value) setPreference(data.value) })
       .catch(() => {})
   }, [])
-
-  // Sync word-wrap state to the Electron native menu checkbox on startup
-  useEffect(() => {
-    window.electronAPI?.sendMenuState?.('word-wrap', wordWrap)
-  }, [wordWrap])
-
-  // Sync lore-stat mode to the Electron native menu radio on startup/change
-  useEffect(() => {
-    window.electronAPI?.sendMenuState?.('lore-stat', loreStatMode)
-  }, [loreStatMode])
 
   // helper to massage storage format into the version expected by dockview
   const normalizeLayout = (layout: any) => {
@@ -286,8 +266,8 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   // Native-menu IPC listener.
   // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, setLoreStatMode })
-  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, setLoreStatMode }
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference })
+  menuActionsRef.current = { handleResetLayouts, onClose, setPreference }
 
   useEffect(() => {
     if (!window.electronAPI) return
@@ -298,14 +278,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         menuActionsRef.current.onClose()
       } else if (action.startsWith('set-theme:')) {
         menuActionsRef.current.setPreference(action.slice(10) as ThemePreference)
-      } else if (action.startsWith('set-word-wrap:')) {
-        const value = action === 'set-word-wrap:true'
-        localStorage.setItem(WORD_WRAP_KEY, String(value))
-        setWordWrap(value)
-      } else if (action.startsWith('set-lore-stat:')) {
-        const mode = action.slice(14) as LoreStatMode
-        localStorage.setItem(LORE_STAT_KEY, mode)
-        menuActionsRef.current.setLoreStatMode(mode)
       }
     })
     return () => { window.electronAPI?.removeMenuActionListeners() }
@@ -345,7 +317,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         <LoreSection
           onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
           onOpenLoreNode={openLoreEditor}
-          statMode={loreStatMode}
         />
       </div>
     ),
@@ -403,24 +374,26 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   }
 
   return (
-    <EditorSettingsContext.Provider value={{ wordWrap }}>
-      <div className="flex flex-col h-full">
-        <div className="flex-1 min-h-0 bg-background overflow-hidden">
-          <DockviewReact
-            components={components}
-            tabComponents={tabComponents}
-            watermarkComponent={WelcomeWatermark}
-            onReady={onReady}
-            onWillDrop={handleWillDrop}
-            disableFloatingGroups={false}
-            disableDnd={false}
-            className="dockview-theme"
-          />
+    <LoreSettingsProvider>
+      <EditorSettingsProvider>
+        <div className="flex flex-col h-full">
+          <div className="flex-1 min-h-0 bg-background overflow-hidden">
+            <DockviewReact
+              components={components}
+              tabComponents={tabComponents}
+              watermarkComponent={WelcomeWatermark}
+              onReady={onReady}
+              onWillDrop={handleWillDrop}
+              disableFloatingGroups={false}
+              disableDnd={false}
+              className="dockview-theme"
+            />
+          </div>
+          <div className="flex h-12 border-t border-border p-2 items-center bg-background justify-center">
+            <p className="text-muted-foreground text-sm">Project open</p>
+          </div>
         </div>
-        <div className="flex h-12 border-t border-border p-2 items-center bg-background justify-center">
-          <p className="text-muted-foreground text-sm">Project open</p>
-        </div>
-      </div>
-    </EditorSettingsContext.Provider>
+      </EditorSettingsProvider>
+    </LoreSettingsProvider>
   )
 }
