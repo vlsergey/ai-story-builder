@@ -36,6 +36,17 @@
   - Reads `current_backend` from project settings; returns 400 if no engine is configured or the active engine does not support lore sync
   - **Yandex adapter**: uploads changed/new non-empty lore nodes as plain-text files to Yandex Files API; stores `file_id` in each node's `ai_sync_info.yandex`; deletes remote files for nodes that became empty (`word_count=0`) or are marked `to_be_deleted`; rebuilds the SearchIndex after every sync; stores the new `search_index_id` in `ai_config.yandex.search_index_id`
   - Returns a progress summary: `{ uploaded, deleted, unchanged, search_index_id }`
+- Lore generation API (`POST /api/ai/generate-lore`):
+  - Request body: `{ prompt: string, includeExistingLore: boolean }`
+  - Reads `current_backend` from settings; returns 400 if no engine configured
+  - Reads `text_language` setting (fallback `'ru-RU'`) and includes it in the system prompt
+  - Builds system prompt: "You are a creative writing assistant. Generate a lore item for a story. Write the result in Markdown format. Language: {text_language}. Respond with only the lore content — no explanations, no preamble."
+  - If `includeExistingLore && engine === 'yandex'` and `search_index_id` is present, attaches the Yandex search tool to the completion request
+  - Uses first model from `ai_config.yandex.models` or fallback `'yandexgpt-lite'`
+  - Returns `{ content: string }` on success or `{ error: string }` with HTTP 500 on failure
+- Project creation (`POST /api/project/create`):
+  - Accepts optional `text_language` field in request body (default `'ru-RU'`)
+  - Stores `text_language` as a project setting alongside `project_title`
 
 ### Development Workflow
 - `npm run dev` starts three processes concurrently via `concurrently`:

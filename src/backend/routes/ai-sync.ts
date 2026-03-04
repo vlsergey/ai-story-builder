@@ -297,10 +297,22 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       }
     }
 
-    // Step 4 — upload files (Markdown with YAML frontmatter tags)
+    // Step 4 — for each node to upload: delete old remote file first, then upload new one
     const newFileIds = new Map<number, string>()
     for (const node of toUpload) {
       const row = idToRow.get(node.id)!
+
+      // Delete old remote file before uploading new version (avoids orphaned files on partial failure)
+      if (node.yandexSync?.file_id) {
+        try {
+          await client.files.del(node.yandexSync.file_id)
+        } catch (e: unknown) {
+          if ((e as { status?: number })?.status !== 404) {
+            throw new Error(`Delete old file ${node.yandexSync.file_id} for node "${node.name}" (id=${node.id}):\n${formatApiError(e)}`)
+          }
+        }
+      }
+
       try {
         const fileContent = buildFileContent(row, projectName, pathMap, idToRow)
         const uploaded = await client.files.create({

@@ -16,6 +16,7 @@ function projectDisplayName(fullPath: string): string {
 function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectData) => void }) {
   const navigate = useNavigate()
   const [name, setName] = React.useState('MyProject')
+  const [textLanguage, setTextLanguage] = React.useState('ru-RU')
   const [busy, setBusy] = React.useState(false)
   const [createError, setCreateError] = React.useState<string | null>(null)
 
@@ -27,7 +28,7 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
       const res = await fetch('/api/project/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, text_language: textLanguage }),
       })
       const j = (await res.json()) as ProjectData & { error?: string }
       if (res.ok) {
@@ -45,16 +46,26 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
 
   return (
     <div>
-      <form onSubmit={submit} className="flex items-center gap-2">
-        <Input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          className="h-8 text-sm"
-          placeholder="Project name"
-        />
-        <Button type="submit" disabled={busy} size="sm" className="flex-shrink-0">
-          {busy ? 'Creating…' : 'Create'}
-        </Button>
+      <form onSubmit={submit} className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="h-8 text-sm"
+            placeholder="Project name"
+          />
+          <Button type="submit" disabled={busy} size="sm" className="flex-shrink-0">
+            {busy ? 'Creating…' : 'Create'}
+          </Button>
+        </div>
+        <select
+          value={textLanguage}
+          onChange={e => setTextLanguage(e.target.value)}
+          className="h-8 text-sm rounded-md border border-input bg-background px-3 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          <option value="ru-RU">Русский (ru-RU)</option>
+          <option value="en-US">English (en-US)</option>
+        </select>
       </form>
       {createError && <p className="mt-2 text-xs text-destructive">{createError}</p>}
     </div>

@@ -134,10 +134,9 @@ router.post('/open-folder', (_req: Request, res: Response) => {
 
 // POST /project/create
 router.post('/create', express.json(), (req: Request, res: Response) => {
-  const name =
-    req.body && (req.body as { name?: string }).name
-      ? (req.body as { name: string }).name
-      : `project-${Date.now()}`
+  const body = req.body as { name?: string; text_language?: string } | undefined
+  const name = body?.name ? body.name : `project-${Date.now()}`
+  const text_language = body?.text_language ?? 'ru-RU'
   const safeName = name.replace(/[^a-zA-Z0-9\-_.]/g, '_')
   const projectsDir = path.join(getDataDir(), 'projects')
   fs.mkdirSync(projectsDir, { recursive: true })
@@ -178,6 +177,7 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
     const setSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
     setSetting.run('project_title', name)
     setSetting.run('locale', 'en')
+    setSetting.run('text_language', text_language)
 
     db.close()
 

@@ -27,6 +27,7 @@ Important keys:
   - `ai_config` → JSON string with per-engine credentials (see structure below)
   - `save_api_keys` → `"true" | "false"`
   - `ui_layout` → JSON with saved dockable layout
+  - `text_language` → `"ru-RU" | "en-US"` — language of story texts; used in AI generation system prompts; set at project creation (default `"ru-RU"`); backfilled to `"ru-RU"` for existing projects by migration 3 → 4
   - `last_opened_at`, `project_title`, etc.
 
 ### `ai_config` JSON structure

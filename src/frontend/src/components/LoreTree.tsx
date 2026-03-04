@@ -14,11 +14,11 @@ import {
   ChevronRight, ChevronDown,
   Library, BookOpen, ScrollText,
   Plus, CopyPlus, Pencil, SquarePen, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
-  CheckCircle2, Circle, Loader2,
+  CheckCircle2, Circle, Loader2, Wand2,
 } from 'lucide-react'
 import { LoreNode } from '../types/models'
 import { useLoreSettings } from '../lib/lore-settings'
-import { LORE_NODE_SAVED_EVENT, LoreNodeSavedDetail } from '../lib/lore-events'
+import { LORE_NODE_SAVED_EVENT, LORE_TREE_REFRESH_EVENT, LoreNodeSavedDetail } from '../lib/lore-events'
 import { engineSupportsFileUpload } from '../lib/ai-engines'
 
 // ── Command system ────────────────────────────────────────────────────────────
@@ -201,10 +201,12 @@ function subtreeIsInProgress(node: LoreNode, syncingNodeIds: ReadonlySet<number>
 export default function LoreTree({
   onSelectLoreNode,
   onOpenLoreNode,
+  onOpenLoreWizard,
   syncingNodeIds,
 }: {
   onSelectLoreNode: (node: LoreNode) => void
   onOpenLoreNode?: (node: LoreNode) => void
+  onOpenLoreWizard?: (node: LoreNode) => void
   syncingNodeIds?: ReadonlySet<number>
 }) {
   const { statMode, currentAiEngine } = useLoreSettings()
@@ -246,6 +248,12 @@ export default function LoreTree({
     }
     window.addEventListener(LORE_NODE_SAVED_EVENT, onNodeSaved)
     return () => window.removeEventListener(LORE_NODE_SAVED_EVENT, onNodeSaved)
+  }, [])
+
+  // Re-fetch the full tree when LoreWizard saves a new node.
+  useEffect(() => {
+    window.addEventListener(LORE_TREE_REFRESH_EVENT, fetchTree)
+    return () => window.removeEventListener(LORE_TREE_REFRESH_EVENT, fetchTree)
   }, [])
 
   // Once the pending-rename item appears in `items`, select it and start rename
@@ -468,6 +476,13 @@ export default function LoreTree({
     if (node) onOpenLoreNode?.(node)
   }
 
+  function handleOpenWizard() {
+    if (selectedNodeIds.size !== 1) return
+    const [nodeId] = selectedNodeIds
+    const node = findNode(nodeId, tree)
+    if (node) onOpenLoreWizard?.(node)
+  }
+
   function showError(message: string) {
     if (window.electronAPI) {
       void window.electronAPI.showErrorDialog('Sync Error', message)
@@ -516,6 +531,15 @@ export default function LoreTree({
   // ── Command registry ──────────────────────────────────────────────────────
 
   const toolbarItems: ToolbarItem[] = [
+    {
+      id: 'wizard',
+      label: currentAiEngine ? 'Create with AI' : 'Create with AI (no engine configured)',
+      icon: <Wand2 size={15} />,
+      enabled: oneSelected && currentAiEngine != null,
+      variant: 'primary',
+      execute: handleOpenWizard,
+    },
+    'separator',
     { id: 'create',    label: 'Create child node',  icon: <Plus size={15} />,        enabled: oneSelected,  execute: handleCreate },
     { id: 'duplicate', label: 'Duplicate',           icon: <CopyPlus size={15} />,    enabled: oneSelected && !onlyRootSelected, execute: handleDuplicate },
     { id: 'rename',    label: 'Rename (F2)',          icon: <Pencil size={15} />,      enabled: oneSelected, execute: handleRename },

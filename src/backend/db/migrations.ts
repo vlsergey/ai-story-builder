@@ -129,6 +129,10 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       update.run(words, chars, bytes, row.id)
     }
   },
+  // version 3 → 4: add text_language setting (default ru-RU) for existing projects
+  (db) => {
+    db.exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('text_language', 'ru-RU')`)
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length

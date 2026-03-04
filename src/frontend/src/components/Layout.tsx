@@ -9,6 +9,7 @@ import 'dockview/dist/styles/dockview.css'
 import LoreSection from './LoreSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
+import LoreWizard from './LoreWizard'
 import PlanEditor from './PlanEditor'
 import SettingsPanel from './SettingsPanel'
 import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
@@ -84,6 +85,26 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
       tabComponent: 'loreEditorTab',
       title: node.name,
       params: { nodeId: node.id },
+      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
+    })
+  }
+
+  /** Opens (or activates) a lore-wizard tab for the given node in the center group. */
+  function openLoreWizard(node: LoreNode) {
+    const api = dockviewRef.current
+    if (!api) return
+    const panelId = `lore-wizard-${node.id}`
+    const existing = api.getPanel(panelId)
+    if (existing) { existing.api.setActive(); return }
+    const editorGroup: any =
+      api.groups.find((g: any) => g.panels.some((p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('lore-wizard-'))) ??
+      api.groups.find((g: any) => g.panels.length === 0)
+    api.addPanel({
+      id: panelId,
+      component: 'lore-wizard',
+      tabComponent: 'loreEditorTab',
+      title: `AI Wizard → ${node.name}`,
+      params: { parentNodeId: node.id, parentNodeName: node.name },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
   }
@@ -325,11 +346,19 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         <LoreSection
           onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
           onOpenLoreNode={openLoreEditor}
+          onOpenLoreWizard={openLoreWizard}
         />
       </div>
     ),
     'lore-editor': (props: any) => (
       <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
+    ),
+    'lore-wizard': (props: any) => (
+      <LoreWizard
+        parentNodeId={props.params?.parentNodeId}
+        parentNodeName={props.params?.parentNodeName}
+        panelApi={props.api}
+      />
     ),
     plan: () => (
       <div className="p-2 h-full">
@@ -374,11 +403,11 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     const targetGroup = event.group
     if (!targetGroup) return
     const isEditorGroup = targetGroup.panels.some(
-      (p: any) => p.id.startsWith('lore-editor-') || p.id === 'settings'
+      (p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('lore-wizard-') || p.id === 'settings'
     )
     if (!isEditorGroup) return
     const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
-    if (!draggedPanelId?.startsWith('lore-editor-') && draggedPanelId !== 'settings') {
+    if (!draggedPanelId?.startsWith('lore-editor-') && !draggedPanelId?.startsWith('lore-wizard-') && draggedPanelId !== 'settings') {
       event.preventDefault()
     }
   }

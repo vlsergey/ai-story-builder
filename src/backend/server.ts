@@ -9,6 +9,7 @@ import generationRouter from './routes/generation.js'
 import settingsRouter from './routes/settings.js'
 import aiConfigRouter from './routes/ai-config.js'
 import aiSyncRouter from './routes/ai-sync.js'
+import generateLoreRouter from './routes/generate-lore.js'
 import { getDataDir } from './db/state.js'
 
 const app = express()
@@ -54,6 +55,7 @@ app.use('/api', generationRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/ai', aiConfigRouter)
 app.use('/api/ai', aiSyncRouter)
+app.use('/api/ai', generateLoreRouter)
 
 app.get('/api/hello', (_req, res) => {
   res.json({ message: 'hello from backend' })

@@ -17,6 +17,9 @@ export function dispatchLoreNodeSaved(detail: LoreNodeSavedDetail): void {
   window.dispatchEvent(new CustomEvent<LoreNodeSavedDetail>(LORE_NODE_SAVED_EVENT, { detail }))
 }
 
+/** Event fired by LoreWizard after saving a new node, to trigger a full tree reload. */
+export const LORE_TREE_REFRESH_EVENT = 'lore-tree-refresh'
+
 /** Event fired by SettingsPanel when the active AI engine changes. */
 export const AI_ENGINE_CHANGED_EVENT = 'ai-engine-changed'
 

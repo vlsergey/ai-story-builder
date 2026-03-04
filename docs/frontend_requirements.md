@@ -43,6 +43,35 @@ Since this is a **local, single-user Electron application**, the chosen pattern 
 
 All shared event names and detail types live in `src/frontend/src/lib/lore-events.ts`.
 
+### LoreWizard Panel
+
+A dockview panel (`id='lore-wizard-{nodeId}'`) opened from the Lore toolbar via a wand button when a node is selected and an AI engine is configured.
+
+**Props:** `parentNodeId: number`, `parentNodeName: string`, `panelApi?: { setTitle: (t: string) => void }`
+
+**Layout (flex-col, full height):**
+- Prompt `<textarea>` (h-1/4) with placeholder text
+- Toolbar row: "Include existing lore" checkbox + "Generate" button
+- CodeMirror Markdown editor (flex-1) displaying and allowing editing of the AI response
+- Footer row: name `<input>` + "Save" button
+
+**Behaviour:**
+- On mount: sets panel title to `'AI Wizard → {parentNodeName}'`
+- **Generate**: `POST /api/ai/generate-lore` with `{ prompt, includeExistingLore }`; populates CodeMirror with `data.content`; shows inline error on failure
+- **Save**: creates a new lore node via `POST /api/lore` (child of `parentNodeId`, with the given name), then saves content via `PATCH /api/lore/:id`; dispatches `LORE_TREE_REFRESH_EVENT` so the tree reloads
+
+**Wand button in LoreTree toolbar:**
+- Shows `Wand2` icon at the start of the toolbar (before the separator)
+- Enabled only when exactly one node is selected **and** an AI engine is configured (`currentAiEngine != null`)
+- Tooltip: `'Create with AI'` / `'Create with AI (no engine configured)'`
+
+### New Project Form
+
+The "Create new project" form on the Start Screen includes a language selector:
+- `<select>` dropdown with options: `ru-RU` (Русский), `en-US` (English)
+- Default: `ru-RU`
+- Value is sent as `text_language` in the `POST /api/project/create` body
+
 ### Settings Panel
 
 A singleton dockview panel (`id='settings'`) that opens in the editor group by default (same group as lore-editor tabs) via View > Settings. Can be moved freely and returned to the editor group.
