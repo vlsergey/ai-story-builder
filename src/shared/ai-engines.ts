@@ -23,19 +23,22 @@ export interface AgeRatingInfo {
   /** Short rating code shown as a badge (e.g. "G", "18+"). Not translated. */
   label: string
   minAge: number
-  colorClass: string
+  /** Background color hex for the badge (used as inline style to avoid Tailwind purging). */
+  bg: string
+  /** Text color hex for the badge (used as inline style). */
+  fg: string
 }
 
 /** All age ratings in ascending order of maturity. */
 export const AGE_RATING_ORDER: AgeRating[] = ['G', 'PG', '12', '16', '18', 'NC21']
 
 export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
-  G:    { label: 'G',      minAge: 0,  colorClass: 'bg-green-600 text-white' },
-  PG:   { label: 'PG',    minAge: 7,  colorClass: 'bg-lime-600 text-white' },
-  '12': { label: '12+',   minAge: 12, colorClass: 'bg-yellow-500 text-black' },
-  '16': { label: '16+',   minAge: 16, colorClass: 'bg-orange-500 text-white' },
-  '18': { label: '18+',   minAge: 18, colorClass: 'bg-red-600 text-white' },
-  NC21: { label: 'NC-21', minAge: 21, colorClass: 'bg-purple-800 text-white' },
+  G:    { label: 'G',      minAge: 0,  bg: '#16a34a', fg: '#fff' }, // green-600
+  PG:   { label: 'PG',    minAge: 7,  bg: '#65a30d', fg: '#fff' }, // lime-600
+  '12': { label: '12+',   minAge: 12, bg: '#eab308', fg: '#000' }, // yellow-500
+  '16': { label: '16+',   minAge: 16, bg: '#f97316', fg: '#fff' }, // orange-500
+  '18': { label: '18+',   minAge: 18, bg: '#dc2626', fg: '#fff' }, // red-600
+  NC21: { label: 'NC-21', minAge: 21, bg: '#6b21a8', fg: '#fff' }, // purple-800
 }
 
 export interface AiEngineCapabilities {
