@@ -1,7 +1,10 @@
 'use strict'
 
-const { app, BrowserWindow, Menu, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron')
 const path = require('path')
+
+/** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
+let wordWrapMenuItem = null
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -21,11 +24,20 @@ function sendMenuAction(action) {
  * Structure: [appMenu (macOS only)] File | Edit | View | Window
  */
 function buildApplicationMenu() {
+  wordWrapMenuItem = {
+    type: 'checkbox',
+    label: 'Word Wrap in Editors',
+    checked: true, // default; renderer syncs the real value on startup
+    click: (item) => sendMenuAction(`set-word-wrap:${item.checked}`),
+  }
+
   const viewSubmenu = [
     {
       label: 'Reset layouts',
       click: () => sendMenuAction('reset-layouts'),
     },
+    { type: 'separator' },
+    wordWrapMenuItem,
     { type: 'separator' },
     {
       label: 'Theme',
@@ -114,6 +126,13 @@ function checkNativeDeps() {
     app.exit(1)
   }
 }
+
+// Renderer sends this to keep menu checkbox in sync with localStorage state
+ipcMain.on('set-menu-state', (_event, { key, value }) => {
+  if (key === 'word-wrap' && wordWrapMenuItem) {
+    wordWrapMenuItem.checked = value
+  }
+})
 
 app.whenReady().then(async () => {
   checkNativeDeps()

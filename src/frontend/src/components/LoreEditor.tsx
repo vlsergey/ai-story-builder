@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
+import { EditorView } from '@codemirror/view'
 import { useTheme } from '../lib/theme/theme-provider'
+import { useEditorSettings } from '../lib/editor-settings'
 
 interface LoreEditorProps {
   nodeId: number
@@ -11,6 +13,7 @@ interface LoreEditorProps {
 
 export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   const { resolvedTheme } = useTheme()
+  const { wordWrap } = useEditorSettings()
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
@@ -100,7 +103,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         <CodeMirror
           value={content}
           height="100%"
-          extensions={[markdown()]}
+          extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
           theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
           onChange={handleContentChange}
           className="h-full text-sm"

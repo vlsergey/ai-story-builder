@@ -40,6 +40,7 @@ describe('Layout', () => {
     window.electronAPI = {
       onMenuAction: vi.fn((cb) => { menuActionHandler = cb }),
       removeMenuActionListeners: vi.fn(),
+      sendMenuState: vi.fn(),
     }
 
     vi.stubGlobal('fetch', (_url: unknown, opts?: unknown) => {

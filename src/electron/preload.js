@@ -16,4 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeMenuActionListeners: () => {
     ipcRenderer.removeAllListeners('menu-action')
   },
+
+  /** Sync a UI setting back to the main process so native menu items stay in sync. */
+  sendMenuState: (key, value) => {
+    ipcRenderer.send('set-menu-state', { key, value })
+  },
 })

@@ -8,8 +8,13 @@
 * Global state: Zustand
 * Server state & caching: TanStack Query (React Query)
 * Forms: React Hook Form + Zod
-* Markdown editor: CodeMirror 6 via `@uiw/react-codemirror` + `@codemirror/lang-markdown` (supports syntax highlighting, dark/light themes)
+* Markdown editor: CodeMirror 6 via `@uiw/react-codemirror` + `@codemirror/lang-markdown` (supports syntax highlighting, dark/light themes, word-wrap toggle)
 * i18n: react-i18next (English + Russian minimum)
+* Desktop shell: **Electron** (the app runs as an Electron desktop app). Electron is used for:
+  * Native application menu (File / Edit / View / Window) with IPC bridge to the renderer
+  * System integrations (opening external URLs in the system browser, window management)
+  * IPC pattern: main process sends actions to renderer via `menu-action` channel; renderer syncs state back via `set-menu-state` channel
+  * The `window.electronAPI` bridge is declared in `src/frontend/src/types/electron.d.ts`
 
 ### Core Architecture
 * Desktop-first design (minimum supported width 1280px)

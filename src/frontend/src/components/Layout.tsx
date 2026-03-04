@@ -11,6 +11,7 @@ import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
 import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
+import { EditorSettingsContext } from '../lib/editor-settings'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -42,6 +43,12 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
 
+  const WORD_WRAP_KEY = 'ai-story-builder-word-wrap'
+  const [wordWrap, setWordWrap] = React.useState<boolean>(() => {
+    const saved = localStorage.getItem(WORD_WRAP_KEY)
+    return saved === null ? true : saved === 'true'
+  })
+
   /** Opens (or activates) a lore-editor tab for the given node in the center group. */
   function openLoreEditor(node: LoreNode) {
     const api = dockviewRef.current
@@ -70,6 +77,11 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
       .then((data: { value?: string }) => { if (data.value) setPreference(data.value) })
       .catch(() => {})
   }, [])
+
+  // Sync word-wrap state to the Electron native menu checkbox on startup
+  useEffect(() => {
+    window.electronAPI?.sendMenuState?.('word-wrap', wordWrap)
+  }, [wordWrap])
 
   // helper to massage storage format into the version expected by dockview
   const normalizeLayout = (layout: any) => {
@@ -265,6 +277,10 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         menuActionsRef.current.onClose()
       } else if (action.startsWith('set-theme:')) {
         menuActionsRef.current.setPreference(action.slice(10) as ThemePreference)
+      } else if (action.startsWith('set-word-wrap:')) {
+        const value = action === 'set-word-wrap:true'
+        localStorage.setItem(WORD_WRAP_KEY, String(value))
+        setWordWrap(value)
       }
     })
     return () => { window.electronAPI?.removeMenuActionListeners() }
@@ -326,21 +342,23 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 min-h-0 bg-background overflow-hidden">
-        <DockviewReact
-          components={components}
-          tabComponents={tabComponents}
-          watermarkComponent={WelcomeWatermark}
-          onReady={onReady}
-          disableFloatingGroups={false}
-          disableDnd={false}
-          className="dockview-theme"
-        />
+    <EditorSettingsContext.Provider value={{ wordWrap }}>
+      <div className="flex flex-col h-full">
+        <div className="flex-1 min-h-0 bg-background overflow-hidden">
+          <DockviewReact
+            components={components}
+            tabComponents={tabComponents}
+            watermarkComponent={WelcomeWatermark}
+            onReady={onReady}
+            disableFloatingGroups={false}
+            disableDnd={false}
+            className="dockview-theme"
+          />
+        </div>
+        <div className="flex h-12 border-t border-border p-2 items-center bg-background justify-center">
+          <p className="text-muted-foreground text-sm">Project open</p>
+        </div>
       </div>
-      <div className="flex h-12 border-t border-border p-2 items-center bg-background justify-center">
-        <p className="text-muted-foreground text-sm">Project open</p>
-      </div>
-    </div>
+    </EditorSettingsContext.Provider>
   )
 }
