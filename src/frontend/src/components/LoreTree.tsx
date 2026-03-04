@@ -157,6 +157,7 @@ export default function LoreTree({
 
   const [pendingRenameId, setPendingRenameId] = useState<number | null>(null)
 
+  const containerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const treeRef = useRef<TreeRef<ItemData>>(null)
 
@@ -435,8 +436,10 @@ export default function LoreTree({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      const target = e.target as HTMLElement
+      // Only handle keyboard shortcuts when focus is within the lore tree panel
+      if (containerRef.current && !containerRef.current.contains(target)) return
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
       if (e.key === 'Enter') {
         const focusedId = viewState['lore-tree']?.focusedItem
         if (focusedId != null && focusedId !== 'root') {
@@ -478,7 +481,7 @@ export default function LoreTree({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={containerRef} className="flex flex-col gap-2">
       <div className="flex items-center gap-0.5 border-b border-border pb-1.5">
         {toolbarItems.map(renderToolbarItem)}
       </div>

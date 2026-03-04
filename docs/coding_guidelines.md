@@ -19,4 +19,6 @@ To keep the project maintainable and scalable, follow these rules:
   Returning `500` because of wrong UI state or invalid user input is a **bug** and must be fixed, not accepted.
 * **Error logging** – The backend logs a stack trace for every 4xx/5xx response automatically. Never swallow exceptions silently; always surface them as the appropriate HTTP error code with a descriptive `{ error: "..." }` JSON body.
 
+* **Keyboard shortcuts scoped to their panel** – A global `window` keydown listener for panel-local shortcuts (e.g. Delete / Enter in the Lore Tree) must guard against events originating outside the panel. Use a container `ref` and check `containerRef.current.contains(e.target)` before processing the event. This prevents the panel's shortcuts from firing when focus is in another panel (e.g. a CodeMirror editor, a form, etc.). Keep the `INPUT` / `TEXTAREA` tag guard as well, for editable fields that live inside the same panel.
+
 These guidelines are part of the project's acceptance criteria and should be reviewed when adding new features.

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LoreTree from '../components/LoreTree';
 import { LoreSettingsContext } from '../lib/lore-settings';
@@ -202,5 +202,44 @@ describe('LoreTree', () => {
     );
     await screen.findByText('Chapter');
     expect(container.querySelector('[aria-label="not synced"]')).not.toBeNull();
+  });
+
+  // ── Keyboard interception ──────────────────────────────────────────────────
+
+  it('does not intercept Enter key when focus is outside the lore tree', async () => {
+    const onOpenLoreNode = vi.fn();
+    mockFetchTree([{
+      id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+      latest_version_status: null, word_count: 0, char_count: 0, byte_count: 0,
+      to_be_deleted: 0, content: null, ai_sync_info: null,
+      children: [{
+        id: 2, parent_id: 1, name: 'Chapter', status: 'ACTIVE',
+        latest_version_status: null, word_count: 0, char_count: 0, byte_count: 0,
+        to_be_deleted: 0, content: null, ai_sync_info: null, children: [],
+      }],
+    }]);
+
+    render(
+      <LoreSettingsContext.Provider value={{ statMode: 'words', currentAiEngine: null }}>
+        <LoreTree onSelectLoreNode={vi.fn()} onOpenLoreNode={onOpenLoreNode} />
+      </LoreSettingsContext.Provider>
+    );
+
+    // Click a tree node to select/focus it in the tree's viewState
+    await screen.findByText('Chapter');
+    fireEvent.click(screen.getByText('Chapter'));
+
+    // Simulate focus moving to an external contenteditable element (e.g. CodeMirror editor)
+    const editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    document.body.appendChild(editor);
+    editor.focus();
+
+    // Press Enter while the external editor has focus — tree should ignore it
+    fireEvent.keyDown(editor, { key: 'Enter', bubbles: true });
+
+    expect(onOpenLoreNode).not.toHaveBeenCalled();
+
+    document.body.removeChild(editor);
   });
 });
