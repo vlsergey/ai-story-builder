@@ -14,6 +14,19 @@
 3. Generate an API key for the service account
 4. Note the Folder ID from the console (format: `b1gXXXXXXXXXX`)
 
+**Available models** (no `listModels` API exists — list is static):
+
+| Model | URI path | Notes |
+|---|---|---|
+| YandexGPT Pro 5 | `yandexgpt/latest` | Stable, most capable |
+| YandexGPT Pro 5.1 | `yandexgpt/rc` | Release candidate |
+| YandexGPT Lite 5 | `yandexgpt-lite` | Fast, cheaper |
+| Fine-tuned Lite | `yandexgpt-lite/latest@{suffix}` | Custom fine-tune |
+
+Full model URI: `gpt://{folder_id}/{model_path}` — e.g. `gpt://b1g12345/yandexgpt/latest`
+
+The Settings panel stores a user-editable list of model paths (one per line). Default: `yandexgpt/latest`, `yandexgpt/rc`, `yandexgpt-lite`. See the full current list at [aistudio.yandex.ru/docs](https://aistudio.yandex.ru/docs/ru/ai-studio/concepts/generation/models.html).
+
 ---
 
 ## Capabilities We Use

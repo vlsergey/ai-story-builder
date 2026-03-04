@@ -10,7 +10,7 @@ import { dispatchAiEngineChanged } from '../lib/lore-events'
 interface ConfigData {
   current_engine: string | null
   grok: { api_key: string }
-  yandex: { api_key: string; folder_id: string }
+  yandex: { api_key: string; folder_id: string; models: string }
 }
 
 interface TestState {
@@ -35,10 +35,17 @@ export default function SettingsPanel() {
       .then((data: ConfigData) => {
         setConfig(data)
         setCurrentEngine(data.current_engine)
-        setFormValues({
-          grok:   { api_key: data.grok.api_key },
-          yandex: { api_key: data.yandex.api_key, folder_id: data.yandex.folder_id },
-        })
+        // Use saved values, falling back to field defaultValue if nothing stored yet
+        const initialValues: Record<string, Record<string, string>> = {}
+        for (const engine of BUILTIN_ENGINES) {
+          const saved = (data as Record<string, Record<string, string>>)[engine.id] ?? {}
+          initialValues[engine.id] = {}
+          for (const field of engine.configFields) {
+            const stored = saved[field.key] ?? ''
+            initialValues[engine.id][field.key] = stored !== '' ? stored : (field.defaultValue ?? '')
+          }
+        }
+        setFormValues(initialValues)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -154,42 +161,56 @@ export default function SettingsPanel() {
                 {engine.configFields.map(field => {
                   const fieldKey = `${engine.id}_${field.key}`
                   const shown = showField[fieldKey]
-                  const value = formValues[engine.id]?.[field.key] ?? ''
+                  const value = formValues[engine.id]?.[field.key] ?? field.defaultValue ?? ''
+                  const updateValue = (v: string) =>
+                    setFormValues(prev => ({
+                      ...prev,
+                      [engine.id]: { ...(prev[engine.id] ?? {}), [field.key]: v },
+                    }))
                   return (
                     <div key={field.key} className="flex flex-col gap-0.5">
                       <label className="text-xs text-muted-foreground">{field.label}</label>
-                      <div className="flex gap-1">
-                        <input
-                          type={field.type === 'password' && !shown ? 'password' : 'text'}
+                      {field.type === 'textarea' ? (
+                        <textarea
                           value={value}
-                          onChange={e => {
-                            const v = e.target.value
-                            setFormValues(prev => ({
-                              ...prev,
-                              [engine.id]: { ...(prev[engine.id] ?? {}), [field.key]: v },
-                            }))
-                          }}
+                          rows={4}
+                          onChange={e => updateValue(e.target.value)}
                           onBlur={e => saveField(engine.id, field.key, e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') saveField(engine.id, field.key, value)
-                          }}
-                          className="flex-1 text-sm border border-border rounded px-2 py-1 bg-background"
-                          placeholder={field.label}
+                          className="text-sm border border-border rounded px-2 py-1 bg-background font-mono resize-y"
+                          placeholder={field.defaultValue ?? field.label}
                           spellCheck={false}
-                          autoComplete="off"
                         />
-                        {field.type === 'password' && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setShowField(prev => ({ ...prev, [fieldKey]: !prev[fieldKey] }))
-                            }
-                            className="text-xs px-2 py-1 border border-border rounded hover:bg-muted shrink-0"
-                          >
-                            {shown ? 'Hide' : 'Show'}
-                          </button>
-                        )}
-                      </div>
+                      ) : (
+                        <div className="flex gap-1">
+                          <input
+                            type={field.type === 'password' && !shown ? 'password' : 'text'}
+                            value={value}
+                            onChange={e => updateValue(e.target.value)}
+                            onBlur={e => saveField(engine.id, field.key, e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') saveField(engine.id, field.key, value)
+                            }}
+                            className="flex-1 text-sm border border-border rounded px-2 py-1 bg-background"
+                            placeholder={field.label}
+                            spellCheck={false}
+                            autoComplete="off"
+                          />
+                          {field.type === 'password' && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowField(prev => ({ ...prev, [fieldKey]: !prev[fieldKey] }))
+                              }
+                              className="text-xs px-2 py-1 border border-border rounded hover:bg-muted shrink-0"
+                            >
+                              {shown ? 'Hide' : 'Show'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {field.hint && (
+                        <p className="text-xs text-muted-foreground">{field.hint}</p>
+                      )}
                     </div>
                   )
                 })}

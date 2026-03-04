@@ -49,7 +49,11 @@ export interface AiEngineCapabilities {
 export interface AiEngineConfigField {
   key: string
   label: string
-  type: 'text' | 'password'
+  type: 'text' | 'password' | 'textarea'
+  /** Default value shown when no saved value exists. */
+  defaultValue?: string
+  /** Optional help text shown below the field. */
+  hint?: string
 }
 
 export interface AiEngineDefinition {
@@ -125,7 +129,15 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
     },
     configFields: [
       { key: 'api_key',   label: 'API Key',   type: 'password' },
-      { key: 'folder_id', label: 'Folder ID', type: 'text' },
+      { key: 'folder_id', label: 'Folder ID', type: 'text',
+        hint: 'Your Yandex Cloud folder ID (e.g. b1gXXXXXXXXXX). Models use URI: gpt://{folder_id}/{model}/latest' },
+      {
+        key: 'models',
+        label: 'Available Models',
+        type: 'textarea',
+        defaultValue: 'yandexgpt/latest\nyandexgpt/rc\nyandexgpt-lite',
+        hint: 'One model path per line. Full URI: gpt://{folder_id}/{model}. See aistudio.yandex.ru/docs for the current list.',
+      },
     ],
     notes: 'Subject to Russian Federation content regulations. No LGBTQ+ or political content.',
   },

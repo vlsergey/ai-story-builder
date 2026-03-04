@@ -20,6 +20,7 @@ interface GrokConfig {
 interface YandexConfig {
   api_key?: string
   folder_id?: string
+  models?: string
 }
 
 interface AiConfigStore {
@@ -80,6 +81,7 @@ router.get('/config', (_req: Request, res: Response) => {
       yandex: {
         api_key: config.yandex?.api_key ?? '',
         folder_id: config.yandex?.folder_id ?? '',
+        models: config.yandex?.models ?? '',
       },
     })
   } catch (e) {
