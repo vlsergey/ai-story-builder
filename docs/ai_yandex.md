@@ -13,9 +13,10 @@
 new OpenAI({
   apiKey,
   baseURL: 'https://ai.api.cloud.yandex.net/v1',
-  defaultHeaders: { 'x-folder-id': folderId },
+  project: folderId,   // sends OpenAI-Project header; NOT x-folder-id
 })
 ```
+Note: Yandex accepts the `OpenAI-Project` header (sent by the SDK `project` field) to identify the folder. The `x-folder-id` header is **not** used with the OpenAI-compatible API.
 
 **Obtaining credentials:**
 1. Log in to [Yandex Cloud Console](https://console.yandex.cloud)
