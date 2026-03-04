@@ -1,7 +1,6 @@
 import React, { useRef, useEffect } from 'react'
 import { DockviewReact, DockviewDefaultTab } from 'dockview'
 import { useTheme } from '../lib/theme/theme-provider'
-import { useLocale } from '../lib/locale'
 
 // Import the dockview styles
 import 'dockview/dist/styles/dockview.css'
@@ -46,7 +45,6 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   const [selectedPlanNode, setSelectedPlanNode] = React.useState<PlanNodeTree | null>(null)
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
-  const { setLocale } = useLocale()
 
   /** Opens (or activates) the Settings singleton tab in the editor group. */
   function openSettings() {
@@ -293,10 +291,11 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   }
 
   // Native-menu IPC listener.
-  // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>', 'set-locale:<value>'
+  // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
+  // Note: 'set-locale:*' is handled in LocaleProvider so it works on the start screen too.
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, setLocale, openSettings })
-  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, setLocale, openSettings }
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, openSettings })
+  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, openSettings }
 
   useEffect(() => {
     if (!window.electronAPI) return
@@ -309,8 +308,6 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
         menuActionsRef.current.onClose()
       } else if (action.startsWith('set-theme:')) {
         menuActionsRef.current.setPreference(action.slice(10) as ThemePreference)
-      } else if (action.startsWith('set-locale:')) {
-        menuActionsRef.current.setLocale(action.slice(11))
       }
     })
     return () => { window.electronAPI?.removeMenuActionListeners() }

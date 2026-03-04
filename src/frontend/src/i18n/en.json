@@ -10,6 +10,13 @@
   "start.no_files": "No project files found",
 
   "settings.loading": "Loading settings…",
+  "settings.uiLanguage.title": "Interface Language",
+  "settings.uiLanguage.en": "English",
+  "settings.uiLanguage.ru": "Русский",
+  "settings.theme.title": "Theme",
+  "settings.theme.auto": "Auto (follow system)",
+  "settings.theme.obsidian": "Obsidian (dark)",
+  "settings.theme.github": "GitHub (light)",
   "settings.textLanguage.title": "Text Language",
   "settings.textLanguage.description": "Language used in AI-generated story texts and lore items.",
   "settings.aiEngine.title": "Current AI Engine",

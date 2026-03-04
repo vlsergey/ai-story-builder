@@ -28,6 +28,18 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     window.electronAPI?.sendMenuState?.('locale', locale)
   }, [locale])
 
+  // Handle set-locale:* IPC from Electron menu.
+  // Lives here (not in Layout) so it works on the start screen too.
+  useEffect(() => {
+    if (!window.electronAPI) return
+    window.electronAPI.onMenuAction((action: string) => {
+      if (!action.startsWith('set-locale:')) return
+      setLocale(action.slice(11))
+    })
+    // No cleanup: LocaleProvider lives for the app's lifetime.
+    // Removing all listeners here would break handlers registered by child components.
+  }, [])
+
   const strings = useMemo<LocaleStrings>(() => LOCALES[locale] ?? en, [locale])
   const t = (key: string, fallback?: string): string => strings[key] ?? fallback ?? key
 

@@ -8,6 +8,7 @@ import {
 } from '../lib/ai-engines'
 import { dispatchAiEngineChanged } from '../lib/lore-events'
 import { useLocale } from '../lib/locale'
+import { useTheme } from '../lib/theme/theme-provider'
 
 interface ConfigData {
   current_engine: string | null
@@ -21,7 +22,8 @@ interface TestState {
 }
 
 export default function SettingsPanel() {
-  const { t } = useLocale()
+  const { t, locale, setLocale } = useLocale()
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme()
   const [config, setConfig] = useState<ConfigData | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
@@ -120,6 +122,33 @@ export default function SettingsPanel() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       <div className="flex flex-col gap-6 p-4">
+
+        {/* ── Interface Language ── */}
+        <section>
+          <h2 className="text-base font-semibold mb-3">{t('settings.uiLanguage.title')}</h2>
+          <select
+            value={locale}
+            onChange={e => setLocale(e.target.value)}
+            className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
+          >
+            <option value="en">{t('settings.uiLanguage.en')}</option>
+            <option value="ru">{t('settings.uiLanguage.ru')}</option>
+          </select>
+        </section>
+
+        {/* ── Theme ── */}
+        <section>
+          <h2 className="text-base font-semibold mb-3">{t('settings.theme.title')}</h2>
+          <select
+            value={themePreference}
+            onChange={e => setThemePreference(e.target.value)}
+            className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
+          >
+            <option value="auto">{t('settings.theme.auto')}</option>
+            <option value="obsidian">{t('settings.theme.obsidian')}</option>
+            <option value="github">{t('settings.theme.github')}</option>
+          </select>
+        </section>
 
         {/* ── Text Language ── */}
         <section>

@@ -10,6 +10,13 @@
   "start.no_files": "Файлы проектов не найдены",
 
   "settings.loading": "Загрузка настроек…",
+  "settings.uiLanguage.title": "Язык интерфейса",
+  "settings.uiLanguage.en": "English",
+  "settings.uiLanguage.ru": "Русский",
+  "settings.theme.title": "Тема",
+  "settings.theme.auto": "Авто (по системе)",
+  "settings.theme.obsidian": "Obsidian (тёмная)",
+  "settings.theme.github": "GitHub (светлая)",
   "settings.textLanguage.title": "Язык текстов",
   "settings.textLanguage.description": "Язык AI-сгенерированных текстов истории и элементов лора.",
   "settings.aiEngine.title": "Текущий AI движок",
