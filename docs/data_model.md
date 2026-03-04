@@ -68,7 +68,6 @@ emerges from usage.
   - `content` TEXT — direct editable markdown text for the node (nullable; edited via the lore editor tab)
   - `word_count` INTEGER NOT NULL DEFAULT 0 — whitespace-separated word count of `content`; updated automatically by the PATCH endpoint whenever content changes; the tree view aggregates subtree totals from this field
   - `ai_sync_info` TEXT NULL — JSON object keyed by AI engine code (e.g. `"grok"`, `"yandex"`); each value is an `AiEngineSyncRecord` (see below); NULL means never synced with any engine
-  - `content_updated_at` DATETIME NULL — set to `CURRENT_TIMESTAMP` whenever `content` is written via the PATCH endpoint; used to detect whether content was changed after the last AI engine sync (compare with `ai_sync_info[engine].last_synced_at`)
   - `position` INTEGER DEFAULT 0
   - `status` TEXT NOT NULL DEFAULT 'ACTIVE'   -- ACTIVE
   - `to_be_deleted` INTEGER NOT NULL DEFAULT 0   -- 1 = pending removal after next AI sync
@@ -79,6 +78,7 @@ emerges from usage.
   - `last_synced_at` TEXT — ISO-8601 UTC timestamp of last successful sync
   - `file_id` TEXT (optional) — remote file ID if the node was uploaded as its own file to the AI engine
   - `uploaded_as_parent` boolean (optional) — true if the node's content was included in its parent's file rather than as a standalone file
+  - `content_updated_at` TEXT (optional) — ISO-8601 UTC timestamp set by the PATCH endpoint each time content is saved; compared with `last_synced_at` to detect whether the node needs re-upload
 
 - `lore_versions`
   - `id` INTEGER PRIMARY KEY

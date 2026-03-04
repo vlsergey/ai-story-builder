@@ -5,6 +5,8 @@ export interface AiEngineSyncRecord {
   file_id?: string
   /** True if the content was included in the parent's file, not as a standalone file */
   uploaded_as_parent?: boolean
+  /** ISO-8601 UTC timestamp of when content was last modified (updated by PATCH on every content save) */
+  content_updated_at?: string
 }
 
 /** Which statistic to show per node in the lore tree */
@@ -25,8 +27,6 @@ export interface LoreNode {
   char_count: number
   byte_count: number
   ai_sync_info: Record<string, AiEngineSyncRecord> | null
-  /** ISO-8601 UTC timestamp of when content was last saved; null if never saved */
-  content_updated_at: string | null
   position: number
   status: string
   /** 1 = marked for deletion, 0 = active */

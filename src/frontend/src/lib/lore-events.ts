@@ -1,13 +1,15 @@
 /** Event name fired by LoreEditor after a successful content save. */
 export const LORE_NODE_SAVED_EVENT = 'lore-node-saved'
 
+import type { AiEngineSyncRecord } from '../types/models'
+
 export interface LoreNodeSavedDetail {
   id: number
   name?: string
   wordCount?: number
   charCount?: number
   byteCount?: number
-  contentUpdatedAt?: string | null
+  aiSyncInfo?: Record<string, AiEngineSyncRecord> | null
 }
 
 /** Dispatch a lore-node-saved event on window so other panels can react. */

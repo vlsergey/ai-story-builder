@@ -9,7 +9,6 @@ export interface LoreNodeRow {
   char_count: number
   byte_count: number
   ai_sync_info: string | null
-  content_updated_at: string | null
   position: number
   status: string
   to_be_deleted: number
@@ -111,6 +110,8 @@ export interface AiEngineSyncRecord {
   file_id?: string
   /** True if the content was included in the parent's file, not as a standalone file */
   uploaded_as_parent?: boolean
+  /** ISO-8601 UTC timestamp of when content was last modified (set by PATCH on every content save) */
+  content_updated_at?: string
 }
 
 export interface PlanNodeTree extends PlanNodeRow {

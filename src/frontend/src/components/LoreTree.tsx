@@ -46,6 +46,18 @@ function collectAllIds(nodes: LoreNode[]): number[] {
   return ids
 }
 
+function collectSyncableIds(nodes: LoreNode[], engine: string): Set<number> {
+  const ids = new Set<number>()
+  function walk(list: LoreNode[]) {
+    list.forEach(n => {
+      if (nodeSyncState(n, engine) !== 'none') ids.add(n.id)
+      if (n.children?.length) walk(n.children)
+    })
+  }
+  walk(nodes)
+  return ids
+}
+
 function findNode(id: number, nodes: LoreNode[]): LoreNode | null {
   for (const n of nodes) {
     if (n.id === id) return n
@@ -104,7 +116,7 @@ function uniqueName(base: string, existingNames: string[]): string {
 }
 
 function patchNode(
-  nodes: LoreNode[], id: number, patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'content_updated_at'>>
+  nodes: LoreNode[], id: number, patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'ai_sync_info'>>
 ): LoreNode[] {
   return nodes.map(n => {
     if (n.id === id) return { ...n, ...patch }
@@ -157,7 +169,7 @@ function nodeSyncState(node: LoreNode, engine: string): 'none' | 'needs-sync' | 
   if (!syncRecord) return 'needs-sync'
 
   // Dirty check: content changed after last sync
-  if (node.content_updated_at && node.content_updated_at > syncRecord.last_synced_at) {
+  if (syncRecord.content_updated_at && syncRecord.content_updated_at > syncRecord.last_synced_at) {
     return 'needs-sync'
   }
 
@@ -198,6 +210,7 @@ export default function LoreTree({
   const { statMode, currentAiEngine } = useLoreSettings()
 
   const [tree, setTree] = useState<LoreNode[]>([])
+  const [syncingIds, setSyncingIds] = useState<Set<number>>(new Set())
   const [items, setItems] = useState<Record<TreeItemIndex, TreeItem<ItemData>>>({
     root: { index: 'root', isFolder: true, children: [], canMove: false, data: null },
   })
@@ -220,13 +233,13 @@ export default function LoreTree({
   // Update a node's stats locally when LoreEditor saves content, without re-fetching the whole tree.
   useEffect(() => {
     function onNodeSaved(e: Event) {
-      const { id, name, wordCount, charCount, byteCount, contentUpdatedAt } = (e as CustomEvent<LoreNodeSavedDetail>).detail
-      const patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'content_updated_at'>> = {}
+      const { id, name, wordCount, charCount, byteCount, aiSyncInfo } = (e as CustomEvent<LoreNodeSavedDetail>).detail
+      const patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'ai_sync_info'>> = {}
       if (name !== undefined) patch.name = name
       if (wordCount !== undefined) patch.word_count = wordCount
       if (charCount !== undefined) patch.char_count = charCount
       if (byteCount !== undefined) patch.byte_count = byteCount
-      if (contentUpdatedAt !== undefined) patch.content_updated_at = contentUpdatedAt
+      if (aiSyncInfo !== undefined) patch.ai_sync_info = aiSyncInfo
       const next = patchNode(treeDataRef.current, id, patch)
       setTree(next)
       setItems(buildItemsMap(next))
@@ -456,7 +469,21 @@ export default function LoreTree({
   }
 
   async function handleSyncLore() {
-    window.alert('AI Engine sync is not yet implemented.\n\nThis will upload all lore to the selected AI Engine and remove items marked for deletion.')
+    if (!currentAiEngine) return
+    const toSync = collectSyncableIds(tree, currentAiEngine)
+    setSyncingIds(toSync.size > 0 ? toSync : new Set(collectAllIds(tree).map(id => id)))
+    try {
+      const res = await fetch(`/api/ai/${currentAiEngine}/sync-lore`, { method: 'POST' })
+      const data = await res.json() as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) {
+        window.alert(`Sync failed: ${data.error ?? 'unknown error'}`)
+      }
+    } catch (e) {
+      window.alert(`Sync error: ${String(e)}`)
+    } finally {
+      setSyncingIds(new Set())
+      fetchTree()
+    }
   }
 
   // ── Enable/disable ────────────────────────────────────────────────────────
@@ -627,7 +654,8 @@ export default function LoreTree({
 
             const statText = statMode !== 'none' ? formatStat(subtreeStat(node, statMode), statMode) : ''
             const syncState = engineSupportsFileUpload(currentAiEngine) ? subtreeSyncState(node, currentAiEngine!) : 'none'
-            const inProgress = syncState !== 'none' && !!syncingNodeIds && subtreeIsInProgress(node, syncingNodeIds)
+            const effectiveSyncingIds = syncingIds.size > 0 ? syncingIds : (syncingNodeIds ?? new Set<number>())
+            const inProgress = syncState !== 'none' && subtreeIsInProgress(node, effectiveSyncingIds)
             const showSync = syncState !== 'none'
             const synced = syncState === 'synced'
 
