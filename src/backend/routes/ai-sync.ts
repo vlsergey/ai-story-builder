@@ -61,7 +61,7 @@ function createYandexClient(apiKey: string, folderId: string): OpenAI {
   return new OpenAI({
     apiKey,
     baseURL: 'https://ai.api.cloud.yandex.net/v1',
-    defaultHeaders: { 'x-folder-id': folderId },
+    project: folderId,
   })
 }
 
