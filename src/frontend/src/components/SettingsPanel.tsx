@@ -10,7 +10,7 @@ import { dispatchAiEngineChanged } from '../lib/lore-events'
 interface ConfigData {
   current_engine: string | null
   grok: { api_key: string }
-  yandex: { api_key: string; folder_id: string; models: string }
+  yandex: { api_key: string; folder_id: string }
 }
 
 interface TestState {
@@ -25,20 +25,23 @@ export default function SettingsPanel() {
   const [engineError, setEngineError] = useState<string | null>(null)
   const [testStates, setTestStates] = useState<Record<string, TestState>>({})
   const [showField, setShowField] = useState<Record<string, boolean>>({})
+  const [textLanguage, setTextLanguage] = useState('ru-RU')
 
   // form values: engineId → fieldKey → value
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({})
 
   useEffect(() => {
-    fetch('/api/ai/config')
-      .then(r => r.json())
-      .then((data: ConfigData) => {
-        setConfig(data)
-        setCurrentEngine(data.current_engine)
+    Promise.all([
+      fetch('/api/ai/config').then(r => r.json()) as Promise<ConfigData>,
+      fetch('/api/settings/text_language').then(r => r.json()) as Promise<{ value: string | null }>,
+    ]).then(([aiData, langData]) => {
+        setConfig(aiData)
+        setCurrentEngine(aiData.current_engine)
+        if (langData.value) setTextLanguage(langData.value)
         // Use saved values, falling back to field defaultValue if nothing stored yet
         const initialValues: Record<string, Record<string, string>> = {}
         for (const engine of BUILTIN_ENGINES) {
-          const saved = (data as Record<string, Record<string, string>>)[engine.id] ?? {}
+          const saved = (aiData as Record<string, Record<string, string>>)[engine.id] ?? {}
           initialValues[engine.id] = {}
           for (const field of engine.configFields) {
             const stored = saved[field.key] ?? ''
@@ -50,6 +53,15 @@ export default function SettingsPanel() {
       })
       .catch(() => setLoading(false))
   }, [])
+
+  async function handleTextLanguageChange(lang: string) {
+    setTextLanguage(lang)
+    await fetch('/api/settings/text_language', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: lang }),
+    })
+  }
 
   async function handleEngineSelect(engine: string | null) {
     setEngineError(null)
@@ -105,6 +117,24 @@ export default function SettingsPanel() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       <div className="flex flex-col gap-6 p-4">
+
+        {/* ── Text Language ── */}
+        <section>
+          <h2 className="text-base font-semibold mb-3">Text Language</h2>
+          <div className="flex flex-col gap-1.5">
+            <select
+              value={textLanguage}
+              onChange={e => handleTextLanguageChange(e.target.value)}
+              className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
+            >
+              <option value="ru-RU">Русский (ru-RU)</option>
+              <option value="en-US">English (en-US)</option>
+            </select>
+            <p className="text-xs text-muted-foreground max-w-md">
+              Language used in AI-generated story texts and lore items.
+            </p>
+          </div>
+        </section>
 
         {/* ── Current AI Engine ── */}
         <section>
