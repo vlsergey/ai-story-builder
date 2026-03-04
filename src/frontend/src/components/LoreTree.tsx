@@ -496,6 +496,10 @@ export default function LoreTree({
 
   // ── Enable/disable ────────────────────────────────────────────────────────
 
+  const treeSyncNeeded = currentAiEngine != null &&
+    engineSupportsFileUpload(currentAiEngine) &&
+    tree.some(n => subtreeSyncState(n, currentAiEngine) === 'needs-sync')
+
   const oneSelected = selectedNodeIds.size === 1
   const anySelected = selectedNodeIds.size >= 1
   const canSort = [...selectedNodeIds].some(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
@@ -533,7 +537,7 @@ export default function LoreTree({
           execute: handleDelete,
         },
     'spacer',
-    { id: 'sync-ai', label: engineSupportsFileUpload(currentAiEngine) ? 'Sync lore with AI Engine' : 'Sync lore with AI Engine (engine does not support file upload)', icon: <CloudUpload size={15} />, enabled: engineSupportsFileUpload(currentAiEngine), variant: 'primary', execute: handleSyncLore },
+    { id: 'sync-ai', label: !engineSupportsFileUpload(currentAiEngine) ? 'Sync lore with AI Engine (engine does not support file upload)' : !treeSyncNeeded ? 'Sync lore with AI Engine (all nodes already synced)' : 'Sync lore with AI Engine', icon: <CloudUpload size={15} />, enabled: treeSyncNeeded, variant: 'primary', execute: handleSyncLore },
   ]
 
   const commandsRef = useRef<LoreCommand[]>([])
