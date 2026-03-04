@@ -104,6 +104,15 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       );
     `)
   },
+  // version 1 → 2: add word/char/byte counts and AI sync info to lore_nodes
+  (db) => {
+    db.exec(`
+      ALTER TABLE lore_nodes ADD COLUMN word_count  INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE lore_nodes ADD COLUMN char_count  INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE lore_nodes ADD COLUMN byte_count  INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE lore_nodes ADD COLUMN ai_sync_info TEXT NULL;
+    `)
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length

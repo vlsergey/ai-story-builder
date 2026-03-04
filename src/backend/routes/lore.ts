@@ -27,6 +27,21 @@ try {
 
 const router: Router = express.Router()
 
+// ── Content stats helpers ─────────────────────────────────────────────────────
+
+function countWords(text: string): number {
+  const t = text.trim()
+  return t === '' ? 0 : t.split(/\s+/).length
+}
+
+function countChars(text: string): number {
+  return [...text].length  // Unicode code points
+}
+
+function countBytes(text: string): number {
+  return Buffer.byteLength(text, 'utf8')
+}
+
 // ── Tree ──────────────────────────────────────────────────────────────────────
 
 // GET /lore/tree — full lore tree with latest version status per node
@@ -38,6 +53,7 @@ router.get('/tree', (_req: Request, res: Response) => {
     const db = new Database(dbPath, { readonly: true })
     const rows = db.prepare(`
       SELECT n.id, n.parent_id, n.name, n.position, n.status, n.to_be_deleted, n.created_at,
+        n.word_count, n.char_count, n.byte_count, n.ai_sync_info,
         (SELECT lv.status FROM lore_versions lv
          WHERE lv.lore_node_id = n.id ORDER BY lv.version DESC LIMIT 1
         ) AS latest_version_status
@@ -47,7 +63,11 @@ router.get('/tree', (_req: Request, res: Response) => {
     db.close()
 
     const map = new Map<number, LoreTreeNode>()
-    rows.forEach(r => map.set(r.id, { ...r, children: [] }))
+    rows.forEach(r => map.set(r.id, {
+      ...r,
+      ai_sync_info: r.ai_sync_info ? JSON.parse(r.ai_sync_info) : null,
+      children: [],
+    }))
     const roots: LoreTreeNode[] = []
     for (const node of map.values()) {
       if (node.parent_id != null && map.has(node.parent_id)) {
@@ -185,9 +205,14 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
   try {
     const db = new Database(dbPath)
     const sets: string[] = []
-    const params: (string | null)[] = []
+    const params: (string | number | null)[] = []
     if (hasName) { sets.push('name = ?'); params.push(name!.trim()) }
-    if (hasContent) { sets.push('content = ?'); params.push(content!) }
+    if (hasContent) {
+      sets.push('content = ?'); params.push(content!)
+      sets.push('word_count = ?');  params.push(countWords(content!))
+      sets.push('char_count = ?');  params.push(countChars(content!))
+      sets.push('byte_count = ?');  params.push(countBytes(content!))
+    }
     params.push(req.params.id)
     db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
     db.close()

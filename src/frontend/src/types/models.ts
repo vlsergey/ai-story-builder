@@ -1,3 +1,15 @@
+export interface AiEngineSyncRecord {
+  /** ISO-8601 UTC timestamp of last successful sync */
+  last_synced_at: string
+  /** Remote file ID if the node was uploaded as its own file */
+  file_id?: string
+  /** True if the content was included in the parent's file, not as a standalone file */
+  uploaded_as_parent?: boolean
+}
+
+/** Which statistic to show per node in the lore tree */
+export type LoreStatMode = 'none' | 'words' | 'chars' | 'bytes'
+
 /**
  * Unified lore tree node.
  * - A node with children acts as a folder/section.
@@ -9,6 +21,10 @@ export interface LoreNode {
   parent_id: number | null
   name: string
   content: string | null
+  word_count: number
+  char_count: number
+  byte_count: number
+  ai_sync_info: Record<string, AiEngineSyncRecord> | null
   position: number
   status: string
   /** 1 = marked for deletion, 0 = active */

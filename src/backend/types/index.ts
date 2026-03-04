@@ -5,6 +5,10 @@ export interface LoreNodeRow {
   parent_id: number | null
   name: string
   content: string | null
+  word_count: number
+  char_count: number
+  byte_count: number
+  ai_sync_info: string | null
   position: number
   status: string
   to_be_deleted: number
@@ -91,11 +95,21 @@ export interface SettingRow {
 
 // Composite / derived types
 
-/** Full lore tree node (returned by GET /lore/tree) */
-export interface LoreTreeNode extends LoreNodeRow {
-  /** Status of the latest lore_version, or null if no versions exist */
+/** Full lore tree node (returned by GET /lore/tree).
+ *  ai_sync_info is delivered as a parsed object (not raw JSON string). */
+export interface LoreTreeNode extends Omit<LoreNodeRow, 'ai_sync_info'> {
   latest_version_status: string | null
+  ai_sync_info: Record<string, AiEngineSyncRecord> | null
   children: LoreTreeNode[]
+}
+
+export interface AiEngineSyncRecord {
+  /** ISO-8601 UTC timestamp of last successful sync */
+  last_synced_at: string
+  /** Remote file ID if the node was uploaded as its own file */
+  file_id?: string
+  /** True if the content was included in the parent's file, not as a standalone file */
+  uploaded_as_parent?: boolean
 }
 
 export interface PlanNodeTree extends PlanNodeRow {

@@ -10,7 +10,7 @@ import LoreSection from './LoreSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
-import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
+import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference, LoreStatMode } from '../types/models'
 import { EditorSettingsContext } from '../lib/editor-settings'
 
 /**
@@ -49,6 +49,11 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     return saved === null ? true : saved === 'true'
   })
 
+  const LORE_STAT_KEY = 'ai-story-builder-lore-stat'
+  const [loreStatMode, setLoreStatMode] = React.useState<LoreStatMode>(() => {
+    return (localStorage.getItem(LORE_STAT_KEY) as LoreStatMode | null) ?? 'words'
+  })
+
   /** Opens (or activates) a lore-editor tab for the given node in the center group. */
   function openLoreEditor(node: LoreNode) {
     const api = dockviewRef.current
@@ -83,6 +88,11 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   useEffect(() => {
     window.electronAPI?.sendMenuState?.('word-wrap', wordWrap)
   }, [wordWrap])
+
+  // Sync lore-stat mode to the Electron native menu radio on startup/change
+  useEffect(() => {
+    window.electronAPI?.sendMenuState?.('lore-stat', loreStatMode)
+  }, [loreStatMode])
 
   // helper to massage storage format into the version expected by dockview
   const normalizeLayout = (layout: any) => {
@@ -276,8 +286,8 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   // Native-menu IPC listener.
   // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference })
-  menuActionsRef.current = { handleResetLayouts, onClose, setPreference }
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, setLoreStatMode })
+  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, setLoreStatMode }
 
   useEffect(() => {
     if (!window.electronAPI) return
@@ -292,6 +302,10 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         const value = action === 'set-word-wrap:true'
         localStorage.setItem(WORD_WRAP_KEY, String(value))
         setWordWrap(value)
+      } else if (action.startsWith('set-lore-stat:')) {
+        const mode = action.slice(14) as LoreStatMode
+        localStorage.setItem(LORE_STAT_KEY, mode)
+        menuActionsRef.current.setLoreStatMode(mode)
       }
     })
     return () => { window.electronAPI?.removeMenuActionListeners() }
@@ -331,6 +345,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         <LoreSection
           onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
           onOpenLoreNode={openLoreEditor}
+          statMode={loreStatMode}
         />
       </div>
     ),

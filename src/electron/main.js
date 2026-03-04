@@ -6,6 +6,9 @@ const path = require('path')
 /** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
 let wordWrapMenuItem = null
 
+/** References to the "Show in Lore Tree" radio items, keyed by mode value. */
+let loreStatMenuItems = {}
+
 const isDev = process.env.NODE_ENV === 'development'
 
 // Stored once the server (or dev Vite) is ready, reused on macOS re-activate.
@@ -31,6 +34,15 @@ function buildApplicationMenu() {
     click: (item) => sendMenuAction(`set-word-wrap:${item.checked}`),
   }
 
+  for (const [mode, label] of [['none', 'Nothing'], ['words', 'Words'], ['chars', 'Characters'], ['bytes', 'Bytes']]) {
+    loreStatMenuItems[mode] = {
+      type: 'radio',
+      label,
+      checked: mode === 'words', // default; renderer syncs the real value on startup
+      click: () => sendMenuAction(`set-lore-stat:${mode}`),
+    }
+  }
+
   const viewSubmenu = [
     {
       label: 'Reset layouts',
@@ -38,6 +50,11 @@ function buildApplicationMenu() {
     },
     { type: 'separator' },
     wordWrapMenuItem,
+    { type: 'separator' },
+    {
+      label: 'Show in Lore Tree',
+      submenu: Object.values(loreStatMenuItems),
+    },
     { type: 'separator' },
     {
       label: 'Theme',
@@ -127,10 +144,14 @@ function checkNativeDeps() {
   }
 }
 
-// Renderer sends this to keep menu checkbox in sync with localStorage state
+// Renderer sends this to keep menu checkbox/radio in sync with localStorage state
 ipcMain.on('set-menu-state', (_event, { key, value }) => {
   if (key === 'word-wrap' && wordWrapMenuItem) {
     wordWrapMenuItem.checked = value
+  } else if (key === 'lore-stat') {
+    for (const [mode, item] of Object.entries(loreStatMenuItems)) {
+      item.checked = mode === value
+    }
   }
 })
 

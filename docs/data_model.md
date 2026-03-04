@@ -39,11 +39,18 @@ emerges from usage.
   - `parent_id` INTEGER NULL REFERENCES `lore_nodes`(`id`) ON DELETE CASCADE
   - `name` TEXT NOT NULL
   - `content` TEXT — direct editable markdown text for the node (nullable; edited via the lore editor tab)
+  - `word_count` INTEGER NOT NULL DEFAULT 0 — whitespace-separated word count of `content`; updated automatically by the PATCH endpoint whenever content changes; the tree view aggregates subtree totals from this field
+  - `ai_sync_info` TEXT NULL — JSON object keyed by AI engine code (e.g. `"grok"`, `"yandex"`); each value is an `AiEngineSyncRecord` (see below); NULL means never synced with any engine
   - `position` INTEGER DEFAULT 0
   - `status` TEXT NOT NULL DEFAULT 'ACTIVE'   -- ACTIVE
   - `to_be_deleted` INTEGER NOT NULL DEFAULT 0   -- 1 = pending removal after next AI sync
   - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
   - Unique constraint on (`parent_id`, `name`)
+
+`AiEngineSyncRecord` (value in `ai_sync_info` JSON map):
+  - `last_synced_at` TEXT — ISO-8601 UTC timestamp of last successful sync
+  - `file_id` TEXT (optional) — remote file ID if the node was uploaded as its own file to the AI engine
+  - `uploaded_as_parent` boolean (optional) — true if the node's content was included in its parent's file rather than as a standalone file
 
 - `lore_versions`
   - `id` INTEGER PRIMARY KEY

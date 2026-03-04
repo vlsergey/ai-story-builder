@@ -14,8 +14,9 @@ import {
   ChevronRight, ChevronDown,
   Library, BookOpen, ScrollText,
   Plus, CopyPlus, Pencil, SquarePen, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
+  CheckCircle2, Circle, Loader2,
 } from 'lucide-react'
-import { LoreNode } from '../types/models'
+import { LoreNode, LoreStatMode } from '../types/models'
 
 // ── Command system ────────────────────────────────────────────────────────────
 
@@ -99,14 +100,51 @@ function uniqueName(base: string, existingNames: string[]): string {
   return `${base} ${n}`
 }
 
+// ── Stats helpers ──────────────────────────────────────────────────────────────
+
+function subtreeStat(node: LoreNode, mode: LoreStatMode): number {
+  const own = mode === 'words' ? node.word_count : mode === 'chars' ? node.char_count : node.byte_count
+  return own + (node.children ?? []).reduce((sum, c) => sum + subtreeStat(c, mode), 0)
+}
+
+function formatStat(count: number, mode: LoreStatMode): string {
+  if (count === 0) return ''
+  if (mode === 'words') return `${count}w`
+  if (mode === 'chars') return `${count}c`
+  if (count < 1000) return `${count}B`
+  if (count < 1_000_000) return `${(count / 1000).toFixed(1)}kB`
+  return `${(count / 1_000_000).toFixed(1)}MB`
+}
+
+function subtreeHasAnyContent(node: LoreNode): boolean {
+  if (node.latest_version_status !== null || node.content !== null) return true
+  return (node.children ?? []).some(subtreeHasAnyContent)
+}
+
+function subtreeIsInProgress(node: LoreNode, syncingNodeIds: ReadonlySet<number>): boolean {
+  if (syncingNodeIds.has(node.id)) return true
+  return (node.children ?? []).some(c => subtreeIsInProgress(c, syncingNodeIds))
+}
+
+function subtreeIsSynced(node: LoreNode, engine: string): boolean {
+  if ((node.latest_version_status !== null || node.content !== null) && !node.ai_sync_info?.[engine]) return false
+  return (node.children ?? []).every(c => subtreeIsSynced(c, engine))
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoreTree({
   onSelectLoreNode,
   onOpenLoreNode,
+  statMode = 'none',
+  currentAiEngine = null,
+  syncingNodeIds,
 }: {
   onSelectLoreNode: (node: LoreNode) => void
   onOpenLoreNode?: (node: LoreNode) => void
+  statMode?: LoreStatMode
+  currentAiEngine?: string | null
+  syncingNodeIds?: ReadonlySet<number>
 }) {
   const [tree, setTree] = useState<LoreNode[]>([])
   const [items, setItems] = useState<Record<TreeItemIndex, TreeItem<ItemData>>>({
@@ -510,6 +548,12 @@ export default function LoreTree({
             const isDeleted = !!node.to_be_deleted
             const hasVersions = node.latest_version_status !== null
             const Icon = node.parent_id === null ? Library : nodeIcon(node)
+
+            const statText = statMode !== 'none' ? formatStat(subtreeStat(node, statMode), statMode) : ''
+            const showSync = !!currentAiEngine && subtreeHasAnyContent(node)
+            const inProgress = showSync && !!syncingNodeIds && subtreeIsInProgress(node, syncingNodeIds)
+            const synced = showSync && !inProgress && subtreeIsSynced(node, currentAiEngine!)
+
             return (
               <li
                 {...(context.itemContainerWithChildrenProps as React.HTMLAttributes<HTMLLIElement>)}
@@ -524,7 +568,7 @@ export default function LoreTree({
                     {...(context.interactiveElementProps as React.HTMLAttributes<HTMLDivElement>)}
                     onDoubleClick={() => { if (node) onOpenLoreNode?.(node) }}
                     className={[
-                      'flex items-center gap-1 flex-1 cursor-pointer rounded px-1 py-0.5 text-sm select-none',
+                      'flex items-center gap-1 flex-1 min-w-0 cursor-pointer rounded px-1 py-0.5 text-sm select-none overflow-hidden',
                       context.isSelected ? 'bg-primary/15 text-primary' :
                       context.isDraggingOver ? 'ring-1 ring-primary bg-primary/5' : 'hover:bg-secondary',
                       isDeleted ? 'line-through opacity-50' : '',
@@ -537,6 +581,18 @@ export default function LoreTree({
                     {arrow}
                     <Icon size={14} className="shrink-0 text-muted-foreground" />
                     {title}
+                    {statText && (
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums pl-1">{statText}</span>
+                    )}
+                    {showSync && inProgress && (
+                      <Loader2 size={12} className={`shrink-0 text-muted-foreground animate-spin${!statText ? ' ml-auto' : ''}`} />
+                    )}
+                    {showSync && !inProgress && synced && (
+                      <CheckCircle2 size={12} className={`shrink-0 text-green-500${!statText ? ' ml-auto' : ''}`} />
+                    )}
+                    {showSync && !inProgress && !synced && (
+                      <Circle size={12} className={`shrink-0 text-muted-foreground${!statText ? ' ml-auto' : ''}`} />
+                    )}
                   </div>
                 </div>
                 {children}
@@ -552,7 +608,7 @@ export default function LoreTree({
               {item.isFolder && (context.isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
             </button>
           )}
-          renderItemTitle={({ title }) => <span>{title}</span>}
+          renderItemTitle={({ title }) => <span className="flex-1 min-w-0 truncate">{title}</span>}
           renderItemsContainer={({ children, containerProps }) => (
             <ul
               {...(containerProps as React.HTMLAttributes<HTMLUListElement>)}
