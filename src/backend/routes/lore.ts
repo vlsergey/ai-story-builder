@@ -207,16 +207,22 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
     const sets: string[] = []
     const params: (string | number | null)[] = []
     if (hasName) { sets.push('name = ?'); params.push(name!.trim()) }
+    const wordCount = hasContent ? countWords(content!) : null
+    const charCount = hasContent ? countChars(content!) : null
+    const byteCount = hasContent ? countBytes(content!) : null
     if (hasContent) {
       sets.push('content = ?'); params.push(content!)
-      sets.push('word_count = ?');  params.push(countWords(content!))
-      sets.push('char_count = ?');  params.push(countChars(content!))
-      sets.push('byte_count = ?');  params.push(countBytes(content!))
+      sets.push('word_count = ?');  params.push(wordCount!)
+      sets.push('char_count = ?');  params.push(charCount!)
+      sets.push('byte_count = ?');  params.push(byteCount!)
     }
     params.push(req.params.id)
     db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
     db.close()
-    res.json({ ok: true })
+    res.json(hasContent
+      ? { ok: true, word_count: wordCount, char_count: charCount, byte_count: byteCount }
+      : { ok: true }
+    )
   } catch (e) {
     res.status(500).json({ error: String(e) })
   }
