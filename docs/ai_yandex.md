@@ -3,10 +3,19 @@
 ## Overview
 
 **Provider:** Yandex Cloud
-**API base URL:** `https://llm.api.cloud.yandex.net`
+**API base URL:** `https://ai.api.cloud.yandex.net/v1` (OpenAI-compatible)
 **Authentication:**
-- `Authorization: Api-Key {api_key}` — IAM API key (service account or user)
+- `Authorization: Bearer {api_key}` — as sent by the OpenAI SDK
 - `x-folder-id: {folder_id}` — mandatory header identifying the Yandex Cloud folder (project scope)
+
+**Client library:** We use the official `openai` npm package pointed at the Yandex base URL:
+```typescript
+new OpenAI({
+  apiKey,
+  baseURL: 'https://ai.api.cloud.yandex.net/v1',
+  defaultHeaders: { 'x-folder-id': folderId },
+})
+```
 
 **Obtaining credentials:**
 1. Log in to [Yandex Cloud Console](https://console.yandex.cloud)
@@ -65,10 +74,12 @@ The Settings panel stores a user-editable list of model paths (one per line). De
 
 ## API Endpoints Used
 
+All calls go through the `openai` npm package. The following endpoints are used internally by the SDK:
+
 ### Tokenize (used for connection test)
 ```
 POST https://llm.api.cloud.yandex.net/foundationModels/v1/tokenize
-Authorization: Api-Key {api_key}
+Authorization: Bearer {api_key}
 x-folder-id: {folder_id}
 Content-Type: application/json
 
@@ -77,40 +88,66 @@ Content-Type: application/json
   "text": "test"
 }
 ```
-Returns token information for the given text. Used as a lightweight credential check — non-generative and cheap. Note: there is **no `listModels` endpoint** in the Yandex Foundation Models API; model URIs must be known in advance (see models list in the docs).
+Note: there is **no `listModels` endpoint** in the Yandex Foundation Models API; model URIs must be known in advance (see models list in the docs).
 
 ### File Upload
 ```
-POST https://llm.api.cloud.yandex.net/files/v1/files
-Authorization: Api-Key {api_key}
+POST https://ai.api.cloud.yandex.net/v1/files
+Authorization: Bearer {api_key}
 x-folder-id: {folder_id}
 Content-Type: multipart/form-data
 
-file=<binary>
-mimeType=text/plain
-name=lore_chapter.txt
+file=<binary .md file>   (MIME type: text/markdown)
+purpose=assistants
+```
+Via SDK: `client.files.create({ file: new File([content], 'name.md', { type: 'text/markdown' }), purpose: 'assistants' })`
+
+Each uploaded file is a Markdown document with a YAML frontmatter header containing metadata tags:
+```markdown
+---
+project: my-story
+path: /Characters/Protagonists/Alice
+parent: Protagonists
+---
+# Alice
+
+The hero of the story...
 ```
 
-### Create SearchIndex (Knowledge Base)
+### File Delete
 ```
-POST https://llm.api.cloud.yandex.net/searchindex/v1/searchindex
-Authorization: Api-Key {api_key}
+DELETE https://ai.api.cloud.yandex.net/v1/files/{file_id}
+```
+Via SDK: `client.files.del(fileId)`
+
+### Create VectorStore (Knowledge Base)
+```
+POST https://ai.api.cloud.yandex.net/v1/vector_stores
+Authorization: Bearer {api_key}
 x-folder-id: {folder_id}
 Content-Type: application/json
 
 {
-  "folderId": "{folder_id}",
-  "name": "story-lore-index",
-  "fileIds": ["file-id-1", "file-id-2"],
-  "textSearchIndex": {}   // or "vectorSearchIndex": {} or "hybridSearchIndex": {}
+  "name": "story-lore-{timestamp}",
+  "file_ids": ["file-id-1", "file-id-2"]
 }
 ```
+Via SDK: `client.beta.vectorStores.create({ name, file_ids })`
 
-### Foundation Models Completion with SearchIndex
+Returns `{ id, status }` where `status` is one of: `in_progress`, `completed`, `failed`, `expired`.
+If `status !== 'completed'`, poll with retrieve until done.
+
+### VectorStore Retrieve (for polling)
 ```
-POST https://llm.api.cloud.yandex.net/assistants/v1/runs
+GET https://ai.api.cloud.yandex.net/v1/vector_stores/{id}
 ```
-The SearchIndex is referenced as a tool in the assistant configuration. See [Yandex RAG Tutorial](https://yandex.cloud/en/docs/tutorials/ml-ai/pdf-searchindex-ai-assistant).
+Via SDK: `client.beta.vectorStores.retrieve(id)`
+
+### VectorStore Delete
+```
+DELETE https://ai.api.cloud.yandex.net/v1/vector_stores/{id}
+```
+Via SDK: `client.beta.vectorStores.del(id)`
 
 ---
 
@@ -130,16 +167,26 @@ The Yandex Foundation Models Files API (`/files/v1/files`) provides flat object 
 
 **No directory/folder hierarchy** — The `folder_id` in file requests refers to the Yandex Cloud billing/organizational unit, not a filesystem subdirectory. There is no way to create sub-directories. Grouping is only possible via `labels` (key-value tags).
 
-### File metadata fields
-| Field | Type | Notes |
-|---|---|---|
-| `folder_id` | string | Required — Yandex Cloud org folder |
-| `name` | string | Human-readable display name |
-| `description` | string | Optional |
-| `mime_type` | string | e.g. `text/plain`, `application/pdf` |
-| `content` | bytes | Binary file content |
-| `labels` | map<string,string> | Key-value tags for grouping |
-| `expiration_config` | ExpirationConfig | Optional TTL (`ttl_days` + policy) |
+### File format
+
+Files are uploaded as **Markdown** (`.md`, MIME type `text/markdown`) with YAML frontmatter containing context tags. This lets the AI understand the lore hierarchy even without a folder structure in the API:
+
+```markdown
+---
+project: my-story
+path: /World/Geography/Northern Kingdoms
+parent: Geography
+---
+
+# Northern Kingdoms
+
+Content here...
+```
+
+Tags embedded:
+- `project` — database file name (without extension)
+- `path` — full path from lore root (e.g. `/Characters/Alice`)
+- `parent` — direct parent node name (omitted for root nodes)
 
 ### Limits
 | Limit | Value |

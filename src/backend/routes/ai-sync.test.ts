@@ -16,11 +16,34 @@ vi.mock('../db/state.js', () => ({
   getDataDir: () => os.tmpdir(),
 }))
 
+// ─── OpenAI mock ──────────────────────────────────────────────────────────────
+
+const { mockFilesCreate, mockFilesDel, mockVsCreate, mockVsDel, mockVsRetrieve } = vi.hoisted(() => ({
+  mockFilesCreate: vi.fn(),
+  mockFilesDel: vi.fn(),
+  mockVsCreate: vi.fn(),
+  mockVsDel: vi.fn(),
+  mockVsRetrieve: vi.fn(),
+}))
+
+vi.mock('openai', () => ({
+  default: class {
+    files = { create: mockFilesCreate, del: mockFilesDel }
+    beta = {
+      vectorStores: { create: mockVsCreate, del: mockVsDel, retrieve: mockVsRetrieve },
+    }
+  },
+}))
+
+// ─── App setup ────────────────────────────────────────────────────────────────
+
 const { default: router, POLL_CONFIG } = await import('./ai-sync.js')
 
 const app = express()
 app.use(express.json())
 app.use('/ai', router)
+
+// ─── DB helper ────────────────────────────────────────────────────────────────
 
 function setupDb(opts?: {
   apiKey?: string
@@ -38,7 +61,7 @@ function setupDb(opts?: {
 }): string {
   const file = path.join(
     os.tmpdir(),
-    `yandex_sync_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`
+    `ai_sync_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`
   )
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
@@ -64,13 +87,11 @@ function setupDb(opts?: {
     );
   `)
 
-  // Insert current engine (defaults to 'yandex' when credentials are provided)
   const currentEngine = opts?.currentEngine ?? (opts?.apiKey || opts?.folderId ? 'yandex' : undefined)
   if (currentEngine) {
     db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', ?)").run(currentEngine)
   }
 
-  // Insert credentials if provided
   if (opts?.apiKey || opts?.folderId) {
     const yandex: Record<string, string> = {}
     if (opts.apiKey) yandex['api_key'] = opts.apiKey
@@ -81,7 +102,6 @@ function setupDb(opts?: {
     )
   }
 
-  // Insert nodes
   const insertNode = db.prepare(
     `INSERT INTO lore_nodes (id, name, content, word_count, to_be_deleted, ai_sync_info)
      VALUES (?, ?, ?, ?, ?, ?)`
@@ -102,18 +122,23 @@ function setupDb(opts?: {
   return file
 }
 
-beforeEach(() => { testDbPath = '' })
+beforeEach(() => {
+  testDbPath = ''
+  vi.clearAllMocks()
+})
 afterEach(() => {
-  vi.unstubAllGlobals()
   vi.useRealTimers()
   if (testDbPath) {
     try { fs.unlinkSync(testDbPath) } catch { /* ignore */ }
   }
 })
 
-// ─── 1. 400 when no project open ──────────────────────────────────────────────
+// ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('POST /ai/sync-lore', () => {
+
+  // ─── 1. Basic validation ───────────────────────────────────────────────────
+
   it('returns 400 when no project open', async () => {
     testDbPath = ''
     const res = await request(app).post('/ai/sync-lore')
@@ -122,7 +147,7 @@ describe('POST /ai/sync-lore', () => {
   })
 
   it('returns 400 when no AI engine is configured', async () => {
-    testDbPath = setupDb() // no current_backend in settings
+    testDbPath = setupDb()
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('no AI engine configured')
@@ -135,17 +160,15 @@ describe('POST /ai/sync-lore', () => {
     expect(res.body.error).toContain("not supported for engine 'grok'")
   })
 
-  // ─── 2. 400 when credentials missing ────────────────────────────────────────
-
   it('returns 400 when api_key is missing', async () => {
-    testDbPath = setupDb({ folderId: 'b1g123' }) // no api_key
+    testDbPath = setupDb({ folderId: 'b1g123' })
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('api_key')
   })
 
   it('returns 400 when folder_id is missing', async () => {
-    testDbPath = setupDb({ apiKey: 'AQVN-test' }) // no folder_id
+    testDbPath = setupDb({ apiKey: 'AQVN-test' })
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('folder_id')
@@ -164,7 +187,6 @@ describe('POST /ai/sync-lore', () => {
           content: 'Some content here',
           word_count: 3,
           to_be_deleted: 0,
-          // content_updated_at == last_synced_at → unchanged
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: syncedAt, file_id: 'f1', content_updated_at: syncedAt } }),
         },
         {
@@ -172,18 +194,13 @@ describe('POST /ai/sync-lore', () => {
           content: 'More content here',
           word_count: 3,
           to_be_deleted: 0,
-          // content_updated_at < last_synced_at → unchanged
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: syncedAt, file_id: 'f2', content_updated_at: '2024-12-31T00:00:00.000Z' } }),
         },
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ // POST create search index (2 file_ids exist)
-        ok: true,
-        json: async () => ({ id: 'op-1', done: true, response: { id: 'new-idx' } }),
-      })
-    vi.stubGlobal('fetch', mockFetch)
+    // Two unchanged nodes with file_ids → vector store will be created
+    mockVsCreate.mockResolvedValueOnce({ id: 'vs-new', status: 'completed' })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
@@ -191,6 +208,7 @@ describe('POST /ai/sync-lore', () => {
     expect(res.body.uploaded).toBe(0)
     expect(res.body.deleted).toBe(0)
     expect(res.body.unchanged).toBe(2)
+    expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
   // ─── 4. Uploads new non-empty node ────────────────────────────────────────
@@ -206,21 +224,13 @@ describe('POST /ai/sync-lore', () => {
           content: 'Dragons are ancient creatures',
           word_count: 4,
           to_be_deleted: 0,
-          ai_sync_info: null, // never synced → always uploaded
+          ai_sync_info: null,
         },
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ // POST upload file
-        ok: true,
-        json: async () => ({ id: 'remote-file-1' }),
-      })
-      .mockResolvedValueOnce({ // POST create search index
-        ok: true,
-        json: async () => ({ id: 'op-1', done: true, response: { id: 'idx-1' } }),
-      })
-    vi.stubGlobal('fetch', mockFetch)
+    mockFilesCreate.mockResolvedValueOnce({ id: 'remote-file-1' })
+    mockVsCreate.mockResolvedValueOnce({ id: 'idx-1', status: 'completed' })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
@@ -237,6 +247,17 @@ describe('POST /ai/sync-lore', () => {
     db.close()
     const syncInfo = JSON.parse(row.ai_sync_info) as { yandex: { file_id: string } }
     expect(syncInfo.yandex.file_id).toBe('remote-file-1')
+
+    // Verify file was uploaded as .md with correct fields
+    expect(mockFilesCreate).toHaveBeenCalledOnce()
+    const [uploadArg] = mockFilesCreate.mock.calls[0]
+    expect(uploadArg.file.name).toBe('Dragon Lore.md')
+    expect(uploadArg.purpose).toBe('assistants')
+    // Verify YAML frontmatter in file content
+    const content = await (uploadArg.file as File).text()
+    expect(content).toContain('---')
+    expect(content).toContain('path: /Dragon Lore')
+    expect(content).toContain('Dragons are ancient creatures')
   })
 
   // ─── 5. Skips unchanged node ──────────────────────────────────────────────
@@ -253,29 +274,18 @@ describe('POST /ai/sync-lore', () => {
           content: 'Long history text',
           word_count: 3,
           to_be_deleted: 0,
-          // content_updated_at BEFORE last_synced_at → unchanged
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: syncedAt, file_id: 'f-existing', content_updated_at: '2025-05-31T00:00:00.000Z' } }),
         },
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ // POST create search index (uses existing file_id)
-        ok: true,
-        json: async () => ({ id: 'op-1', done: true, response: { id: 'idx-new' } }),
-      })
-    vi.stubGlobal('fetch', mockFetch)
+    mockVsCreate.mockResolvedValueOnce({ id: 'idx-new', status: 'completed' })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.uploaded).toBe(0)
     expect(res.body.unchanged).toBe(1)
-
-    // Upload endpoint should NOT have been called
-    const uploadCalled = mockFetch.mock.calls.some(
-      ([url]: [string]) => url.includes('/files/v1/files') && !url.includes('DELETE')
-    )
-    expect(uploadCalled).toBe(false)
+    expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
   // ─── 6. Re-uploads changed node ───────────────────────────────────────────
@@ -291,7 +301,6 @@ describe('POST /ai/sync-lore', () => {
           content: 'Updated magic rules',
           word_count: 3,
           to_be_deleted: 0,
-          // content_updated_at AFTER last_synced_at → needs upload
           ai_sync_info: JSON.stringify({
             yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'old-file', content_updated_at: '2025-06-01T00:00:00.000Z' },
           }),
@@ -299,16 +308,8 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ // POST upload file → new file ID
-        ok: true,
-        json: async () => ({ id: 'new-file-id' }),
-      })
-      .mockResolvedValueOnce({ // POST create search index
-        ok: true,
-        json: async () => ({ id: 'op-1', done: true, response: { id: 'idx-1' } }),
-      })
-    vi.stubGlobal('fetch', mockFetch)
+    mockFilesCreate.mockResolvedValueOnce({ id: 'new-file-id' })
+    mockVsCreate.mockResolvedValueOnce({ id: 'idx-1', status: 'completed' })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
@@ -336,21 +337,22 @@ describe('POST /ai/sync-lore', () => {
           name: 'Deleted Chapter',
           content: 'Old content',
           word_count: 2,
-          to_be_deleted: 1, // marked for deletion
+          to_be_deleted: 1,
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'del-file', content_updated_at: '2025-01-01T00:00:00.000Z' } }),
         },
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE file → success
-    vi.stubGlobal('fetch', mockFetch)
+    mockFilesDel.mockResolvedValueOnce({ deleted: true })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.deleted).toBe(1)
     expect(res.body.uploaded).toBe(0)
-    expect(res.body.search_index_id).toBeNull() // no files left
+    expect(res.body.search_index_id).toBeNull()
+
+    // Verify delete was called with the right file ID
+    expect(mockFilesDel).toHaveBeenCalledWith('del-file')
 
     // Verify ai_sync_info.yandex was cleared in DB
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -360,12 +362,6 @@ describe('POST /ai/sync-lore', () => {
     db.close()
     const syncInfo = JSON.parse(row.ai_sync_info) as Record<string, unknown>
     expect(syncInfo['yandex']).toBeUndefined()
-
-    // Verify delete was called with the right file ID
-    const deleteCall = mockFetch.mock.calls.find(
-      ([url, opts]: [string, RequestInit]) => url.includes('del-file') && opts?.method === 'DELETE'
-    )
-    expect(deleteCall).toBeDefined()
   })
 
   // ─── 8. Deletes remote file for emptied node (word_count=0) ──────────────
@@ -379,16 +375,14 @@ describe('POST /ai/sync-lore', () => {
           id: 40,
           name: 'Empty Node',
           content: '',
-          word_count: 0, // empty
+          word_count: 0,
           to_be_deleted: 0,
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'empty-file', content_updated_at: '2025-01-01T00:00:00.000Z' } }),
         },
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE file
-    vi.stubGlobal('fetch', mockFetch)
+    mockFilesDel.mockResolvedValueOnce({ deleted: true })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
@@ -406,9 +400,9 @@ describe('POST /ai/sync-lore', () => {
     expect(syncInfo.yandex.file_id).toBeUndefined()
   })
 
-  // ─── 9. Calls SearchIndex delete (old) then create + poll ────────────────
+  // ─── 9. Deletes old VectorStore, creates new, polls until done ────────────
 
-  it('deletes old SearchIndex, creates new one, polls until done, stores search_index_id', async () => {
+  it('deletes old VectorStore, creates new one, polls until done, stores search_index_id', async () => {
     testDbPath = setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
@@ -420,28 +414,24 @@ describe('POST /ai/sync-lore', () => {
           content: 'The world is vast',
           word_count: 4,
           to_be_deleted: 0,
-          // Already synced with a file_id, content_updated_at < last_synced_at → unchanged
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2025-06-01T00:00:00.000Z', file_id: 'f-existing', content_updated_at: '2025-05-01T00:00:00.000Z' } }),
         },
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE old index
-      .mockResolvedValueOnce({ // POST create search index → returns pending operation
-        ok: true,
-        json: async () => ({ id: 'op-new', done: false }),
-      })
-      .mockResolvedValueOnce({ // GET operation (poll 1) → done immediately (no 5s sleep)
-        ok: true,
-        json: async () => ({ done: true, response: { id: 'new-idx-456' } }),
-      })
-    vi.stubGlobal('fetch', mockFetch)
+    mockVsDel.mockResolvedValueOnce({ deleted: true })
+    mockVsCreate.mockResolvedValueOnce({ id: 'new-idx-456', status: 'in_progress' })
+    mockVsRetrieve.mockResolvedValueOnce({ id: 'new-idx-456', status: 'completed' })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
     expect(res.body.search_index_id).toBe('new-idx-456')
+
+    // Verify delete was called on old index
+    expect(mockVsDel).toHaveBeenCalledWith('old-idx')
+    // Verify polling was triggered
+    expect(mockVsRetrieve).toHaveBeenCalledWith('new-idx-456')
 
     // Verify search_index_id stored in settings
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -451,17 +441,11 @@ describe('POST /ai/sync-lore', () => {
     db.close()
     const config = JSON.parse(configRow.value) as { yandex: { search_index_id: string } }
     expect(config.yandex.search_index_id).toBe('new-idx-456')
-
-    // Verify delete was called on the old index
-    const deleteCall = mockFetch.mock.calls.find(
-      ([url, opts]: [string, RequestInit]) => url.includes('old-idx') && opts?.method === 'DELETE'
-    )
-    expect(deleteCall).toBeDefined()
   })
 
   // ─── 10. Empty allFileIds: delete old index, don't create new one ────────
 
-  it('when all files deleted, removes old index and clears search_index_id', async () => {
+  it('when all files deleted, removes old VectorStore and clears search_index_id', async () => {
     testDbPath = setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
@@ -472,28 +456,22 @@ describe('POST /ai/sync-lore', () => {
           name: 'Removed Chapter',
           content: 'Content',
           word_count: 1,
-          to_be_deleted: 1, // will be deleted
+          to_be_deleted: 1,
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'f-to-delete', content_updated_at: '2025-01-01T00:00:00.000Z' } }),
         },
       ],
     })
 
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE remote file
-      .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE old search index
-    vi.stubGlobal('fetch', mockFetch)
+    mockFilesDel.mockResolvedValueOnce({ deleted: true })
+    mockVsDel.mockResolvedValueOnce({ deleted: true })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
     expect(res.body.search_index_id).toBeNull()
 
-    // POST create index should NOT have been called
-    const createCall = mockFetch.mock.calls.find(
-      ([url, opts]: [string, RequestInit]) =>
-        url.includes('/searchindex/v1/searchindex') && opts?.method === 'POST'
-    )
-    expect(createCall).toBeUndefined()
+    // VectorStore create should NOT have been called
+    expect(mockVsCreate).not.toHaveBeenCalled()
 
     // Verify search_index_id cleared in settings
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -518,26 +496,21 @@ describe('POST /ai/sync-lore', () => {
           content: 'Some content',
           word_count: 2,
           to_be_deleted: 0,
-          ai_sync_info: null, // never synced → will try to upload
+          ai_sync_info: null,
         },
       ],
     })
 
-    const mockFetch = vi.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      text: async () => 'Internal Server Error',
-    })
-    vi.stubGlobal('fetch', mockFetch)
+    mockFilesCreate.mockRejectedValueOnce(Object.assign(new Error('HTTP 500 Internal Server Error'), { status: 500 }))
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(500)
     expect(res.body.error).toContain('Upload failed')
   })
 
-  // ─── 12. 500 if SearchIndex polling times out ─────────────────────────────
+  // ─── 12. 500 if VectorStore polling times out ─────────────────────────────
 
-  it('returns 500 when SearchIndex polling exceeds timeout', async () => {
+  it('returns 500 when VectorStore polling exceeds timeout', async () => {
     testDbPath = setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
@@ -548,31 +521,20 @@ describe('POST /ai/sync-lore', () => {
           content: 'Some content',
           word_count: 2,
           to_be_deleted: 0,
-          ai_sync_info: null, // never synced → will try to upload
+          ai_sync_info: null,
         },
       ],
     })
 
-    // Use a tiny real timeout so the poll loop expires quickly without fake timers
     const origIntervalMs = POLL_CONFIG.intervalMs
     const origTimeoutMs = POLL_CONFIG.timeoutMs
     POLL_CONFIG.intervalMs = 5
     POLL_CONFIG.timeoutMs = 20
 
-    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
-      const urlStr = String(url)
-      if (urlStr.includes('/files/v1/files')) {
-        return { ok: true, json: async () => ({ id: 'file-1' }) }
-      }
-      if (urlStr.includes('/searchindex/v1/searchindex') && !urlStr.includes('DELETE')) {
-        return { ok: true, json: async () => ({ id: 'op-timeout', done: false }) }
-      }
-      if (urlStr.includes('/operations/')) {
-        return { ok: true, json: async () => ({ done: false }) }
-      }
-      return { ok: true, json: async () => ({}) }
-    })
-    vi.stubGlobal('fetch', mockFetch)
+    mockFilesCreate.mockResolvedValueOnce({ id: 'file-1' })
+    mockVsCreate.mockResolvedValueOnce({ id: 'vs-timeout', status: 'in_progress' })
+    // Always return in_progress → triggers timeout
+    mockVsRetrieve.mockResolvedValue({ id: 'vs-timeout', status: 'in_progress' })
 
     const res = await request(app).post('/ai/sync-lore')
 

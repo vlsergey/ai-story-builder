@@ -1,4 +1,6 @@
+import path from 'path'
 import express, { Request, Response, Router } from 'express'
+import OpenAI from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
 
 let Database: typeof import('better-sqlite3') | null = null
@@ -39,6 +41,7 @@ interface AiConfigStore {
 
 interface LoreNodeRow {
   id: number
+  parent_id: number | null
   name: string
   content: string | null
   word_count: number
@@ -54,122 +57,53 @@ function getDb(dbPath: string, readonly = false) {
   return new (Database as typeof import('better-sqlite3'))(dbPath, readonly ? { readonly: true } : undefined)
 }
 
-function yandexHeaders(apiKey: string, folderId: string): Record<string, string> {
-  return {
-    Authorization: `Api-Key ${apiKey}`,
-    'x-folder-id': folderId,
-  }
-}
-
-async function uploadFile(apiKey: string, folderId: string, name: string, text: string): Promise<string> {
-  const url = 'https://llm.api.cloud.yandex.net/files/v1/files'
-  const formData = new FormData()
-  const blob = new Blob([text], { type: 'text/plain' })
-  formData.append('content', blob, `${name}.txt`)
-  formData.append('mimeType', 'text/plain')
-  formData.append('name', `${name}.txt`)
-  formData.append('folderId', folderId)
-
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: yandexHeaders(apiKey, folderId),
-    body: formData,
+function createYandexClient(apiKey: string, folderId: string): OpenAI {
+  return new OpenAI({
+    apiKey,
+    baseURL: 'https://ai.api.cloud.yandex.net/v1',
+    defaultHeaders: { 'x-folder-id': folderId },
   })
-  if (!r.ok) {
-    const body = await r.text()
-    throw new Error(`POST ${url} → HTTP ${r.status} (folder_id=${folderId})\n${body.trim()}`)
-  }
-  const data = await r.json() as { id: string }
-  return data.id
 }
 
-async function deleteFile(apiKey: string, folderId: string, fileId: string): Promise<void> {
-  const url = `https://llm.api.cloud.yandex.net/files/v1/files/${fileId}`
-  const r = await fetch(url, {
-    method: 'DELETE',
-    headers: yandexHeaders(apiKey, folderId),
-  })
-  if (!r.ok && r.status !== 404) {
-    const body = await r.text()
-    throw new Error(`DELETE ${url} → HTTP ${r.status}\n${body.trim()}`)
-  }
-}
+function buildPathMap(rows: LoreNodeRow[]): Map<number, string> {
+  const idToRow = new Map(rows.map(r => [r.id, r]))
+  const paths = new Map<number, string>()
 
-async function deleteSearchIndex(apiKey: string, folderId: string, indexId: string): Promise<void> {
-  const url = `https://llm.api.cloud.yandex.net/searchindex/v1/searchindex/${indexId}`
-  const r = await fetch(url, {
-    method: 'DELETE',
-    headers: yandexHeaders(apiKey, folderId),
-  })
-  if (!r.ok && r.status !== 404) {
-    const body = await r.text()
-    throw new Error(`DELETE ${url} → HTTP ${r.status}\n${body.trim()}`)
-  }
-}
-
-async function pollOperation(
-  apiKey: string,
-  folderId: string,
-  operationId: string,
-): Promise<Record<string, unknown>> {
-  const url = `https://llm.api.cloud.yandex.net/operations/${operationId}`
-  const start = Date.now()
-  while (Date.now() - start < POLL_CONFIG.timeoutMs) {
-    const r = await fetch(url, {
-      headers: yandexHeaders(apiKey, folderId),
-    })
-    if (!r.ok) {
-      const body = await r.text()
-      throw new Error(`GET ${url} → HTTP ${r.status}\n${body.trim()}`)
+  function getPath(id: number): string {
+    if (paths.has(id)) return paths.get(id)!
+    const row = idToRow.get(id)!
+    if (!row.parent_id) {
+      const p = `/${row.name}`
+      paths.set(id, p)
+      return p
     }
-    const data = await r.json() as Record<string, unknown>
-    if (data['done']) {
-      if (data['error']) {
-        throw new Error(`Operation ${operationId} failed: ${JSON.stringify(data['error'])}`)
-      }
-      return data
-    }
-    await new Promise(resolve => setTimeout(resolve, POLL_CONFIG.intervalMs))
+    const p = `${getPath(row.parent_id)}/${row.name}`
+    paths.set(id, p)
+    return p
   }
-  throw new Error(`SearchIndex creation timed out after ${POLL_CONFIG.timeoutMs / 1000}s (operation ${operationId})`)
+
+  for (const row of rows) getPath(row.id)
+  return paths
 }
 
-async function createAndWaitForSearchIndex(
-  apiKey: string,
-  folderId: string,
-  fileIds: string[]
-): Promise<string> {
-  const url = 'https://llm.api.cloud.yandex.net/searchindex/v1/searchindex'
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {
-      ...yandexHeaders(apiKey, folderId),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      folderId,
-      name: `story-lore-${Date.now()}`,
-      fileIds,
-      textSearchIndex: {},
-    }),
-  })
-  if (!r.ok) {
-    const body = await r.text()
-    throw new Error(`POST ${url} → HTTP ${r.status} (folder_id=${folderId})\n${body.trim()}`)
-  }
-  const operation = await r.json() as { id: string; done?: boolean; response?: { id: string } }
+function buildFileContent(
+  row: LoreNodeRow,
+  projectName: string,
+  pathMap: Map<number, string>,
+  idToRow: Map<number, LoreNodeRow>,
+): string {
+  const nodePath = pathMap.get(row.id) ?? `/${row.name}`
+  const parentName = row.parent_id ? (idToRow.get(row.parent_id)?.name ?? '') : ''
 
-  // If the operation completed synchronously
-  if (operation.done && operation.response?.id) {
-    return operation.response.id
-  }
-
-  const completed = await pollOperation(apiKey, folderId, operation.id)
-  const response = completed['response'] as { id: string } | undefined
-  if (!response?.id) {
-    throw new Error('SearchIndex creation completed but no index ID returned')
-  }
-  return response.id
+  const lines = [
+    '---',
+    `project: ${projectName}`,
+    `path: ${nodePath}`,
+    ...(parentName ? [`parent: ${parentName}`] : []),
+    '---',
+    '',
+  ]
+  return lines.join('\n') + (row.content ?? '')
 }
 
 function parseYandexSync(aiSyncInfoJson: string | null): AiEngineSyncRecord | undefined {
@@ -191,6 +125,22 @@ function parseAiSyncInfoMap(aiSyncInfoJson: string | null): Record<string, AiEng
   }
 }
 
+async function waitForVectorStore(
+  client: OpenAI,
+  storeId: string,
+): Promise<OpenAI.Beta.VectorStore> {
+  const start = Date.now()
+  while (Date.now() - start < POLL_CONFIG.timeoutMs) {
+    const store = await client.beta.vectorStores.retrieve(storeId)
+    if (store.status === 'completed') return store
+    if (store.status === 'failed' || store.status === 'expired') {
+      throw new Error(`VectorStore ${storeId} reached status '${store.status}'`)
+    }
+    await new Promise(resolve => setTimeout(resolve, POLL_CONFIG.intervalMs))
+  }
+  throw new Error(`VectorStore creation timed out after ${POLL_CONFIG.timeoutMs / 1000}s (id=${storeId})`)
+}
+
 // ─── POST /sync-lore ─────────────────────────────────────────────────────────
 
 router.post('/sync-lore', async (_req: Request, res: Response) => {
@@ -199,7 +149,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
   try {
-    // Step 1 — load current engine, credentials, and all lore nodes
+    // Step 1 — load settings and nodes
     const db = getDb(dbPath, true)
     const engineRow = db
       .prepare("SELECT value FROM settings WHERE key = 'current_backend'")
@@ -208,9 +158,8 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       .prepare("SELECT value FROM settings WHERE key = 'ai_config'")
       .get() as { value: string } | undefined
 
-    // Step 2 — load all lore nodes
     const rows = db
-      .prepare('SELECT id, name, content, word_count, to_be_deleted, ai_sync_info FROM lore_nodes')
+      .prepare('SELECT id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info FROM lore_nodes')
       .all() as LoreNodeRow[]
     db.close()
 
@@ -218,15 +167,13 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     if (!currentEngine) {
       return res.status(400).json({ error: 'no AI engine configured' })
     }
+    if (currentEngine !== 'yandex') {
+      return res.status(400).json({ error: `Lore sync is not supported for engine '${currentEngine}'` })
+    }
 
     let config: AiConfigStore = {}
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
-    }
-
-    // Dispatch to the engine-specific adapter
-    if (currentEngine !== 'yandex') {
-      return res.status(400).json({ error: `Lore sync is not supported for engine '${currentEngine}'` })
     }
 
     const apiKey = config.yandex?.api_key?.trim()
@@ -234,6 +181,13 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     if (!apiKey || !folderId) {
       return res.status(400).json({ error: 'Yandex api_key and folder_id are required' })
     }
+
+    const projectName = path.basename(dbPath).replace(/\.[^.]+$/, '')
+    const client = createYandexClient(apiKey, folderId)
+
+    // Build path and parent helpers
+    const idToRow = new Map(rows.map(r => [r.id, r]))
+    const pathMap = buildPathMap(rows)
 
     // Step 3 — categorise
     interface NodeInfo {
@@ -275,12 +229,17 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       }
     }
 
-    // Step 4 — upload files
+    // Step 4 — upload files (Markdown with YAML frontmatter tags)
     const newFileIds = new Map<number, string>()
     for (const node of toUpload) {
+      const row = idToRow.get(node.id)!
       try {
-        const fileId = await uploadFile(apiKey, folderId, node.name, node.content)
-        newFileIds.set(node.id, fileId)
+        const fileContent = buildFileContent(row, projectName, pathMap, idToRow)
+        const uploaded = await client.files.create({
+          file: new File([fileContent], `${node.name}.md`, { type: 'text/markdown' }),
+          purpose: 'assistants',
+        })
+        newFileIds.set(node.id, uploaded.id)
       } catch (e) {
         throw new Error(`Upload failed for node "${node.name}" (id=${node.id}):\n${String(e)}`)
       }
@@ -289,11 +248,15 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     // Step 5 — delete remote files
     for (const node of toDelete) {
       if (node.yandexSync?.file_id) {
-        await deleteFile(apiKey, folderId, node.yandexSync.file_id)
+        try {
+          await client.files.del(node.yandexSync.file_id)
+        } catch (e: unknown) {
+          if ((e as { status?: number })?.status !== 404) throw e
+        }
       }
     }
 
-    // Step 6 — collect all valid file IDs for new index
+    // Step 6 — collect all valid file IDs for new vector store
     const deleteNodeIds = new Set(toDelete.map(n => n.id))
     const allFileIds: string[] = []
 
@@ -312,16 +275,26 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       }
     }
 
-    // Step 7 — rebuild SearchIndex
+    // Step 7 — rebuild VectorStore (delete old, create new)
     const oldSearchIndexId = config.yandex?.search_index_id
-
     if (oldSearchIndexId) {
-      await deleteSearchIndex(apiKey, folderId, oldSearchIndexId)
+      try {
+        await client.beta.vectorStores.del(oldSearchIndexId)
+      } catch (e: unknown) {
+        if ((e as { status?: number })?.status !== 404) throw e
+      }
     }
 
     let newSearchIndexId: string | undefined
     if (allFileIds.length > 0) {
-      newSearchIndexId = await createAndWaitForSearchIndex(apiKey, folderId, allFileIds)
+      const store = await client.beta.vectorStores.create({
+        name: `story-lore-${Date.now()}`,
+        file_ids: allFileIds,
+      })
+      const completed = store.status === 'completed'
+        ? store
+        : await waitForVectorStore(client, store.id)
+      newSearchIndexId = completed.id
     }
 
     // Step 8 — commit to DB (single transaction)
@@ -331,7 +304,6 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     db2.transaction(() => {
       const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
 
-      // Update uploaded nodes
       for (const [nodeId, fileId] of newFileIds.entries()) {
         const nodeRow = rows.find(r => r.id === nodeId)
         const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
@@ -339,22 +311,17 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
         updateStmt.run(JSON.stringify(existing), nodeId)
       }
 
-      // Update deleted nodes
       for (const node of toDelete) {
         const nodeRow = rows.find(r => r.id === node.id)
         const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
-
         if (node.to_be_deleted === 1) {
-          // Remove yandex entry entirely
           delete existing['yandex']
         } else {
-          // word_count === 0 — keep record but without file_id
           existing['yandex'] = { last_synced_at: now }
         }
         updateStmt.run(JSON.stringify(existing), node.id)
       }
 
-      // Update search_index_id in settings
       const updatedConfig = { ...config }
       if (!updatedConfig.yandex) updatedConfig.yandex = {}
       if (newSearchIndexId) {
