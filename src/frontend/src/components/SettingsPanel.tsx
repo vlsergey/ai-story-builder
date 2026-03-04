@@ -3,6 +3,7 @@ import {
   BUILTIN_ENGINES,
   CAPABILITY_KEYS,
   AGE_RATING_INFO,
+  AGE_RATING_ORDER,
   type AiEngineDefinition,
 } from '../lib/ai-engines'
 import { dispatchAiEngineChanged } from '../lib/lore-events'
@@ -163,7 +164,8 @@ export default function SettingsPanel() {
 
         {/* ── Per-engine sections ── */}
         {BUILTIN_ENGINES.map(engine => {
-          const ageInfo = AGE_RATING_INFO[engine.ageRating]
+          const maxRatingIdx = AGE_RATING_ORDER.indexOf(engine.ageRating)
+          const supportedRatings = AGE_RATING_ORDER.slice(0, maxRatingIdx + 1)
           const testState = testStates[engine.id]
           const isActive = currentEngine === engine.id
           const engineNotes = t(`engine.${engine.id}.notes`, '')
@@ -180,12 +182,20 @@ export default function SettingsPanel() {
                 {isActive && (
                   <span className="text-xs text-primary font-medium">{t('settings.aiEngine.active')}</span>
                 )}
-                <span
-                  className={`ml-auto text-xs font-bold px-1.5 py-0.5 rounded ${ageInfo.colorClass}`}
-                  title={t(`ageRating.${engine.ageRating}.longLabel`)}
-                >
-                  {ageInfo.label}
-                </span>
+                <div className="ml-auto flex gap-0.5">
+                  {supportedRatings.map(rating => {
+                    const info = AGE_RATING_INFO[rating]
+                    return (
+                      <span
+                        key={rating}
+                        className={`text-[10px] font-bold px-1 py-0.5 rounded ${info.colorClass}`}
+                        title={t(`ageRating.${rating}.longLabel`)}
+                      >
+                        {info.label}
+                      </span>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Credential fields */}

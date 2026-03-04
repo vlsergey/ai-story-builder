@@ -26,6 +26,9 @@ export interface AgeRatingInfo {
   colorClass: string
 }
 
+/** All age ratings in ascending order of maturity. */
+export const AGE_RATING_ORDER: AgeRating[] = ['G', 'PG', '12', '16', '18', 'NC21']
+
 export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
   G:    { label: 'G',      minAge: 0,  colorClass: 'bg-green-600 text-white' },
   PG:   { label: 'PG',    minAge: 7,  colorClass: 'bg-lime-600 text-white' },
