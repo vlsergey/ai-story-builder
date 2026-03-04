@@ -163,6 +163,21 @@ describe('LoreTree', () => {
     expect(container.querySelector('.text-green-500')).toBeNull();
   });
 
+  it('shows not-synced icon when engine is set and node has content via word_count but no versions', async () => {
+    // The lore tree query does NOT return the content field (too large).
+    // A node with word_count > 0 has direct content — should still show sync icon.
+    const { container } = renderWithSettings(
+      [{ id: 1, parent_id: null, name: 'Chapter', status: 'ACTIVE',
+         latest_version_status: null,  // no lore_versions rows
+         content: null,                // not returned by the tree query
+         word_count: 5, char_count: 20, byte_count: 20,
+         to_be_deleted: 0, ai_sync_info: null, children: [] }],
+      { currentAiEngine: 'grok' }
+    );
+    await screen.findByText('Chapter');
+    expect(container.querySelector('[aria-label="not synced"]')).not.toBeNull();
+  });
+
   it('shows synced icon when node is synced with current engine', async () => {
     const { container } = renderWithSettings(
       [{ id: 1, parent_id: null, name: 'Chapter', status: 'ACTIVE',
@@ -174,22 +189,18 @@ describe('LoreTree', () => {
       { currentAiEngine: 'grok' }
     );
     await screen.findByText('Chapter');
-    expect(container.querySelector('.text-green-500')).not.toBeNull();
+    expect(container.querySelector('[aria-label="synced"]')).not.toBeNull();
   });
 
-  it('shows not-synced icon when node has content but not synced to current engine', async () => {
+  it('shows not-synced icon when node has versions but not synced to current engine', async () => {
     const { container } = renderWithSettings(
       [{ id: 1, parent_id: null, name: 'Chapter', status: 'ACTIVE',
-         latest_version_status: 'ACTIVE', content: 'text',
+         latest_version_status: 'ACTIVE', content: null,
          word_count: 5, char_count: 20, byte_count: 20,
          to_be_deleted: 0, ai_sync_info: null, children: [] }],
       { currentAiEngine: 'grok' }
     );
     await screen.findByText('Chapter');
-    // green icon absent — not synced indicator (Circle icon) present
-    expect(container.querySelector('.text-green-500')).toBeNull();
-    // The not-synced Circle icon renders as an SVG; parent has the sync icon
-    const svgs = container.querySelectorAll('svg');
-    expect(svgs.length).toBeGreaterThan(0);
+    expect(container.querySelector('[aria-label="not synced"]')).not.toBeNull();
   });
 });

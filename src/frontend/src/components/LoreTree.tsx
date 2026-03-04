@@ -118,7 +118,8 @@ function formatStat(count: number, mode: LoreStatMode): string {
 }
 
 function subtreeHasAnyContent(node: LoreNode): boolean {
-  if (node.latest_version_status !== null || node.content !== null) return true
+  // word_count > 0 covers nodes with direct content (content field not in tree query)
+  if (node.latest_version_status !== null || (node.word_count ?? 0) > 0 || node.content !== null) return true
   return (node.children ?? []).some(subtreeHasAnyContent)
 }
 
@@ -128,7 +129,8 @@ function subtreeIsInProgress(node: LoreNode, syncingNodeIds: ReadonlySet<number>
 }
 
 function subtreeIsSynced(node: LoreNode, engine: string): boolean {
-  if ((node.latest_version_status !== null || node.content !== null) && !node.ai_sync_info?.[engine]) return false
+  const hasContent = node.latest_version_status !== null || (node.word_count ?? 0) > 0 || node.content !== null
+  if (hasContent && !node.ai_sync_info?.[engine]) return false
   return (node.children ?? []).every(c => subtreeIsSynced(c, engine))
 }
 
@@ -584,13 +586,13 @@ export default function LoreTree({
                       <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums pl-1">{statText}</span>
                     )}
                     {showSync && inProgress && (
-                      <Loader2 size={12} className={`shrink-0 text-muted-foreground animate-spin${!statText ? ' ml-auto' : ''}`} />
+                      <Loader2 aria-label="syncing" size={12} className={`shrink-0 text-muted-foreground animate-spin${!statText ? ' ml-auto' : ''}`} />
                     )}
                     {showSync && !inProgress && synced && (
-                      <CheckCircle2 size={12} className={`shrink-0 text-green-500${!statText ? ' ml-auto' : ''}`} />
+                      <CheckCircle2 aria-label="synced" size={12} className={`shrink-0 text-green-500${!statText ? ' ml-auto' : ''}`} />
                     )}
                     {showSync && !inProgress && !synced && (
-                      <Circle size={12} className={`shrink-0 text-muted-foreground${!statText ? ' ml-auto' : ''}`} />
+                      <Circle aria-label="not synced" size={12} className={`shrink-0 text-muted-foreground${!statText ? ' ml-auto' : ''}`} />
                     )}
                   </div>
                 </div>
