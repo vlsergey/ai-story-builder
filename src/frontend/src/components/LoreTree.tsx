@@ -92,6 +92,13 @@ function buildItemsMap(roots: LoreNode[]): Record<TreeItemIndex, TreeItem<ItemDa
   return items
 }
 
+function uniqueName(base: string, existingNames: string[]): string {
+  if (!existingNames.includes(base)) return base
+  let n = 2
+  while (existingNames.includes(`${base} ${n}`)) n++
+  return `${base} ${n}`
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node: LoreNode) => void }) {
@@ -103,10 +110,27 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
     'lore-tree': { expandedItems: [], selectedItems: [] },
   })
 
+  const [pendingRenameId, setPendingRenameId] = useState<number | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const treeRef = useRef<TreeRef<ItemData>>(null)
 
   useEffect(() => { fetchTree() }, [])
+
+  // Once the pending-rename item appears in `items`, select it and start rename
+  useEffect(() => {
+    if (pendingRenameId === null || !items[pendingRenameId]) return
+    setViewState(prev => ({
+      ...prev,
+      'lore-tree': {
+        ...prev['lore-tree'],
+        selectedItems: [pendingRenameId],
+        focusedItem: pendingRenameId,
+      },
+    }))
+    treeRef.current?.startRenamingItem(pendingRenameId)
+    setPendingRenameId(null)
+  }, [pendingRenameId, items])
 
   function fetchTree() {
     fetch('/api/lore/tree')
@@ -216,13 +240,15 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
   async function handleCreate() {
     if (selectedNodeIds.size !== 1) return
     const [parentId] = selectedNodeIds
-    const name = window.prompt('New node name:')
-    if (!name?.trim()) return
-    await fetch('/api/lore', {
+    const siblings = findNode(parentId, tree)?.children ?? []
+    const name = uniqueName('New node', siblings.map(s => s.name))
+    const res = await fetch('/api/lore', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parent_id: parentId, name: name.trim() }),
+      body: JSON.stringify({ parent_id: parentId, name }),
     })
+    const { id: newId } = await res.json() as { id: number }
+    setPendingRenameId(newId)
     fetchTree()
   }
 
