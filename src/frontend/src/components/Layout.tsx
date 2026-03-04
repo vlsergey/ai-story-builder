@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react'
-import { DockviewReact } from 'dockview'
+import { DockviewReact, DockviewDefaultTab } from 'dockview'
 import { useTheme } from '../lib/theme/theme-provider'
 
 // Import the dockview styles
@@ -41,9 +41,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const [selectedLoreNode, setSelectedLoreNode] = React.useState<LoreNode | null>(null)
   const [selectedPlanNode, setSelectedPlanNode] = React.useState<PlanNodeTree | null>(null)
   const dockviewRef = useRef<any>(null)
-  // True while a programmatic layout operation (clear/fromJSON/setupDefault) is in progress.
-  // Used to suppress onDidRemoveGroup during those operations.
-  const isApplyingLayout = useRef(false)
   const { setPreference } = useTheme()
 
   const WORD_WRAP_KEY = 'ai-story-builder-word-wrap'
@@ -67,6 +64,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     api.addPanel({
       id: panelId,
       component: 'lore-editor',
+      tabComponent: 'loreEditorTab',
       title: node.name,
       params: { nodeId: node.id },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
@@ -130,15 +128,12 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
       rawSize: JSON.stringify(savedLayout).length
     })
     if (savedLayout) {
-      isApplyingLayout.current = true
       try {
         dockviewRef.current.fromJSON(normalizeLayout(savedLayout))
         console.log('[Layout] restoreLayout: applied to dockview')
       } catch (e) {
         console.warn('Failed to restore layout', e)
         setupDefaultLayout()
-      } finally {
-        isApplyingLayout.current = false
       }
     } else {
       console.log('[Layout] restoreLayout: no saved layout, using defaults')
@@ -206,8 +201,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const setupDefaultLayout = () => {
     if (!dockviewRef.current) return
 
-    isApplyingLayout.current = true
-    try {
     dockviewRef.current.clear()
 
     // Create the center group with no arguments — passing any options object (even just {id})
@@ -241,9 +234,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
       position: { referenceGroup: centerGroup, direction: 'right' },
       minimumWidth: 200,
     })
-    } finally {
-      isApplyingLayout.current = false
-    }
   }
 
   const onReady = (event: any) => {
@@ -261,22 +251,6 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     })
     // When a panel is removed, re-lock any groups that are now empty
     event.api.onDidRemovePanel(lockWatermarkGroups)
-    // When a group is removed (e.g. last editor tab closed), recreate an empty
-    // center/watermark group so the layout doesn't collapse.
-    // Suppressed during programmatic layout operations (clear/fromJSON).
-    event.api.onDidRemoveGroup(() => {
-      if (isApplyingLayout.current) return
-      const api = dockviewRef.current
-      if (!api) return
-      const hasEmptyGroup = api.groups.some((g: any) => g.panels.length === 0)
-      if (!hasEmptyGroup) {
-        // Recreate the center watermark group between lore and cards panels
-        const ref = api.getPanel('lore-panel') ? 'lore-panel' : 'cards-panel'
-        const dir = api.getPanel('lore-panel') ? 'right' : 'left'
-        api.addGroup({ referencePanel: ref, direction: dir })
-        lockWatermarkGroups()
-      }
-    })
     // try to restore a saved layout once the api is available
     restoreLayout()
   }
@@ -332,6 +306,25 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     );
   };
 
+  // Tab for lore-editor panels. Wraps DockviewDefaultTab but overrides the close
+  // action so that closing the last panel in a group keeps the group alive (shows
+  // watermark) instead of collapsing the layout.
+  const LoreEditorTab = (props: any) => {
+    const closeAction = () => {
+      const group = props.api?.group
+      if (group && group.panels.length === 1) {
+        // Last panel — remove without destroying the group
+        ;(props.containerApi as any).component.removePanel(
+          (props.api as any).panel,
+          { removeEmptyGroup: false }
+        )
+      } else {
+        props.api?.close()
+      }
+    }
+    return <DockviewDefaultTab {...props} closeActionOverride={closeAction} />
+  };
+
   const components = {
     lore: () => (
       <div className="p-2 h-full">
@@ -376,6 +369,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
 
   const tabComponents = {
     nonClosableTab: NonClosableTab,
+    loreEditorTab: LoreEditorTab,
   };
 
   return (
