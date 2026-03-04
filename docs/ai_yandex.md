@@ -52,13 +52,19 @@
 
 ## API Endpoints Used
 
-### List Models (used for connection test)
+### Tokenize (used for connection test)
 ```
-GET https://llm.api.cloud.yandex.net/foundationModels/v1/listModels
+POST https://llm.api.cloud.yandex.net/foundationModels/v1/tokenize
 Authorization: Api-Key {api_key}
 x-folder-id: {folder_id}
+Content-Type: application/json
+
+{
+  "modelUri": "gpt://{folder_id}/yandexgpt-lite/latest",
+  "text": "test"
+}
 ```
-Returns a list of available foundation models. Used to verify that credentials are valid.
+Returns token information for the given text. Used as a lightweight credential check — non-generative and cheap. Note: there is **no `listModels` endpoint** in the Yandex Foundation Models API; model URIs must be known in advance (see models list in the docs).
 
 ### File Upload
 ```

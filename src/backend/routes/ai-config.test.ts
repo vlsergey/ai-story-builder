@@ -261,10 +261,7 @@ describe('POST /ai/:engine/test', () => {
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        models: [
-          { id: 'yandexgpt-lite/latest' },
-          { id: 'yandexgpt/latest' },
-        ],
+        tokens: [{ id: 1, text: 'test', special: false }],
       }),
     })
     vi.stubGlobal('fetch', mockFetch)
@@ -273,7 +270,7 @@ describe('POST /ai/:engine/test', () => {
       .post('/ai/yandex/test')
       .send({ api_key: 'AQVN-valid', folder_id: 'b1g999' })
     expect(res.body.ok).toBe(true)
-    expect(res.body.detail).toContain('2 model')
+    expect(res.body.detail).toContain('1 token')
 
     vi.unstubAllGlobals()
   })

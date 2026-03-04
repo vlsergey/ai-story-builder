@@ -191,19 +191,27 @@ router.post('/:engine/test', express.json(), async (req: Request, res: Response)
       if (!apiKey) return res.status(400).json({ ok: false, error: 'api_key is required' })
       if (!folderId) return res.status(400).json({ ok: false, error: 'folder_id is required' })
 
+      // Use the tokenize endpoint as a lightweight credential check.
+      // No listModels endpoint exists in the Yandex Foundation Models API.
       const r = await fetch(
-        'https://llm.api.cloud.yandex.net/foundationModels/v1/listModels',
+        'https://llm.api.cloud.yandex.net/foundationModels/v1/tokenize',
         {
+          method: 'POST',
           headers: {
             Authorization: `Api-Key ${apiKey}`,
             'x-folder-id': folderId,
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            modelUri: `gpt://${folderId}/yandexgpt-lite/latest`,
+            text: 'test',
+          }),
         }
       )
       if (r.ok) {
-        const data = await r.json() as { models?: unknown[] }
-        const count = Array.isArray(data.models) ? data.models.length : 0
-        res.json({ ok: true, detail: `Connected. ${count} model(s) available.` })
+        const data = await r.json() as { tokens?: unknown[] }
+        const tokenCount = Array.isArray(data.tokens) ? data.tokens.length : '?'
+        res.json({ ok: true, detail: `Connected. Tokenized: ${tokenCount} token(s).` })
       } else {
         const body = await r.text()
         res.json({ ok: false, error: `HTTP ${r.status}: ${body}` })
