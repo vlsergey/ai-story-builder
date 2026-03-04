@@ -26,6 +26,12 @@
 - All user data (project databases, backups, application settings) is stored in the OS-standard user data directory via Electron's `app.getPath('userData')`. In development (plain Node.js), falls back to `<cwd>/data`.
 - Automatic database backup is created before opening any project and before schema migrations (keep last 7 backups).
 - Full support for multiple AI backends: Grok API, Yandex Cloud AI, Local LLM (via OpenAI-compatible HTTP endpoint), and Mock mode.
+- AI configuration API (`/api/ai/*`) for managing engine credentials and selecting the active engine:
+  - `GET /api/ai/config` — returns current engine list with credentials (API keys returned as-is since stored in per-user project DB)
+  - `POST /api/ai/config` — saves per-engine credential fields (merged into existing JSON)
+  - `POST /api/ai/current-engine` — sets the active engine; validates required fields before accepting; body: `{ engine: string | null }`
+  - `POST /api/ai/:engine/test` — tests credentials against the real AI provider API; accepts credentials in request body (unsaved values allowed); uses Node.js native `fetch` (Node 18+)
+- AI engine connection tests use the real provider APIs (not mocked): Grok uses `GET https://api.x.ai/v1/models`; Yandex uses `GET https://llm.api.cloud.yandex.net/foundationModels/v1/listModels`
 
 ### Development Workflow
 - `npm run dev` starts three processes concurrently via `concurrently`:

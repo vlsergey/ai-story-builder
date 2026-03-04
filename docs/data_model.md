@@ -23,11 +23,34 @@
   - `value` TEXT NOT NULL
 
 Important keys:
-  - `current_backend` → "grok" | "yandex" | "local" | "mock:grok" | "mock:yandex"
-  - `ai_config` → JSON with per-engine configuration
-  - `save_api_keys` → "true" | "false"
+  - `current_backend` → `"grok" | "yandex" | "local" | "mock:grok" | "mock:yandex" | null` — the active AI engine; null or missing means "none selected"
+  - `ai_config` → JSON string with per-engine credentials (see structure below)
+  - `save_api_keys` → `"true" | "false"`
   - `ui_layout` → JSON with saved dockable layout
   - `last_opened_at`, `project_title`, etc.
+
+### `ai_config` JSON structure
+```json
+{
+  "grok": {
+    "api_key": "xai-..."
+  },
+  "yandex": {
+    "api_key": "AQVN...",
+    "folder_id": "b1gXXXXXXXXXX"
+  },
+  "custom": {
+    "{engine-id}": {
+      "api_key": "...",
+      "base_url": "http://..."
+    }
+  }
+}
+```
+
+**Note:** Model selection is NOT stored in the engine config. The specific model used for each operation (generation, plan, cards) is configured per-operation, not per-engine. This allows different operations to use different models on the same engine.
+
+**Note:** API keys should only be stored in the project database when the user explicitly enables the "Save API keys" setting (disabled by default). When disabled, keys are kept only in memory for the session.
 
 ## Lore (Unified tree of nodes and persistent texts)
 Lore is a unified tree of nodes. A node with children acts as a section/folder; a node with

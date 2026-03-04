@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { LoreStatMode } from '../types/models'
+import { AI_ENGINE_CHANGED_EVENT } from './lore-events'
 
 const LORE_STAT_KEY = 'ai-story-builder-lore-stat'
 
@@ -23,11 +24,21 @@ export function LoreSettingsProvider({ children }: { children: React.ReactNode }
   )
   const [currentAiEngine, setCurrentAiEngine] = useState<string | null>(null)
 
-  useEffect(() => {
+  function fetchCurrentEngine() {
     fetch('/api/settings/current_backend')
       .then(r => r.json())
       .then((data: { value?: string | null }) => setCurrentAiEngine(data.value ?? null))
       .catch(() => setCurrentAiEngine(null))
+  }
+
+  useEffect(() => {
+    fetchCurrentEngine()
+  }, [])
+
+  // Re-fetch the active engine whenever SettingsPanel changes it.
+  useEffect(() => {
+    window.addEventListener(AI_ENGINE_CHANGED_EVENT, fetchCurrentEngine)
+    return () => window.removeEventListener(AI_ENGINE_CHANGED_EVENT, fetchCurrentEngine)
   }, [])
 
   // Sync statMode to Electron native menu radio on mount/change

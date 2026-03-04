@@ -10,6 +10,7 @@ import LoreSection from './LoreSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
+import SettingsPanel from './SettingsPanel'
 import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
@@ -43,6 +44,27 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const [selectedPlanNode, setSelectedPlanNode] = React.useState<PlanNodeTree | null>(null)
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
+
+  /** Opens (or activates) the Settings singleton tab in the editor group. */
+  function openSettings() {
+    const api = dockviewRef.current
+    if (!api) return
+    const existing = api.getPanel('settings')
+    if (existing) { existing.api.setActive(); return }
+    // Open in same group as editor panels, or the watermark (empty) group
+    const editorGroup: any =
+      api.groups.find((g: any) =>
+        g.panels.some((p: any) => p.id.startsWith('lore-editor-') || p.id === 'settings')
+      ) ??
+      api.groups.find((g: any) => g.panels.length === 0)
+    api.addPanel({
+      id: 'settings',
+      component: 'settings',
+      tabComponent: 'loreEditorTab',
+      title: 'Settings',
+      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
+    })
+  }
 
   /** Opens (or activates) a lore-editor tab for the given node in the center group. */
   function openLoreEditor(node: LoreNode) {
@@ -266,13 +288,15 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   // Native-menu IPC listener.
   // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference })
-  menuActionsRef.current = { handleResetLayouts, onClose, setPreference }
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, openSettings })
+  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, openSettings }
 
   useEffect(() => {
     if (!window.electronAPI) return
     window.electronAPI.onMenuAction((action: string) => {
-      if (action === 'reset-layouts') {
+      if (action === 'open-settings') {
+        menuActionsRef.current.openSettings()
+      } else if (action === 'reset-layouts') {
         menuActionsRef.current.handleResetLayouts()
       } else if (action === 'close-project') {
         menuActionsRef.current.onClose()
@@ -350,7 +374,8 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         <h3 className="font-semibold mb-2">Cards</h3>
         <p className="text-muted-foreground">Card definitions and values panel placeholder.</p>
       </div>
-    )
+    ),
+    settings: () => <SettingsPanel />,
   };
 
   const tabComponents = {
@@ -358,17 +383,18 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     loreEditorTab: LoreEditorTab,
   };
 
-  // Prevent non-lore-editor panels from being dropped into the editor group.
-  // The editor group is identified by already containing at least one lore-editor panel.
+  // Prevent sidebar/utility panels (lore, plan, cards) from being dropped into the editor group.
+  // The editor group is identified by containing lore-editor or settings panels.
+  // The settings panel is allowed in the editor group (and can also move to any other group).
   const handleWillDrop = (event: any) => {
     const targetGroup = event.group
     if (!targetGroup) return
     const isEditorGroup = targetGroup.panels.some(
-      (p: any) => p.id.startsWith('lore-editor-')
+      (p: any) => p.id.startsWith('lore-editor-') || p.id === 'settings'
     )
     if (!isEditorGroup) return
     const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
-    if (!draggedPanelId?.startsWith('lore-editor-')) {
+    if (!draggedPanelId?.startsWith('lore-editor-') && draggedPanelId !== 'settings') {
       event.preventDefault()
     }
   }

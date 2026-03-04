@@ -7,6 +7,7 @@ import loreRouter from './routes/lore.js'
 import plansRouter from './routes/plans.js'
 import generationRouter from './routes/generation.js'
 import settingsRouter from './routes/settings.js'
+import aiConfigRouter from './routes/ai-config.js'
 import { getDataDir } from './db/state.js'
 
 const app = express()
@@ -50,6 +51,7 @@ app.use('/api/lore', loreRouter)
 app.use('/api/plan', plansRouter)
 app.use('/api', generationRouter)
 app.use('/api/settings', settingsRouter)
+app.use('/api/ai', aiConfigRouter)
 
 app.get('/api/hello', (_req, res) => {
   res.json({ message: 'hello from backend' })

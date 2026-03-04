@@ -43,6 +43,23 @@ Since this is a **local, single-user Electron application**, the chosen pattern 
 
 All shared event names and detail types live in `src/frontend/src/lib/lore-events.ts`.
 
+### Settings Panel
+
+A singleton dockview panel (`id='settings'`) that opens in the editor group by default (same group as lore-editor tabs) via View > Settings. Can be moved freely and returned to the editor group.
+
+**Content:**
+- Current AI Engine selector (dropdown): `none` / `grok` / `yandex` / user-defined custom engines
+  - Saving triggers `POST /api/ai/current-engine` with validation; inline error shown on rejection
+  - On success: dispatches `AI_ENGINE_CHANGED_EVENT` on `window` so `LoreSettingsProvider` re-fetches
+- Per-engine section (one for each configured engine):
+  - Credential fields (auto-saved on blur; password fields with Show/Hide toggle)
+  - **Test Connection** button → `POST /api/ai/:engine/test` with current form values → spinner → "✓ Connected (N models)" or "✗ Error message"
+  - **Capabilities list**: File Upload, File Attachment, Knowledge Base, File Search — checkmark/cross per capability with description
+  - **Age rating badge** (colored): G / PG / 12+ / 16+ / 18+ / NC-21
+- **Model selection is NOT in engine config** — models are chosen per-operation
+
+**AI Engine capability definitions** live in a shared frontend module (e.g., `src/frontend/src/lib/ai-engines.ts`) so they can be imported by both SettingsPanel and future panels.
+
 ### Additional Technical Requirements
 * Centralized API client with easy backend switching (Grok / Yandex / Local / Mock)
 * Comprehensive error boundaries

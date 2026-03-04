@@ -24,6 +24,7 @@
   * Close Project: closes the current project and returns to the Start screen
   * Quit: closes the project and attempts to exit the application (browser window close, or process termination for desktop apps)
 * **View Menu**: Available when a project is open, provides:
+  * **Settings**: opens the Settings panel in the editor group (singleton)
   * Reset layouts: restores the default dock/panel layout configuration
   * Theme selection: choose between available themes (Zinc, Slate, Neutral, Obsidian, Carbon)
 * UI organized as dockable interface with areas (specified sizes are default, actual values stored in project database):
@@ -46,6 +47,53 @@
 * API keys are saved in project database only if "Save API keys" checkbox is enabled (disabled by default)
 * Real balance and spending information is shown from Billing API (for Grok and Yandex)
 * On any AI backend error a dialog appears with detailed error message (copy-paste enabled for reporting) and buttons: Abort, Retry, Ignore (Ignore continues in Mock mode)
+
+### Settings Panel
+* Accessible via **View > Settings** in the application menu
+* Opens as a dockable tab in the **editor group** (center area) by default; can be moved to any area and returned to the editor group
+* Settings panel is a **singleton** — reopening it activates the existing tab rather than opening a duplicate
+* **Current AI Engine** selector: choose from predefined engines (Grok AI, Yandex Cloud AI) or custom user-defined engines; "None" option is always available
+  * Selecting an engine validates required credentials are saved; shows inline validation error if required fields are missing
+  * Changing the active engine emits an `AI_ENGINE_CHANGED_EVENT` so the Lore Tree sync icon updates immediately
+* **Per-engine configuration sections**, one per supported engine:
+  * Credential fields (API key, folder ID, etc.) — auto-saved on blur or Enter key
+  * Password fields with Show/Hide toggle
+  * **Test Connection** button — sends current form values (possibly unsaved) to backend test endpoint; shows spinner → result (Connected / error)
+  * **Capabilities list** — shows which features the engine supports (see below)
+  * **Age rating badge** — shows the engine's content maturity rating (see below)
+* **Model selection is NOT part of engine configuration** — the specific model for each operation (generation, plan, story cards) is chosen per-operation, not stored in the engine settings. This allows using different models on the same engine for different tasks.
+
+#### AI Engine Capabilities
+
+Each AI engine has a defined set of capabilities. Capabilities are fixed for built-in engines and user-selectable for custom engines:
+
+| Capability | Description |
+|---|---|
+| **File Upload** | Upload documents (PDF, TXT, etc.) to persistent AI storage for reuse across requests |
+| **File Attachment** | Reference an uploaded file in a specific request so the model can read it directly |
+| **Knowledge Base** | Build a searchable vector/hybrid index from uploaded files (RAG — Retrieval-Augmented Generation). Also called: Vector Store (OpenAI), Collection (xAI), SearchIndex (Yandex) |
+| **File Search** | Reference a Knowledge Base in a request so the model automatically searches it for relevant context. Also called: file_search (OpenAI), collections_search (xAI), Search Index Tool (Yandex) |
+
+Built-in engine capabilities:
+* **Grok AI**: File Upload ✓, File Attachment ✓, Knowledge Base ✗, File Search ✗ — max 10 files per request
+* **Yandex Cloud AI**: File Upload ✓, File Attachment ✓, Knowledge Base ✓, File Search ✓
+
+#### Age Rating System
+
+Each AI engine has a content maturity rating indicating what kind of content the engine may produce:
+
+| Rating | Label | Description |
+|---|---|---|
+| `G`    | All Ages  | Completely family-safe content only |
+| `PG`   | 7+        | Parental guidance; mild themes |
+| `12`   | 12+       | Teen-appropriate; standard assistant-level content |
+| `16`   | 16+       | Mature themes; no explicit content |
+| `18`   | 18+       | Adult content; explicit material possible |
+| `NC21` | NC-21     | Unrestricted adult content (21+) |
+
+Built-in ratings: **Grok AI = NC-21**, **Yandex Cloud AI = 12+**
+Custom engines: age rating is user-selectable.
+Age rating is displayed as a colored badge in the Settings panel and is informational only (no enforcement).
 
 ### Instances, sessions, databases
 * Each instance of application supports single session (single connected database) related to single project

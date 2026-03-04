@@ -45,6 +45,11 @@ function buildApplicationMenu() {
 
   const viewSubmenu = [
     {
+      label: 'Settings',
+      click: () => sendMenuAction('open-settings'),
+    },
+    { type: 'separator' },
+    {
       label: 'Reset layouts',
       click: () => sendMenuAction('reset-layouts'),
     },
