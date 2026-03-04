@@ -24,15 +24,15 @@ export function EditorSettingsProvider({ children }: { children: React.ReactNode
   }, [wordWrap])
 
   // Handle set-word-wrap:* IPC from Electron menu.
-  // No cleanup here — Layout.tsx owns removeMenuActionListeners() on unmount.
   useEffect(() => {
     if (!window.electronAPI) return
-    window.electronAPI.onMenuAction((action: string) => {
+    const unsub = window.electronAPI.onMenuAction((action: string) => {
       if (!action.startsWith('set-word-wrap:')) return
       const value = action === 'set-word-wrap:true'
       localStorage.setItem(WORD_WRAP_KEY, String(value))
       setWordWrap(value)
     })
+    return unsub
   }, [])
 
   return (

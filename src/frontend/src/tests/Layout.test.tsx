@@ -49,8 +49,7 @@ describe('Layout', () => {
     menuActionHandler = null
     capturedOnOpenLoreNode = null
     window.electronAPI = {
-      onMenuAction: vi.fn((cb) => { menuActionHandler = cb }),
-      removeMenuActionListeners: vi.fn(),
+      onMenuAction: vi.fn((cb) => { menuActionHandler = cb; return vi.fn() }),
       sendMenuState: vi.fn(),
       showErrorDialog: vi.fn(),
     }

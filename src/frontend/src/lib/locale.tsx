@@ -32,12 +32,11 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   // Lives here (not in Layout) so it works on the start screen too.
   useEffect(() => {
     if (!window.electronAPI) return
-    window.electronAPI.onMenuAction((action: string) => {
+    const unsub = window.electronAPI.onMenuAction((action: string) => {
       if (!action.startsWith('set-locale:')) return
       setLocale(action.slice(11))
     })
-    // No cleanup: LocaleProvider lives for the app's lifetime.
-    // Removing all listeners here would break handlers registered by child components.
+    return unsub
   }, [])
 
   const strings = useMemo<LocaleStrings>(() => LOCALES[locale] ?? en, [locale])

@@ -47,15 +47,15 @@ export function LoreSettingsProvider({ children }: { children: React.ReactNode }
   }, [statMode])
 
   // Handle set-lore-stat:* IPC from Electron menu.
-  // No cleanup here — Layout.tsx owns removeMenuActionListeners() on unmount.
   useEffect(() => {
     if (!window.electronAPI) return
-    window.electronAPI.onMenuAction((action: string) => {
+    const unsub = window.electronAPI.onMenuAction((action: string) => {
       if (!action.startsWith('set-lore-stat:')) return
       const mode = action.slice(14) as LoreStatMode
       localStorage.setItem(LORE_STAT_KEY, mode)
       setStatMode(mode)
     })
+    return unsub
   }, [])
 
   return (

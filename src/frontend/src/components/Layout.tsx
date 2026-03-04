@@ -299,7 +299,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
 
   useEffect(() => {
     if (!window.electronAPI) return
-    window.electronAPI.onMenuAction((action: string) => {
+    const unsub = window.electronAPI.onMenuAction((action: string) => {
       if (action === 'open-settings') {
         menuActionsRef.current.openSettings()
       } else if (action === 'reset-layouts') {
@@ -310,7 +310,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
         menuActionsRef.current.setPreference(action.slice(10) as ThemePreference)
       }
     })
-    return () => { window.electronAPI?.removeMenuActionListeners() }
+    return unsub
   }, [])
 
   // Custom tab components without close buttons for non-closable panels

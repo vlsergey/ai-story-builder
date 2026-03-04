@@ -5,16 +5,13 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * Register a callback for native-menu actions sent from the main process.
-   * Multiple calls accumulate listeners — call removeMenuActionListeners() first
-   * if you need to replace the handler.
+   * Returns an unsubscribe function that removes only this specific listener.
+   * Call the returned function on component unmount to avoid memory leaks.
    */
   onMenuAction: (callback) => {
-    ipcRenderer.on('menu-action', (_event, action) => callback(action))
-  },
-
-  /** Remove all 'menu-action' IPC listeners (used on component unmount). */
-  removeMenuActionListeners: () => {
-    ipcRenderer.removeAllListeners('menu-action')
+    const handler = (_event, action) => callback(action)
+    ipcRenderer.on('menu-action', handler)
+    return () => ipcRenderer.removeListener('menu-action', handler)
   },
 
   /** Sync a UI setting back to the main process so native menu items stay in sync. */
