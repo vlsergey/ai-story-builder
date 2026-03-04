@@ -106,6 +106,15 @@ function buildFileContent(
   return lines.join('\n') + (row.content ?? '')
 }
 
+function formatApiError(e: unknown): string {
+  if (e != null && typeof e === 'object' && 'status' in e && 'message' in e) {
+    const apiErr = e as { status: number; message: string; error?: unknown }
+    const detail = apiErr.error ? '\n' + JSON.stringify(apiErr.error) : ''
+    return `HTTP ${apiErr.status} ${apiErr.message}${detail}`
+  }
+  return String(e)
+}
+
 function parseYandexSync(aiSyncInfoJson: string | null): AiEngineSyncRecord | undefined {
   if (!aiSyncInfoJson) return undefined
   try {
@@ -236,12 +245,12 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       try {
         const fileContent = buildFileContent(row, projectName, pathMap, idToRow)
         const uploaded = await client.files.create({
-          file: new File([fileContent], `${node.name}.md`, { type: 'text/markdown' }),
+          file: new File([fileContent], `${node.name}.md`, { type: 'text/plain' }),
           purpose: 'assistants',
         })
         newFileIds.set(node.id, uploaded.id)
       } catch (e) {
-        throw new Error(`Upload failed for node "${node.name}" (id=${node.id}):\n${String(e)}`)
+        throw new Error(`Upload failed for node "${node.name}" (id=${node.id}):\n${formatApiError(e)}`)
       }
     }
 
@@ -251,7 +260,9 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
         try {
           await client.files.del(node.yandexSync.file_id)
         } catch (e: unknown) {
-          if ((e as { status?: number })?.status !== 404) throw e
+          if ((e as { status?: number })?.status !== 404) {
+            throw new Error(`Delete file ${node.yandexSync.file_id} failed:\n${formatApiError(e)}`)
+          }
         }
       }
     }
@@ -281,7 +292,9 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       try {
         await client.beta.vectorStores.del(oldSearchIndexId)
       } catch (e: unknown) {
-        if ((e as { status?: number })?.status !== 404) throw e
+        if ((e as { status?: number })?.status !== 404) {
+          throw new Error(`Delete VectorStore ${oldSearchIndexId} failed:\n${formatApiError(e)}`)
+        }
       }
     }
 
