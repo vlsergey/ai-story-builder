@@ -19,6 +19,7 @@ import {
 import { LoreNode } from '../types/models'
 import { useLoreSettings } from '../lib/lore-settings'
 import { LORE_NODE_SAVED_EVENT, LoreNodeSavedDetail } from '../lib/lore-events'
+import { engineSupportsFileUpload } from '../lib/ai-engines'
 
 // ── Command system ────────────────────────────────────────────────────────────
 
@@ -497,7 +498,7 @@ export default function LoreTree({
           execute: handleDelete,
         },
     'spacer',
-    { id: 'sync-ai', label: 'Sync lore with AI Engine', icon: <CloudUpload size={15} />, enabled: true, variant: 'primary', execute: handleSyncLore },
+    { id: 'sync-ai', label: engineSupportsFileUpload(currentAiEngine) ? 'Sync lore with AI Engine' : 'Sync lore with AI Engine (engine does not support file upload)', icon: <CloudUpload size={15} />, enabled: engineSupportsFileUpload(currentAiEngine), variant: 'primary', execute: handleSyncLore },
   ]
 
   const commandsRef = useRef<LoreCommand[]>([])
@@ -625,7 +626,7 @@ export default function LoreTree({
             const Icon = node.parent_id === null ? Library : nodeIcon(node)
 
             const statText = statMode !== 'none' ? formatStat(subtreeStat(node, statMode), statMode) : ''
-            const syncState = currentAiEngine ? subtreeSyncState(node, currentAiEngine) : 'none'
+            const syncState = engineSupportsFileUpload(currentAiEngine) ? subtreeSyncState(node, currentAiEngine!) : 'none'
             const inProgress = syncState !== 'none' && !!syncingNodeIds && subtreeIsInProgress(node, syncingNodeIds)
             const showSync = syncState !== 'none'
             const synced = syncState === 'synced'

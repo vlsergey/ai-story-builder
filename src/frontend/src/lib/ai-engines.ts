@@ -98,6 +98,12 @@ export const CAPABILITY_META: Array<{
   },
 ]
 
+/** Returns true if the given engine (by id) supports file upload. Unknown engine ids return false. */
+export function engineSupportsFileUpload(engineId: string | null | undefined): boolean {
+  if (!engineId) return false
+  return BUILTIN_ENGINES.find(e => e.id === engineId)?.capabilities.fileUpload ?? false
+}
+
 /** Built-in AI engine definitions. */
 export const BUILTIN_ENGINES: AiEngineDefinition[] = [
   {
