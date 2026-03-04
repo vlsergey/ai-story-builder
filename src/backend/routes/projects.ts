@@ -9,6 +9,7 @@ import {
   writeAppSettings,
   getDataDir,
 } from '../db/state.js'
+import { setVerboseLogging } from '../lib/yandex-client.js'
 
 // openProjectDatabase is a CommonJS module; use require to load it at runtime
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -46,6 +47,21 @@ function getProjectInitialData(dbPath: string): ProjectInitialData {
   } catch (e) {
     console.warn('[getProjectInitialData] failed to read initial data from', dbPath, (e as Error).message)
     return { layout: null, projectTitle: null }
+  }
+}
+
+/** Reads runtime flags (e.g. verbose_ai_logging) from the project DB and applies them. */
+function applyRuntimeSettings(dbPath: string): void {
+  if (!Database) return
+  try {
+    const db = new Database(dbPath, { readonly: true })
+    const row = db
+      .prepare("SELECT value FROM settings WHERE key = 'verbose_ai_logging'")
+      .get() as { value: string } | undefined
+    db.close()
+    setVerboseLogging(row?.value === 'true')
+  } catch {
+    // non-fatal — leave current flag value unchanged
   }
 }
 
@@ -87,6 +103,7 @@ router.post('/open', express.json(), (req: Request, res: Response) => {
   }
 
   setCurrentDbPath(dbPath)
+  applyRuntimeSettings(dbPath)
   updateRecent(dbPath)
   res.json({ path: dbPath, ...getProjectInitialData(dbPath) })
 })

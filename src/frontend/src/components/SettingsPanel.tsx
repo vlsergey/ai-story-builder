@@ -31,6 +31,7 @@ export default function SettingsPanel() {
   const [testStates, setTestStates] = useState<Record<string, TestState>>({})
   const [showField, setShowField] = useState<Record<string, boolean>>({})
   const [textLanguage, setTextLanguage] = useState('ru-RU')
+  const [verboseAiLogging, setVerboseAiLogging] = useState(false)
 
   // form values: engineId → fieldKey → value
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({})
@@ -39,10 +40,12 @@ export default function SettingsPanel() {
     Promise.all([
       fetch('/api/ai/config').then(r => r.json()) as Promise<ConfigData>,
       fetch('/api/settings/text_language').then(r => r.json()) as Promise<{ value: string | null }>,
-    ]).then(([aiData, langData]) => {
+      fetch('/api/settings/verbose_ai_logging').then(r => r.json()) as Promise<{ value: string | null }>,
+    ]).then(([aiData, langData, verboseData]) => {
         setConfig(aiData)
         setCurrentEngine(aiData.current_engine)
         if (langData.value) setTextLanguage(langData.value)
+        setVerboseAiLogging(verboseData.value === 'true')
         // Use saved values, falling back to field defaultValue if nothing stored yet
         const initialValues: Record<string, Record<string, string>> = {}
         for (const engine of BUILTIN_ENGINES) {
@@ -58,6 +61,15 @@ export default function SettingsPanel() {
       })
       .catch(() => setLoading(false))
   }, [])
+
+  async function handleVerboseAiLoggingChange(enabled: boolean) {
+    setVerboseAiLogging(enabled)
+    await fetch('/api/settings/verbose_ai_logging', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: String(enabled) }),
+    })
+  }
 
   async function handleTextLanguageChange(lang: string) {
     setTextLanguage(lang)
@@ -350,6 +362,25 @@ export default function SettingsPanel() {
             </section>
           )
         })}
+
+        {/* ── Debug ── */}
+        <section>
+          <h2 className="text-base font-semibold mb-3">{t('settings.debug.title')}</h2>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={verboseAiLogging}
+              onChange={e => handleVerboseAiLoggingChange(e.target.checked)}
+              className="mt-0.5 shrink-0"
+            />
+            <div>
+              <p className="text-sm">{t('settings.debug.verboseAiLogging')}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t('settings.debug.verboseAiLoggingDescription')}
+              </p>
+            </div>
+          </label>
+        </section>
 
         {/* Spacer at bottom */}
         <div className="h-4" />

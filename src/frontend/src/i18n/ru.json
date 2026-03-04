@@ -47,6 +47,10 @@
   "capability.knowledgeBaseAttachment.label": "Прикрепление базы знаний",
   "capability.knowledgeBaseAttachment.description": "Прикрепление готовой базы знаний (векторного хранилища / поискового индекса) к запросу генерации для автоматического извлечения релевантного контекста. Также называется: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).",
 
+  "settings.debug.title": "Отладка",
+  "settings.debug.verboseAiLogging": "Подробное логирование AI запросов",
+  "settings.debug.verboseAiLoggingDescription": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции.",
+
   "ageRating.G.longLabel": "Все возрасты",
   "ageRating.PG.longLabel": "С 7 лет",
   "ageRating.12.longLabel": "С 12 лет",

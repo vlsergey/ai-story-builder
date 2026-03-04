@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
+import { setVerboseLogging } from '../lib/yandex-client.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -59,6 +60,27 @@ router.post('/layout', express.json(), (req: Request, res: Response) => {
     res.json({ ok: true })
   } catch (e) {
     console.error('[Layout POST] error:', (e as Error).message)
+    res.status(500).json({ error: String(e) })
+  }
+})
+
+// POST /settings/verbose_ai_logging — save to DB and apply to the running process immediately.
+// Must be declared before /:key to avoid Express treating the literal string as the key param.
+router.post('/verbose_ai_logging', express.json(), (req: Request, res: Response) => {
+  const { value } = req.body as { value?: unknown }
+  const dbPath = getCurrentDbPath()
+  if (!dbPath || value === undefined) {
+    return res.status(400).json({ error: 'value required, db must be open' })
+  }
+  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  try {
+    const strValue = String(value)
+    const db = new Database(dbPath)
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('verbose_ai_logging', ?)").run(strValue)
+    db.close()
+    setVerboseLogging(strValue === 'true')
+    res.json({ ok: true })
+  } catch (e) {
     res.status(500).json({ error: String(e) })
   }
 })
