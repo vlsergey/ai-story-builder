@@ -46,18 +46,27 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
 
+  /**
+   * Returns the group that should receive editor-type panels (lore-editor, lore-wizard, settings).
+   * Prefers an existing editor group; falls back to the watermark (empty) group; then undefined.
+   */
+  function findEditorGroup(api: any): any {
+    return (
+      api.groups.find((g: any) =>
+        g.panels.some((p: any) =>
+          p.id.startsWith('lore-editor-') || p.id.startsWith('lore-wizard-') || p.id === 'settings'
+        )
+      ) ?? api.groups.find((g: any) => g.panels.length === 0)
+    )
+  }
+
   /** Opens (or activates) the Settings singleton tab in the editor group. */
   function openSettings() {
     const api = dockviewRef.current
     if (!api) return
     const existing = api.getPanel('settings')
     if (existing) { existing.api.setActive(); return }
-    // Open in same group as editor panels, or the watermark (empty) group
-    const editorGroup: any =
-      api.groups.find((g: any) =>
-        g.panels.some((p: any) => p.id.startsWith('lore-editor-') || p.id === 'settings')
-      ) ??
-      api.groups.find((g: any) => g.panels.length === 0)
+    const editorGroup = findEditorGroup(api)
     api.addPanel({
       id: 'settings',
       component: 'settings',
@@ -75,10 +84,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     // If already open, just bring it to the front
     const existing = api.getPanel(panelId)
     if (existing) { existing.api.setActive(); return }
-    // Find best target group: existing editor panels > empty (watermark) group > no ref
-    const editorGroup: any =
-      api.groups.find((g: any) => g.panels.some((p: any) => p.id.startsWith('lore-editor-'))) ??
-      api.groups.find((g: any) => g.panels.length === 0)
+    const editorGroup = findEditorGroup(api)
     api.addPanel({
       id: panelId,
       component: 'lore-editor',
@@ -96,9 +102,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     const panelId = `lore-wizard-${node.id}`
     const existing = api.getPanel(panelId)
     if (existing) { existing.api.setActive(); return }
-    const editorGroup: any =
-      api.groups.find((g: any) => g.panels.some((p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('lore-wizard-'))) ??
-      api.groups.find((g: any) => g.panels.length === 0)
+    const editorGroup = findEditorGroup(api)
     api.addPanel({
       id: panelId,
       component: 'lore-wizard',

@@ -3,15 +3,21 @@ import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Layout from '../components/Layout';
 
-// Captures the onOpenLoreNode callback so tests can trigger editor opens
+// Captures the onOpenLoreNode / onOpenLoreWizard callbacks so tests can trigger panel opens
 let capturedOnOpenLoreNode: ((node: any) => void) | null = null
+let capturedOnOpenLoreWizard: ((node: any) => void) | null = null
 
 // Mock child components that have their own network/state dependencies
 vi.mock('../components/LoreSection', () => ({
   default: (props: any) => {
     capturedOnOpenLoreNode = props.onOpenLoreNode
+    capturedOnOpenLoreWizard = props.onOpenLoreWizard
     return <div data-testid="folder-section">Folder Section</div>
   }
+}));
+
+vi.mock('../components/LoreWizard', () => ({
+  default: () => <div>Lore Wizard</div>
 }));
 
 vi.mock('../components/PlanSection', () => ({
@@ -48,6 +54,7 @@ describe('Layout', () => {
   beforeEach(() => {
     menuActionHandler = null
     capturedOnOpenLoreNode = null
+    capturedOnOpenLoreWizard = null
     window.electronAPI = {
       onMenuAction: vi.fn((cb) => { menuActionHandler = cb; return vi.fn() }),
       sendMenuState: vi.fn(),
@@ -167,6 +174,48 @@ describe('Layout', () => {
     await waitFor(() => {
       expect(screen.getByText('AI Story Builder')).toBeInTheDocument()
     })
+  })
+
+  it('lore editor opens in the wizard group when no empty group exists', async () => {
+    const { container } = render(<Layout {...mockProps} />)
+    await screen.findByTestId('folder-section')
+
+    const mockNode = {
+      id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
+      position: 0, status: 'ACTIVE', to_be_deleted: 0,
+      latest_version_status: null, created_at: '', children: [],
+    }
+
+    // Open wizard — fills the empty center group
+    act(() => { capturedOnOpenLoreWizard?.(mockNode) })
+    await waitFor(() => {
+      expect(screen.getByText('AI Wizard → Dragon Lore')).toBeInTheDocument()
+    })
+
+    // Open editor next to it — should land in the same (center) group
+    act(() => { capturedOnOpenLoreNode?.(mockNode) })
+    await waitFor(() => {
+      expect(container.querySelector('.dv-default-tab-action')).toBeInTheDocument()
+    })
+
+    // Close editor — center group now holds only the wizard (no empty group exists)
+    await act(async () => {
+      // Find the editor tab's close button — it's the second tab (wizard + editor)
+      const closeButtons = container.querySelectorAll<HTMLElement>('.dv-default-tab-action')
+      fireEvent.click(closeButtons[closeButtons.length - 1])
+    })
+
+    // Re-open editor — must land in the same group as the wizard, NOT the lore-tree group
+    act(() => { capturedOnOpenLoreNode?.(mockNode) })
+
+    await waitFor(() => {
+      expect(screen.getByText('Dragon Lore')).toBeInTheDocument()
+    })
+
+    // Both the wizard tab and editor tab must share the same .dv-groupview container
+    const wizardTab = screen.getByText('AI Wizard → Dragon Lore')
+    const editorTab = screen.getByText('Dragon Lore')
+    expect(wizardTab.closest('.dv-groupview')).toBe(editorTab.closest('.dv-groupview'))
   })
 
   it('saves layout to database when reset-layouts IPC action fires', async () => {
