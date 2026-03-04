@@ -21,4 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendMenuState: (key, value) => {
     ipcRenderer.send('set-menu-state', { key, value })
   },
+
+  /** Show a native error dialog with a "Copy to Clipboard" button. */
+  showErrorDialog: (title, message) => {
+    return ipcRenderer.invoke('show-error-dialog', { title, message })
+  },
 })

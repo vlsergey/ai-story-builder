@@ -468,6 +468,14 @@ export default function LoreTree({
     if (node) onOpenLoreNode?.(node)
   }
 
+  function showError(message: string) {
+    if (window.electronAPI) {
+      void window.electronAPI.showErrorDialog('Sync Error', message)
+    } else {
+      window.alert(message)
+    }
+  }
+
   async function handleSyncLore() {
     if (!currentAiEngine) return
     const toSync = collectSyncableIds(tree, currentAiEngine)
@@ -476,10 +484,10 @@ export default function LoreTree({
       const res = await fetch('/api/ai/sync-lore', { method: 'POST' })
       const data = await res.json() as { ok?: boolean; error?: string }
       if (!res.ok || !data.ok) {
-        window.alert(`Sync failed: ${data.error ?? 'unknown error'}`)
+        showError(`Sync failed: ${data.error ?? 'unknown error'}`)
       }
     } catch (e) {
-      window.alert(`Sync error: ${String(e)}`)
+      showError(`Sync error: ${String(e)}`)
     } finally {
       setSyncingIds(new Set())
       fetchTree()

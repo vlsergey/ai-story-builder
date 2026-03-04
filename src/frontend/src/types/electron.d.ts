@@ -13,6 +13,8 @@ declare global {
       removeMenuActionListeners: () => void
       /** Sync a UI setting back to the main process (e.g. 'word-wrap', true). */
       sendMenuState: (key: string, value: boolean | string) => void
+      /** Show a native error dialog with a "Copy to Clipboard" button. */
+      showErrorDialog: (title: string, message: string) => Promise<void>
     }
   }
 }

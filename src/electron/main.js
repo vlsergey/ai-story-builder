@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron')
+const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } = require('electron')
 const path = require('path')
 
 /** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
@@ -148,6 +148,22 @@ function checkNativeDeps() {
     app.exit(1)
   }
 }
+
+// Show a native error dialog with a "Copy to Clipboard" button.
+ipcMain.handle('show-error-dialog', async (event, { title, message }) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'error',
+    title,
+    message,
+    buttons: ['Close', 'Copy to Clipboard'],
+    defaultId: 0,
+    cancelId: 0,
+  })
+  if (response === 1) {
+    clipboard.writeText(message)
+  }
+})
 
 // Renderer sends this to keep menu checkbox/radio in sync with localStorage state
 ipcMain.on('set-menu-state', (_event, { key, value }) => {
