@@ -156,10 +156,10 @@ function parseAiSyncInfoMap(aiSyncInfoJson: string | null): Record<string, AiEng
 async function waitForVectorStore(
   client: OpenAI,
   storeId: string,
-): Promise<OpenAI.Beta.VectorStore> {
+): Promise<OpenAI.VectorStore> {
   const start = Date.now()
   while (Date.now() - start < POLL_CONFIG.timeoutMs) {
-    const store = await client.beta.vectorStores.retrieve(storeId)
+    const store = await client.vectorStores.retrieve(storeId)
     if (store.status === 'completed') return store
     if (store.status === 'failed' || store.status === 'expired') {
       throw new Error(`VectorStore ${storeId} reached status '${store.status}'`)
@@ -310,7 +310,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     const oldSearchIndexId = config.yandex?.search_index_id
     if (oldSearchIndexId) {
       try {
-        await client.beta.vectorStores.del(oldSearchIndexId)
+        await client.vectorStores.del(oldSearchIndexId)
       } catch (e: unknown) {
         if ((e as { status?: number })?.status !== 404) {
           throw new Error(`Delete VectorStore ${oldSearchIndexId} failed:\n${formatApiError(e)}`)
@@ -320,7 +320,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
 
     let newSearchIndexId: string | undefined
     if (allFileIds.length > 0) {
-      const store = await client.beta.vectorStores.create({
+      const store = await client.vectorStores.create({
         name: `story-lore-${Date.now()}`,
         file_ids: allFileIds,
       })

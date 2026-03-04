@@ -30,9 +30,7 @@ const { mockFilesCreate, mockFilesDel, mockVsCreate, mockVsDel, mockVsRetrieve, 
 vi.mock('openai', () => ({
   default: class {
     files = { create: mockFilesCreate, del: mockFilesDel }
-    beta = {
-      vectorStores: { create: mockVsCreate, del: mockVsDel, retrieve: mockVsRetrieve },
-    }
+    vectorStores = { create: mockVsCreate, del: mockVsDel, retrieve: mockVsRetrieve }
   },
   toFile: mockToFile,
 }))
