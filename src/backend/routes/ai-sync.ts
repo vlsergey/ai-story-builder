@@ -2,7 +2,10 @@ import path from 'path'
 import express, { Request, Response, Router } from 'express'
 import OpenAI, { toFile } from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
+import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import { createYandexClient, makeLoggingFetch } from '../lib/yandex-client.js'
+import { createGrokClient } from '../lib/grok-client.js'
+import { collapseLoreTree } from '../lib/lore-tree.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -26,6 +29,8 @@ interface AiEngineSyncRecord {
   last_synced_at: string
   file_id?: string
   content_updated_at?: string
+  /** Grok only: node's content was merged into the parent level-2 group file. */
+  merged_into_parent?: boolean
 }
 
 interface YandexConfig {
@@ -34,8 +39,13 @@ interface YandexConfig {
   search_index_id?: string
 }
 
+interface GrokConfig {
+  api_key?: string
+}
+
 interface AiConfigStore {
   yandex?: YandexConfig
+  grok?: GrokConfig
   [key: string]: unknown
 }
 
@@ -145,6 +155,44 @@ function parseAiSyncInfoMap(aiSyncInfoJson: string | null): Record<string, AiEng
   }
 }
 
+/**
+ * Returns true if a Grok collapsed group needs to be re-uploaded.
+ *
+ * Triggers:
+ * - No existing file_id on the level-2 node (never uploaded).
+ * - A node with content has no grok sync entry (newly added to the group).
+ * - A node previously merged has been deleted since the last sync.
+ * - A node's content was updated after the last sync.
+ */
+function grokGroupNeedsReupload(
+  l2GrokSync: AiEngineSyncRecord | undefined,
+  groupRows: LoreNodeRow[],
+): boolean {
+  if (!l2GrokSync?.file_id) return true
+
+  const lastSynced = l2GrokSync.last_synced_at
+
+  for (const row of groupRows) {
+    const syncMap = parseAiSyncInfoMap(row.ai_sync_info)
+    const rowGrokSync = syncMap['grok']
+
+    if (row.to_be_deleted === 1) {
+      // Was this node previously included in the group?
+      if (rowGrokSync?.merged_into_parent || rowGrokSync?.file_id) return true
+      continue
+    }
+
+    if (row.word_count > 0) {
+      // New node — never included in any grok sync
+      if (!rowGrokSync) return true
+      // Content updated since last sync
+      if (rowGrokSync.content_updated_at && rowGrokSync.content_updated_at > lastSynced) return true
+    }
+  }
+
+  return false
+}
+
 async function waitForVectorStore(
   client: OpenAI,
   storeId: string,
@@ -187,13 +235,154 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     if (!currentEngine) {
       return res.status(400).json({ error: 'no AI engine configured' })
     }
-    if (currentEngine !== 'yandex') {
+
+    const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
+    if (!engineDef) {
       return res.status(400).json({ error: `Lore sync is not supported for engine '${currentEngine}'` })
     }
 
     let config: AiConfigStore = {}
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
+    }
+
+    // ── Grok sync (collapsed tree, file attachment, no vector store) ──────────
+
+    if (currentEngine === 'grok') {
+      const apiKey = config.grok?.api_key?.trim()
+      if (!apiKey) {
+        return res.status(400).json({ error: 'Grok api_key is required' })
+      }
+
+      const maxFiles = engineDef.maxFilesPerRequest ?? 10
+      const collapseResult = collapseLoreTree(rows, maxFiles)
+
+      if ('error' in collapseResult) {
+        return res.status(400).json({ error: collapseResult.error })
+      }
+
+      const groups = collapseResult
+      const client = createGrokClient(apiKey)
+      const now = new Date().toISOString()
+
+      const idToRow = new Map(rows.map(r => [r.id, r]))
+
+      // Categorise groups
+      interface GrokGroupResult {
+        group: typeof groups[number]
+        action: 'upload' | 'delete' | 'unchanged'
+        newFileId?: string
+      }
+
+      const results: GrokGroupResult[] = []
+
+      for (const group of groups) {
+        const l2Row = idToRow.get(group.level2NodeId)!
+        const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
+        const l2GrokSync = l2SyncMap['grok']
+        const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
+
+        if (!group.hasContent) {
+          results.push({ group, action: 'delete' })
+          continue
+        }
+
+        if (grokGroupNeedsReupload(l2GrokSync, groupRows)) {
+          results.push({ group, action: 'upload' })
+        } else {
+          results.push({ group, action: 'unchanged' })
+        }
+      }
+
+      // Upload / delete
+      for (const result of results) {
+        const { group } = result
+        const l2Row = idToRow.get(group.level2NodeId)!
+        const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
+        const oldFileId = l2SyncMap['grok']?.file_id
+
+        if (result.action === 'delete') {
+          if (oldFileId) {
+            try {
+              await client.files.del(oldFileId)
+            } catch (e: unknown) {
+              if ((e as { status?: number })?.status !== 404) {
+                throw new Error(`Delete Grok file ${oldFileId} for group "${group.level2NodeName}" failed:\n${formatApiError(e)}`)
+              }
+            }
+          }
+        } else if (result.action === 'upload') {
+          // Delete old file first to avoid orphans
+          if (oldFileId) {
+            try {
+              await client.files.del(oldFileId)
+            } catch (e: unknown) {
+              if ((e as { status?: number })?.status !== 404) {
+                throw new Error(`Delete old Grok file ${oldFileId} for group "${group.level2NodeName}" failed:\n${formatApiError(e)}`)
+              }
+            }
+          }
+          try {
+            const uploaded = await client.files.create({
+              file: await toFile(
+                Buffer.from(group.content, 'utf-8'),
+                `lore-group-${group.level2NodeId}.md`,
+                { type: 'text/plain' },
+              ),
+              purpose: 'assistants',
+            })
+            result.newFileId = uploaded.id
+          } catch (e) {
+            throw new Error(`Upload failed for Grok group "${group.level2NodeName}" (id=${group.level2NodeId}):\n${formatApiError(e)}`)
+          }
+        }
+      }
+
+      // Commit to DB
+      const db2 = getDb(dbPath)
+      db2.transaction(() => {
+        const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
+
+        for (const result of results) {
+          const { group, action, newFileId } = result
+          const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
+
+          if (action === 'delete') {
+            for (const row of groupRows) {
+              const existing = parseAiSyncInfoMap(row.ai_sync_info)
+              delete existing['grok']
+              updateStmt.run(JSON.stringify(existing), row.id)
+            }
+          } else if (action === 'upload' && newFileId) {
+            // Level-2 node gets file_id
+            const l2Row = idToRow.get(group.level2NodeId)!
+            const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
+            existing['grok'] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
+            updateStmt.run(JSON.stringify(existing), group.level2NodeId)
+
+            // Descendants get merged_into_parent marker
+            for (const row of groupRows) {
+              if (row.id === group.level2NodeId) continue
+              const existing = parseAiSyncInfoMap(row.ai_sync_info)
+              existing['grok'] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
+              updateStmt.run(JSON.stringify(existing), row.id)
+            }
+          }
+        }
+      })()
+      db2.close()
+
+      const uploaded = results.filter(r => r.action === 'upload').length
+      const deleted = results.filter(r => r.action === 'delete').length
+      const unchanged = results.filter(r => r.action === 'unchanged').length
+
+      return res.json({ ok: true, uploaded, deleted, unchanged, search_index_id: null })
+    }
+
+    // ── Yandex sync (individual file upload + VectorStore) ────────────────────
+
+    if (currentEngine !== 'yandex') {
+      return res.status(400).json({ error: `Lore sync is not supported for engine '${currentEngine}'` })
     }
 
     const apiKey = config.yandex?.api_key?.trim()

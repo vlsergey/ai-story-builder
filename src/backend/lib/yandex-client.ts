@@ -32,11 +32,19 @@ function maskedHeaders(raw: Parameters<typeof fetch>[1]['headers']): Record<stri
   return out
 }
 
-/** Returns a fetch wrapper that logs every Yandex API call to the console. */
-export function makeLoggingFetch(): typeof globalThis.fetch {
+/**
+ * Returns a fetch wrapper that logs every AI API call to the console.
+ *
+ * @param providerName  Label used in log lines, e.g. `'Yandex'` or `'Grok'`.
+ * @param baseUrl       Base URL stripped from logged URLs for brevity.
+ */
+export function makeLoggingFetch(
+  providerName = 'Yandex',
+  baseUrl = YANDEX_BASE,
+): typeof globalThis.fetch {
   return async function loggingFetch(url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> {
     const method = (init?.method ?? 'GET').padEnd(6)
-    const shortUrl = String(url).replace(YANDEX_BASE + '/', '')
+    const shortUrl = String(url).replace(baseUrl + '/', '')
     const start = Date.now()
 
     let reqSize = ''
@@ -51,10 +59,10 @@ export function makeLoggingFetch(): typeof globalThis.fetch {
     }
 
     if (verboseLogging) {
-      console.log(`[Yandex] REQ ${method.trim()} ${shortUrl}`)
-      console.log(`[Yandex] REQ headers: ${JSON.stringify(maskedHeaders(init?.headers))}`)
+      console.log(`[${providerName}] REQ ${method.trim()} ${shortUrl}`)
+      console.log(`[${providerName}] REQ headers: ${JSON.stringify(maskedHeaders(init?.headers))}`)
       if (init?.body && typeof init.body === 'string') {
-        console.log(`[Yandex] REQ body: ${init.body}`)
+        console.log(`[${providerName}] REQ body: ${init.body}`)
       }
     }
 
@@ -62,7 +70,7 @@ export function makeLoggingFetch(): typeof globalThis.fetch {
     try {
       response = await globalThis.fetch(url, init)
     } catch (e) {
-      console.error(`[Yandex] ${method} ${shortUrl}${reqSize} — ERROR after ${Date.now() - start}ms: ${e}`)
+      console.error(`[${providerName}] ${method} ${shortUrl}${reqSize} — ERROR after ${Date.now() - start}ms: ${e}`)
       throw e
     }
 
@@ -71,11 +79,11 @@ export function makeLoggingFetch(): typeof globalThis.fetch {
     const respSize = contentLength ? ` resp:${contentLength}B` : ''
     const traceId = response.headers.get('x-server-trace-id') ?? ''
     const traceStr = traceId ? ` trace:${traceId}` : ''
-    console.log(`[Yandex] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`)
+    console.log(`[${providerName}] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`)
 
     if (verboseLogging) {
       response.clone().text().then(body => {
-        console.log(`[Yandex] RESP body: ${body}`)
+        console.log(`[${providerName}] RESP body: ${body}`)
       }).catch(() => {})
     }
 

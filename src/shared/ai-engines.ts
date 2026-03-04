@@ -72,6 +72,12 @@ export interface AiEngineDefinition {
   capabilities: AiEngineCapabilities
   ageRating: AgeRating
   configFields: AiEngineConfigField[]
+  /**
+   * Maximum number of files that can be attached to a single request, or null if unlimited.
+   * When set and the engine supports fileUpload + fileAttachment, the lore tree is collapsed
+   * to at most this many files before uploading (level-2 collapse).
+   */
+  maxFilesPerRequest: number | null
 }
 
 /** Capability keys in display order. Labels and descriptions are in i18n locale files. */
@@ -97,6 +103,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
     configFields: [
       { key: 'api_key', type: 'password' },
     ],
+    maxFilesPerRequest: 10,
   },
   {
     id: 'yandex',
@@ -112,6 +119,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       { key: 'api_key',   type: 'password' },
       { key: 'folder_id', type: 'text' },
     ],
+    maxFilesPerRequest: null,
   },
 ]
 
