@@ -62,6 +62,7 @@ function yandexHeaders(apiKey: string, folderId: string): Record<string, string>
 }
 
 async function uploadFile(apiKey: string, folderId: string, name: string, text: string): Promise<string> {
+  const url = 'https://llm.api.cloud.yandex.net/files/v1/files'
   const formData = new FormData()
   const blob = new Blob([text], { type: 'text/plain' })
   formData.append('content', blob, `${name}.txt`)
@@ -69,38 +70,40 @@ async function uploadFile(apiKey: string, folderId: string, name: string, text: 
   formData.append('name', `${name}.txt`)
   formData.append('folderId', folderId)
 
-  const r = await fetch('https://llm.api.cloud.yandex.net/files/v1/files', {
+  const r = await fetch(url, {
     method: 'POST',
     headers: yandexHeaders(apiKey, folderId),
     body: formData,
   })
   if (!r.ok) {
     const body = await r.text()
-    throw new Error(`Upload failed (HTTP ${r.status}): ${body}`)
+    throw new Error(`POST ${url} → HTTP ${r.status} (folder_id=${folderId})\n${body.trim()}`)
   }
   const data = await r.json() as { id: string }
   return data.id
 }
 
 async function deleteFile(apiKey: string, folderId: string, fileId: string): Promise<void> {
-  const r = await fetch(`https://llm.api.cloud.yandex.net/files/v1/files/${fileId}`, {
+  const url = `https://llm.api.cloud.yandex.net/files/v1/files/${fileId}`
+  const r = await fetch(url, {
     method: 'DELETE',
     headers: yandexHeaders(apiKey, folderId),
   })
   if (!r.ok && r.status !== 404) {
     const body = await r.text()
-    throw new Error(`Delete file failed (HTTP ${r.status}): ${body}`)
+    throw new Error(`DELETE ${url} → HTTP ${r.status}\n${body.trim()}`)
   }
 }
 
 async function deleteSearchIndex(apiKey: string, folderId: string, indexId: string): Promise<void> {
-  const r = await fetch(`https://llm.api.cloud.yandex.net/searchindex/v1/searchindex/${indexId}`, {
+  const url = `https://llm.api.cloud.yandex.net/searchindex/v1/searchindex/${indexId}`
+  const r = await fetch(url, {
     method: 'DELETE',
     headers: yandexHeaders(apiKey, folderId),
   })
   if (!r.ok && r.status !== 404) {
     const body = await r.text()
-    throw new Error(`Delete search index failed (HTTP ${r.status}): ${body}`)
+    throw new Error(`DELETE ${url} → HTTP ${r.status}\n${body.trim()}`)
   }
 }
 
@@ -109,25 +112,26 @@ async function pollOperation(
   folderId: string,
   operationId: string,
 ): Promise<Record<string, unknown>> {
+  const url = `https://llm.api.cloud.yandex.net/operations/${operationId}`
   const start = Date.now()
   while (Date.now() - start < POLL_CONFIG.timeoutMs) {
-    const r = await fetch(`https://llm.api.cloud.yandex.net/operations/${operationId}`, {
+    const r = await fetch(url, {
       headers: yandexHeaders(apiKey, folderId),
     })
     if (!r.ok) {
       const body = await r.text()
-      throw new Error(`Poll operation failed (HTTP ${r.status}): ${body}`)
+      throw new Error(`GET ${url} → HTTP ${r.status}\n${body.trim()}`)
     }
     const data = await r.json() as Record<string, unknown>
     if (data['done']) {
       if (data['error']) {
-        throw new Error(`Operation failed: ${JSON.stringify(data['error'])}`)
+        throw new Error(`Operation ${operationId} failed: ${JSON.stringify(data['error'])}`)
       }
       return data
     }
     await new Promise(resolve => setTimeout(resolve, POLL_CONFIG.intervalMs))
   }
-  throw new Error('SearchIndex creation timed out')
+  throw new Error(`SearchIndex creation timed out after ${POLL_CONFIG.timeoutMs / 1000}s (operation ${operationId})`)
 }
 
 async function createAndWaitForSearchIndex(
@@ -135,7 +139,8 @@ async function createAndWaitForSearchIndex(
   folderId: string,
   fileIds: string[]
 ): Promise<string> {
-  const r = await fetch('https://llm.api.cloud.yandex.net/searchindex/v1/searchindex', {
+  const url = 'https://llm.api.cloud.yandex.net/searchindex/v1/searchindex'
+  const r = await fetch(url, {
     method: 'POST',
     headers: {
       ...yandexHeaders(apiKey, folderId),
@@ -150,7 +155,7 @@ async function createAndWaitForSearchIndex(
   })
   if (!r.ok) {
     const body = await r.text()
-    throw new Error(`Create search index failed (HTTP ${r.status}): ${body}`)
+    throw new Error(`POST ${url} → HTTP ${r.status} (folder_id=${folderId})\n${body.trim()}`)
   }
   const operation = await r.json() as { id: string; done?: boolean; response?: { id: string } }
 
@@ -273,8 +278,12 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     // Step 4 — upload files
     const newFileIds = new Map<number, string>()
     for (const node of toUpload) {
-      const fileId = await uploadFile(apiKey, folderId, node.name, node.content)
-      newFileIds.set(node.id, fileId)
+      try {
+        const fileId = await uploadFile(apiKey, folderId, node.name, node.content)
+        newFileIds.set(node.id, fileId)
+      } catch (e) {
+        throw new Error(`Upload failed for node "${node.name}" (id=${node.id}):\n${String(e)}`)
+      }
     }
 
     // Step 5 — delete remote files
