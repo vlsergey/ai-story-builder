@@ -8,6 +8,7 @@ export interface LoreNode {
   id: number
   parent_id: number | null
   name: string
+  content: string | null
   position: number
   status: string
   /** 1 = marked for deletion, 0 = active */
@@ -31,6 +32,7 @@ export interface PlanNodeTree {
   id: number
   parent_id: number | null
   title: string
+  content: string | null
   position: number
   created_at: string
   children: PlanNodeTree[]

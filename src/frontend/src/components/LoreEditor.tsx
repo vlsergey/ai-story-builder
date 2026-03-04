@@ -1,92 +1,116 @@
-import React, { useEffect, useState } from 'react'
-import DiffViewer from './DiffViewer'
-import { Button } from './ui/button'
-import { Textarea } from './ui/textarea'
-import { LoreNode, LoreVersion } from '../types/models'
+import React, { useEffect, useRef, useState } from 'react'
+import CodeMirror from '@uiw/react-codemirror'
+import { markdown } from '@codemirror/lang-markdown'
+import { useTheme } from '../lib/theme/theme-provider'
 
-// Minimal markdown editor for lore node versions.
-export default function LoreEditor({ loreNode }: { loreNode: LoreNode }) {
-  const [latest, setLatest] = useState<LoreVersion | null>(null)
-  const [content, setContent] = useState<string>('')
-  const [saving, setSaving] = useState<boolean>(false)
-  const [versions, setVersions] = useState<LoreVersion[]>([])
-  const [diffTarget, setDiffTarget] = useState<LoreVersion | null>(null)
-  const [error, setError] = useState<string | null>(null)
+interface LoreEditorProps {
+  nodeId: number
+  /** Dockview panel API — used to update the tab title on rename */
+  panelApi?: { setTitle: (title: string) => void }
+}
 
-  useEffect(() => { loadLatest(); loadVersions() }, [loreNode])
+export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
+  const { resolvedTheme } = useTheme()
+  const [name, setName] = useState('')
+  const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [nameDirty, setNameDirty] = useState(false)
+  const [contentDirty, setContentDirty] = useState(false)
+  const dirty = nameDirty || contentDirty
 
-  function loadVersions() {
-    fetch(`/api/lore/${loreNode.id}/versions`)
-      .then(r => r.json()).then(setVersions).catch(() => setVersions([]))
-  }
+  const nameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function loadLatest() {
-    fetch(`/api/lore/${loreNode.id}/latest`)
+  useEffect(() => {
+    setLoading(true)
+    setNameDirty(false)
+    setContentDirty(false)
+    fetch(`/api/lore/${nodeId}`)
       .then(r => r.json())
-      .then((j: LoreVersion | null) => { setLatest(j); setContent(j ? j.content : '') })
-      .catch(() => { setLatest(null); setContent('') })
-  }
-
-  async function saveNewVersion() {
-    setSaving(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/lore/${loreNode.id}/versions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+      .then((node: { name: string; content: string | null }) => {
+        setName(node.name)
+        setContent(node.content ?? '')
+        setLoading(false)
       })
-      const j = await res.json() as { error?: string }
-      if (res.ok) { loadLatest(); loadVersions() }
-      else setError('Save error: ' + (j.error || JSON.stringify(j)))
-    } catch (e) { setError('Save failed: ' + (e as Error).message) }
-    setSaving(false)
+      .catch(() => setLoading(false))
+  }, [nodeId])
+
+  // Clear timers on unmount
+  useEffect(() => () => {
+    if (nameTimerRef.current) clearTimeout(nameTimerRef.current)
+    if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
+  }, [])
+
+  function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setName(value)
+    setNameDirty(true)
+    if (nameTimerRef.current) clearTimeout(nameTimerRef.current)
+    nameTimerRef.current = setTimeout(() => {
+      if (!value.trim()) { setNameDirty(false); return }
+      fetch(`/api/lore/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: value.trim() }),
+      }).then(() => {
+        panelApi?.setTitle(value.trim())
+        setNameDirty(false)
+      }).catch(() => setNameDirty(false))
+    }, 1000)
   }
 
-  function restoreVersion(versionId: number) {
-    fetch(`/api/lore/restore/${versionId}`, { method: 'POST' })
-      .then(r => r.json())
-      .then(() => { loadLatest(); loadVersions() })
+  function handleContentChange(value: string) {
+    setContent(value)
+    setContentDirty(true)
+    if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
+    contentTimerRef.current = setTimeout(() => {
+      fetch(`/api/lore/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: value }),
+      }).then(() => setContentDirty(false)).catch(() => setContentDirty(false))
+    }, 1000)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span className="text-muted-foreground text-sm">Loading…</span>
+      </div>
+    )
   }
 
   return (
-    <div className="p-4 bg-background">
-      <h3 className="text-xl font-semibold mb-2">{loreNode.name}</h3>
-      {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
-      <div className="mb-4 flex space-x-2">
-        <Button variant="link" className="p-0 h-auto" onClick={loadLatest}>Reload latest</Button>
-        <Button variant="link" className="p-0 h-auto" onClick={saveNewVersion} disabled={saving}>
-          {saving ? 'Saving...' : 'Save new version'}
-        </Button>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Title bar */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+        <input
+          className="flex-1 text-base font-semibold bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5 transition-colors"
+          value={name}
+          onChange={handleNameChange}
+          placeholder="Node name"
+          aria-label="Node name"
+        />
+        <span className="text-xs text-muted-foreground shrink-0 w-14 text-right">
+          {dirty ? 'Saving…' : 'Saved'}
+        </span>
       </div>
-      <Textarea value={content} onChange={e => setContent(e.target.value)} className="h-48 mb-4" />
-      {versions.length > 0 && (
-        <>
-          <h4 className="font-semibold mb-2">History</h4>
-          <ul className="list-disc pl-5 space-y-1">
-            {versions.map(v => (
-              <li key={v.id} className="text-sm">
-                <strong>v{v.version}</strong>{' '}
-                <em className="text-muted-foreground">{v.created_at}</em>
-                <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => setDiffTarget(v)}>diff</Button>
-                <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => restoreVersion(v.id)}>restore</Button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {!latest && (
-        <p className="text-muted-foreground text-sm">No content yet. Start typing and save a version.</p>
-      )}
-      {diffTarget && (
-        <div className="mt-4">
-          <h5 className="font-semibold mb-2">Diff (v{diffTarget.version})</h5>
-          <DiffViewer
-            oldText={versions.find(x => x.version === diffTarget.version - 1)?.content || ''}
-            newText={diffTarget.content}
-          />
-        </div>
-      )}
+      {/* Content editor */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <CodeMirror
+          value={content}
+          height="100%"
+          extensions={[markdown()]}
+          theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
+          onChange={handleContentChange}
+          className="h-full text-sm"
+          basicSetup={{
+            lineNumbers: false,
+            foldGutter: false,
+            highlightActiveLine: true,
+          }}
+        />
+      </div>
     </div>
   )
 }

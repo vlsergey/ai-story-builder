@@ -42,6 +42,27 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
 
+  /** Opens (or activates) a lore-editor tab for the given node in the center group. */
+  function openLoreEditor(node: LoreNode) {
+    const api = dockviewRef.current
+    if (!api) return
+    const panelId = `lore-editor-${node.id}`
+    // If already open, just bring it to the front
+    const existing = api.getPanel(panelId)
+    if (existing) { existing.api.setActive(); return }
+    // Find best target group: existing editor panels > empty (watermark) group > no ref
+    const editorGroup: any =
+      api.groups.find((g: any) => g.panels.some((p: any) => p.id.startsWith('lore-editor-'))) ??
+      api.groups.find((g: any) => g.panels.length === 0)
+    api.addPanel({
+      id: panelId,
+      component: 'lore-editor',
+      title: node.name,
+      params: { nodeId: node.id },
+      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
+    })
+  }
+
   // Load saved theme preference from the project settings
   useEffect(() => {
     fetch('/api/settings/ui_theme')
@@ -263,8 +284,12 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
       <div className="p-2 h-full">
         <LoreSection
           onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
+          onOpenLoreNode={openLoreEditor}
         />
       </div>
+    ),
+    'lore-editor': (props: any) => (
+      <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
     plan: () => (
       <div className="p-2 h-full">

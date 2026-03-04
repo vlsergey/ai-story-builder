@@ -26,8 +26,10 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.0",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-menubar": "^1.1.16",
+    "@uiw/react-codemirror": "^4.25.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff": "^5.0.0",

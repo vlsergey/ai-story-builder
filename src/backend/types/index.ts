@@ -4,6 +4,7 @@ export interface LoreNodeRow {
   id: number
   parent_id: number | null
   name: string
+  content: string | null
   position: number
   status: string
   to_be_deleted: number
@@ -23,6 +24,7 @@ export interface PlanNodeRow {
   id: number
   parent_id: number | null
   title: string
+  content: string | null
   position: number
   created_at: string
 }

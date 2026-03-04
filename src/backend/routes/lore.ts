@@ -157,15 +157,39 @@ router.post('/reorder-children', express.json(), (req: Request, res: Response) =
   }
 })
 
-// PATCH /lore/:id — rename a node
-router.patch('/:id', express.json(), (req: Request, res: Response) => {
-  const { name } = req.body as { name?: string }
+// GET /lore/:id — fetch a single node (including content)
+router.get('/:id', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
-  if (!dbPath || !name?.trim()) return res.status(400).json({ error: 'name required and db must be open' })
+  if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   try {
+    const db = new Database(dbPath, { readonly: true })
+    const node = db.prepare('SELECT * FROM lore_nodes WHERE id = ?').get(req.params.id)
+    db.close()
+    if (!node) return res.status(404).json({ error: 'node not found' })
+    res.json(node)
+  } catch (e) {
+    res.status(500).json({ error: String(e) })
+  }
+})
+
+// PATCH /lore/:id — update name and/or content of a node
+router.patch('/:id', express.json(), (req: Request, res: Response) => {
+  const { name, content } = req.body as { name?: string; content?: string }
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) return res.status(400).json({ error: 'no project open' })
+  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  const hasName = typeof name === 'string' && name.trim().length > 0
+  const hasContent = content !== undefined
+  if (!hasName && !hasContent) return res.status(400).json({ error: 'name or content required' })
+  try {
     const db = new Database(dbPath)
-    db.prepare('UPDATE lore_nodes SET name = ? WHERE id = ?').run(name.trim(), req.params.id)
+    const sets: string[] = []
+    const params: (string | null)[] = []
+    if (hasName) { sets.push('name = ?'); params.push(name!.trim()) }
+    if (hasContent) { sets.push('content = ?'); params.push(content!) }
+    params.push(req.params.id)
+    db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
     db.close()
     res.json({ ok: true })
   } catch (e) {

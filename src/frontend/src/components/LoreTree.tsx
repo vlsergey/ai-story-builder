@@ -13,7 +13,7 @@ import 'react-complex-tree/lib/style-modern.css'
 import {
   ChevronRight, ChevronDown,
   Library, BookOpen, ScrollText,
-  Plus, CopyPlus, Pencil, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
+  Plus, CopyPlus, Pencil, SquarePen, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
 } from 'lucide-react'
 import { LoreNode } from '../types/models'
 
@@ -101,7 +101,13 @@ function uniqueName(base: string, existingNames: string[]): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node: LoreNode) => void }) {
+export default function LoreTree({
+  onSelectLoreNode,
+  onOpenLoreNode,
+}: {
+  onSelectLoreNode: (node: LoreNode) => void
+  onOpenLoreNode?: (node: LoreNode) => void
+}) {
   const [tree, setTree] = useState<LoreNode[]>([])
   const [items, setItems] = useState<Record<TreeItemIndex, TreeItem<ItemData>>>({
     root: { index: 'root', isFolder: true, children: [], canMove: false, data: null },
@@ -330,6 +336,13 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
     fetchTree()
   }
 
+  function handleOpen() {
+    if (selectedNodeIds.size !== 1) return
+    const [nodeId] = selectedNodeIds
+    const node = findNode(nodeId, tree)
+    if (node) onOpenLoreNode?.(node)
+  }
+
   async function handleSyncLore() {
     window.alert('AI Engine sync is not yet implemented.\n\nThis will upload all lore to the selected AI Engine and remove items marked for deletion.')
   }
@@ -355,6 +368,7 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
     { id: 'create',    label: 'Create child node',  icon: <Plus size={15} />,        enabled: oneSelected,  execute: handleCreate },
     { id: 'duplicate', label: 'Duplicate',           icon: <CopyPlus size={15} />,    enabled: oneSelected && !onlyRootSelected, execute: handleDuplicate },
     { id: 'rename',    label: 'Rename (F2)',          icon: <Pencil size={15} />,      enabled: oneSelected, execute: handleRename },
+    { id: 'edit',      label: 'Open editor (Enter)', icon: <SquarePen size={15} />,   enabled: oneSelected, execute: handleOpen },
     { id: 'sort-asc',  label: 'Sort children A→Z',  icon: <ArrowUpAZ size={15} />,   enabled: canSort,      execute: handleSortChildren },
     'separator',
     { id: 'import', label: 'Import file as child', icon: <Download size={15} />, enabled: oneSelected, execute: handleImport },
@@ -384,12 +398,20 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'Enter') {
+        const focusedId = viewState['lore-tree']?.focusedItem
+        if (focusedId != null && focusedId !== 'root') {
+          const node = findNode(Number(focusedId), tree)
+          if (node) { e.preventDefault(); onOpenLoreNode?.(node) }
+        }
+        return
+      }
       const cmd = commandsRef.current.find(c => c.shortcut === e.key && c.enabled)
       if (cmd) { e.preventDefault(); void cmd.execute() }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [viewState, tree, onOpenLoreNode])
 
   // ── Toolbar rendering ─────────────────────────────────────────────────────
 
@@ -500,6 +522,7 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
                 >
                   <div
                     {...(context.interactiveElementProps as React.HTMLAttributes<HTMLDivElement>)}
+                    onDoubleClick={() => { if (node) onOpenLoreNode?.(node) }}
                     className={[
                       'flex items-center gap-1 flex-1 cursor-pointer rounded px-1 py-0.5 text-sm select-none',
                       context.isSelected ? 'bg-primary/15 text-primary' :

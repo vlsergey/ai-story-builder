@@ -70,22 +70,34 @@
 Lore of story is stable collection of text organized in folders. Some folders will be created on new project creation, like: locations, abilities, spells, bestiary, characters. There is always a root folder "Story Lore" (can't delete or move it). User can:
 * create new folder
 * move folder (using drag-drop)
-* rename folder
+* rename folder (inline in the tree via F2 or Rename button)
 * delete folder (ask for confirmation)
-* create new file in folder (open MD editor automatically)
+* create new file in folder (opens inline rename immediately)
 * import (upload) files to directory (via Import button in toolbar)
 * export one or more lore items as text files (via Export button in toolbar)
 * rename file
+* open lore item editor (double-click, Enter, or Edit button in toolbar)
 * select multiple files to do batch operations: move/delete/export/drop
 
+#### Lore Editor Tab
+Opening a lore item (double-click / Enter / toolbar Edit button) opens a dedicated editor tab in the **central panel group** (where the watermark is shown initially). Multiple lore items can be open simultaneously as separate tabs. Re-opening an already-open item activates its existing tab.
+
+The lore editor tab contains:
+* **Title field** — single-line input showing the node name. Changes are auto-saved with a ~1 s debounce (no Save button required). Saving the title also updates the dockview tab label.
+* **Content field** — full-height CodeMirror 6 editor with Markdown syntax highlighting. Supports dark and light themes matching the application theme. Changes are auto-saved with a ~1 s debounce. Content is stored in `lore_nodes.content`.
+* **Save indicator** — "Saved" / "Saving…" label in the title bar.
+
 The Lore panel has a toolbar with the following icon buttons:
-* **Create folder** — active when exactly one folder is selected; creates a subfolder inside it
-* **Create item** — active when exactly one folder is selected; creates a new lore item in it
-* **Import** — active when exactly one folder is selected; imports a file as a new lore item (modal in future)
-* **Export** — active when at least one lore item is selected; downloads selected items as text files
-* **Delete** — active when at least one element is selected; marks selected items/folders as `TO_BE_DELETED` in the database (soft-delete). Items and folders with this status are displayed with a strikethrough until the next AI Engine sync removes them permanently. If an item has no versions yet (never saved), it is hard-deleted immediately.
-* **Sync with AI Engine** — always active; synchronises all lore with the selected AI Engine and permanently removes items/folders marked as `TO_BE_DELETED`. Actual behavior depends on engine:
-  * Yandex Cloud AI: upload files to collection / vector storage (replacing existing, so we can refer to those files as single Yandex Cloud AI vector ID)
+* **Create child node** — active when exactly one node is selected; creates a child with a unique default name and immediately starts inline rename
+* **Duplicate** — active when one non-root node is selected
+* **Rename (F2)** — active when one node is selected; starts inline rename in the tree
+* **Open editor (Enter)** — active when one node is selected; opens the editor tab
+* **Sort children A→Z** — active when at least one selected node has more than one child
+* **Import** — active when exactly one node is selected; imports a file as a new child lore item
+* **Export** — active when at least one lore item with content is selected; downloads selected items as text files
+* **Delete / Restore** — active when at least one element is selected; marks selected items as `to_be_deleted = 1` (soft-delete, shown as strikethrough). When all selected items are already marked for deletion, the button switches to **Restore** which clears the flag. Cascades to all descendants.
+* **Sync with AI Engine** — always active; synchronises all lore with the selected AI Engine and permanently removes items marked for deletion. Actual behavior depends on engine:
+  * Yandex Cloud AI: upload files to collection / vector storage (replacing existing)
   * Grok AI: group/concatenate files up to 10 files (usually by folders) and upload as files (remembering IDs)
 * Each lore item should have status: DRAFT (not uploaded to AI engine) / UPLOADED. This status will be different to each supported AI engine (stored separately).
 * When folder or file is deleted locally, it is removed from AI server (Grok/Yandex) during the next lore synchronization.

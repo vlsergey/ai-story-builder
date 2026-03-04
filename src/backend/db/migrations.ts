@@ -13,6 +13,7 @@ const MIGRATIONS: Array<(db: Database) => void> = [
         id             INTEGER PRIMARY KEY,
         parent_id      INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
         name           TEXT NOT NULL,
+        content        TEXT,
         position       INTEGER DEFAULT 0,
         status         TEXT NOT NULL DEFAULT 'ACTIVE',
         to_be_deleted  INTEGER NOT NULL DEFAULT 0,
@@ -34,6 +35,7 @@ const MIGRATIONS: Array<(db: Database) => void> = [
         id        INTEGER PRIMARY KEY,
         parent_id INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
         title     TEXT NOT NULL,
+        content   TEXT,
         position  INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );

@@ -8,7 +8,7 @@
 * Global state: Zustand
 * Server state & caching: TanStack Query (React Query)
 * Forms: React Hook Form + Zod
-* Markdown editor: Tiptap
+* Markdown editor: CodeMirror 6 via `@uiw/react-codemirror` + `@codemirror/lang-markdown` (supports syntax highlighting, dark/light themes)
 * i18n: react-i18next (English + Russian minimum)
 
 ### Core Architecture
