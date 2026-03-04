@@ -12,24 +12,27 @@
  *
  * Age ratings use a 6-level scale loosely inspired by MPAA:
  *   G / PG / 12 / 16 / 18 / NC21
+ *
+ * Display strings (name, notes, field labels/hints, capability labels/descriptions, age rating long labels)
+ * are intentionally absent — they live in the frontend i18n locale files (src/frontend/src/i18n/).
  */
 
 export type AgeRating = 'G' | 'PG' | '12' | '16' | '18' | 'NC21'
 
 export interface AgeRatingInfo {
+  /** Short rating code shown as a badge (e.g. "G", "18+"). Not translated. */
   label: string
-  longLabel: string
   minAge: number
   colorClass: string
 }
 
 export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
-  G:    { label: 'G',     longLabel: 'All Ages',       minAge: 0,  colorClass: 'bg-green-600 text-white' },
-  PG:   { label: 'PG',   longLabel: 'Ages 7+',         minAge: 7,  colorClass: 'bg-lime-600 text-white' },
-  '12': { label: '12+',  longLabel: 'Ages 12+',        minAge: 12, colorClass: 'bg-yellow-500 text-black' },
-  '16': { label: '16+',  longLabel: 'Ages 16+',        minAge: 16, colorClass: 'bg-orange-500 text-white' },
-  '18': { label: '18+',  longLabel: 'Adults Only',     minAge: 18, colorClass: 'bg-red-600 text-white' },
-  NC21: { label: 'NC-21',longLabel: 'Adults Only 21+', minAge: 21, colorClass: 'bg-purple-800 text-white' },
+  G:    { label: 'G',      minAge: 0,  colorClass: 'bg-green-600 text-white' },
+  PG:   { label: 'PG',    minAge: 7,  colorClass: 'bg-lime-600 text-white' },
+  '12': { label: '12+',   minAge: 12, colorClass: 'bg-yellow-500 text-black' },
+  '16': { label: '16+',   minAge: 16, colorClass: 'bg-orange-500 text-white' },
+  '18': { label: '18+',   minAge: 18, colorClass: 'bg-red-600 text-white' },
+  NC21: { label: 'NC-21', minAge: 21, colorClass: 'bg-purple-800 text-white' },
 }
 
 export interface AiEngineCapabilities {
@@ -51,62 +54,32 @@ export interface AiEngineCapabilities {
 
 export interface AiEngineConfigField {
   key: string
-  label: string
   type: 'text' | 'password' | 'textarea'
-  /** Default value shown when no saved value exists. */
+  /** Default value pre-filled in the field when no saved value exists. */
   defaultValue?: string
-  /** Optional help text shown below the field. */
-  hint?: string
 }
 
 export interface AiEngineDefinition {
   id: string
-  name: string
+  /** Provider proper name (e.g. "xAI", "Yandex"). Not translated — it is a brand name. */
   provider: string
   capabilities: AiEngineCapabilities
   ageRating: AgeRating
   configFields: AiEngineConfigField[]
-  notes?: string
 }
 
-/** Capability metadata for display in the UI. */
-export const CAPABILITY_META: Array<{
-  key: keyof AiEngineCapabilities
-  label: string
-  description: string
-}> = [
-  {
-    key: 'fileUpload',
-    label: 'File Upload',
-    description:
-      'Upload documents (PDF, TXT, etc.) to persistent AI storage. Uploaded files can be reused across multiple requests without re-uploading.',
-  },
-  {
-    key: 'fileAttachment',
-    label: 'File Attachment',
-    description:
-      'Reference an uploaded file in a specific request so the model can read its contents directly.',
-  },
-  {
-    key: 'knowledgeBase',
-    label: 'Knowledge Base',
-    description:
-      'Build a searchable vector or hybrid index from uploaded files (RAG — Retrieval-Augmented Generation). Also called: Vector Store, SearchIndex, Collection.',
-  },
-  {
-    key: 'knowledgeBaseAttachment',
-    label: 'Knowledge Base Attachment',
-    description:
-      'Attach a pre-built Knowledge Base (vector store / search index) to a generation request so the model automatically retrieves relevant context from it. ' +
-      'Also called: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).',
-  },
+/** Capability keys in display order. Labels and descriptions are in i18n locale files. */
+export const CAPABILITY_KEYS: Array<keyof AiEngineCapabilities> = [
+  'fileUpload',
+  'fileAttachment',
+  'knowledgeBase',
+  'knowledgeBaseAttachment',
 ]
 
 /** Built-in AI engine definitions. */
 export const BUILTIN_ENGINES: AiEngineDefinition[] = [
   {
     id: 'grok',
-    name: 'Grok AI',
     provider: 'xAI',
     ageRating: 'NC21',
     capabilities: {
@@ -116,13 +89,11 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       knowledgeBaseAttachment: false,
     },
     configFields: [
-      { key: 'api_key', label: 'API Key', type: 'password' },
+      { key: 'api_key', type: 'password' },
     ],
-    notes: 'Maximum 10 files per request. No vector/collection search.',
   },
   {
     id: 'yandex',
-    name: 'Yandex Cloud AI',
     provider: 'Yandex',
     ageRating: '12',
     capabilities: {
@@ -132,11 +103,9 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       knowledgeBaseAttachment: true,
     },
     configFields: [
-      { key: 'api_key',   label: 'API Key',   type: 'password' },
-      { key: 'folder_id', label: 'Folder ID', type: 'text',
-        hint: 'Your Yandex Cloud folder ID (e.g. b1gXXXXXXXXXX). Models use URI: gpt://{folder_id}/{model}/latest' },
+      { key: 'api_key',   type: 'password' },
+      { key: 'folder_id', type: 'text' },
     ],
-    notes: 'Subject to Russian Federation content regulations. No LGBTQ+ or political content.',
   },
 ]
 

@@ -1,28 +1,23 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import StartScreen from './pages/StartScreen'
 import Layout from './components/Layout'
-import en from './i18n/en.json'
-import ru from './i18n/ru.json'
 import './styles.css'
 import { ThemeProvider } from './lib/theme/theme-provider'
+import { LocaleProvider } from './lib/locale'
 import { ProjectData } from './types/models'
 
 /**
  * Root application component
  * - Renders initial Start screen where user can open/upload project DB
  * - After opening a project, displays the main `Layout` (left/center/right/bottom panels)
- * - Locale files are simple JSON maps stored in `src/frontend/src/i18n` (can be extended)
+ * - Locale is managed by LocaleProvider (persisted to localStorage)
  */
 export default function App() {
   const navigate = useNavigate()
   const [projectOpen, setProjectOpen] = useState<boolean>(false)
   const [initialLayout, setInitialLayout] = useState<unknown | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [locale, setLocale] = useState<string>('en')
-
-  // Simple locale resolver
-  const localeStrings = useMemo(() => (locale === 'ru' ? ru : en), [locale])
 
   // Check if a project is already open on the server
   useEffect(() => {
@@ -69,27 +64,31 @@ export default function App() {
   if (isLoading) {
     return (
       <ThemeProvider>
-        <div className="app-root h-full flex items-center justify-center">
-          <div className="text-muted-foreground">Loading...</div>
-        </div>
+        <LocaleProvider>
+          <div className="app-root h-full flex items-center justify-center">
+            <div className="text-muted-foreground">Loading...</div>
+          </div>
+        </LocaleProvider>
       </ThemeProvider>
     )
   }
 
   return (
     <ThemeProvider>
-      <div className="app-root h-full">
-        <Routes>
-          <Route path="/" element={<StartScreen onOpenProject={handleOpenProject} localeStrings={localeStrings} />} />
-          <Route path="/project" element={
-            projectOpen ? (
-              <Layout localeStrings={localeStrings} onClose={handleCloseProject} initialLayout={initialLayout} />
-            ) : (
-              <StartScreen onOpenProject={handleOpenProject} localeStrings={localeStrings} />
-            )
-          } />
-        </Routes>
-      </div>
+      <LocaleProvider>
+        <div className="app-root h-full">
+          <Routes>
+            <Route path="/" element={<StartScreen onOpenProject={handleOpenProject} />} />
+            <Route path="/project" element={
+              projectOpen ? (
+                <Layout onClose={handleCloseProject} initialLayout={initialLayout} />
+              ) : (
+                <StartScreen onOpenProject={handleOpenProject} />
+              )
+            } />
+          </Routes>
+        </div>
+      </LocaleProvider>
     </ThemeProvider>
   )
 }

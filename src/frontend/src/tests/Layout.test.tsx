@@ -31,8 +31,12 @@ vi.mock('../lib/theme/theme-provider', () => ({
   useTheme: () => ({ preference: 'auto', resolvedTheme: 'github', setPreference: vi.fn() })
 }));
 
+// Mock locale context used by Layout
+vi.mock('../lib/locale', () => ({
+  useLocale: () => ({ locale: 'en', setLocale: vi.fn(), t: (key: string) => key }),
+}));
+
 const mockProps = {
-  localeStrings: {},
   onClose: vi.fn(),
   initialLayout: null,
 };
@@ -48,6 +52,7 @@ describe('Layout', () => {
       onMenuAction: vi.fn((cb) => { menuActionHandler = cb }),
       removeMenuActionListeners: vi.fn(),
       sendMenuState: vi.fn(),
+      showErrorDialog: vi.fn(),
     }
 
     vi.stubGlobal('fetch', (_url: unknown, opts?: unknown) => {

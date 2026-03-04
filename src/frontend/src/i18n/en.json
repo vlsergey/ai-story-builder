@@ -3,7 +3,47 @@
   "start.recent": "Recent projects",
   "start.no_recent": "No recent projects",
   "start.upload": "Upload project database",
-  "start.upload_btn": "Upload"
-  ,"start.create": "Create new project"
-  ,"start.existing_open": "Project already exists – opening existing"
+  "start.upload_btn": "Upload",
+  "start.create": "Create new project",
+  "start.existing_open": "Project already exists – opening existing",
+  "start.projects_folder": "Projects folder",
+  "start.no_files": "No project files found",
+
+  "settings.loading": "Loading settings…",
+  "settings.textLanguage.title": "Text Language",
+  "settings.textLanguage.description": "Language used in AI-generated story texts and lore items.",
+  "settings.aiEngine.title": "Current AI Engine",
+  "settings.aiEngine.none": "None",
+  "settings.aiEngine.description": "Controls the sync-status icon in the Lore Tree. Required credentials must be saved before activating an engine.",
+  "settings.aiEngine.active": "● active",
+  "settings.aiEngine.by": "by",
+  "settings.testConnection": "Test Connection",
+  "settings.testing": "Testing…",
+  "settings.capabilities": "Capabilities",
+
+  "engine.grok.name": "Grok AI",
+  "engine.grok.notes": "Maximum 10 files per request. No vector/collection search.",
+  "engine.grok.field.api_key.label": "API Key",
+
+  "engine.yandex.name": "Yandex Cloud AI",
+  "engine.yandex.notes": "Subject to Russian Federation content regulations. No LGBTQ+ or political content.",
+  "engine.yandex.field.api_key.label": "API Key",
+  "engine.yandex.field.folder_id.label": "Folder ID",
+  "engine.yandex.field.folder_id.hint": "Your Yandex Cloud folder ID (e.g. b1gXXXXXXXXXX). Models use URI: gpt://{folder_id}/{model}/latest",
+
+  "capability.fileUpload.label": "File Upload",
+  "capability.fileUpload.description": "Upload documents (PDF, TXT, etc.) to persistent AI storage. Uploaded files can be reused across multiple requests without re-uploading.",
+  "capability.fileAttachment.label": "File Attachment",
+  "capability.fileAttachment.description": "Reference an uploaded file in a specific request so the model can read its contents directly.",
+  "capability.knowledgeBase.label": "Knowledge Base",
+  "capability.knowledgeBase.description": "Build a searchable vector or hybrid index from uploaded files (RAG — Retrieval-Augmented Generation). Also called: Vector Store, SearchIndex, Collection.",
+  "capability.knowledgeBaseAttachment.label": "Knowledge Base Attachment",
+  "capability.knowledgeBaseAttachment.description": "Attach a pre-built Knowledge Base (vector store / search index) to a generation request so the model automatically retrieves relevant context from it. Also called: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).",
+
+  "ageRating.G.longLabel": "All Ages",
+  "ageRating.PG.longLabel": "Ages 7+",
+  "ageRating.12.longLabel": "Ages 12+",
+  "ageRating.16.longLabel": "Ages 16+",
+  "ageRating.18.longLabel": "Adults Only",
+  "ageRating.NC21.longLabel": "Adults Only 21+"
 }

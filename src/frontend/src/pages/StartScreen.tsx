@@ -5,7 +5,8 @@ import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus } from
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { ProjectData, LocaleStrings } from '../types/models'
+import { ProjectData } from '../types/models'
+import { useLocale } from '../lib/locale'
 
 /** Returns the project display name from a full filesystem path: basename without extension. */
 function projectDisplayName(fullPath: string): string {
@@ -15,6 +16,7 @@ function projectDisplayName(fullPath: string): string {
 
 function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectData) => void }) {
   const navigate = useNavigate()
+  const { t } = useLocale()
   const [name, setName] = React.useState('MyProject')
   const [textLanguage, setTextLanguage] = React.useState('ru-RU')
   const [busy, setBusy] = React.useState(false)
@@ -74,11 +76,10 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
 
 export default function StartScreen({
   onOpenProject,
-  localeStrings,
 }: {
   onOpenProject: (path: string, data: ProjectData) => void
-  localeStrings: LocaleStrings
 }) {
+  const { t } = useLocale()
   const [recent, setRecent] = useState<string[]>([])
   const [projectsData, setProjectsData] = useState<{ dir: string; files: string[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -145,7 +146,7 @@ export default function StartScreen({
         {/* Recent projects list */}
         <div className="flex-1 overflow-y-auto py-4">
           <p className="px-5 mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-            {localeStrings['start.recent'] || 'Recent'}
+            {t('start.recent')}
           </p>
 
           {error && (
@@ -156,7 +157,7 @@ export default function StartScreen({
 
           {recent.length === 0 ? (
             <p className="px-5 py-2 text-xs text-muted-foreground">
-              {localeStrings['start.no_recent'] || 'No recent projects'}
+              {t('start.no_recent')}
             </p>
           ) : (
             <ul className="space-y-0.5 px-2">
@@ -183,7 +184,7 @@ export default function StartScreen({
         {/* Page header */}
         <div className="px-10 pt-10 pb-8">
           <h2 className="text-2xl font-bold tracking-tight">
-            {localeStrings['start.title'] || 'Open project'}
+            {t('start.title')}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Start a new story or continue an existing one.
@@ -197,7 +198,7 @@ export default function StartScreen({
             <div className="flex items-center gap-2 mb-3">
               <Plus className="h-4 w-4 text-primary flex-shrink-0" />
               <h3 className="text-sm font-semibold">
-                {localeStrings['start.create'] || 'New project'}
+                {t('start.create')}
               </h3>
             </div>
             <CreateNewForm onCreated={(p, data) => onOpenProject(p, data)} />
@@ -210,7 +211,7 @@ export default function StartScreen({
             <div className="flex items-center gap-2 mb-1">
               <FolderOpen className="h-4 w-4 text-primary flex-shrink-0" />
               <h3 className="text-sm font-semibold">
-                {localeStrings['start.projects_folder'] || 'Projects folder'}
+                {t('start.projects_folder')}
               </h3>
               <button
                 onClick={openFolder}
@@ -230,7 +231,7 @@ export default function StartScreen({
 
             {!projectsData || projectsData.files.length === 0 ? (
               <p className="pl-6 text-sm text-muted-foreground">
-                {localeStrings['start.no_files'] || 'No project files found'}
+                {t('start.no_files')}
               </p>
             ) : (
               <ul className="space-y-0.5">

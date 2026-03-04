@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import {
   BUILTIN_ENGINES,
-  CAPABILITY_META,
+  CAPABILITY_KEYS,
   AGE_RATING_INFO,
   type AiEngineDefinition,
 } from '../lib/ai-engines'
 import { dispatchAiEngineChanged } from '../lib/lore-events'
+import { useLocale } from '../lib/locale'
 
 interface ConfigData {
   current_engine: string | null
@@ -19,6 +20,7 @@ interface TestState {
 }
 
 export default function SettingsPanel() {
+  const { t } = useLocale()
   const [config, setConfig] = useState<ConfigData | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
@@ -41,7 +43,7 @@ export default function SettingsPanel() {
         // Use saved values, falling back to field defaultValue if nothing stored yet
         const initialValues: Record<string, Record<string, string>> = {}
         for (const engine of BUILTIN_ENGINES) {
-          const saved = (aiData as Record<string, Record<string, string>>)[engine.id] ?? {}
+          const saved = (aiData as unknown as Record<string, Record<string, string>>)[engine.id] ?? {}
           initialValues[engine.id] = {}
           for (const field of engine.configFields) {
             const stored = saved[field.key] ?? ''
@@ -109,7 +111,7 @@ export default function SettingsPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="text-muted-foreground text-sm">Loading settings…</span>
+        <span className="text-muted-foreground text-sm">{t('settings.loading')}</span>
       </div>
     )
   }
@@ -120,7 +122,7 @@ export default function SettingsPanel() {
 
         {/* ── Text Language ── */}
         <section>
-          <h2 className="text-base font-semibold mb-3">Text Language</h2>
+          <h2 className="text-base font-semibold mb-3">{t('settings.textLanguage.title')}</h2>
           <div className="flex flex-col gap-1.5">
             <select
               value={textLanguage}
@@ -131,31 +133,30 @@ export default function SettingsPanel() {
               <option value="en-US">English (en-US)</option>
             </select>
             <p className="text-xs text-muted-foreground max-w-md">
-              Language used in AI-generated story texts and lore items.
+              {t('settings.textLanguage.description')}
             </p>
           </div>
         </section>
 
         {/* ── Current AI Engine ── */}
         <section>
-          <h2 className="text-base font-semibold mb-3">Current AI Engine</h2>
+          <h2 className="text-base font-semibold mb-3">{t('settings.aiEngine.title')}</h2>
           <div className="flex flex-col gap-1.5">
             <select
               value={currentEngine ?? ''}
               onChange={e => handleEngineSelect(e.target.value || null)}
               className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
             >
-              <option value="">None</option>
+              <option value="">{t('settings.aiEngine.none')}</option>
               {BUILTIN_ENGINES.map(e => (
-                <option key={e.id} value={e.id}>{e.name}</option>
+                <option key={e.id} value={e.id}>{t(`engine.${e.id}.name`)}</option>
               ))}
             </select>
             {engineError && (
               <span className="text-destructive text-xs">{engineError}</span>
             )}
             <p className="text-xs text-muted-foreground max-w-md">
-              Controls the sync-status icon in the Lore Tree.
-              Required credentials must be saved before activating an engine.
+              {t('settings.aiEngine.description')}
             </p>
           </div>
         </section>
@@ -165,6 +166,7 @@ export default function SettingsPanel() {
           const ageInfo = AGE_RATING_INFO[engine.ageRating]
           const testState = testStates[engine.id]
           const isActive = currentEngine === engine.id
+          const engineNotes = t(`engine.${engine.id}.notes`, '')
 
           return (
             <section
@@ -173,14 +175,14 @@ export default function SettingsPanel() {
             >
               {/* Header */}
               <div className="flex items-center gap-2 mb-4">
-                <h3 className="text-sm font-semibold">{engine.name}</h3>
-                <span className="text-xs text-muted-foreground">by {engine.provider}</span>
+                <h3 className="text-sm font-semibold">{t(`engine.${engine.id}.name`)}</h3>
+                <span className="text-xs text-muted-foreground">{t('settings.aiEngine.by')} {engine.provider}</span>
                 {isActive && (
-                  <span className="text-xs text-primary font-medium">● active</span>
+                  <span className="text-xs text-primary font-medium">{t('settings.aiEngine.active')}</span>
                 )}
                 <span
                   className={`ml-auto text-xs font-bold px-1.5 py-0.5 rounded ${ageInfo.colorClass}`}
-                  title={ageInfo.longLabel}
+                  title={t(`ageRating.${engine.ageRating}.longLabel`)}
                 >
                   {ageInfo.label}
                 </span>
@@ -192,6 +194,8 @@ export default function SettingsPanel() {
                   const fieldKey = `${engine.id}_${field.key}`
                   const shown = showField[fieldKey]
                   const value = formValues[engine.id]?.[field.key] ?? field.defaultValue ?? ''
+                  const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label`)
+                  const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint`, '')
                   const updateValue = (v: string) =>
                     setFormValues(prev => ({
                       ...prev,
@@ -199,7 +203,7 @@ export default function SettingsPanel() {
                     }))
                   return (
                     <div key={field.key} className="flex flex-col gap-0.5">
-                      <label className="text-xs text-muted-foreground">{field.label}</label>
+                      <label className="text-xs text-muted-foreground">{fieldLabel}</label>
                       {field.type === 'textarea' ? (
                         <textarea
                           value={value}
@@ -207,7 +211,7 @@ export default function SettingsPanel() {
                           onChange={e => updateValue(e.target.value)}
                           onBlur={e => saveField(engine.id, field.key, e.target.value)}
                           className="text-sm border border-border rounded px-2 py-1 bg-background font-mono resize-y"
-                          placeholder={field.defaultValue ?? field.label}
+                          placeholder={field.defaultValue ?? fieldLabel}
                           spellCheck={false}
                         />
                       ) : (
@@ -221,7 +225,7 @@ export default function SettingsPanel() {
                               if (e.key === 'Enter') saveField(engine.id, field.key, value)
                             }}
                             className="flex-1 text-sm border border-border rounded px-2 py-1 bg-background"
-                            placeholder={field.label}
+                            placeholder={fieldLabel}
                             spellCheck={false}
                             autoComplete="off"
                           />
@@ -238,8 +242,8 @@ export default function SettingsPanel() {
                           )}
                         </div>
                       )}
-                      {field.hint && (
-                        <p className="text-xs text-muted-foreground">{field.hint}</p>
+                      {fieldHint && (
+                        <p className="text-xs text-muted-foreground">{fieldHint}</p>
                       )}
                     </div>
                   )
@@ -254,7 +258,7 @@ export default function SettingsPanel() {
                   disabled={testState?.loading}
                   className="text-xs px-3 py-1 border border-border rounded hover:bg-muted disabled:opacity-50"
                 >
-                  {testState?.loading ? 'Testing…' : 'Test Connection'}
+                  {testState?.loading ? t('settings.testing') : t('settings.testConnection')}
                 </button>
                 {testState?.result && (
                   <span
@@ -269,12 +273,12 @@ export default function SettingsPanel() {
 
               {/* Capabilities */}
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Capabilities</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">{t('settings.capabilities')}</p>
                 <div className="flex flex-col gap-1.5">
-                  {CAPABILITY_META.map(cap => {
-                    const supported = engine.capabilities[cap.key]
+                  {CAPABILITY_KEYS.map(capKey => {
+                    const supported = engine.capabilities[capKey]
                     return (
-                      <div key={cap.key} className="flex items-start gap-2">
+                      <div key={capKey} className="flex items-start gap-2">
                         <span
                           className={`text-sm leading-tight mt-0.5 ${
                             supported ? 'text-green-600' : 'text-muted-foreground/40'
@@ -289,9 +293,9 @@ export default function SettingsPanel() {
                               supported ? '' : 'text-muted-foreground/60'
                             }`}
                           >
-                            {cap.label}
+                            {t(`capability.${capKey}.label`)}
                           </p>
-                          <p className="text-xs text-muted-foreground">{cap.description}</p>
+                          <p className="text-xs text-muted-foreground">{t(`capability.${capKey}.description`)}</p>
                         </div>
                       </div>
                     )
@@ -300,8 +304,8 @@ export default function SettingsPanel() {
               </div>
 
               {/* Engine notes */}
-              {engine.notes && (
-                <p className="text-xs text-muted-foreground mt-3 italic">{engine.notes}</p>
+              {engineNotes && (
+                <p className="text-xs text-muted-foreground mt-3 italic">{engineNotes}</p>
               )}
             </section>
           )

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react'
 import { DockviewReact, DockviewDefaultTab } from 'dockview'
 import { useTheme } from '../lib/theme/theme-provider'
+import { useLocale } from '../lib/locale'
 
 // Import the dockview styles
 import 'dockview/dist/styles/dockview.css'
@@ -12,7 +13,7 @@ import LoreEditor from './LoreEditor'
 import LoreWizard from './LoreWizard'
 import PlanEditor from './PlanEditor'
 import SettingsPanel from './SettingsPanel'
-import { LoreNode, PlanNodeTree, LocaleStrings, ThemePreference } from '../types/models'
+import { LoreNode, PlanNodeTree, ThemePreference } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
 
@@ -39,12 +40,13 @@ const WelcomeWatermark = () => (
  * This implementation uses dockview for a fully dockable, resizable interface.
  * Each area is a placeholder component with descriptive comments to make extension straightforward.
  */
-export default function Layout({ localeStrings, onClose, initialLayout }: { localeStrings: LocaleStrings; onClose: () => void; initialLayout: unknown | null }) {
+export default function Layout({ onClose, initialLayout }: { onClose: () => void; initialLayout: unknown | null }) {
   // Use local state to track selected lore item and pass dbPath into child components
   const [selectedLoreNode, setSelectedLoreNode] = React.useState<LoreNode | null>(null)
   const [selectedPlanNode, setSelectedPlanNode] = React.useState<PlanNodeTree | null>(null)
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
+  const { setLocale } = useLocale()
 
   /** Opens (or activates) the Settings singleton tab in the editor group. */
   function openSettings() {
@@ -291,10 +293,10 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   }
 
   // Native-menu IPC listener.
-  // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
+  // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>', 'set-locale:<value>'
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, openSettings })
-  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, openSettings }
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, setLocale, openSettings })
+  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, setLocale, openSettings }
 
   useEffect(() => {
     if (!window.electronAPI) return
@@ -307,6 +309,8 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
         menuActionsRef.current.onClose()
       } else if (action.startsWith('set-theme:')) {
         menuActionsRef.current.setPreference(action.slice(10) as ThemePreference)
+      } else if (action.startsWith('set-locale:')) {
+        menuActionsRef.current.setLocale(action.slice(11))
       }
     })
     return () => { window.electronAPI?.removeMenuActionListeners() }

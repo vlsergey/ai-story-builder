@@ -9,6 +9,9 @@ let wordWrapMenuItem = null
 /** References to the "Show in Lore Tree" radio items, keyed by mode value. */
 let loreStatMenuItems = {}
 
+/** References to the Language radio items, keyed by locale code. */
+let localeMenuItems = {}
+
 const isDev = process.env.NODE_ENV === 'development'
 
 // Stored once the server (or dev Vite) is ready, reused on macOS re-activate.
@@ -43,6 +46,15 @@ function buildApplicationMenu() {
     }
   }
 
+  for (const [locale, label] of [['en', 'English'], ['ru', 'Русский']]) {
+    localeMenuItems[locale] = {
+      type: 'radio',
+      label,
+      checked: locale === 'en', // default; renderer syncs the real value on startup
+      click: () => sendMenuAction(`set-locale:${locale}`),
+    }
+  }
+
   const viewSubmenu = [
     {
       label: 'Settings',
@@ -68,6 +80,10 @@ function buildApplicationMenu() {
         { label: 'Obsidian (dark)', click: () => sendMenuAction('set-theme:obsidian') },
         { label: 'GitHub (light)',  click: () => sendMenuAction('set-theme:github') },
       ],
+    },
+    {
+      label: 'Language',
+      submenu: Object.values(localeMenuItems),
     },
   ]
 
@@ -172,6 +188,10 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
   } else if (key === 'lore-stat') {
     for (const [mode, item] of Object.entries(loreStatMenuItems)) {
       item.checked = mode === value
+    }
+  } else if (key === 'locale') {
+    for (const [locale, item] of Object.entries(localeMenuItems)) {
+      item.checked = locale === value
     }
   }
 })

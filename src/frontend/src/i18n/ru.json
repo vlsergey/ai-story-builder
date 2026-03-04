@@ -5,5 +5,45 @@
   "start.upload": "Загрузить базу проекта",
   "start.upload_btn": "Загрузить",
   "start.create": "Создать новый проект",
-  "start.existing_open": "Проект уже существует – открывается существующий"
+  "start.existing_open": "Проект уже существует – открывается существующий",
+  "start.projects_folder": "Папка проектов",
+  "start.no_files": "Файлы проектов не найдены",
+
+  "settings.loading": "Загрузка настроек…",
+  "settings.textLanguage.title": "Язык текстов",
+  "settings.textLanguage.description": "Язык AI-сгенерированных текстов истории и элементов лора.",
+  "settings.aiEngine.title": "Текущий AI движок",
+  "settings.aiEngine.none": "Не выбран",
+  "settings.aiEngine.description": "Управляет иконкой синхронизации в дереве лора. Необходимые учётные данные должны быть сохранены перед активацией движка.",
+  "settings.aiEngine.active": "● активен",
+  "settings.aiEngine.by": "от",
+  "settings.testConnection": "Проверить соединение",
+  "settings.testing": "Проверка…",
+  "settings.capabilities": "Возможности",
+
+  "engine.grok.name": "Grok AI",
+  "engine.grok.notes": "Максимум 10 файлов на запрос. Без поиска по вектору/коллекции.",
+  "engine.grok.field.api_key.label": "API ключ",
+
+  "engine.yandex.name": "Yandex Cloud AI",
+  "engine.yandex.notes": "Регулируется законодательством РФ о контенте. Без ЛГБТК+ или политического контента.",
+  "engine.yandex.field.api_key.label": "API ключ",
+  "engine.yandex.field.folder_id.label": "Folder ID",
+  "engine.yandex.field.folder_id.hint": "Ваш ID папки Yandex Cloud (напр. b1gXXXXXXXXXX). Модели используют URI: gpt://{folder_id}/{model}/latest",
+
+  "capability.fileUpload.label": "Загрузка файлов",
+  "capability.fileUpload.description": "Загрузка документов (PDF, TXT и др.) в постоянное хранилище AI. Загруженные файлы можно использовать повторно в нескольких запросах без повторной загрузки.",
+  "capability.fileAttachment.label": "Прикрепление файлов",
+  "capability.fileAttachment.description": "Ссылка на загруженный файл в конкретном запросе для прямого чтения содержимого моделью.",
+  "capability.knowledgeBase.label": "База знаний",
+  "capability.knowledgeBase.description": "Построение поискового векторного или гибридного индекса из загруженных файлов (RAG — Retrieval-Augmented Generation). Также называется: Vector Store, SearchIndex, Collection.",
+  "capability.knowledgeBaseAttachment.label": "Прикрепление базы знаний",
+  "capability.knowledgeBaseAttachment.description": "Прикрепление готовой базы знаний (векторного хранилища / поискового индекса) к запросу генерации для автоматического извлечения релевантного контекста. Также называется: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).",
+
+  "ageRating.G.longLabel": "Все возрасты",
+  "ageRating.PG.longLabel": "С 7 лет",
+  "ageRating.12.longLabel": "С 12 лет",
+  "ageRating.16.longLabel": "С 16 лет",
+  "ageRating.18.longLabel": "Только взрослые",
+  "ageRating.NC21.longLabel": "Только для взрослых 21+"
 }
