@@ -279,9 +279,9 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
 
   async function handleSortChildren() {
     await Promise.all(
-      [...selectedNodeIds].map(id =>
-        fetch(`/api/lore_nodes/${id}/sort-children`, { method: 'POST' })
-      )
+      [...selectedNodeIds]
+        .filter(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
+        .map(id => fetch(`/api/lore_nodes/${id}/sort-children`, { method: 'POST' }))
     )
     fetchTree()
   }
@@ -303,6 +303,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
 
   const oneSelected = selectedNodeIds.size === 1
   const anySelected = selectedNodeIds.size >= 1
+  const canSort = [...selectedNodeIds].some(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
   const hasContent = anySelected && [...selectedNodeIds].some(id => findNode(id, tree)?.latest_version_status !== null)
   const deletableCount = [...selectedNodeIds].filter(id => findNode(id, tree)?.parent_id !== null).length
   const canDelete = deletableCount > 0
@@ -314,7 +315,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     { id: 'create',    label: 'Create child node',  icon: <Plus size={15} />,        enabled: oneSelected,  execute: handleCreate },
     { id: 'duplicate', label: 'Duplicate',           icon: <CopyPlus size={15} />,    enabled: oneSelected && !onlyRootSelected, execute: handleDuplicate },
     { id: 'rename',    label: 'Rename (F2)',          icon: <Pencil size={15} />,      enabled: oneSelected, execute: handleRename },
-    { id: 'sort-asc',  label: 'Sort children A→Z',  icon: <ArrowUpAZ size={15} />,   enabled: anySelected,  execute: handleSortChildren },
+    { id: 'sort-asc',  label: 'Sort children A→Z',  icon: <ArrowUpAZ size={15} />,   enabled: canSort,      execute: handleSortChildren },
     'separator',
     { id: 'import', label: 'Import file as child', icon: <Upload size={15} />,   enabled: oneSelected, execute: handleImport },
     { id: 'export', label: 'Export selected',      icon: <Download size={15} />, enabled: hasContent,  execute: handleExport },
