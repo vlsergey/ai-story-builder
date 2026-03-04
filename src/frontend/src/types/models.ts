@@ -9,8 +9,9 @@ export interface LoreNode {
   parent_id: number | null
   name: string
   position: number
-  /** Node deletion status: 'ACTIVE' | 'TO_BE_DELETED' */
   status: string
+  /** 1 = marked for deletion, 0 = active */
+  to_be_deleted: number
   /** Status of the latest lore_version, null if no versions exist */
   latest_version_status: string | null
   created_at: string

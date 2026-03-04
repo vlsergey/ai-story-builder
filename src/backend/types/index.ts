@@ -6,6 +6,7 @@ export interface LoreNodeRow {
   name: string
   position: number
   status: string
+  to_be_deleted: number
   created_at: string
 }
 

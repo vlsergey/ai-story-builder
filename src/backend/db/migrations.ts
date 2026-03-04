@@ -10,12 +10,13 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       -- A node with children acts as a folder; a node with versions holds content.
       -- There is no separate node_type — behaviour emerges from usage.
       CREATE TABLE lore_nodes (
-        id         INTEGER PRIMARY KEY,
-        parent_id  INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
-        name       TEXT NOT NULL,
-        position   INTEGER DEFAULT 0,
-        status     TEXT NOT NULL DEFAULT 'ACTIVE',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        id             INTEGER PRIMARY KEY,
+        parent_id      INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
+        name           TEXT NOT NULL,
+        position       INTEGER DEFAULT 0,
+        status         TEXT NOT NULL DEFAULT 'ACTIVE',
+        to_be_deleted  INTEGER NOT NULL DEFAULT 0,
+        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (parent_id, name)
       );
 

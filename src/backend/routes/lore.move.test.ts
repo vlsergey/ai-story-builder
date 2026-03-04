@@ -58,12 +58,13 @@ function setupDb(): string {
 
   db.exec(`
     CREATE TABLE lore_nodes (
-      id         INTEGER PRIMARY KEY,
-      parent_id  INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
-      name       TEXT NOT NULL,
-      position   INTEGER DEFAULT 0,
-      status     TEXT NOT NULL DEFAULT 'ACTIVE',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      id             INTEGER PRIMARY KEY,
+      parent_id      INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
+      name           TEXT NOT NULL,
+      position       INTEGER DEFAULT 0,
+      status         TEXT NOT NULL DEFAULT 'ACTIVE',
+      to_be_deleted  INTEGER NOT NULL DEFAULT 0,
+      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (parent_id, name)
     );
     INSERT INTO lore_nodes (id, parent_id, name) VALUES
@@ -159,6 +160,22 @@ describe('POST /lore/:id/move — invalid cases', () => {
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/target parent/)
     // node must not have moved
+    expect(parentOf(testDbPath, 3)).toBe(1)
+  })
+
+  it('400 when moving an active node into a to_be_deleted parent', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath)
+    db.prepare('UPDATE lore_nodes SET to_be_deleted = 1 WHERE id = 2').run()
+    db.close()
+
+    // Try to move child-b (3, active) under child-a (2, to_be_deleted)
+    const res = await request(app)
+      .post('/lore/3/move')
+      .send({ parent_id: 2 })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/marked for deletion/)
     expect(parentOf(testDbPath, 3)).toBe(1)
   })
 

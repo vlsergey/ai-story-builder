@@ -37,7 +37,7 @@ router.get('/tree', (_req: Request, res: Response) => {
   try {
     const db = new Database(dbPath, { readonly: true })
     const rows = db.prepare(`
-      SELECT n.id, n.parent_id, n.name, n.position, n.status, n.created_at,
+      SELECT n.id, n.parent_id, n.name, n.position, n.status, n.to_be_deleted, n.created_at,
         (SELECT lv.status FROM lore_versions lv
          WHERE lv.lore_node_id = n.id ORDER BY lv.version DESC LIMIT 1
         ) AS latest_version_status
@@ -173,7 +173,7 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
   }
 })
 
-// DELETE /lore/:id — soft-delete (root node protected)
+// DELETE /lore/:id — mark node and all descendants as to_be_deleted (root protected)
 router.delete('/:id', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -188,7 +188,36 @@ router.delete('/:id', (req: Request, res: Response) => {
       db.close()
       return res.status(403).json({ error: 'root node cannot be deleted' })
     }
-    db.prepare("UPDATE lore_nodes SET status = 'TO_BE_DELETED' WHERE id = ?").run(req.params.id)
+    db.prepare(`
+      WITH RECURSIVE sub AS (
+        SELECT id FROM lore_nodes WHERE id = ?
+        UNION ALL
+        SELECT n.id FROM lore_nodes n INNER JOIN sub s ON n.parent_id = s.id
+      )
+      UPDATE lore_nodes SET to_be_deleted = 1 WHERE id IN (SELECT id FROM sub)
+    `).run(req.params.id)
+    db.close()
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: String(e) })
+  }
+})
+
+// POST /lore/:id/restore — clear to_be_deleted on node and all descendants
+router.post('/:id/restore', (req: Request, res: Response) => {
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) return res.status(400).json({ error: 'no project open' })
+  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  try {
+    const db = new Database(dbPath)
+    db.prepare(`
+      WITH RECURSIVE sub AS (
+        SELECT id FROM lore_nodes WHERE id = ?
+        UNION ALL
+        SELECT n.id FROM lore_nodes n INNER JOIN sub s ON n.parent_id = s.id
+      )
+      UPDATE lore_nodes SET to_be_deleted = 0 WHERE id IN (SELECT id FROM sub)
+    `).run(req.params.id)
     db.close()
     res.json({ ok: true })
   } catch (e) {
@@ -228,8 +257,8 @@ router.post('/:id/move', express.json(), (req: Request, res: Response) => {
 
     // Root node cannot be moved
     const node = db
-      .prepare('SELECT parent_id FROM lore_nodes WHERE id = ?')
-      .get(nodeId) as { parent_id: number | null } | undefined
+      .prepare('SELECT parent_id, to_be_deleted FROM lore_nodes WHERE id = ?')
+      .get(nodeId) as { parent_id: number | null; to_be_deleted: number } | undefined
     if (!node) { db.close(); return res.status(404).json({ error: 'node not found' }) }
     if (node.parent_id === null) { db.close(); return res.status(403).json({ error: 'root node cannot be moved' }) }
 
@@ -238,8 +267,15 @@ router.post('/:id/move', express.json(), (req: Request, res: Response) => {
 
     // Target parent must exist
     if (newParentId !== null) {
-      const target = db.prepare('SELECT id FROM lore_nodes WHERE id = ?').get(newParentId)
+      const target = db
+        .prepare('SELECT id, to_be_deleted FROM lore_nodes WHERE id = ?')
+        .get(newParentId) as { id: number; to_be_deleted: number } | undefined
       if (!target) { db.close(); return res.status(400).json({ error: 'target parent does not exist' }) }
+      // Cannot move an active node into a node marked for deletion
+      if (target.to_be_deleted && !node.to_be_deleted) {
+        db.close()
+        return res.status(400).json({ error: 'cannot move active node into a node marked for deletion' })
+      }
     }
 
     // Cannot move to a descendant (would create a cycle)

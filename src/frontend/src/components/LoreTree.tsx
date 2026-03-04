@@ -13,7 +13,7 @@ import 'react-complex-tree/lib/style-modern.css'
 import {
   ChevronRight, ChevronDown,
   Library, BookOpen, ScrollText,
-  Plus, CopyPlus, Pencil, Upload, Download, Trash2, CloudUpload, ArrowUpAZ,
+  Plus, CopyPlus, Pencil, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
 } from 'lucide-react'
 import { LoreNode } from '../types/models'
 
@@ -313,11 +313,20 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
   }
 
   async function handleDelete() {
-    const toDelete = [...selectedNodeIds].filter(id => findNode(id, tree)?.parent_id !== null)
+    const toDelete = [...selectedNodeIds].filter(id => {
+      const n = findNode(id, tree)
+      return n?.parent_id !== null && !n?.to_be_deleted
+    })
     if (toDelete.length === 0) return
-    if (!window.confirm(`Delete ${toDelete.length} node${toDelete.length > 1 ? 's' : ''}?`)) return
+    if (!window.confirm(`Mark ${toDelete.length} node${toDelete.length > 1 ? 's' : ''} for deletion? All descendants will also be marked.`)) return
     await Promise.all(toDelete.map(id => fetch(`/api/lore/${id}`, { method: 'DELETE' })))
     setViewState(prev => ({ ...prev, 'lore-tree': { ...prev['lore-tree'], selectedItems: [] } }))
+    fetchTree()
+  }
+
+  async function handleRestore() {
+    const toRestore = [...selectedNodeIds].filter(id => findNode(id, tree)?.to_be_deleted)
+    await Promise.all(toRestore.map(id => fetch(`/api/lore/${id}/restore`, { method: 'POST' })))
     fetchTree()
   }
 
@@ -331,9 +340,14 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
   const anySelected = selectedNodeIds.size >= 1
   const canSort = [...selectedNodeIds].some(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
   const hasContent = anySelected && [...selectedNodeIds].some(id => findNode(id, tree)?.latest_version_status !== null)
-  const deletableCount = [...selectedNodeIds].filter(id => findNode(id, tree)?.parent_id !== null).length
+  const deletableCount = [...selectedNodeIds].filter(id => {
+    const n = findNode(id, tree)
+    return n?.parent_id !== null && !n?.to_be_deleted
+  }).length
   const canDelete = deletableCount > 0
   const onlyRootSelected = anySelected && !canDelete
+  // All selected nodes are marked for deletion → show Restore instead of Delete
+  const allSelectedToBeDeleted = anySelected && [...selectedNodeIds].every(id => findNode(id, tree)?.to_be_deleted)
 
   // ── Command registry ──────────────────────────────────────────────────────
 
@@ -346,15 +360,17 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
     { id: 'import', label: 'Import file as child', icon: <Upload size={15} />,   enabled: oneSelected, execute: handleImport },
     { id: 'export', label: 'Export selected',      icon: <Download size={15} />, enabled: hasContent,  execute: handleExport },
     'separator',
-    {
-      id: 'delete',
-      label: onlyRootSelected ? 'Root node cannot be deleted' : 'Delete selected',
-      icon: <Trash2 size={15} />,
-      shortcut: 'Delete',
-      enabled: canDelete,
-      variant: 'destructive',
-      execute: handleDelete,
-    },
+    allSelectedToBeDeleted
+      ? { id: 'restore', label: 'Restore selected', icon: <RotateCcw size={15} />, enabled: true, execute: handleRestore }
+      : {
+          id: 'delete',
+          label: onlyRootSelected ? 'Root node cannot be deleted' : 'Delete selected',
+          icon: <Trash2 size={15} />,
+          shortcut: 'Delete',
+          enabled: canDelete,
+          variant: 'destructive' as const,
+          execute: handleDelete,
+        },
     'spacer',
     { id: 'sync-ai', label: 'Sync lore with AI Engine', icon: <CloudUpload size={15} />, enabled: true, variant: 'primary', execute: handleSyncLore },
   ]
@@ -415,9 +431,17 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
           canDropOnNonFolder
           canReorderItems
           canDrag={items => items.every(i => i.canMove !== false)}
-          canDropAt={(_items, target) =>
-            !(target.targetType === 'between-items' && target.parentItem === 'root')
-          }
+          canDropAt={(droppedItems, target) => {
+            if (target.targetType === 'between-items' && target.parentItem === 'root') return false
+            // Cannot drop active nodes into a to_be_deleted parent
+            const parentKey = target.targetType === 'item' ? target.targetItem
+              : target.targetType === 'between-items' ? target.parentItem : null
+            if (parentKey) {
+              const parentData = items[parentKey]?.data
+              if (parentData?.to_be_deleted && droppedItems.some(i => !i.data?.to_be_deleted)) return false
+            }
+            return true
+          }}
           defaultInteractionMode={InteractionMode.ClickArrowToExpand}
           onSelectItems={handleSelectItems}
           onFocusItem={handleFocusItem}
@@ -461,7 +485,7 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
           renderItem={({ item, depth, children, title, arrow, context }) => {
             const node = item.data
             if (!node) return <>{children}</>
-            const isDeleted = node.status === 'TO_BE_DELETED'
+            const isDeleted = !!node.to_be_deleted
             const hasVersions = node.latest_version_status !== null
             const Icon = node.parent_id === null ? Library : nodeIcon(node)
             return (
