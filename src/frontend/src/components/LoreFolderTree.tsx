@@ -4,6 +4,7 @@ import {
   Tree,
   TreeItem,
   TreeItemIndex,
+  TreeRef,
   DraggingPosition,
   TreeViewState,
   InteractionMode,
@@ -81,7 +82,7 @@ function buildItemsMap(roots: LoreNode[]): Record<TreeItemIndex, TreeItem<ItemDa
         isFolder: (n.children?.length ?? 0) > 0,
         children: n.children?.map(c => c.id) ?? [],
         canMove: n.parent_id !== null,
-        canRename: false,
+        canRename: true,
         data: n,
       }
       if (n.children?.length) walk(n.children)
@@ -103,6 +104,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const treeRef = useRef<TreeRef<ItemData>>(null)
 
   useEffect(() => { fetchTree() }, [])
 
@@ -133,12 +135,24 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   function handleSelectItems(ids: TreeItemIndex[]) {
     setViewState(prev => ({
       ...prev,
-      'lore-tree': { ...prev['lore-tree'], selectedItems: ids },
+      'lore-tree': {
+        ...prev['lore-tree'],
+        selectedItems: ids,
+        // Keep focus in sync with selection so F2 renames the right item
+        focusedItem: ids.length === 1 ? ids[0] : prev['lore-tree']?.focusedItem,
+      },
     }))
     if (ids.length === 1) {
       const node = findNode(Number(ids[0]), tree)
       if (node) onSelectLoreNode(node)
     }
+  }
+
+  function handleFocusItem(item: TreeItem<ItemData>, treeId: string) {
+    setViewState(prev => ({
+      ...prev,
+      [treeId]: { ...prev[treeId], focusedItem: item.index },
+    }))
   }
 
   // ── DnD ───────────────────────────────────────────────────────────────────
@@ -212,14 +226,15 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     fetchTree()
   }
 
-  async function handleRename() {
+  function handleRename() {
     if (selectedNodeIds.size !== 1) return
     const [nodeId] = selectedNodeIds
-    const node = findNode(nodeId, tree)
-    if (!node) return
-    const newName = window.prompt('Rename:', node.name)
-    if (!newName?.trim() || newName.trim() === node.name) return
-    await fetch(`/api/lore_nodes/${nodeId}`, {
+    treeRef.current?.startRenamingItem(nodeId)
+  }
+
+  async function handleInlineRename(item: TreeItem<ItemData>, newName: string) {
+    if (!item.data?.id || !newName.trim() || newName.trim() === item.data.name) return
+    await fetch(`/api/lore_nodes/${item.data.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName.trim() }),
@@ -298,7 +313,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   const toolbarItems: ToolbarItem[] = [
     { id: 'create',    label: 'Create child node',  icon: <Plus size={15} />,        enabled: oneSelected,  execute: handleCreate },
     { id: 'duplicate', label: 'Duplicate',           icon: <CopyPlus size={15} />,    enabled: oneSelected && !onlyRootSelected, execute: handleDuplicate },
-    { id: 'rename',    label: 'Rename',              icon: <Pencil size={15} />,      enabled: oneSelected, shortcut: 'F2', execute: handleRename },
+    { id: 'rename',    label: 'Rename (F2)',          icon: <Pencil size={15} />,      enabled: oneSelected, execute: handleRename },
     { id: 'sort-asc',  label: 'Sort children A→Z',  icon: <ArrowUpAZ size={15} />,   enabled: anySelected,  execute: handleSortChildren },
     'separator',
     { id: 'import', label: 'Import file as child', icon: <Upload size={15} />,   enabled: oneSelected, execute: handleImport },
@@ -378,6 +393,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
           }
           defaultInteractionMode={InteractionMode.ClickArrowToExpand}
           onSelectItems={handleSelectItems}
+          onFocusItem={handleFocusItem}
           onExpandItem={(item, treeId) => {
             setViewState(prev => ({
               ...prev,
@@ -396,7 +412,25 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
               },
             }))
           }}
+          canRename
+          onRenameItem={handleInlineRename}
           onDrop={handleDrop}
+          renderRenameInput={({ inputProps, inputRef, submitButtonProps, submitButtonRef, formProps }) => (
+            <form {...formProps} className="flex items-center gap-1 flex-1 min-w-0">
+              <input
+                {...inputProps}
+                ref={inputRef}
+                className="flex-1 min-w-0 text-sm bg-background border border-primary rounded px-1 outline-none focus:ring-1 focus:ring-primary"
+              />
+              <input
+                {...submitButtonProps}
+                ref={submitButtonRef}
+                type="submit"
+                value="✓"
+                className="text-xs text-primary cursor-pointer hover:text-primary/70"
+              />
+            </form>
+          )}
           renderItem={({ item, depth, children, title, arrow, context }) => {
             const node = item.data
             if (!node) return <>{children}</>
@@ -466,7 +500,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
             />
           )}
         >
-          <Tree treeId="lore-tree" rootItem="root" treeLabel="Lore" />
+          <Tree ref={treeRef} treeId="lore-tree" rootItem="root" treeLabel="Lore" />
         </ControlledTreeEnvironment>
       </div>
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChosen} />
