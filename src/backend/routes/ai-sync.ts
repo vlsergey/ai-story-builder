@@ -57,12 +57,52 @@ function getDb(dbPath: string, readonly = false) {
   return new (Database as typeof import('better-sqlite3'))(dbPath, readonly ? { readonly: true } : undefined)
 }
 
+const YANDEX_BASE = 'https://ai.api.cloud.yandex.net/v1'
+
+function makeLoggingFetch(): typeof globalThis.fetch {
+  return async function loggingFetch(url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const method = (init?.method ?? 'GET').padEnd(6)
+    const shortUrl = String(url).replace(YANDEX_BASE + '/', '')
+    const start = Date.now()
+
+    // Estimate request body size
+    let reqSize = ''
+    if (init?.body) {
+      if (typeof init.body === 'string') {
+        reqSize = ` req:${Buffer.byteLength(init.body, 'utf-8')}B`
+      } else if (Buffer.isBuffer(init.body)) {
+        reqSize = ` req:${(init.body as Buffer).length}B`
+      } else {
+        reqSize = ' req:multipart'
+      }
+    }
+
+    let response: Response
+    try {
+      response = await globalThis.fetch(url, init)
+    } catch (e) {
+      console.error(`[Yandex] ${method} ${shortUrl}${reqSize} — ERROR after ${Date.now() - start}ms: ${e}`)
+      throw e
+    }
+
+    const elapsed = Date.now() - start
+    const contentLength = response.headers.get('content-length')
+    const respSize = contentLength ? ` resp:${contentLength}B` : ''
+    const traceId = response.headers.get('x-server-trace-id') ?? ''
+    const traceStr = traceId ? ` trace:${traceId}` : ''
+    console.log(`[Yandex] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`)
+
+    return response
+  }
+}
+
 function createYandexClient(apiKey: string, folderId: string): OpenAI {
   return new OpenAI({
     apiKey,
-    baseURL: 'https://ai.api.cloud.yandex.net/v1',
+    baseURL: YANDEX_BASE,
     project: folderId,
     defaultHeaders: { 'x-folder-id': folderId },
+    fetch: makeLoggingFetch(),
   })
 }
 
