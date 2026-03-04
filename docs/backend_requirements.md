@@ -32,11 +32,9 @@
   - `POST /api/ai/current-engine` — sets the active engine; validates required fields before accepting; body: `{ engine: string | null }`
   - `POST /api/ai/:engine/test` — tests credentials against the real AI provider API; accepts credentials in request body (unsaved values allowed); uses Node.js native `fetch` (Node 18+)
 - AI engine connection tests use the real provider APIs (not mocked): Grok uses `GET https://api.x.ai/v1/models`; Yandex uses `POST https://llm.api.cloud.yandex.net/foundationModels/v1/tokenize` (the listModels endpoint does not exist in Yandex Foundation Models API)
-- Yandex lore sync API (`POST /api/ai/yandex/sync-lore`):
-  - Uploads changed/new non-empty lore nodes as plain-text files to Yandex Files API; stores `file_id` in each node's `ai_sync_info.yandex`
-  - Deletes remote files for nodes that became empty (`word_count=0`) or are marked `to_be_deleted` and had a previously recorded `file_id`
-  - After all file changes, deletes the old SearchIndex (if one exists) and then creates a new one with all current `file_id`s; polls the async creation operation until `DONE` state before proceeding
-  - Marks nodes as synced and stores the new `search_index_id` in `ai_config.yandex.search_index_id` **only after** the new index is fully created; clears `search_index_id` if creation fails
+- Lore sync API (`POST /api/ai/sync-lore`):
+  - Reads `current_backend` from project settings; returns 400 if no engine is configured or the active engine does not support lore sync
+  - **Yandex adapter**: uploads changed/new non-empty lore nodes as plain-text files to Yandex Files API; stores `file_id` in each node's `ai_sync_info.yandex`; deletes remote files for nodes that became empty (`word_count=0`) or are marked `to_be_deleted`; rebuilds the SearchIndex after every sync; stores the new `search_index_id` in `ai_config.yandex.search_index_id`
   - Returns a progress summary: `{ uploaded, deleted, unchanged, search_index_id }`
 
 ### Development Workflow

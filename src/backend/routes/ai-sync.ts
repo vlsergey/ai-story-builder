@@ -186,16 +186,19 @@ function parseAiSyncInfoMap(aiSyncInfoJson: string | null): Record<string, AiEng
   }
 }
 
-// ─── POST /yandex/sync-lore ───────────────────────────────────────────────────
+// ─── POST /sync-lore ─────────────────────────────────────────────────────────
 
-router.post('/yandex/sync-lore', async (_req: Request, res: Response) => {
+router.post('/sync-lore', async (_req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
   try {
-    // Step 1 — load credentials and full config
+    // Step 1 — load current engine, credentials, and all lore nodes
     const db = getDb(dbPath, true)
+    const engineRow = db
+      .prepare("SELECT value FROM settings WHERE key = 'current_backend'")
+      .get() as { value: string } | undefined
     const configRow = db
       .prepare("SELECT value FROM settings WHERE key = 'ai_config'")
       .get() as { value: string } | undefined
@@ -206,9 +209,19 @@ router.post('/yandex/sync-lore', async (_req: Request, res: Response) => {
       .all() as LoreNodeRow[]
     db.close()
 
+    const currentEngine = engineRow?.value
+    if (!currentEngine) {
+      return res.status(400).json({ error: 'no AI engine configured' })
+    }
+
     let config: AiConfigStore = {}
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
+    }
+
+    // Dispatch to the engine-specific adapter
+    if (currentEngine !== 'yandex') {
+      return res.status(400).json({ error: `Lore sync is not supported for engine '${currentEngine}'` })
     }
 
     const apiKey = config.yandex?.api_key?.trim()

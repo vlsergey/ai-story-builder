@@ -1,5 +1,5 @@
 /**
- * Integration tests for POST /api/ai/yandex/sync-lore
+ * Integration tests for POST /api/ai/sync-lore
  */
 
 import fs from 'fs'
@@ -16,7 +16,7 @@ vi.mock('../db/state.js', () => ({
   getDataDir: () => os.tmpdir(),
 }))
 
-const { default: router, POLL_CONFIG } = await import('./yandex-sync.js')
+const { default: router, POLL_CONFIG } = await import('./ai-sync.js')
 
 const app = express()
 app.use(express.json())
@@ -26,6 +26,7 @@ function setupDb(opts?: {
   apiKey?: string
   folderId?: string
   searchIndexId?: string
+  currentEngine?: string
   nodes?: Array<{
     id?: number
     name: string
@@ -62,6 +63,12 @@ function setupDb(opts?: {
       value TEXT NOT NULL
     );
   `)
+
+  // Insert current engine (defaults to 'yandex' when credentials are provided)
+  const currentEngine = opts?.currentEngine ?? (opts?.apiKey || opts?.folderId ? 'yandex' : undefined)
+  if (currentEngine) {
+    db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', ?)").run(currentEngine)
+  }
 
   // Insert credentials if provided
   if (opts?.apiKey || opts?.folderId) {
@@ -106,26 +113,40 @@ afterEach(() => {
 
 // ─── 1. 400 when no project open ──────────────────────────────────────────────
 
-describe('POST /ai/yandex/sync-lore', () => {
+describe('POST /ai/sync-lore', () => {
   it('returns 400 when no project open', async () => {
     testDbPath = ''
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('no project open')
+  })
+
+  it('returns 400 when no AI engine is configured', async () => {
+    testDbPath = setupDb() // no current_backend in settings
+    const res = await request(app).post('/ai/sync-lore')
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('no AI engine configured')
+  })
+
+  it('returns 400 when current engine does not support lore sync', async () => {
+    testDbPath = setupDb({ currentEngine: 'grok' })
+    const res = await request(app).post('/ai/sync-lore')
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain("not supported for engine 'grok'")
   })
 
   // ─── 2. 400 when credentials missing ────────────────────────────────────────
 
   it('returns 400 when api_key is missing', async () => {
     testDbPath = setupDb({ folderId: 'b1g123' }) // no api_key
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('api_key')
   })
 
   it('returns 400 when folder_id is missing', async () => {
     testDbPath = setupDb({ apiKey: 'AQVN-test' }) // no folder_id
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('folder_id')
   })
@@ -164,7 +185,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
     expect(res.body.uploaded).toBe(0)
@@ -201,7 +222,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
     expect(res.body.uploaded).toBe(1)
@@ -245,7 +266,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.uploaded).toBe(0)
     expect(res.body.unchanged).toBe(1)
@@ -289,7 +310,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.uploaded).toBe(1)
 
@@ -325,7 +346,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE file → success
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.deleted).toBe(1)
     expect(res.body.uploaded).toBe(0)
@@ -369,7 +390,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE file
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.deleted).toBe(1)
 
@@ -417,7 +438,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
     expect(res.body.search_index_id).toBe('new-idx-456')
@@ -462,7 +483,7 @@ describe('POST /ai/yandex/sync-lore', () => {
       .mockResolvedValueOnce({ ok: true, status: 200 }) // DELETE old search index
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
     expect(res.body.search_index_id).toBeNull()
@@ -509,7 +530,7 @@ describe('POST /ai/yandex/sync-lore', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(500)
     expect(res.body.error).toContain('Upload failed')
   })
@@ -553,7 +574,7 @@ describe('POST /ai/yandex/sync-lore', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/sync-lore')
+    const res = await request(app).post('/ai/sync-lore')
 
     POLL_CONFIG.intervalMs = origIntervalMs
     POLL_CONFIG.timeoutMs = origTimeoutMs

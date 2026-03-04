@@ -28,4 +28,6 @@ To keep the project maintainable and scalable, follow these rules:
   * Should backfill existing rows where the new column has a meaningful value that can be derived from existing data.
   * Test fixtures (e.g. `setupDb()` in `*.test.ts` files) must include any new columns so the tests reflect the real schema.
 
+* **Engine-agnostic API endpoints** – API routes must not be tied to a specific AI engine (e.g. no `/api/ai/yandex/…` paths). All engine-specific operations should be exposed through engine-agnostic endpoints (e.g. `POST /api/ai/sync-lore`) that read the `current_backend` value from the project settings and dispatch to the appropriate adapter. This keeps the frontend and route structure independent of which engine is active. Engine-specific logic lives in adapter functions/modules, not in the route path.
+
 These guidelines are part of the project's acceptance criteria and should be reviewed when adding new features.

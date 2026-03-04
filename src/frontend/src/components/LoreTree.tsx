@@ -473,7 +473,7 @@ export default function LoreTree({
     const toSync = collectSyncableIds(tree, currentAiEngine)
     setSyncingIds(toSync.size > 0 ? toSync : new Set(collectAllIds(tree).map(id => id)))
     try {
-      const res = await fetch(`/api/ai/${currentAiEngine}/sync-lore`, { method: 'POST' })
+      const res = await fetch('/api/ai/sync-lore', { method: 'POST' })
       const data = await res.json() as { ok?: boolean; error?: string }
       if (!res.ok || !data.ok) {
         window.alert(`Sync failed: ${data.error ?? 'unknown error'}`)
