@@ -39,7 +39,6 @@ Important keys:
   "yandex": {
     "api_key": "AQVN...",
     "folder_id": "b1gXXXXXXXXXX",
-    "models": "yandexgpt/latest\nyandexgpt/rc\nyandexgpt-lite",
     "search_index_id": "fvtXXXXXXXXXX"
   },
   "custom": {

@@ -146,13 +146,6 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       { key: 'api_key',   label: 'API Key',   type: 'password' },
       { key: 'folder_id', label: 'Folder ID', type: 'text',
         hint: 'Your Yandex Cloud folder ID (e.g. b1gXXXXXXXXXX). Models use URI: gpt://{folder_id}/{model}/latest' },
-      {
-        key: 'models',
-        label: 'Available Models',
-        type: 'textarea',
-        defaultValue: 'yandexgpt/latest\nyandexgpt/rc\nyandexgpt-lite',
-        hint: 'One model path per line. Full URI: gpt://{folder_id}/{model}. See aistudio.yandex.ru/docs for the current list.',
-      },
     ],
     notes: 'Subject to Russian Federation content regulations. No LGBTQ+ or political content.',
   },

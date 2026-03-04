@@ -17,7 +17,6 @@ const YANDEX_BASE = 'https://ai.api.cloud.yandex.net/v1'
 interface YandexConfig {
   api_key?: string
   folder_id?: string
-  models?: string
   search_index_id?: string
 }
 
@@ -81,7 +80,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     `Write the result in Markdown format. Language: ${textLanguage}.\n` +
     `Respond with only the lore content — no explanations, no preamble.`
 
-  const model = config.yandex?.models?.split(',')[0]?.trim() || 'yandexgpt-lite'
+  const model = `gpt://${folderId}/yandexgpt/latest`
   const searchIndexId = config.yandex?.search_index_id
 
   const client = createYandexClient(apiKey, folderId)

@@ -30,7 +30,6 @@ interface AiEngineSyncRecord {
 interface YandexConfig {
   api_key?: string
   folder_id?: string
-  models?: string
   search_index_id?: string
 }
 
