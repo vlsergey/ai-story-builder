@@ -1,7 +1,8 @@
 import express, { Request, Response, Router } from 'express'
-import OpenAI from 'openai'
+import type OpenAI from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
+import { createYandexClient } from '../lib/yandex-client.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -13,8 +14,6 @@ try {
 
 const router: Router = express.Router()
 
-const YANDEX_BASE = 'https://ai.api.cloud.yandex.net/v1'
-
 interface YandexConfig {
   api_key?: string
   folder_id?: string
@@ -24,16 +23,6 @@ interface YandexConfig {
 interface AiConfigStore {
   yandex?: YandexConfig
   [key: string]: unknown
-}
-
-// ─── Client factory ────────────────────────────────────────────────────────
-
-function createYandexClient(apiKey: string, folderId: string): OpenAI {
-  return new OpenAI({
-    apiKey,
-    baseURL: YANDEX_BASE,
-    project: folderId
-  })
 }
 
 // ─── POST /generate-lore ───────────────────────────────────────────────────
@@ -120,7 +109,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
       if (caps?.knowledgeBaseAttachment && searchIndexId) {
         // Path A — KB attachment: pass the pre-built vector store ID so the model
         // automatically retrieves relevant lore context from it.
-        ;(requestParams as Record<string, unknown>)['tools'] = [
+        ;(requestParams as unknown as Record<string, unknown>)['tools'] = [
           { searchIndex: { searchIndexIds: [searchIndexId] } },
         ]
       } else if (caps?.fileAttachment && engineFileIds.length > 0) {
