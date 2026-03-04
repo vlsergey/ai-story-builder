@@ -3,6 +3,7 @@ import type OpenAI from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import { createYandexClient } from '../lib/yandex-client.js'
+import { createGrokClient } from '../lib/grok-client.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -20,8 +21,13 @@ interface YandexConfig {
   search_index_id?: string
 }
 
+interface GrokConfig {
+  api_key?: string
+}
+
 interface AiConfigStore {
   yandex?: YandexConfig
+  grok?: GrokConfig
   [key: string]: unknown
 }
 
@@ -44,7 +50,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   let config: AiConfigStore = {}
   let textLanguage = 'ru-RU'
 
-  // Collect per-engine file IDs from lore nodes (used if KB attachment is unavailable)
+  // Collect per-engine file IDs from lore nodes (for file-attachment path)
   const engineFileIds: string[] = []
 
   try {
@@ -61,7 +67,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     }
     if (langRow?.value) textLanguage = langRow.value
 
-    // Pre-collect uploaded file IDs for the active engine (for file-attachment fallback path)
+    // Collect uploaded file IDs for the active engine
     if (includeExistingLore && engine) {
       const nodes = db.prepare(
         'SELECT ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL AND to_be_deleted = 0 AND word_count > 0'
@@ -80,14 +86,9 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     return res.status(500).json({ error: 'failed to read project settings: ' + String(e) })
   }
 
-  if (engine !== 'yandex') {
+  const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
+  if (!engineDef) {
     return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
-  }
-
-  const apiKey = config.yandex?.api_key?.trim()
-  const folderId = config.yandex?.folder_id?.trim()
-  if (!apiKey || !folderId) {
-    return res.status(400).json({ error: 'Yandex api_key and folder_id are required' })
   }
 
   const systemPrompt =
@@ -95,44 +96,93 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     `Write the result in Markdown format. Language: ${textLanguage}.\n` +
     `Respond with only the lore content — no explanations, no preamble.`
 
-  const model = requestedModel?.trim() || `gpt://${folderId}/yandexgpt/latest`
-  const client = createYandexClient(apiKey, folderId)
+  // ── Yandex ────────────────────────────────────────────────────────────────
 
-  try {
-    const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt.trim() },
-      ],
+  if (engine === 'yandex') {
+    const apiKey = config.yandex?.api_key?.trim()
+    const folderId = config.yandex?.folder_id?.trim()
+    if (!apiKey || !folderId) {
+      return res.status(400).json({ error: 'Yandex api_key and folder_id are required' })
     }
 
-    const tools: unknown[] = []
+    const model = requestedModel?.trim() || `gpt://${folderId}/yandexgpt/latest`
+    const client = createYandexClient(apiKey, folderId)
 
-    if (includeExistingLore) {
-      const caps = BUILTIN_ENGINES.find(e => e.id === engine)?.capabilities
-      const searchIndexId = config.yandex?.search_index_id
-
-      if (caps?.knowledgeBaseAttachment && searchIndexId) {
-        tools.push({ type: 'file_search', file_search: { vector_store_ids: [searchIndexId] } })
+    try {
+      const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt.trim() },
+        ],
       }
-      // fileAttachment fallback path: placeholder for future per-engine implementation.
-    }
 
-    if (webSearch && webSearch !== 'none') {
-      tools.push({ type: 'web_search', web_search: { search_context_size: webSearch } })
-    }
+      const tools: unknown[] = []
 
-    if (tools.length > 0) {
-      ;(requestParams as unknown as Record<string, unknown>)['tools'] = tools
-    }
+      if (includeExistingLore) {
+        const searchIndexId = config.yandex?.search_index_id
+        if (engineDef.capabilities.knowledgeBaseAttachment && searchIndexId) {
+          tools.push({ type: 'file_search', file_search: { vector_store_ids: [searchIndexId] } })
+        }
+      }
 
-    const completion = await client.chat.completions.create(requestParams)
-    const content = completion.choices[0]?.message?.content ?? ''
-    return res.json({ content })
-  } catch (e) {
-    return res.status(500).json({ error: String(e) })
+      if (webSearch && webSearch !== 'none') {
+        tools.push({ type: 'web_search', web_search: { search_context_size: webSearch } })
+      }
+
+      if (tools.length > 0) {
+        ;(requestParams as unknown as Record<string, unknown>)['tools'] = tools
+      }
+
+      const completion = await client.chat.completions.create(requestParams)
+      const content = completion.choices[0]?.message?.content ?? ''
+      return res.json({ content })
+    } catch (e) {
+      return res.status(500).json({ error: String(e) })
+    }
   }
+
+  // ── Grok ──────────────────────────────────────────────────────────────────
+
+  if (engine === 'grok') {
+    const apiKey = config.grok?.api_key?.trim()
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Grok api_key is required' })
+    }
+
+    const maxFiles = engineDef.maxFilesPerRequest ?? 10
+    // Default model — falls back if available_models not cached yet
+    const model = requestedModel?.trim() || 'grok-3'
+    const client = createGrokClient(apiKey)
+
+    try {
+      // Build user message — attach file IDs if lore was synced
+      const attachableFileIds = engineFileIds.slice(0, maxFiles)
+      const userContent: unknown[] = [{ type: 'text', text: prompt.trim() }]
+
+      if (includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
+        for (const fileId of attachableFileIds) {
+          userContent.push({ type: 'file', file: { file_id: fileId } })
+        }
+      }
+
+      const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent as OpenAI.Chat.Completions.ChatCompletionContentPart[] },
+        ],
+      }
+
+      const completion = await client.chat.completions.create(requestParams)
+      const content = completion.choices[0]?.message?.content ?? ''
+      return res.json({ content })
+    } catch (e) {
+      return res.status(500).json({ error: String(e) })
+    }
+  }
+
+  return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
 })
 
 export default router
