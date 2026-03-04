@@ -357,8 +357,8 @@ export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node
     { id: 'rename',    label: 'Rename (F2)',          icon: <Pencil size={15} />,      enabled: oneSelected, execute: handleRename },
     { id: 'sort-asc',  label: 'Sort children A→Z',  icon: <ArrowUpAZ size={15} />,   enabled: canSort,      execute: handleSortChildren },
     'separator',
-    { id: 'import', label: 'Import file as child', icon: <Upload size={15} />,   enabled: oneSelected, execute: handleImport },
-    { id: 'export', label: 'Export selected',      icon: <Download size={15} />, enabled: hasContent,  execute: handleExport },
+    { id: 'import', label: 'Import file as child', icon: <Download size={15} />, enabled: oneSelected, execute: handleImport },
+    { id: 'export', label: 'Export selected',      icon: <Upload size={15} />,   enabled: hasContent,  execute: handleExport },
     'separator',
     allSelectedToBeDeleted
       ? { id: 'restore', label: 'Restore selected', icon: <RotateCcw size={15} />, enabled: true, execute: handleRestore }
