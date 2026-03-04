@@ -3,9 +3,15 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Layout from '../components/Layout';
 
+// Captures the onOpenLoreNode callback so tests can trigger editor opens
+let capturedOnOpenLoreNode: ((node: any) => void) | null = null
+
 // Mock child components that have their own network/state dependencies
 vi.mock('../components/LoreSection', () => ({
-  default: () => <div data-testid="folder-section">Folder Section</div>
+  default: (props: any) => {
+    capturedOnOpenLoreNode = props.onOpenLoreNode
+    return <div data-testid="folder-section">Folder Section</div>
+  }
 }));
 
 vi.mock('../components/PlanSection', () => ({
@@ -37,6 +43,7 @@ describe('Layout', () => {
 
   beforeEach(() => {
     menuActionHandler = null
+    capturedOnOpenLoreNode = null
     window.electronAPI = {
       onMenuAction: vi.fn((cb) => { menuActionHandler = cb }),
       removeMenuActionListeners: vi.fn(),
@@ -107,6 +114,29 @@ describe('Layout', () => {
     await waitFor(() => expect(screen.getByTestId('folder-section')).toBeInTheDocument());
     expect(window.electronAPI!.onMenuAction).toHaveBeenCalled();
   });
+
+  it('tab bar becomes visible in center group when a lore editor is opened', async () => {
+    const { container } = render(<Layout {...mockProps} />)
+    await screen.findByTestId('folder-section')
+
+    const hiddenTabBars = () =>
+      Array.from(container.querySelectorAll<HTMLElement>('.dv-tabs-and-actions-container'))
+        .filter(el => el.style.display === 'none')
+
+    // Before: the empty center (watermark) group has its tab bar hidden
+    expect(hiddenTabBars().length).toBeGreaterThan(0)
+
+    // Simulate opening a lore editor via the LoreSection callback
+    const mockNode = {
+      id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
+      position: 0, status: 'ACTIVE', to_be_deleted: 0,
+      latest_version_status: null, created_at: '', children: [],
+    }
+    act(() => { capturedOnOpenLoreNode?.(mockNode) })
+
+    // After: the center group now has a panel — its tab bar must be visible
+    await waitFor(() => { expect(hiddenTabBars().length).toBe(0) })
+  })
 
   it('saves layout to database when reset-layouts IPC action fires', async () => {
     const fetchSpy = vi.spyOn(global, 'fetch');

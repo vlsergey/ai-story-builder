@@ -240,9 +240,10 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
     dockviewRef.current = event.api
     // Subscribe to layout changes via the api (not a JSX prop)
     event.api.onDidLayoutChange(handleLayoutChange)
-    // When a panel is added to a group, show that group's tab bar and allow drops
-    event.api.onDidAddPanel((e: any) => {
-      const group = e.panel?.group
+    // When a panel is added to a group, show that group's tab bar and allow drops.
+    // dockview fires onDidAddPanel with the panel itself (not { panel: ... }).
+    event.api.onDidAddPanel((panel: any) => {
+      const group = panel?.group
       if (!group) return
       if (group.header?.hidden) group.header.hidden = false
       if (group.locked) group.locked = false
