@@ -9,6 +9,9 @@ let wordWrapMenuItem = null
 /** References to the "Show in Lore Tree" radio items, keyed by mode value. */
 let loreStatMenuItems = {}
 
+/** References to the Theme radio items, keyed by theme value. */
+let themeMenuItems = {}
+
 /** References to the Language radio items, keyed by locale code. */
 let localeMenuItems = {}
 
@@ -46,6 +49,15 @@ function buildApplicationMenu() {
     }
   }
 
+  for (const [theme, label] of [['auto', 'Auto'], ['obsidian', 'Obsidian (dark)'], ['github', 'GitHub (light)']]) {
+    themeMenuItems[theme] = {
+      type: 'radio',
+      label,
+      checked: theme === 'auto', // default; renderer syncs the real value on startup
+      click: () => sendMenuAction(`set-theme:${theme}`),
+    }
+  }
+
   for (const [locale, label] of [['en', 'English'], ['ru', 'Русский']]) {
     localeMenuItems[locale] = {
       type: 'radio',
@@ -75,11 +87,7 @@ function buildApplicationMenu() {
     { type: 'separator' },
     {
       label: 'Theme',
-      submenu: [
-        { label: 'Auto',            click: () => sendMenuAction('set-theme:auto') },
-        { label: 'Obsidian (dark)', click: () => sendMenuAction('set-theme:obsidian') },
-        { label: 'GitHub (light)',  click: () => sendMenuAction('set-theme:github') },
-      ],
+      submenu: Object.values(themeMenuItems),
     },
     {
       label: 'Language',
@@ -188,6 +196,10 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
   } else if (key === 'lore-stat') {
     for (const [mode, item] of Object.entries(loreStatMenuItems)) {
       item.checked = mode === value
+    }
+  } else if (key === 'theme') {
+    for (const [theme, item] of Object.entries(themeMenuItems)) {
+      item.checked = theme === value
     }
   } else if (key === 'locale') {
     for (const [locale, item] of Object.entries(localeMenuItems)) {

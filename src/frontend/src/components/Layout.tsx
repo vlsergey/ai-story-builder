@@ -12,7 +12,7 @@ import LoreEditor from './LoreEditor'
 import LoreWizard from './LoreWizard'
 import PlanEditor from './PlanEditor'
 import SettingsPanel from './SettingsPanel'
-import { LoreNode, PlanNodeTree, ThemePreference } from '../types/models'
+import { LoreNode, PlanNodeTree } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
 
@@ -294,8 +294,8 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
   // Note: 'set-locale:*' is handled in LocaleProvider so it works on the start screen too.
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, setPreference, openSettings })
-  menuActionsRef.current = { handleResetLayouts, onClose, setPreference, openSettings }
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, openSettings })
+  menuActionsRef.current = { handleResetLayouts, onClose, openSettings }
 
   useEffect(() => {
     if (!window.electronAPI) return
@@ -306,8 +306,6 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
         menuActionsRef.current.handleResetLayouts()
       } else if (action === 'close-project') {
         menuActionsRef.current.onClose()
-      } else if (action.startsWith('set-theme:')) {
-        menuActionsRef.current.setPreference(action.slice(10) as ThemePreference)
       }
     })
     return unsub

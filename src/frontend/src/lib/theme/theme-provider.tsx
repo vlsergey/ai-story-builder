@@ -33,6 +33,22 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemePro
     () => window.matchMedia('(prefers-color-scheme: dark)').matches
   )
 
+  // Sync preference to Electron native menu on mount and on change
+  useEffect(() => {
+    window.electronAPI?.sendMenuState?.('theme', preference)
+  }, [preference])
+
+  // Handle set-theme:* IPC from Electron menu.
+  // Lives here (not in Layout) so it works on the start screen too.
+  useEffect(() => {
+    if (!window.electronAPI) return
+    const unsub = window.electronAPI.onMenuAction((action: string) => {
+      if (!action.startsWith('set-theme:')) return
+      setPreference(action.slice(10))
+    })
+    return unsub
+  }, [])
+
   // Track OS-level dark/light changes
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
