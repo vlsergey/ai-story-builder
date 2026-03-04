@@ -2,10 +2,12 @@
  * AI engine definitions: built-in engines with their capabilities and age ratings.
  *
  * Capabilities use industry-standard terminology:
- *   - fileUpload:     Upload documents to persistent AI storage (reusable across requests)
- *   - fileAttachment: Reference an uploaded file in a specific request
- *   - knowledgeBase:  Build a searchable vector/hybrid index (RAG corpus / Vector Store / SearchIndex)
- *   - fileSearch:     Reference a Knowledge Base in a request for automatic retrieval (grounding)
+ *   - fileUpload:              Upload documents to persistent AI storage (reusable across requests)
+ *   - fileAttachment:          Reference an uploaded file in a specific request
+ *   - knowledgeBase:           Build a searchable vector/hybrid index (RAG corpus / Vector Store / SearchIndex)
+ *   - knowledgeBaseAttachment: Attach a pre-built Knowledge Base (vector store) to a generation request
+ *                              for automatic retrieval (RAG grounding). Yandex: Search Index Tool;
+ *                              xAI Grok: Collections Search Tool; OpenAI: file_search tool.
  *
  * Age ratings use a 6-level scale loosely inspired by MPAA:
  *   G / PG / 12 / 16 / 18 / NC21
@@ -40,10 +42,10 @@ export interface AiEngineCapabilities {
    */
   knowledgeBase: boolean
   /**
-   * Reference a Knowledge Base in a request for automatic retrieval.
-   * Also called: file_search (OpenAI), collections_search (xAI), Search Index Tool (Yandex).
+   * Attach a pre-built Knowledge Base (vector store) to a generation request for automatic retrieval.
+   * Also called: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).
    */
-  fileSearch: boolean
+  knowledgeBaseAttachment: boolean
 }
 
 export interface AiEngineConfigField {
@@ -91,10 +93,11 @@ export const CAPABILITY_META: Array<{
       'Build a searchable vector or hybrid index from uploaded files (RAG — Retrieval-Augmented Generation). Also called: Vector Store, SearchIndex, Collection.',
   },
   {
-    key: 'fileSearch',
-    label: 'File Search',
+    key: 'knowledgeBaseAttachment',
+    label: 'Knowledge Base Attachment',
     description:
-      'Reference a Knowledge Base in a request so the model automatically searches it for relevant context. Also called: file_search, grounding, Search Index Tool.',
+      'Attach a pre-built Knowledge Base (vector store / search index) to a generation request so the model automatically retrieves relevant context from it. ' +
+      'Also called: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).',
   },
 ]
 
@@ -102,6 +105,12 @@ export const CAPABILITY_META: Array<{
 export function engineSupportsFileUpload(engineId: string | null | undefined): boolean {
   if (!engineId) return false
   return BUILTIN_ENGINES.find(e => e.id === engineId)?.capabilities.fileUpload ?? false
+}
+
+/** Returns true if the given engine supports attaching a pre-built Knowledge Base during generation. */
+export function engineSupportsKnowledgeBaseAttachment(engineId: string | null | undefined): boolean {
+  if (!engineId) return false
+  return BUILTIN_ENGINES.find(e => e.id === engineId)?.capabilities.knowledgeBaseAttachment ?? false
 }
 
 /** Built-in AI engine definitions. */
@@ -115,7 +124,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       fileUpload: true,
       fileAttachment: true,
       knowledgeBase: false,
-      fileSearch: false,
+      knowledgeBaseAttachment: false,
     },
     configFields: [
       { key: 'api_key', label: 'API Key', type: 'password' },
@@ -131,7 +140,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       fileUpload: true,
       fileAttachment: true,
       knowledgeBase: true,
-      fileSearch: true,
+      knowledgeBaseAttachment: true,
     },
     configFields: [
       { key: 'api_key',   label: 'API Key',   type: 'password' },

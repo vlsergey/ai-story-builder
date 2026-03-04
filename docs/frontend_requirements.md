@@ -83,7 +83,7 @@ A singleton dockview panel (`id='settings'`) that opens in the editor group by d
 - Per-engine section (one for each configured engine):
   - Credential fields (auto-saved on blur; password fields with Show/Hide toggle)
   - **Test Connection** button → `POST /api/ai/:engine/test` with current form values → spinner → "✓ Connected (N models)" or "✗ Error message"
-  - **Capabilities list**: File Upload, File Attachment, Knowledge Base, File Search — checkmark/cross per capability with description
+  - **Capabilities list**: File Upload, File Attachment, Knowledge Base, Knowledge Base Attachment — checkmark/cross per capability with description
   - **Age rating badge** (colored): G / PG / 12+ / 16+ / 18+ / NC-21
 - **Model selection is NOT in engine config** — models are chosen per-operation
 

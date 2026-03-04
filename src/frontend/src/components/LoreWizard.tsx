@@ -5,6 +5,8 @@ import { EditorView } from '@codemirror/view'
 import { useTheme } from '../lib/theme/theme-provider'
 import { useEditorSettings } from '../lib/editor-settings'
 import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
+import { useLoreSettings } from '../lib/lore-settings'
+import { engineSupportsKnowledgeBaseAttachment } from '../lib/ai-engines'
 
 interface LoreWizardProps {
   parentNodeId: number
@@ -15,6 +17,8 @@ interface LoreWizardProps {
 export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: LoreWizardProps) {
   const { resolvedTheme } = useTheme()
   const { wordWrap } = useEditorSettings()
+  const { currentAiEngine } = useLoreSettings()
+  const canUseKnowledgeBase = engineSupportsKnowledgeBaseAttachment(currentAiEngine)
 
   const [prompt, setPrompt] = useState('')
   const [includeExistingLore, setIncludeExistingLore] = useState(false)
@@ -87,11 +91,15 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
 
       {/* Controls row */}
       <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0">
-        <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer">
+        <label
+          className={`flex items-center gap-1.5 text-sm select-none ${canUseKnowledgeBase ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
+          title={canUseKnowledgeBase ? undefined : 'Knowledge Base Attachment is not supported by the current AI engine'}
+        >
           <input
             type="checkbox"
             checked={includeExistingLore}
             onChange={e => setIncludeExistingLore(e.target.checked)}
+            disabled={!canUseKnowledgeBase}
             className="accent-primary"
           />
           Include existing lore
