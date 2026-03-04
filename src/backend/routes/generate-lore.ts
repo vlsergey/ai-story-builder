@@ -32,10 +32,11 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore, model: requestedModel } = req.body as {
+  const { prompt, includeExistingLore, model: requestedModel, webSearch } = req.body as {
     prompt?: string
     includeExistingLore?: boolean
     model?: string
+    webSearch?: string
   }
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
@@ -106,25 +107,24 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
       ],
     }
 
+    const tools: unknown[] = []
+
     if (includeExistingLore) {
       const caps = BUILTIN_ENGINES.find(e => e.id === engine)?.capabilities
       const searchIndexId = config.yandex?.search_index_id
 
       if (caps?.knowledgeBaseAttachment && searchIndexId) {
-        // Path A — KB attachment: attach the vector store via the OpenAI-compatible
-        // file_search tool so the model retrieves relevant lore context from it.
-        ;(requestParams as unknown as Record<string, unknown>)['tools'] = [
-          { type: 'file_search', file_search: { vector_store_ids: [searchIndexId] } },
-        ]
-      } else if (caps?.fileAttachment && engineFileIds.length > 0) {
-        // Path B — file attachment fallback: no KB/vector store available yet,
-        // but individual files were uploaded. Attach them to the request directly.
-        // The exact attachment format is provider-specific; implement per engine when needed.
-        // engineFileIds contains all file_id values for the active engine.
-        // (Currently not reached for any supported engine — placeholder for future use.)
+        tools.push({ type: 'file_search', file_search: { vector_store_ids: [searchIndexId] } })
       }
-      // If neither path applies (engine doesn't support lore attachment, or nothing synced yet),
-      // the generation proceeds without lore context.
+      // fileAttachment fallback path: placeholder for future per-engine implementation.
+    }
+
+    if (webSearch && webSearch !== 'none') {
+      tools.push({ type: 'web_search', web_search: { search_context_size: webSearch } })
+    }
+
+    if (tools.length > 0) {
+      ;(requestParams as unknown as Record<string, unknown>)['tools'] = tools
     }
 
     const completion = await client.chat.completions.create(requestParams)

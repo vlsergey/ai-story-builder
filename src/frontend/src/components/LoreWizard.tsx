@@ -25,6 +25,7 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState('')
+  const [webSearch, setWebSearch] = useState<'none' | 'low' | 'medium' | 'high'>('none')
   const [content, setContent] = useState('')
   const [name, setName] = useState('New lore item')
   const [generating, setGenerating] = useState(false)
@@ -62,6 +63,7 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
           prompt,
           includeExistingLore,
           ...(selectedModel ? { model: selectedModel } : {}),
+          webSearch,
         }),
       })
       const data = await res.json() as { content?: string; error?: string }
@@ -122,6 +124,18 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
           />
           Include existing lore
         </label>
+
+        <select
+          value={webSearch}
+          onChange={e => setWebSearch(e.target.value as typeof webSearch)}
+          className="text-sm border border-border rounded px-2 py-0.5 bg-background"
+          title="Web search"
+        >
+          <option value="none">No web search</option>
+          <option value="low">Web: low</option>
+          <option value="medium">Web: medium</option>
+          <option value="high">Web: high</option>
+        </select>
 
         {availableModels.length > 0 && (
           <select
