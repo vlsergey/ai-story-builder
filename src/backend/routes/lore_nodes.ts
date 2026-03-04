@@ -139,6 +139,24 @@ router.post('/', express.json(), (req: Request, res: Response) => {
   }
 })
 
+// POST /lore_nodes/reorder-children — set positions of direct children in the given order
+router.post('/reorder-children', express.json(), (req: Request, res: Response) => {
+  const { child_ids } = req.body as { child_ids?: number[] }
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) return res.status(400).json({ error: 'no project open' })
+  if (!Array.isArray(child_ids)) return res.status(400).json({ error: 'child_ids must be an array' })
+  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  try {
+    const db = new Database(dbPath)
+    const update = db.prepare('UPDATE lore_nodes SET position = ? WHERE id = ?')
+    db.transaction(() => { child_ids.forEach((id, i) => update.run(i, id)) })()
+    db.close()
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: String(e) })
+  }
+})
+
 // PATCH /lore_nodes/:id — rename a node
 router.patch('/:id', express.json(), (req: Request, res: Response) => {
   const { name } = req.body as { name?: string }

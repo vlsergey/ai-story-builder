@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
+  ControlledTreeEnvironment,
+  Tree,
+  TreeItem,
+  TreeItemIndex,
+  DraggingPosition,
+  TreeViewState,
+  InteractionMode,
+} from 'react-complex-tree'
+import 'react-complex-tree/lib/style-modern.css'
+import {
   ChevronRight, ChevronDown,
   Library, BookOpen, ScrollText,
   Plus, CopyPlus, Pencil, Upload, Download, Trash2, CloudUpload, ArrowUpAZ,
@@ -22,23 +32,13 @@ type ToolbarItem = LoreCommand | 'separator' | 'spacer'
 
 // ── Tree helpers ──────────────────────────────────────────────────────────────
 
-function collectAllIds(nodes: LoreNode[]): Set<number> {
-  const ids = new Set<number>()
+function collectAllIds(nodes: LoreNode[]): number[] {
+  const ids: number[] = []
   function walk(list: LoreNode[]) {
-    list.forEach(n => { ids.add(n.id); if (n.children?.length) walk(n.children) })
+    list.forEach(n => { ids.push(n.id); if (n.children?.length) walk(n.children) })
   }
   walk(nodes)
   return ids
-}
-
-/** Pre-order traversal — used for Shift+click range. */
-function collectNodeOrder(nodes: LoreNode[]): number[] {
-  const order: number[] = []
-  function walk(list: LoreNode[]) {
-    list.forEach(n => { order.push(n.id); if (n.children?.length) walk(n.children) })
-  }
-  walk(nodes)
-  return order
 }
 
 function findNode(id: number, nodes: LoreNode[]): LoreNode | null {
@@ -62,13 +62,45 @@ function nodeIcon(node: LoreNode): typeof Library {
   return allLeaves ? BookOpen : Library
 }
 
+type ItemData = LoreNode | null
+
+function buildItemsMap(roots: LoreNode[]): Record<TreeItemIndex, TreeItem<ItemData>> {
+  const items: Record<TreeItemIndex, TreeItem<ItemData>> = {}
+  items['root'] = {
+    index: 'root',
+    isFolder: true,
+    children: roots.map(r => r.id),
+    canMove: false,
+    canRename: false,
+    data: null,
+  }
+  function walk(nodes: LoreNode[]) {
+    for (const n of nodes) {
+      items[n.id] = {
+        index: n.id,
+        isFolder: (n.children?.length ?? 0) > 0,
+        children: n.children?.map(c => c.id) ?? [],
+        canMove: n.parent_id !== null,
+        canRename: false,
+        data: n,
+      }
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(roots)
+  return items
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode: (node: LoreNode) => void }) {
   const [tree, setTree] = useState<LoreNode[]>([])
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
-  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<number>>(new Set())
-  const [lastClickedId, setLastClickedId] = useState<number | null>(null)
+  const [items, setItems] = useState<Record<TreeItemIndex, TreeItem<ItemData>>>({
+    root: { index: 'root', isFolder: true, children: [], canMove: false, data: null },
+  })
+  const [viewState, setViewState] = useState<TreeViewState>({
+    'lore-tree': { expandedItems: [], selectedItems: [] },
+  })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -77,40 +109,95 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   function fetchTree() {
     fetch('/api/lore_nodes/tree')
       .then(r => r.json())
-      .then((data: LoreNode[]) => { setTree(data); setExpanded(collectAllIds(data)) })
+      .then((data: LoreNode[]) => {
+        if (!Array.isArray(data)) return
+        setTree(data)
+        setItems(buildItemsMap(data))
+        setViewState(prev => ({
+          ...prev,
+          'lore-tree': {
+            ...prev['lore-tree'],
+            expandedItems: collectAllIds(data),
+          },
+        }))
+      })
       .catch(() => setTree([]))
   }
 
-  // ── Selection (plain / Ctrl / Shift) ─────────────────────────────────────────
+  // ── Selection ─────────────────────────────────────────────────────────────
 
-  function handleNodeClick(e: React.MouseEvent, node: LoreNode) {
-    // Open in editor whenever node is clicked (editor handles no-content state)
-    onSelectLoreNode(node)
+  const selectedNodeIds = new Set<number>(
+    ((viewState['lore-tree']?.selectedItems ?? []) as TreeItemIndex[]).map(id => Number(id))
+  )
 
-    if (e.shiftKey && lastClickedId !== null) {
-      const order = collectNodeOrder(tree)
-      const a = order.indexOf(lastClickedId)
-      const b = order.indexOf(node.id)
-      const range = order.slice(Math.min(a, b), Math.max(a, b) + 1)
-      setSelectedNodeIds(prev => { const next = new Set(prev); range.forEach(id => next.add(id)); return next })
-    } else if (e.ctrlKey || e.metaKey) {
-      setSelectedNodeIds(prev => {
-        const next = new Set(prev)
-        if (next.has(node.id)) next.delete(node.id); else next.add(node.id)
-        return next
-      })
-      setLastClickedId(node.id)
-    } else {
-      setSelectedNodeIds(new Set([node.id]))
-      setLastClickedId(node.id)
+  function handleSelectItems(ids: TreeItemIndex[]) {
+    setViewState(prev => ({
+      ...prev,
+      'lore-tree': { ...prev['lore-tree'], selectedItems: ids },
+    }))
+    if (ids.length === 1) {
+      const node = findNode(Number(ids[0]), tree)
+      if (node) onSelectLoreNode(node)
     }
   }
 
-  function toggleExpanded(id: number) {
-    setExpanded(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  // ── DnD ───────────────────────────────────────────────────────────────────
+
+  async function handleDrop(droppedItems: TreeItem<ItemData>[], target: DraggingPosition) {
+    if (target.targetType === 'root') return
+
+    if (target.targetType === 'item') {
+      const newParentId = target.targetItem as number
+      for (const item of droppedItems) {
+        if (!item.data?.id) continue
+        await fetch(`/api/lore_nodes/${item.data.id}/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parent_id: newParentId }),
+        })
+      }
+    } else if (target.targetType === 'between-items') {
+      const parentKey = target.parentItem
+      const newParentId = parentKey === 'root' ? null : Number(parentKey)
+      const draggedIds = new Set(
+        droppedItems.map(i => i.data?.id).filter((id): id is number => id != null)
+      )
+
+      // Build reordered children list:
+      // Count non-dragged items appearing before childIndex in the original list
+      // to find the correct insertion point after removal.
+      const currentChildren = (items[parentKey]?.children ?? []).map(Number)
+      let insertAt = 0
+      for (let i = 0; i < target.childIndex && i < currentChildren.length; i++) {
+        if (!draggedIds.has(currentChildren[i])) insertAt++
+      }
+      const remaining = currentChildren.filter(id => !draggedIds.has(id))
+      remaining.splice(insertAt, 0, ...droppedItems.map(i => i.data!.id))
+
+      // Move to new parent first if parent changed
+      for (const item of droppedItems) {
+        if (!item.data?.id) continue
+        if (item.data.parent_id !== newParentId) {
+          await fetch(`/api/lore_nodes/${item.data.id}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parent_id: newParentId }),
+          })
+        }
+      }
+
+      // Reorder siblings
+      await fetch('/api/lore_nodes/reorder-children', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ child_ids: remaining }),
+      })
+    }
+
+    fetchTree()
   }
 
-  // ── Actions ──────────────────────────────────────────────────────────────────
+  // ── Actions ──────────────────────────────────────────────────────────────
 
   async function handleCreate() {
     if (selectedNodeIds.size !== 1) return
@@ -189,7 +276,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     if (toDelete.length === 0) return
     if (!window.confirm(`Delete ${toDelete.length} node${toDelete.length > 1 ? 's' : ''}?`)) return
     await Promise.all(toDelete.map(id => fetch(`/api/lore_nodes/${id}`, { method: 'DELETE' })))
-    setSelectedNodeIds(new Set())
+    setViewState(prev => ({ ...prev, 'lore-tree': { ...prev['lore-tree'], selectedItems: [] } }))
     fetchTree()
   }
 
@@ -197,7 +284,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     window.alert('AI Engine sync is not yet implemented.\n\nThis will upload all lore to the selected AI Engine and remove items marked for deletion.')
   }
 
-  // ── Enable/disable conditions ─────────────────────────────────────────────────
+  // ── Enable/disable ────────────────────────────────────────────────────────
 
   const oneSelected = selectedNodeIds.size === 1
   const anySelected = selectedNodeIds.size >= 1
@@ -206,7 +293,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   const canDelete = deletableCount > 0
   const onlyRootSelected = anySelected && !canDelete
 
-  // ── Command registry ──────────────────────────────────────────────────────────
+  // ── Command registry ──────────────────────────────────────────────────────
 
   const toolbarItems: ToolbarItem[] = [
     { id: 'create',    label: 'Create child node',  icon: <Plus size={15} />,        enabled: oneSelected,  execute: handleCreate },
@@ -246,71 +333,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // ── Drag-and-drop ─────────────────────────────────────────────────────────────
-
-  function handleDragStart(e: React.DragEvent<HTMLLIElement>, node: LoreNode) {
-    if (node.parent_id === null) { e.preventDefault(); return } // root is not draggable
-    e.dataTransfer.setData('application/x-node-id', String(node.id))
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function handleDragOver(e: React.DragEvent<HTMLElement>) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move' }
-
-  function handleDrop(e: React.DragEvent<HTMLElement>, targetNode: LoreNode) {
-    e.preventDefault()
-    e.stopPropagation()
-    const data = e.dataTransfer.getData('application/x-node-id')
-    if (!data) return
-    if (data === String(targetNode.id)) return // drop onto self — ignore
-    fetch(`/api/lore_nodes/${data}/move`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parent_id: targetNode.id }),
-    }).then(() => fetchTree()).catch(console.error)
-  }
-
-  // ── Tree rendering ────────────────────────────────────────────────────────────
-
-  function renderNode(node: LoreNode) {
-    const hasChildren = (node.children?.length ?? 0) > 0
-    const hasVersions = node.latest_version_status !== null
-    const isExpanded = expanded.has(node.id)
-    const isSelected = selectedNodeIds.has(node.id)
-    const isDeleted = node.status === 'TO_BE_DELETED'
-
-    const Icon = node.parent_id === null ? Library : nodeIcon(node)
-
-    return (
-      <li key={node.id} draggable={node.parent_id !== null} onDragStart={e => handleDragStart(e, node)} onDragOver={handleDragOver} onDrop={e => handleDrop(e, node)}>
-        <div className="flex items-center">
-          <button
-            className="flex items-center justify-center w-4 h-4 shrink-0 text-muted-foreground hover:text-foreground"
-            tabIndex={-1}
-            onClick={e => { e.stopPropagation(); hasChildren && toggleExpanded(node.id) }}
-          >
-            {hasChildren && (isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
-          </button>
-          <div
-            className={`flex items-center gap-1.5 flex-1 cursor-pointer rounded px-1 py-0.5 text-sm select-none ${
-              isSelected ? 'bg-primary/15 text-primary' : 'hover:bg-secondary'
-            } ${isDeleted ? 'line-through opacity-50' : ''}`}
-            onClick={e => handleNodeClick(e, node)}
-            title={isDeleted ? 'Pending deletion (sync with AI Engine to remove)' : hasVersions ? 'Has content' : undefined}
-          >
-            <Icon size={14} className="shrink-0 text-muted-foreground" />
-            {node.name}
-          </div>
-        </div>
-        {hasChildren && isExpanded && (
-          <ul className="ml-4 border-l border-border/50 pl-1 mt-0.5">
-            {node.children!.map(renderNode)}
-          </ul>
-        )}
-      </li>
-    )
-  }
-
-  // ── Toolbar rendering ─────────────────────────────────────────────────────────
+  // ── Toolbar rendering ─────────────────────────────────────────────────────
 
   const btnBase = 'flex items-center justify-center w-7 h-7 rounded hover:bg-secondary transition-colors'
   const btnDisabled = 'opacity-30 cursor-not-allowed pointer-events-none'
@@ -333,7 +356,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     )
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-2">
@@ -341,7 +364,110 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
         {toolbarItems.map(renderToolbarItem)}
       </div>
       <div className="overflow-auto">
-        <ul>{Array.isArray(tree) ? tree.map(renderNode) : null}</ul>
+        <ControlledTreeEnvironment<ItemData>
+          items={items}
+          getItemTitle={item => item.data?.name ?? ''}
+          viewState={viewState}
+          canDragAndDrop
+          canDropOnFolder
+          canDropOnNonFolder
+          canReorderItems
+          canDrag={items => items.every(i => i.canMove !== false)}
+          canDropAt={(_items, target) =>
+            !(target.targetType === 'between-items' && target.parentItem === 'root')
+          }
+          defaultInteractionMode={InteractionMode.ClickArrowToExpand}
+          onSelectItems={handleSelectItems}
+          onExpandItem={(item, treeId) => {
+            setViewState(prev => ({
+              ...prev,
+              [treeId]: {
+                ...prev[treeId],
+                expandedItems: [...(prev[treeId]?.expandedItems ?? []), item.index],
+              },
+            }))
+          }}
+          onCollapseItem={(item, treeId) => {
+            setViewState(prev => ({
+              ...prev,
+              [treeId]: {
+                ...prev[treeId],
+                expandedItems: (prev[treeId]?.expandedItems ?? []).filter(id => id !== item.index),
+              },
+            }))
+          }}
+          onDrop={handleDrop}
+          renderItem={({ item, depth, children, title, arrow, context }) => {
+            const node = item.data
+            if (!node) return <>{children}</>
+            const isDeleted = node.status === 'TO_BE_DELETED'
+            const hasVersions = node.latest_version_status !== null
+            const Icon = node.parent_id === null ? Library : nodeIcon(node)
+            return (
+              <li
+                {...(context.itemContainerWithChildrenProps as React.HTMLAttributes<HTMLLIElement>)}
+                className="list-none"
+              >
+                <div
+                  {...(context.itemContainerWithoutChildrenProps as React.HTMLAttributes<HTMLDivElement>)}
+                  style={{ paddingLeft: `${depth * 16}px` }}
+                  className="flex"
+                >
+                  <div
+                    {...(context.interactiveElementProps as React.HTMLAttributes<HTMLDivElement>)}
+                    className={[
+                      'flex items-center gap-1 flex-1 cursor-pointer rounded px-1 py-0.5 text-sm select-none',
+                      context.isSelected ? 'bg-primary/15 text-primary' :
+                      context.isDraggingOver ? 'ring-1 ring-primary bg-primary/5' : 'hover:bg-secondary',
+                      isDeleted ? 'line-through opacity-50' : '',
+                    ].join(' ')}
+                    title={
+                      isDeleted ? 'Pending deletion (sync with AI Engine to remove)' :
+                      hasVersions ? 'Has content' : undefined
+                    }
+                  >
+                    {arrow}
+                    <Icon size={14} className="shrink-0 text-muted-foreground" />
+                    {title}
+                  </div>
+                </div>
+                {children}
+              </li>
+            )
+          }}
+          renderItemArrow={({ item, context }) => (
+            <button
+              className="flex items-center justify-center w-4 h-4 shrink-0 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+              {...(context.arrowProps as React.HTMLAttributes<HTMLButtonElement>)}
+            >
+              {item.isFolder && (context.isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
+            </button>
+          )}
+          renderItemTitle={({ title }) => <span>{title}</span>}
+          renderItemsContainer={({ children, containerProps }) => (
+            <ul
+              {...(containerProps as React.HTMLAttributes<HTMLUListElement>)}
+              className="pl-0 m-0"
+            >
+              {children}
+            </ul>
+          )}
+          renderTreeContainer={({ children, containerProps }) => (
+            <div {...(containerProps as React.HTMLAttributes<HTMLDivElement>)}>
+              {children}
+            </div>
+          )}
+          renderDragBetweenLine={({ draggingPosition, lineProps }) => (
+            <div
+              {...(lineProps as React.HTMLAttributes<HTMLDivElement>)}
+              style={{ left: `${draggingPosition.depth * 16}px`, right: 0 }}
+              className="absolute h-0.5 bg-primary z-50 pointer-events-none rounded-full"
+            />
+          )}
+        >
+          <Tree treeId="lore-tree" rootItem="root" treeLabel="Lore" />
+        </ControlledTreeEnvironment>
       </div>
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChosen} />
     </div>
