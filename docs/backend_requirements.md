@@ -35,8 +35,8 @@
 - Yandex lore sync API (`POST /api/ai/yandex/sync-lore`):
   - Uploads changed/new non-empty lore nodes as plain-text files to Yandex Files API; stores `file_id` in each node's `ai_sync_info.yandex`
   - Deletes remote files for nodes that became empty (`word_count=0`) or are marked `to_be_deleted` and had a previously recorded `file_id`
-  - After all file changes, recreates the SearchIndex from scratch with all current `file_id`s (adding files is possible incrementally, but removing is not — full recreation is required when any file is removed)
-  - Stores the new `search_index_id` in `ai_config.yandex.search_index_id` in the project settings
+  - After all file changes, deletes the old SearchIndex (if one exists) and then creates a new one with all current `file_id`s; polls the async creation operation until `DONE` state before proceeding
+  - Marks nodes as synced and stores the new `search_index_id` in `ai_config.yandex.search_index_id` **only after** the new index is fully created; clears `search_index_id` if creation fails
   - Returns a progress summary: `{ uploaded, deleted, unchanged, search_index_id }`
 
 ### Development Workflow

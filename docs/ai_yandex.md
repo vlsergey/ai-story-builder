@@ -162,9 +162,13 @@ The SearchIndex is **partially mutable**:
 Because file removal requires full index recreation:
 1. Upload new/changed lore files to Files API.
 2. Delete remote files for nodes that are now empty or marked `to_be_deleted`.
-3. If any file was deleted (step 2 had results), delete the old SearchIndex and create a new one.
-4. If only additions occurred, use `SearchIndexFileService.BatchCreate` to add to the existing index.
-5. Store the `search_index_id` in `ai_config.yandex.search_index_id` in project settings.
+3. If any file was deleted (step 2 had results) **or** there is an existing SearchIndex:
+   a. Delete the old SearchIndex first (to avoid leaving orphaned indexes in the user's account).
+   b. Create a new SearchIndex with all current `file_id`s.
+   c. Poll the creation operation until it reaches `DONE` state (creation is async).
+   d. Only after the operation completes successfully, mark `ai_sync_info[engine].last_synced_at` on all nodes and store the new `search_index_id` in project settings.
+4. If only additions occurred and there is no existing index, use `SearchIndexFileService.BatchCreate` to add files, then poll for completion before marking sync as done.
+5. The sync is considered **complete** only after the SearchIndex operation reaches `DONE`. If the operation fails, the sync is marked as failed and the old `search_index_id` is cleared so the next sync starts fresh.
 
 ## What We're Missing
 
