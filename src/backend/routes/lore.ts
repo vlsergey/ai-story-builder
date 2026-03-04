@@ -53,7 +53,7 @@ router.get('/tree', (_req: Request, res: Response) => {
     const db = new Database(dbPath, { readonly: true })
     const rows = db.prepare(`
       SELECT n.id, n.parent_id, n.name, n.position, n.status, n.to_be_deleted, n.created_at,
-        n.word_count, n.char_count, n.byte_count, n.ai_sync_info,
+        n.word_count, n.char_count, n.byte_count, n.ai_sync_info, n.content_updated_at,
         (SELECT lv.status FROM lore_versions lv
          WHERE lv.lore_node_id = n.id ORDER BY lv.version DESC LIMIT 1
         ) AS latest_version_status
@@ -215,12 +215,22 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
       sets.push('word_count = ?');  params.push(wordCount!)
       sets.push('char_count = ?');  params.push(charCount!)
       sets.push('byte_count = ?');  params.push(byteCount!)
+      sets.push('content_updated_at = CURRENT_TIMESTAMP')
     }
     params.push(req.params.id)
     db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+    let contentUpdatedAt: string | null = null
+    if (hasContent) {
+      const row = db
+        .prepare('SELECT content_updated_at FROM lore_nodes WHERE id = ?')
+        .get(req.params.id) as { content_updated_at: string | null }
+      // Normalize SQLite's "YYYY-MM-DD HH:MM:SS" (UTC, no suffix) to ISO 8601
+      const raw = row?.content_updated_at ?? null
+      contentUpdatedAt = raw ? raw.replace(' ', 'T') + 'Z' : null
+    }
     db.close()
     res.json(hasContent
-      ? { ok: true, word_count: wordCount, char_count: charCount, byte_count: byteCount }
+      ? { ok: true, word_count: wordCount, char_count: charCount, byte_count: byteCount, content_updated_at: contentUpdatedAt }
       : { ok: true }
     )
   } catch (e) {

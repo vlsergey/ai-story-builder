@@ -9,6 +9,7 @@ export interface LoreNodeRow {
   char_count: number
   byte_count: number
   ai_sync_info: string | null
+  content_updated_at: string | null
   position: number
   status: string
   to_be_deleted: number

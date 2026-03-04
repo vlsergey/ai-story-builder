@@ -75,9 +75,9 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: value }),
       }).then(r => r.json())
-        .then((data: { ok: boolean; word_count: number; char_count: number; byte_count: number }) => {
+        .then((data: { ok: boolean; word_count: number; char_count: number; byte_count: number; content_updated_at?: string | null }) => {
           setContentDirty(false)
-          dispatchLoreNodeSaved({ id: nodeId, wordCount: data.word_count, charCount: data.char_count, byteCount: data.byte_count })
+          dispatchLoreNodeSaved({ id: nodeId, wordCount: data.word_count, charCount: data.char_count, byteCount: data.byte_count, contentUpdatedAt: data.content_updated_at })
         }).catch(() => setContentDirty(false))
     }, 1000)
   }

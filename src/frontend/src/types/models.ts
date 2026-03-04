@@ -25,6 +25,8 @@ export interface LoreNode {
   char_count: number
   byte_count: number
   ai_sync_info: Record<string, AiEngineSyncRecord> | null
+  /** ISO-8601 UTC timestamp of when content was last saved; null if never saved */
+  content_updated_at: string | null
   position: number
   status: string
   /** 1 = marked for deletion, 0 = active */

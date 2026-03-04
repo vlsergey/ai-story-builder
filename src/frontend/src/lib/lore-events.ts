@@ -7,6 +7,7 @@ export interface LoreNodeSavedDetail {
   wordCount?: number
   charCount?: number
   byteCount?: number
+  contentUpdatedAt?: string | null
 }
 
 /** Dispatch a lore-node-saved event on window so other panels can react. */

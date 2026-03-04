@@ -19,6 +19,12 @@
   2. Fix the bug.
   3. Confirm the test now passes.
 
+## Database Schema
+
+- **All schema changes must go through migrations.** Never edit the initial `CREATE TABLE` statements. Add a new migration step to `src/backend/db/migrations.ts` for every column/table addition or change.
+- Each migration must backfill existing rows where possible (derive values from existing data).
+- Test DB fixtures (`setupDb()` functions in `*.test.ts`) must be kept in sync with the real schema — add any new columns to the fixture `CREATE TABLE` statements.
+
 ## Git Commits
 
 - Never add AI name (e.g. "Co-Authored-By: Claude") to commit messages or descriptions.

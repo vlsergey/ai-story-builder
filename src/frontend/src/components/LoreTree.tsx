@@ -103,7 +103,7 @@ function uniqueName(base: string, existingNames: string[]): string {
 }
 
 function patchNode(
-  nodes: LoreNode[], id: number, patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count'>>
+  nodes: LoreNode[], id: number, patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'content_updated_at'>>
 ): LoreNode[] {
   return nodes.map(n => {
     if (n.id === id) return { ...n, ...patch }
@@ -128,21 +128,59 @@ function formatStat(count: number, mode: LoreStatMode): string {
   return `${(count / 1_000_000).toFixed(1)}MB`
 }
 
-function subtreeHasAnyContent(node: LoreNode): boolean {
-  // word_count > 0 covers nodes with direct content (content field not in tree query)
-  if (node.latest_version_status !== null || (node.word_count ?? 0) > 0 || node.content !== null) return true
-  return (node.children ?? []).some(subtreeHasAnyContent)
+/**
+ * Sync state for a single node (ignoring children).
+ *
+ * Rules:
+ *  - to_be_deleted + previously synced  → needs-sync (remote file must be deleted)
+ *  - to_be_deleted + never synced       → none       (nothing to do)
+ *  - empty (word_count=0) + previously synced → needs-sync (remote file must be cleaned up)
+ *  - empty + never synced               → none       (nothing to do)
+ *  - non-empty, not yet synced          → needs-sync
+ *  - non-empty, synced, content changed since last sync → needs-sync
+ *  - non-empty, synced, up-to-date      → synced
+ */
+function nodeSyncState(node: LoreNode, engine: string): 'none' | 'needs-sync' | 'synced' {
+  const syncRecord = node.ai_sync_info?.[engine]
+
+  if (node.to_be_deleted) {
+    return syncRecord ? 'needs-sync' : 'none'
+  }
+
+  const wordCount = node.word_count ?? 0
+  if (wordCount === 0) {
+    return syncRecord ? 'needs-sync' : 'none'
+  }
+
+  // Non-empty, active node
+  if (!syncRecord) return 'needs-sync'
+
+  // Dirty check: content changed after last sync
+  if (node.content_updated_at && node.content_updated_at > syncRecord.last_synced_at) {
+    return 'needs-sync'
+  }
+
+  return 'synced'
+}
+
+/**
+ * Aggregate sync state across an entire subtree.
+ *   any needs-sync → needs-sync
+ *   all none       → none
+ *   otherwise      → synced
+ */
+function subtreeSyncState(node: LoreNode, engine: string): 'none' | 'needs-sync' | 'synced' {
+  const own = nodeSyncState(node, engine)
+  const childStates = (node.children ?? []).map(c => subtreeSyncState(c, engine))
+  const all = [own, ...childStates]
+  if (all.some(s => s === 'needs-sync')) return 'needs-sync'
+  if (all.every(s => s === 'none')) return 'none'
+  return 'synced'
 }
 
 function subtreeIsInProgress(node: LoreNode, syncingNodeIds: ReadonlySet<number>): boolean {
   if (syncingNodeIds.has(node.id)) return true
   return (node.children ?? []).some(c => subtreeIsInProgress(c, syncingNodeIds))
-}
-
-function subtreeIsSynced(node: LoreNode, engine: string): boolean {
-  const hasContent = node.latest_version_status !== null || (node.word_count ?? 0) > 0 || node.content !== null
-  if (hasContent && !node.ai_sync_info?.[engine]) return false
-  return (node.children ?? []).every(c => subtreeIsSynced(c, engine))
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -181,12 +219,13 @@ export default function LoreTree({
   // Update a node's stats locally when LoreEditor saves content, without re-fetching the whole tree.
   useEffect(() => {
     function onNodeSaved(e: Event) {
-      const { id, name, wordCount, charCount, byteCount } = (e as CustomEvent<LoreNodeSavedDetail>).detail
-      const patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count'>> = {}
+      const { id, name, wordCount, charCount, byteCount, contentUpdatedAt } = (e as CustomEvent<LoreNodeSavedDetail>).detail
+      const patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'content_updated_at'>> = {}
       if (name !== undefined) patch.name = name
       if (wordCount !== undefined) patch.word_count = wordCount
       if (charCount !== undefined) patch.char_count = charCount
       if (byteCount !== undefined) patch.byte_count = byteCount
+      if (contentUpdatedAt !== undefined) patch.content_updated_at = contentUpdatedAt
       const next = patchNode(treeDataRef.current, id, patch)
       setTree(next)
       setItems(buildItemsMap(next))
@@ -586,9 +625,10 @@ export default function LoreTree({
             const Icon = node.parent_id === null ? Library : nodeIcon(node)
 
             const statText = statMode !== 'none' ? formatStat(subtreeStat(node, statMode), statMode) : ''
-            const showSync = !!currentAiEngine && subtreeHasAnyContent(node)
-            const inProgress = showSync && !!syncingNodeIds && subtreeIsInProgress(node, syncingNodeIds)
-            const synced = showSync && !inProgress && subtreeIsSynced(node, currentAiEngine!)
+            const syncState = currentAiEngine ? subtreeSyncState(node, currentAiEngine) : 'none'
+            const inProgress = syncState !== 'none' && !!syncingNodeIds && subtreeIsInProgress(node, syncingNodeIds)
+            const showSync = syncState !== 'none'
+            const synced = syncState === 'synced'
 
             return (
               <li

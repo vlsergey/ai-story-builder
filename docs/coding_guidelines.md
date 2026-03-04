@@ -21,4 +21,11 @@ To keep the project maintainable and scalable, follow these rules:
 
 * **Keyboard shortcuts scoped to their panel** – A global `window` keydown listener for panel-local shortcuts (e.g. Delete / Enter in the Lore Tree) must guard against events originating outside the panel. Use a container `ref` and check `containerRef.current.contains(e.target)` before processing the event. This prevents the panel's shortcuts from firing when focus is in another panel (e.g. a CodeMirror editor, a form, etc.). Keep the `INPUT` / `TEXTAREA` tag guard as well, for editable fields that live inside the same panel.
 
+* **Database schema changes require migrations** – Never add, rename, or drop a column/table by editing the initial `CREATE TABLE` statement. All schema changes must be implemented as a new numbered migration step appended to the `MIGRATIONS` array in `src/backend/db/migrations.ts`. Each migration step:
+  * Runs inside a transaction (guaranteed by `migrateDatabase`).
+  * Increments `PRAGMA user_version` atomically.
+  * Must be backward-compatible with existing data (use `ALTER TABLE … ADD COLUMN` with a safe default; avoid destructive changes).
+  * Should backfill existing rows where the new column has a meaningful value that can be derived from existing data.
+  * Test fixtures (e.g. `setupDb()` in `*.test.ts` files) must include any new columns so the tests reflect the real schema.
+
 These guidelines are part of the project's acceptance criteria and should be reviewed when adding new features.

@@ -129,6 +129,20 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       update.run(words, chars, bytes, row.id)
     }
   },
+  // version 3 → 4: add content_updated_at to lore_nodes
+  // Tracks when lore_nodes.content was last written; used to detect content
+  // changes since the last AI engine sync (compare with ai_sync_info[engine].last_synced_at).
+  (db) => {
+    db.exec(`
+      ALTER TABLE lore_nodes ADD COLUMN content_updated_at DATETIME NULL;
+    `)
+    // Backfill: nodes that already have content get content_updated_at = created_at
+    // (best approximation; will be overwritten on next edit)
+    db.prepare(`
+      UPDATE lore_nodes SET content_updated_at = created_at
+      WHERE content IS NOT NULL AND content != ''
+    `).run()
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length
