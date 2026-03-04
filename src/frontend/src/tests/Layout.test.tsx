@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Layout from '../components/Layout';
 
@@ -136,6 +136,33 @@ describe('Layout', () => {
 
     // After: the center group now has a panel — its tab bar must be visible
     await waitFor(() => { expect(hiddenTabBars().length).toBe(0) })
+  })
+
+  it('watermark reappears after last lore editor is closed', async () => {
+    const { container } = render(<Layout {...mockProps} />)
+    await screen.findByTestId('folder-section')
+
+    // Open a lore editor — watermark in the center group should disappear
+    const mockNode = {
+      id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
+      position: 0, status: 'ACTIVE', to_be_deleted: 0,
+      latest_version_status: null, created_at: '', children: [],
+    }
+    act(() => { capturedOnOpenLoreNode?.(mockNode) })
+
+    // Wait until the editor tab is rendered (close button appears)
+    await waitFor(() => {
+      expect(container.querySelector('.dv-default-tab-action')).toBeInTheDocument()
+    })
+
+    // Close the editor — the center group should stay and show the watermark
+    await act(async () => {
+      fireEvent.click(container.querySelector('.dv-default-tab-action')!)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('AI Story Builder')).toBeInTheDocument()
+    })
   })
 
   it('saves layout to database when reset-layouts IPC action fires', async () => {
