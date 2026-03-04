@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express'
 import OpenAI from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
+import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -25,27 +26,13 @@ interface AiConfigStore {
   [key: string]: unknown
 }
 
-// ─── Capability helpers ────────────────────────────────────────────────────
-// These mirror the frontend ai-engines.ts capability flags, kept in sync manually.
-
-/** Engine can attach a pre-built Knowledge Base (vector store) to a generation request. */
-function supportsKnowledgeBaseAttachment(engine: string): boolean {
-  return engine === 'yandex'
-}
-
-/** Engine supports uploading files and referencing them by ID in generation requests. */
-function supportsFileAttachment(engine: string): boolean {
-  return engine === 'yandex'
-}
-
 // ─── Client factory ────────────────────────────────────────────────────────
 
 function createYandexClient(apiKey: string, folderId: string): OpenAI {
   return new OpenAI({
     apiKey,
     baseURL: YANDEX_BASE,
-    project: folderId,
-    defaultHeaders: { 'x-folder-id': folderId },
+    project: folderId
   })
 }
 
@@ -127,15 +114,16 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     }
 
     if (includeExistingLore) {
+      const caps = BUILTIN_ENGINES.find(e => e.id === engine)?.capabilities
       const searchIndexId = config.yandex?.search_index_id
 
-      if (supportsKnowledgeBaseAttachment(engine) && searchIndexId) {
+      if (caps?.knowledgeBaseAttachment && searchIndexId) {
         // Path A — KB attachment: pass the pre-built vector store ID so the model
         // automatically retrieves relevant lore context from it.
         ;(requestParams as Record<string, unknown>)['tools'] = [
           { searchIndex: { searchIndexIds: [searchIndexId] } },
         ]
-      } else if (supportsFileAttachment(engine) && engineFileIds.length > 0) {
+      } else if (caps?.fileAttachment && engineFileIds.length > 0) {
         // Path B — file attachment fallback: no KB/vector store available yet,
         // but individual files were uploaded. Attach them to the request directly.
         // The exact attachment format is provider-specific; implement per engine when needed.

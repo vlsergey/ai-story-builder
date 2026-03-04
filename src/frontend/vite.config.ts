@@ -9,7 +9,10 @@ export default defineConfig({
     jsxRuntime: 'automatic'
   })],
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') }
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@shared': path.resolve(__dirname, '../shared'),
+    }
   },
   server: {
     port: 3000,

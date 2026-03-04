@@ -34,6 +34,7 @@
     "files": [
       "src/electron/**/*",
       "src/backend/**/*",
+      "src/shared/**/*",
       "dist/**/*",
       "!src/backend/scripts/**/*",
       "!src/backend/dist-sea/**/*",

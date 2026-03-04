@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": ".",
-    "rootDir": "."
-  }
+    "outDir": "..",
+    "rootDir": ".."
+  },
+  "include": ["**/*.ts", "../shared/**/*.ts"]
 }
