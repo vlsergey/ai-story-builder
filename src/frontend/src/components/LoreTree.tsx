@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { LoreNode } from '../types/models'
 import { useLoreSettings } from '../lib/lore-settings'
+import { LORE_NODE_SAVED_EVENT, LoreNodeSavedDetail } from '../lib/lore-events'
 
 // ── Command system ────────────────────────────────────────────────────────────
 
@@ -101,6 +102,16 @@ function uniqueName(base: string, existingNames: string[]): string {
   return `${base} ${n}`
 }
 
+function patchNodeStats(
+  nodes: LoreNode[], id: number, wordCount: number, charCount: number, byteCount: number
+): LoreNode[] {
+  return nodes.map(n => {
+    if (n.id === id) return { ...n, word_count: wordCount, char_count: charCount, byte_count: byteCount }
+    if (n.children?.length) return { ...n, children: patchNodeStats(n.children, id, wordCount, charCount, byteCount) }
+    return n
+  })
+}
+
 // ── Stats helpers ──────────────────────────────────────────────────────────────
 
 function subtreeStat(node: LoreNode, mode: LoreStatMode): number {
@@ -160,8 +171,24 @@ export default function LoreTree({
   const containerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const treeRef = useRef<TreeRef<ItemData>>(null)
+  // Ref so the lore-node-saved handler always sees the latest tree without re-registration.
+  const treeDataRef = useRef<LoreNode[]>(tree)
+
+  useEffect(() => { treeDataRef.current = tree }, [tree])
 
   useEffect(() => { fetchTree() }, [])
+
+  // Update a node's stats locally when LoreEditor saves content, without re-fetching the whole tree.
+  useEffect(() => {
+    function onNodeSaved(e: Event) {
+      const { id, wordCount, charCount, byteCount } = (e as CustomEvent<LoreNodeSavedDetail>).detail
+      const next = patchNodeStats(treeDataRef.current, id, wordCount, charCount, byteCount)
+      setTree(next)
+      setItems(buildItemsMap(next))
+    }
+    window.addEventListener(LORE_NODE_SAVED_EVENT, onNodeSaved)
+    return () => window.removeEventListener(LORE_NODE_SAVED_EVENT, onNodeSaved)
+  }, [])
 
   // Once the pending-rename item appears in `items`, select it and start rename
   useEffect(() => {

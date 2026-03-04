@@ -33,6 +33,16 @@
 * Theme background must be consistent across all panels with no white borders around dark layouts when using dark theme
 * Translations stored in separate JSON files
 
+### Real-time State Propagation Between Panels
+
+Since this is a **local, single-user Electron application**, the chosen pattern for propagating backend state changes to the frontend is **Frontend Event Bus via `CustomEvent` on `window`**.
+
+**Rationale**: The frontend is always the initiator of saves; it already holds the new data and can compute derived stats (word/char/byte counts) locally. There is no need for Server-Sent Events or WebSockets for events the frontend itself triggers. SSE/WebSockets are reserved for changes that originate on the backend without frontend initiation (e.g., future AI-generation progress).
+
+**Pattern**: After a successful backend save the initiating component dispatches a typed `CustomEvent` on `window`. Other components (e.g., the Lore Tree) subscribe to the event via `window.addEventListener` inside a `useEffect`, update their local state, and clean up on unmount.
+
+All shared event names and detail types live in `src/frontend/src/lib/lore-events.ts`.
+
 ### Additional Technical Requirements
 * Centralized API client with easy backend switching (Grok / Yandex / Local / Mock)
 * Comprehensive error boundaries

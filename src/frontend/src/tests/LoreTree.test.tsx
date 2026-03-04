@@ -204,6 +204,51 @@ describe('LoreTree', () => {
     expect(container.querySelector('[aria-label="not synced"]')).not.toBeNull();
   });
 
+  // ── Stat update on save ────────────────────────────────────────────────────
+
+  it('updates node stats when lore-node-saved event fires', async () => {
+    renderWithSettings(
+      [{ id: 1, parent_id: null, name: 'Chapter', status: 'ACTIVE', latest_version_status: null,
+         word_count: 0, char_count: 0, byte_count: 0,
+         to_be_deleted: 0, content: null, ai_sync_info: null, children: [] }],
+      { statMode: 'words' }
+    );
+    await screen.findByText('Chapter');
+    expect(screen.queryByText(/\d+w/)).toBeNull();
+
+    window.dispatchEvent(new CustomEvent('lore-node-saved', {
+      detail: { id: 1, wordCount: 7, charCount: 35, byteCount: 35 },
+    }));
+
+    await screen.findByText('7w');
+  });
+
+  it('updates aggregate parent stats when lore-node-saved fires for a child', async () => {
+    renderWithSettings(
+      [{
+        id: 1, parent_id: null, name: 'Root', status: 'ACTIVE', latest_version_status: null,
+        word_count: 0, char_count: 0, byte_count: 0,
+        to_be_deleted: 0, content: null, ai_sync_info: null,
+        children: [{
+          id: 2, parent_id: 1, name: 'Child', status: 'ACTIVE', latest_version_status: null,
+          word_count: 0, char_count: 0, byte_count: 0,
+          to_be_deleted: 0, content: null, ai_sync_info: null, children: [],
+        }],
+      }],
+      { statMode: 'words' }
+    );
+    await screen.findByText('Child');
+    expect(screen.queryByText(/\d+w/)).toBeNull();
+
+    window.dispatchEvent(new CustomEvent('lore-node-saved', {
+      detail: { id: 2, wordCount: 10, charCount: 50, byteCount: 50 },
+    }));
+
+    // Both child and root (aggregate) show '10w'
+    const badges = await screen.findAllByText('10w');
+    expect(badges).toHaveLength(2);
+  });
+
   // ── Keyboard interception ──────────────────────────────────────────────────
 
   it('does not intercept Enter key when focus is outside the lore tree', async () => {

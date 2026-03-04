@@ -4,6 +4,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { useTheme } from '../lib/theme/theme-provider'
 import { useEditorSettings } from '../lib/editor-settings'
+import { computeStats, dispatchLoreNodeSaved } from '../lib/lore-events'
 
 interface LoreEditorProps {
   nodeId: number
@@ -71,7 +72,11 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: value }),
-      }).then(() => setContentDirty(false)).catch(() => setContentDirty(false))
+      }).then(() => {
+        setContentDirty(false)
+        const { wordCount, charCount, byteCount } = computeStats(value)
+        dispatchLoreNodeSaved({ id: nodeId, wordCount, charCount, byteCount })
+      }).catch(() => setContentDirty(false))
     }, 1000)
   }
 
