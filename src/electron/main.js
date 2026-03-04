@@ -1,6 +1,6 @@
 'use strict'
 
-const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } = require('electron')
+const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell } = require('electron')
 const path = require('path')
 
 /** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
@@ -201,6 +201,10 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
     for (const [theme, item] of Object.entries(themeMenuItems)) {
       item.checked = theme === value
     }
+    // Sync native window chrome (title bar, menu bar) to the selected theme
+    if (value === 'obsidian') nativeTheme.themeSource = 'dark'
+    else if (value === 'github') nativeTheme.themeSource = 'light'
+    else nativeTheme.themeSource = 'system'
   } else if (key === 'locale') {
     for (const [locale, item] of Object.entries(localeMenuItems)) {
       item.checked = locale === value
