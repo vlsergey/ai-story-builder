@@ -107,10 +107,10 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
       const searchIndexId = config.yandex?.search_index_id
 
       if (caps?.knowledgeBaseAttachment && searchIndexId) {
-        // Path A — KB attachment: pass the pre-built vector store ID so the model
-        // automatically retrieves relevant lore context from it.
+        // Path A — KB attachment: attach the vector store via the OpenAI-compatible
+        // file_search tool so the model retrieves relevant lore context from it.
         ;(requestParams as unknown as Record<string, unknown>)['tools'] = [
-          { searchIndex: { searchIndexIds: [searchIndexId] } },
+          { type: 'file_search', file_search: { vector_store_ids: [searchIndexId] } },
         ]
       } else if (caps?.fileAttachment && engineFileIds.length > 0) {
         // Path B — file attachment fallback: no KB/vector store available yet,
