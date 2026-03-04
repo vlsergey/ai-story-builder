@@ -8,7 +8,7 @@ export interface LoreSettings {
   currentAiEngine: string | null
 }
 
-const LoreSettingsContext = createContext<LoreSettings>({
+export const LoreSettingsContext = createContext<LoreSettings>({
   statMode: 'words',
   currentAiEngine: null,
 })

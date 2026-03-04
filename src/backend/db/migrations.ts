@@ -113,6 +113,22 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       ALTER TABLE lore_nodes ADD COLUMN ai_sync_info TEXT NULL;
     `)
   },
+  // version 2 → 3: backfill word/char/byte counts for existing lore_nodes with content
+  (db) => {
+    const rows = db
+      .prepare('SELECT id, content FROM lore_nodes WHERE content IS NOT NULL')
+      .all() as { id: number; content: string }[]
+    const update = db.prepare(
+      'UPDATE lore_nodes SET word_count = ?, char_count = ?, byte_count = ? WHERE id = ?'
+    )
+    for (const row of rows) {
+      const t = row.content.trim()
+      const words = t === '' ? 0 : t.split(/\s+/).length
+      const chars = [...row.content].length
+      const bytes = Buffer.byteLength(row.content, 'utf8')
+      update.run(words, chars, bytes, row.id)
+    }
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length

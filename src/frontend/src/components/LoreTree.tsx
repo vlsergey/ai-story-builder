@@ -104,7 +104,7 @@ function uniqueName(base: string, existingNames: string[]): string {
 // ── Stats helpers ──────────────────────────────────────────────────────────────
 
 function subtreeStat(node: LoreNode, mode: LoreStatMode): number {
-  const own = mode === 'words' ? node.word_count : mode === 'chars' ? node.char_count : node.byte_count
+  const own = (mode === 'words' ? node.word_count : mode === 'chars' ? node.char_count : node.byte_count) ?? 0
   return own + (node.children ?? []).reduce((sum, c) => sum + subtreeStat(c, mode), 0)
 }
 
