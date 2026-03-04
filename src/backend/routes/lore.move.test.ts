@@ -1,5 +1,5 @@
 /**
- * Integration tests for POST /lore_nodes/:id/move
+ * Integration tests for POST /lore/:id/move
  *
  * Invalid move cases covered:
  *   - root node cannot be moved (403)
@@ -31,11 +31,11 @@ vi.mock('../db/state.js', () => ({
 }))
 
 // Import router AFTER mock is registered
-const { default: router } = await import('./lore_nodes.js')
+const { default: router } = await import('./lore.js')
 
 const app = express()
 app.use(express.json())
-app.use('/lore_nodes', router)
+app.use('/lore', router)
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -97,11 +97,11 @@ afterEach(() => {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
-describe('POST /lore_nodes/:id/move — invalid cases', () => {
+describe('POST /lore/:id/move — invalid cases', () => {
 
   it('403 when moving the root node', async () => {
     const res = await request(app)
-      .post('/lore_nodes/1/move')
+      .post('/lore/1/move')
       .send({ parent_id: 2 })
     expect(res.status).toBe(403)
     expect(res.body.error).toMatch(/root/)
@@ -111,7 +111,7 @@ describe('POST /lore_nodes/:id/move — invalid cases', () => {
 
   it('400 when moving a node to itself', async () => {
     const res = await request(app)
-      .post('/lore_nodes/2/move')
+      .post('/lore/2/move')
       .send({ parent_id: 2 })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/itself/)
@@ -121,7 +121,7 @@ describe('POST /lore_nodes/:id/move — invalid cases', () => {
   it('400 when moving a node to its direct child (direct cycle)', async () => {
     // child-a (2) → grandchild (4) would put 2 inside 4, but 4 is already inside 2
     const res = await request(app)
-      .post('/lore_nodes/2/move')
+      .post('/lore/2/move')
       .send({ parent_id: 4 })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/descendant/)
@@ -138,7 +138,7 @@ describe('POST /lore_nodes/:id/move — invalid cases', () => {
 
     // Try to move child-a (2) → great-grandchild (5)
     const res = await request(app)
-      .post('/lore_nodes/2/move')
+      .post('/lore/2/move')
       .send({ parent_id: 5 })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/descendant/)
@@ -147,14 +147,14 @@ describe('POST /lore_nodes/:id/move — invalid cases', () => {
 
   it('404 when the node to move does not exist', async () => {
     const res = await request(app)
-      .post('/lore_nodes/999/move')
+      .post('/lore/999/move')
       .send({ parent_id: 3 })
     expect(res.status).toBe(404)
   })
 
   it('400 when the target parent does not exist', async () => {
     const res = await request(app)
-      .post('/lore_nodes/3/move')
+      .post('/lore/3/move')
       .send({ parent_id: 999 })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/target parent/)
@@ -164,12 +164,12 @@ describe('POST /lore_nodes/:id/move — invalid cases', () => {
 
 })
 
-describe('POST /lore_nodes/:id/move — valid cases', () => {
+describe('POST /lore/:id/move — valid cases', () => {
 
   it('200: move node to a sibling (reparent within same level)', async () => {
     // Move child-b (3) under child-a (2)
     const res = await request(app)
-      .post('/lore_nodes/3/move')
+      .post('/lore/3/move')
       .send({ parent_id: 2 })
     expect(res.status).toBe(200)
     expect(parentOf(testDbPath, 3)).toBe(2)
@@ -178,7 +178,7 @@ describe('POST /lore_nodes/:id/move — valid cases', () => {
   it('200: move grandchild to a different branch', async () => {
     // Move grandchild (4) under child-b (3)
     const res = await request(app)
-      .post('/lore_nodes/4/move')
+      .post('/lore/4/move')
       .send({ parent_id: 3 })
     expect(res.status).toBe(200)
     expect(parentOf(testDbPath, 4)).toBe(3)
@@ -187,7 +187,7 @@ describe('POST /lore_nodes/:id/move — valid cases', () => {
   it('200: move node directly under root', async () => {
     // Move grandchild (4) to root (1)
     const res = await request(app)
-      .post('/lore_nodes/4/move')
+      .post('/lore/4/move')
       .send({ parent_id: 1 })
     expect(res.status).toBe(200)
     expect(parentOf(testDbPath, 4)).toBe(1)

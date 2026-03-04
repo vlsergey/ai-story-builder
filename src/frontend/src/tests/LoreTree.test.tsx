@@ -1,12 +1,12 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import LoreFolderTree from '../components/LoreFolderTree';
+import LoreTree from '../components/LoreTree';
 
 // Mock the fetch API
 global.fetch = vi.fn() as unknown as typeof fetch;
 
-describe('LoreFolderTree', () => {
+describe('LoreTree', () => {
   const mockProps = {
     onSelectLoreNode: vi.fn()
   };
@@ -21,7 +21,7 @@ describe('LoreFolderTree', () => {
     });
 
     expect(() => {
-      render(<LoreFolderTree {...mockProps} />);
+      render(<LoreTree {...mockProps} />);
     }).not.toThrow();
   });
 
@@ -31,7 +31,7 @@ describe('LoreFolderTree', () => {
     });
 
     expect(() => {
-      render(<LoreFolderTree {...mockProps} />);
+      render(<LoreTree {...mockProps} />);
     }).not.toThrow();
   });
 
@@ -41,7 +41,7 @@ describe('LoreFolderTree', () => {
     });
 
     expect(() => {
-      render(<LoreFolderTree {...mockProps} />);
+      render(<LoreTree {...mockProps} />);
     }).not.toThrow();
   });
 
@@ -59,7 +59,7 @@ describe('LoreFolderTree', () => {
       json: () => Promise.resolve(tree)
     });
 
-    render(<LoreFolderTree {...mockProps} />);
+    render(<LoreTree {...mockProps} />);
     await screen.findByText('Story Lore');
     expect(screen.getByText('Abilities')).toBeTruthy();
     expect(screen.getByText('Spells')).toBeTruthy();

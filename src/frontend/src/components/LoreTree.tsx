@@ -94,7 +94,7 @@ function buildItemsMap(roots: LoreNode[]): Record<TreeItemIndex, TreeItem<ItemDa
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode: (node: LoreNode) => void }) {
+export default function LoreTree({ onSelectLoreNode }: { onSelectLoreNode: (node: LoreNode) => void }) {
   const [tree, setTree] = useState<LoreNode[]>([])
   const [items, setItems] = useState<Record<TreeItemIndex, TreeItem<ItemData>>>({
     root: { index: 'root', isFolder: true, children: [], canMove: false, data: null },
@@ -109,7 +109,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   useEffect(() => { fetchTree() }, [])
 
   function fetchTree() {
-    fetch('/api/lore_nodes/tree')
+    fetch('/api/lore/tree')
       .then(r => r.json())
       .then((data: LoreNode[]) => {
         if (!Array.isArray(data)) return
@@ -164,7 +164,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
       const newParentId = target.targetItem as number
       for (const item of droppedItems) {
         if (!item.data?.id) continue
-        await fetch(`/api/lore_nodes/${item.data.id}/move`, {
+        await fetch(`/api/lore/${item.data.id}/move`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ parent_id: newParentId }),
@@ -192,7 +192,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
       for (const item of droppedItems) {
         if (!item.data?.id) continue
         if (item.data.parent_id !== newParentId) {
-          await fetch(`/api/lore_nodes/${item.data.id}/move`, {
+          await fetch(`/api/lore/${item.data.id}/move`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parent_id: newParentId }),
@@ -201,7 +201,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
       }
 
       // Reorder siblings
-      await fetch('/api/lore_nodes/reorder-children', {
+      await fetch('/api/lore/reorder-children', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ child_ids: remaining }),
@@ -218,7 +218,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     const [parentId] = selectedNodeIds
     const name = window.prompt('New node name:')
     if (!name?.trim()) return
-    await fetch('/api/lore_nodes', {
+    await fetch('/api/lore', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ parent_id: parentId, name: name.trim() }),
@@ -234,7 +234,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
 
   async function handleInlineRename(item: TreeItem<ItemData>, newName: string) {
     if (!item.data?.id || !newName.trim() || newName.trim() === item.data.name) return
-    await fetch(`/api/lore_nodes/${item.data.id}`, {
+    await fetch(`/api/lore/${item.data.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName.trim() }),
@@ -245,7 +245,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
   async function handleDuplicate() {
     if (selectedNodeIds.size !== 1) return
     const [nodeId] = selectedNodeIds
-    await fetch(`/api/lore_nodes/${nodeId}/duplicate`, { method: 'POST' })
+    await fetch(`/api/lore/${nodeId}/duplicate`, { method: 'POST' })
     fetchTree()
   }
 
@@ -259,7 +259,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     const fd = new FormData()
     fd.append('file', f)
     fd.append('parent_id', String(parentId))
-    await fetch('/api/lore_nodes/import', { method: 'POST', body: fd })
+    await fetch('/api/lore/import', { method: 'POST', body: fd })
     fetchTree()
   }
 
@@ -267,7 +267,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     for (const nodeId of selectedNodeIds) {
       const node = findNode(nodeId, tree)
       if (!node) continue
-      const version = await fetch(`/api/lore_nodes/${nodeId}/latest`).then(r => r.json())
+      const version = await fetch(`/api/lore/${nodeId}/latest`).then(r => r.json())
       if (!version?.content) continue
       const blob = new Blob([version.content], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
@@ -281,7 +281,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     await Promise.all(
       [...selectedNodeIds]
         .filter(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
-        .map(id => fetch(`/api/lore_nodes/${id}/sort-children`, { method: 'POST' }))
+        .map(id => fetch(`/api/lore/${id}/sort-children`, { method: 'POST' }))
     )
     fetchTree()
   }
@@ -290,7 +290,7 @@ export default function LoreFolderTree({ onSelectLoreNode }: { onSelectLoreNode:
     const toDelete = [...selectedNodeIds].filter(id => findNode(id, tree)?.parent_id !== null)
     if (toDelete.length === 0) return
     if (!window.confirm(`Delete ${toDelete.length} node${toDelete.length > 1 ? 's' : ''}?`)) return
-    await Promise.all(toDelete.map(id => fetch(`/api/lore_nodes/${id}`, { method: 'DELETE' })))
+    await Promise.all(toDelete.map(id => fetch(`/api/lore/${id}`, { method: 'DELETE' })))
     setViewState(prev => ({ ...prev, 'lore-tree': { ...prev['lore-tree'], selectedItems: [] } }))
     fetchTree()
   }

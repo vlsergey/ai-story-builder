@@ -88,7 +88,7 @@ export interface SettingRow {
 
 // Composite / derived types
 
-/** Full lore tree node (returned by GET /lore_nodes/tree) */
+/** Full lore tree node (returned by GET /lore/tree) */
 export interface LoreTreeNode extends LoreNodeRow {
   /** Status of the latest lore_version, or null if no versions exist */
   latest_version_status: string | null

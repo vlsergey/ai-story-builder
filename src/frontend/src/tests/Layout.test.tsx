@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Layout from '../components/Layout';
 
 // Mock child components that have their own network/state dependencies
-vi.mock('../components/LoreFolderSection', () => ({
+vi.mock('../components/LoreSection', () => ({
   default: () => <div data-testid="folder-section">Folder Section</div>
 }));
 

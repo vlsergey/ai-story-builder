@@ -6,7 +6,7 @@ import { useTheme } from '../lib/theme/theme-provider'
 import 'dockview/dist/styles/dockview.css'
 
 // Local small wrappers to keep import cycles simple
-import LoreFolderSection from './LoreFolderSection'
+import LoreSection from './LoreSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
@@ -261,7 +261,7 @@ export default function Layout({ localeStrings, onClose, initialLayout }: { loca
   const components = {
     lore: () => (
       <div className="p-2 h-full">
-        <LoreFolderSection
+        <LoreSection
           onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
         />
       </div>

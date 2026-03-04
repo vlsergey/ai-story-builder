@@ -16,12 +16,12 @@ export default function LoreEditor({ loreNode }: { loreNode: LoreNode }) {
   useEffect(() => { loadLatest(); loadVersions() }, [loreNode])
 
   function loadVersions() {
-    fetch(`/api/lore_nodes/${loreNode.id}/versions`)
+    fetch(`/api/lore/${loreNode.id}/versions`)
       .then(r => r.json()).then(setVersions).catch(() => setVersions([]))
   }
 
   function loadLatest() {
-    fetch(`/api/lore_nodes/${loreNode.id}/latest`)
+    fetch(`/api/lore/${loreNode.id}/latest`)
       .then(r => r.json())
       .then((j: LoreVersion | null) => { setLatest(j); setContent(j ? j.content : '') })
       .catch(() => { setLatest(null); setContent('') })
@@ -31,7 +31,7 @@ export default function LoreEditor({ loreNode }: { loreNode: LoreNode }) {
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`/api/lore_nodes/${loreNode.id}/versions`, {
+      const res = await fetch(`/api/lore/${loreNode.id}/versions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
@@ -44,7 +44,7 @@ export default function LoreEditor({ loreNode }: { loreNode: LoreNode }) {
   }
 
   function restoreVersion(versionId: number) {
-    fetch(`/api/lore_nodes/restore/${versionId}`, { method: 'POST' })
+    fetch(`/api/lore/restore/${versionId}`, { method: 'POST' })
       .then(r => r.json())
       .then(() => { loadLatest(); loadVersions() })
   }

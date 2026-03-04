@@ -29,7 +29,7 @@ const router: Router = express.Router()
 
 // ── Tree ──────────────────────────────────────────────────────────────────────
 
-// GET /lore_nodes/tree — full lore tree with latest version status per node
+// GET /lore/tree — full lore tree with latest version status per node
 router.get('/tree', (_req: Request, res: Response) => {
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   const dbPath = getCurrentDbPath()
@@ -64,7 +64,7 @@ router.get('/tree', (_req: Request, res: Response) => {
 
 // ── Import (must precede /:id routes) ─────────────────────────────────────────
 
-// POST /lore_nodes/import — upload a file and create a node with its content
+// POST /lore/import — upload a file and create a node with its content
 router.post('/import', upload.single('file'), (req: Request, res: Response) => {
   if (!req.file) return res.status(400).json({ error: 'file required' })
   const dbPath = getCurrentDbPath()
@@ -90,7 +90,7 @@ router.post('/import', upload.single('file'), (req: Request, res: Response) => {
 
 // ── Restore a version ─────────────────────────────────────────────────────────
 
-// POST /lore_nodes/restore/:version_id — make a copy of an old version as the new latest
+// POST /lore/restore/:version_id — make a copy of an old version as the new latest
 router.post('/restore/:version_id', (_req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -117,7 +117,7 @@ router.post('/restore/:version_id', (_req: Request, res: Response) => {
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-// POST /lore_nodes — create a node (appended at the end of the parent's children)
+// POST /lore — create a node (appended at the end of the parent's children)
 router.post('/', express.json(), (req: Request, res: Response) => {
   const { parent_id, name } = req.body as { parent_id?: number | null; name?: string }
   const dbPath = getCurrentDbPath()
@@ -139,7 +139,7 @@ router.post('/', express.json(), (req: Request, res: Response) => {
   }
 })
 
-// POST /lore_nodes/reorder-children — set positions of direct children in the given order
+// POST /lore/reorder-children — set positions of direct children in the given order
 router.post('/reorder-children', express.json(), (req: Request, res: Response) => {
   const { child_ids } = req.body as { child_ids?: number[] }
   const dbPath = getCurrentDbPath()
@@ -157,7 +157,7 @@ router.post('/reorder-children', express.json(), (req: Request, res: Response) =
   }
 })
 
-// PATCH /lore_nodes/:id — rename a node
+// PATCH /lore/:id — rename a node
 router.patch('/:id', express.json(), (req: Request, res: Response) => {
   const { name } = req.body as { name?: string }
   const dbPath = getCurrentDbPath()
@@ -173,7 +173,7 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
   }
 })
 
-// DELETE /lore_nodes/:id — soft-delete (root node protected)
+// DELETE /lore/:id — soft-delete (root node protected)
 router.delete('/:id', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -196,7 +196,7 @@ router.delete('/:id', (req: Request, res: Response) => {
   }
 })
 
-// POST /lore_nodes/:id/sort-children — sort direct children alphabetically by name
+// POST /lore/:id/sort-children — sort direct children alphabetically by name
 router.post('/:id/sort-children', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -215,7 +215,7 @@ router.post('/:id/sort-children', (req: Request, res: Response) => {
   }
 })
 
-// POST /lore_nodes/:id/move — change parent
+// POST /lore/:id/move — change parent
 router.post('/:id/move', express.json(), (req: Request, res: Response) => {
   const { parent_id } = req.body as { parent_id?: number | null }
   const dbPath = getCurrentDbPath()
@@ -263,7 +263,7 @@ router.post('/:id/move', express.json(), (req: Request, res: Response) => {
   }
 })
 
-// POST /lore_nodes/:id/duplicate — copy node and its latest version content
+// POST /lore/:id/duplicate — copy node and its latest version content
 router.post('/:id/duplicate', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -302,7 +302,7 @@ router.post('/:id/duplicate', (req: Request, res: Response) => {
 
 // ── Versions ──────────────────────────────────────────────────────────────────
 
-// GET /lore_nodes/:id/versions
+// GET /lore/:id/versions
 router.get('/:id/versions', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -319,7 +319,7 @@ router.get('/:id/versions', (req: Request, res: Response) => {
   }
 })
 
-// POST /lore_nodes/:id/versions
+// POST /lore/:id/versions
 router.post('/:id/versions', express.json(), (req: Request, res: Response) => {
   const { content } = req.body as { content?: string }
   const dbPath = getCurrentDbPath()
@@ -341,7 +341,7 @@ router.post('/:id/versions', express.json(), (req: Request, res: Response) => {
   }
 })
 
-// GET /lore_nodes/:id/latest
+// GET /lore/:id/latest
 router.get('/:id/latest', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
