@@ -42,7 +42,7 @@ export interface GenerateResponseRequest {
 export interface AiEngineAdapter {
   generateResponse(
     req: GenerateResponseRequest,
-    onThinking: (status: string) => void,
+    onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void>
 }

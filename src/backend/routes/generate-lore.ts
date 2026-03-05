@@ -129,7 +129,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
         config,
         responseSchema,
       },
-      (status) => sse('thinking', { status }),
+      (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,
     )
     sse('done', {})

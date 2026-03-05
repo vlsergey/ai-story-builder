@@ -23,7 +23,7 @@ export function createGrokClient(apiKey: string): OpenAI {
 export async function grokGenerate(
   apiKey: string,
   params: Record<string, unknown>,
-  onThinking?: (status: string) => void,
+  onThinking?: (status: string, detail?: string) => void,
   onDelta?: (text: string) => void,
 ): Promise<string> {
   const client = createGrokClient(apiKey)
@@ -93,8 +93,12 @@ export async function grokGenerate(
         const input = (event as unknown as { input?: string }).input
         if (input) {
           try {
-            const parsed = JSON.parse(input) as { key?: string }
+            const parsed = JSON.parse(input) as { key?: string; query?: string }
             if (parsed.key) console.log(`[Grok] read_attachment key: ${parsed.key}`)
+            if (parsed.query) {
+              console.log(`[Grok] read_attachment query: ${parsed.query}`)
+              onThinking?.('reading_attachment', parsed.query)
+            }
           } catch { /* ignore */ }
         }
         break

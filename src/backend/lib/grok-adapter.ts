@@ -4,7 +4,7 @@ import { grokGenerate } from './grok-client.js'
 export class GrokAdapter implements AiEngineAdapter {
   async generateResponse(
     req: GenerateResponseRequest,
-    onThinking: (status: string) => void,
+    onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void> {
     const apiKey = req.config.grok?.api_key?.trim()

@@ -5,7 +5,7 @@ import { createYandexClient } from './yandex-client.js'
 export class YandexAdapter implements AiEngineAdapter {
   async generateResponse(
     req: GenerateResponseRequest,
-    onThinking: (status: string) => void,
+    onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void> {
     const apiKey = req.config.yandex?.api_key?.trim()

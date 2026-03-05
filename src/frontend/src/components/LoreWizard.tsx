@@ -39,6 +39,7 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
+  const [thinkingDetail, setThinkingDetail] = useState<string | null>(null)
   const [thinkingDone, setThinkingDone] = useState(false)
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
     setContent('')
     setName('')
     setThinkingStatus(null)
+    setThinkingDetail(null)
     setThinkingDone(false)
     setGenerating(true)
     setError(null)
@@ -79,9 +81,10 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
         includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
-        onThinking: (status) => {
+        onThinking: (status, detail) => {
           if (status === 'done') { setThinkingDone(true) }
           else { setThinkingStatus(status); setThinkingDone(false) }
+          setThinkingDetail(detail ?? null)
         },
         onPartialJson: (partial) => {
           if (typeof partial.name === 'string') setName(partial.name)
@@ -199,11 +202,20 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
 
       {/* Thinking status row */}
       {thinkingStatus !== null && (
-        <div className="flex items-center gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
-          {thinkingDone
-            ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            : <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
-          <span>{t(`thinking.${thinkingDone ? 'done' : thinkingStatus}`)}</span>
+        <div className="flex items-start gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
+          <div className="mt-0.5 shrink-0">
+            {thinkingDone
+              ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+              : <Loader2 className="h-4 w-4 animate-spin" />}
+          </div>
+          <div className="min-w-0">
+            <div>{t(`thinking.${thinkingDone ? 'done' : thinkingStatus}`)}</div>
+            {thinkingDetail && (
+              <div className="text-xs text-muted-foreground/70 truncate" title={thinkingDetail}>
+                {thinkingDetail}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
