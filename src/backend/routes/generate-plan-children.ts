@@ -1,38 +1,8 @@
 import express, { Request, Response, Router } from 'express'
-import { parse as parsePartialJson } from 'best-effort-json-parser'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
+import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
-
-const PLAN_CHILDREN_SCHEMA: JsonSchemaSpec = {
-  name: 'plan_outline',
-  description: 'An annotated outline: a parent overview and an ordered list of subsections, each with a heading and detailed body text',
-  schema: {
-    type: 'object',
-    properties: {
-      overview: {
-        type: 'string',
-        description: 'Brief synopsis / updated overview of the parent section (2–5 sentences)',
-      },
-      items: {
-        type: 'array',
-        description: 'Ordered list of subsections in the outline',
-        items: {
-          type: 'object',
-          properties: {
-            title: { type: 'string', description: 'Subsection heading (1–10 words)' },
-            content: { type: 'string', description: 'Body text / detailed notes for this subsection in plain text format' },
-          },
-          required: ['title', 'content'],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ['overview', 'items'],
-    additionalProperties: false,
-  },
-}
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -40,6 +10,21 @@ try {
   Database = require('better-sqlite3')
 } catch (_) {
   Database = null
+}
+
+/**
+ * Parses a markdown outline where the first block (before any ## heading) is
+ * the overview and each ## heading introduces a new subsection.
+ */
+function parseMarkdownOutline(text: string): { overview: string; items: Array<{ title: string; content: string }> } {
+  const parts = text.split(/^## /m)
+  const overview = parts[0].trim()
+  const items = parts.slice(1).map(part => {
+    const newline = part.indexOf('\n')
+    if (newline === -1) return { title: part.trim(), content: '' }
+    return { title: part.slice(0, newline).trim(), content: part.slice(newline + 1).trim() }
+  })
+  return { overview, items }
 }
 
 const router: Router = express.Router()
@@ -114,17 +99,18 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
     ? `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
       `Your task is to produce a **top-level annotated outline** for an entire literary work titled "${sectionTitle}".\n` +
-      `Generate a structured breakdown of its major parts (chapters, acts, or equivalent units).\n` +
-      `Each subsection must have a concise heading and a rich body: synopsis, character arcs, key themes, scene-by-scene notes — enough detail that a writer can start drafting directly from it.\n` +
-      `Also provide a brief overall overview/synopsis of the work in the "overview" field.\n` +
-      `Respond with a JSON object matching the provided schema. No explanations, no preamble outside the JSON.` +
+      `Begin with a brief overall overview/synopsis paragraph (no heading).\n` +
+      `Then use ## Markdown headings for each major part (chapter, act, or equivalent unit).\n` +
+      `Under each heading write a rich body: synopsis, character arcs, key themes, scene-by-scene notes — enough detail that a writer can start drafting directly from it.\n` +
+      `No explanations, no preamble, no JSON — respond in Markdown only.` +
       parentContext
     : `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
       `Your task is to produce a **detailed breakdown** of the section titled "${sectionTitle}".\n` +
-      `Split it into logically coherent subsections. Each subsection must have a concise heading and a rich body: scene descriptions, character motivations, dialogue hints, pacing notes — enough detail that a writer can start drafting directly from it.\n` +
-      `Also provide a brief synopsis of the parent section as a whole in the "overview" field.\n` +
-      `Respond with a JSON object matching the provided schema. No explanations, no preamble outside the JSON.` +
+      `Begin with a brief synopsis of this section as a whole (no heading).\n` +
+      `Then use ## Markdown headings for each logically coherent subsection.\n` +
+      `Under each heading write a rich body: scene descriptions, character motivations, dialogue hints, pacing notes — enough detail that a writer can start drafting directly from it.\n` +
+      `No explanations, no preamble, no JSON — respond in Markdown only.` +
       parentContext
 
   res.setHeader('Content-Type', 'text/event-stream')
@@ -138,11 +124,11 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   let lastEmittedJson = ''
   const onDelta = (chunk: string) => {
     accumulated += chunk
-    const partial = parsePartialJson(accumulated) as Record<string, unknown>
-    const json = JSON.stringify(partial)
+    const parsed = parseMarkdownOutline(accumulated)
+    const json = JSON.stringify(parsed)
     if (json === lastEmittedJson) return
     lastEmittedJson = json
-    sse('partial_json', partial)
+    sse('partial_json', parsed)
   }
 
   try {
@@ -156,8 +142,6 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
         engineFileIds,
         engineDef,
         config,
-        responseSchema: PLAN_CHILDREN_SCHEMA,
-        stringFormat: false,
         maxTokens: maxTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),

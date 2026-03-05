@@ -1,23 +1,8 @@
 import express, { Request, Response, Router } from 'express'
-import { parse as parsePartialJson } from 'best-effort-json-parser'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
+import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
-
-const PLAN_RESPONSE_SCHEMA: JsonSchemaSpec = {
-  name: 'plan_node',
-  description: 'A plan node with a short title and content in markdown format',
-  schema: {
-    type: 'object',
-    properties: {
-      title: { type: 'string', description: 'Short title for the plan node (1–10 words)' },
-      content: { type: 'string', description: 'Full content of the plan node in markdown format' },
-    },
-    required: ['title', 'content'],
-    additionalProperties: false,
-  },
-}
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -92,12 +77,11 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   const systemPrompt = (mode === 'improve' && baseContent)
     ? `You are a creative writing assistant. Improve the following plan node according to the user's instructions.\n` +
       `Language: ${textLanguage}.\n` +
-      `Respond with a JSON object matching the provided schema. Refine the title only if necessary. ` +
-      `Output the full improved text in Markdown format — never omit or abbreviate any part of the text, even unchanged sections. No explanations, no preamble.\n\n` +
-      `Current text:\n<current_text>\n${baseContent}\n</current_text>`
-    : `You are a creative writing assistant. Generate a plan node for a story.\n` +
+      `Write in Markdown format — output the full improved text, never omit or abbreviate unchanged sections. No explanations, no preamble.\n\n` +
+      `<current_text>\n${baseContent}\n</current_text>`
+    : `You are a creative writing assistant. Generate content for a plan node.\n` +
       `Language: ${textLanguage}.\n` +
-      `Respond with a JSON object matching the provided schema. No explanations, no preamble.`
+      `Write in Markdown format. No explanations, no preamble.`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -107,14 +91,12 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 
   let accumulated = ''
-  let lastEmittedJson = ''
+  let lastEmitted = ''
   const onDelta = (chunk: string) => {
     accumulated += chunk
-    const partial = parsePartialJson(accumulated) as Record<string, unknown>
-    const json = JSON.stringify(partial)
-    if (json === lastEmittedJson) return
-    lastEmittedJson = json
-    sse('partial_json', partial)
+    if (accumulated === lastEmitted) return
+    lastEmitted = accumulated
+    sse('partial_json', { content: accumulated })
   }
 
   try {
@@ -128,7 +110,6 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
         engineFileIds,
         engineDef,
         config,
-        responseSchema: PLAN_RESPONSE_SCHEMA,
         maxTokens: maxTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
