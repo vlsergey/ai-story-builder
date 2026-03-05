@@ -16,12 +16,14 @@ const router: Router = express.Router()
 interface GrokConfig {
   api_key?: string
   available_models?: string[]
+  last_model?: string
 }
 
 interface YandexConfig {
   api_key?: string
   folder_id?: string
   available_models?: string[]
+  last_model?: string
 }
 
 interface AiConfigStore {
@@ -79,11 +81,13 @@ router.get('/config', (_req: Request, res: Response) => {
       grok: {
         api_key: config.grok?.api_key ?? '',
         available_models: config.grok?.available_models ?? [],
+        last_model: config.grok?.last_model ?? null,
       },
       yandex: {
         api_key: config.yandex?.api_key ?? '',
         folder_id: config.yandex?.folder_id ?? '',
         available_models: config.yandex?.available_models ?? [],
+        last_model: config.yandex?.last_model ?? null,
       },
     })
   } catch (e) {

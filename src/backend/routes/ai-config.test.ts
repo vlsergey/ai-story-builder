@@ -76,6 +76,23 @@ describe('GET /ai/config', () => {
     expect(res.body.yandex.folder_id).toBe('b1g12345')
   })
 
+  it('returns null last_model when not set', async () => {
+    const res = await request(app).get('/ai/config')
+    expect(res.status).toBe(200)
+    expect(res.body.grok.last_model).toBeNull()
+    expect(res.body.yandex.last_model).toBeNull()
+  })
+
+  it('returns stored last_model for grok and yandex', async () => {
+    await request(app).post('/ai/config').send({ engine: 'grok', fields: { last_model: 'grok-3' } })
+    await request(app).post('/ai/config').send({ engine: 'yandex', fields: { last_model: 'gpt://b1g999/yandexgpt/latest' } })
+
+    const res = await request(app).get('/ai/config')
+    expect(res.status).toBe(200)
+    expect(res.body.grok.last_model).toBe('grok-3')
+    expect(res.body.yandex.last_model).toBe('gpt://b1g999/yandexgpt/latest')
+  })
+
   it('returns saved current_engine', async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')

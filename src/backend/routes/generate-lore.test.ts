@@ -15,16 +15,21 @@ vi.mock('../db/state.js', () => ({
   getCurrentDbPath: () => testDbPath,
 }))
 
-// ─── OpenAI mock ──────────────────────────────────────────────────────────────
+// ─── OpenAI mock (used by Yandex) ─────────────────────────────────────────────
 
-const { mockChatCreate } = vi.hoisted(() => ({
+const { mockChatCreate, mockGrokGenerate } = vi.hoisted(() => ({
   mockChatCreate: vi.fn(),
+  mockGrokGenerate: vi.fn(),
 }))
 
 vi.mock('openai', () => ({
   default: class {
     chat = { completions: { create: mockChatCreate } }
   },
+}))
+
+vi.mock('../lib/grok-client.js', () => ({
+  grokGenerate: mockGrokGenerate,
 }))
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -129,10 +134,14 @@ function setupDb(opts?: {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function mockCompletionResponse(content = 'Generated lore text') {
+function mockYandexResponse(content = 'Generated lore text') {
   mockChatCreate.mockResolvedValueOnce({
     choices: [{ message: { content } }],
   })
+}
+
+function mockGrokResponse(content = 'Generated lore text') {
+  mockGrokGenerate.mockResolvedValueOnce(content)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -183,7 +192,7 @@ describe('POST /ai/generate-lore', () => {
 
   it('returns generated content for Grok engine', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
-    mockCompletionResponse('A brave hero named Arin.')
+    mockGrokResponse('A brave hero named Arin.')
 
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
     expect(res.status).toBe(200)
@@ -198,9 +207,8 @@ describe('POST /ai/generate-lore', () => {
   })
 
   // ─── 3. Grok file attachment format ───────────────────────────────────────
-  // Bug fix: xAI uses { type: 'file', file_id } not { type: 'file', file: { file_id } }
 
-  it('attaches files using flat { type: file, file_id } format (not nested file.file_id)', async () => {
+  it('attaches files using { type: input_file, file_id } format in Responses API', async () => {
     testDbPath = setupDb({
       grokApiKey: 'grok-key',
       nodes: [
@@ -216,25 +224,23 @@ describe('POST /ai/generate-lore', () => {
         },
       ],
     })
-    mockCompletionResponse('Hero content')
+    mockGrokResponse('Hero content')
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'Describe a hero',
       includeExistingLore: true,
     })
 
-    expect(mockChatCreate).toHaveBeenCalledOnce()
-    const callArgs = mockChatCreate.mock.calls[0][0]
-    const userMessage = callArgs.messages.find((m: { role: string }) => m.role === 'user')
-    expect(Array.isArray(userMessage.content)).toBe(true)
+    expect(mockGrokGenerate).toHaveBeenCalledOnce()
+    const params = mockGrokGenerate.mock.calls[0][1] as {
+      input: Array<{ role: string; content: Array<Record<string, unknown>> }>
+    }
+    const userMessage = params.input.find((m) => m.role === 'user')
+    expect(Array.isArray(userMessage!.content)).toBe(true)
 
-    const fileAttachment = (userMessage.content as Array<Record<string, unknown>>)
-      .find(c => c.type === 'file')
+    const fileAttachment = userMessage!.content.find(c => c.type === 'input_file')
     expect(fileAttachment).toBeDefined()
-    // Must use flat format: { type: 'file', file_id: '...' }
     expect(fileAttachment!.file_id).toBe('file-abc123')
-    // Must NOT use nested format: { type: 'file', file: { file_id: '...' } }
-    expect(fileAttachment!.file).toBeUndefined()
   })
 
   // ─── 4. Grok group-leader nodes (word_count=0) included in file list ───────
@@ -257,18 +263,19 @@ describe('POST /ai/generate-lore', () => {
         },
       ],
     })
-    mockCompletionResponse('Hero lore')
+    mockGrokResponse('Hero lore')
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'Tell me about the hero',
       includeExistingLore: true,
     })
 
-    expect(mockChatCreate).toHaveBeenCalledOnce()
-    const callArgs = mockChatCreate.mock.calls[0][0]
-    const userMessage = callArgs.messages.find((m: { role: string }) => m.role === 'user')
-    const fileAttachments = (userMessage.content as Array<Record<string, unknown>>)
-      .filter(c => c.type === 'file')
+    expect(mockGrokGenerate).toHaveBeenCalledOnce()
+    const params = mockGrokGenerate.mock.calls[0][1] as {
+      input: Array<{ role: string; content: Array<Record<string, unknown>> }>
+    }
+    const userMessage = params.input.find((m) => m.role === 'user')
+    const fileAttachments = userMessage!.content.filter(c => c.type === 'input_file')
 
     // The group-leader node (word_count=0) must be included
     expect(fileAttachments.some(f => f.file_id === 'file-leader')).toBe(true)
@@ -291,17 +298,18 @@ describe('POST /ai/generate-lore', () => {
         },
       ],
     })
-    mockCompletionResponse('Some lore')
+    mockGrokResponse('Some lore')
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'test',
       includeExistingLore: true,
     })
 
-    const callArgs = mockChatCreate.mock.calls[0][0]
-    const userMessage = callArgs.messages.find((m: { role: string }) => m.role === 'user')
-    const fileAttachments = (userMessage.content as Array<Record<string, unknown>>)
-      .filter(c => c.type === 'file')
+    const params = mockGrokGenerate.mock.calls[0][1] as {
+      input: Array<{ role: string; content: Array<Record<string, unknown>> }>
+    }
+    const userMessage = params.input.find((m) => m.role === 'user')
+    const fileAttachments = userMessage!.content.filter(c => c.type === 'input_file')
 
     expect(fileAttachments.some(f => f.file_id === 'file-active')).toBe(true)
     expect(fileAttachments.some(f => f.file_id === 'file-deleted')).toBe(false)
@@ -317,20 +325,18 @@ describe('POST /ai/generate-lore', () => {
         },
       ],
     })
-    mockCompletionResponse('Some lore')
+    mockGrokResponse('Some lore')
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'test',
       includeExistingLore: false,
     })
 
-    const callArgs = mockChatCreate.mock.calls[0][0]
-    const userMessage = callArgs.messages.find((m: { role: string }) => m.role === 'user')
-    // When includeExistingLore=false, content should be a plain string (not array)
-    // OR an array with only text (no file attachments)
-    const fileAttachments = Array.isArray(userMessage.content)
-      ? (userMessage.content as Array<Record<string, unknown>>).filter(c => c.type === 'file')
-      : []
+    const params = mockGrokGenerate.mock.calls[0][1] as {
+      input: Array<{ role: string; content: Array<Record<string, unknown>> }>
+    }
+    const userMessage = params.input.find((m) => m.role === 'user')
+    const fileAttachments = userMessage!.content.filter(c => c.type === 'input_file')
     expect(fileAttachments).toHaveLength(0)
   })
 
@@ -338,7 +344,7 @@ describe('POST /ai/generate-lore', () => {
 
   it('returns generated content for Yandex engine', async () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
-    mockCompletionResponse('Yandex lore result')
+    mockYandexResponse('Yandex lore result')
 
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Create a world' })
     expect(res.status).toBe(200)
@@ -356,23 +362,43 @@ describe('POST /ai/generate-lore', () => {
 
   it('uses text_language from settings in the system prompt', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key', textLanguage: 'en-US' })
-    mockCompletionResponse('English lore')
+    mockGrokResponse('English lore')
 
     await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a wizard' })
 
-    const callArgs = mockChatCreate.mock.calls[0][0]
-    const systemMessage = callArgs.messages.find((m: { role: string }) => m.role === 'system')
-    expect(systemMessage.content).toContain('en-US')
+    const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
+    expect(params.instructions).toContain('en-US')
   })
 
   it('defaults to ru-RU when text_language is not set', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
-    mockCompletionResponse('Russian lore')
+    mockGrokResponse('Russian lore')
 
     await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
 
-    const callArgs = mockChatCreate.mock.calls[0][0]
-    const systemMessage = callArgs.messages.find((m: { role: string }) => m.role === 'system')
-    expect(systemMessage.content).toContain('ru-RU')
+    const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
+    expect(params.instructions).toContain('ru-RU')
+  })
+
+  // ─── 7. Grok web search ────────────────────────────────────────────────────
+
+  it('passes web_search tool to Grok when webSearch is enabled', async () => {
+    testDbPath = setupDb({ grokApiKey: 'grok-key' })
+    mockGrokResponse('Lore with web info')
+
+    await request(app).post('/ai/generate-lore').send({ prompt: 'News', webSearch: 'on' })
+
+    const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
+    expect(params.tools).toEqual([{ type: 'web_search' }])
+  })
+
+  it('does not pass tools to Grok when webSearch is none', async () => {
+    testDbPath = setupDb({ grokApiKey: 'grok-key' })
+    mockGrokResponse('Normal lore')
+
+    await request(app).post('/ai/generate-lore').send({ prompt: 'Something', webSearch: 'none' })
+
+    const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
+    expect(params.tools).toBeUndefined()
   })
 })

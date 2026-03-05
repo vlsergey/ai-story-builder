@@ -2,6 +2,6 @@
   "watch": ["."],
   "ext": "ts,json",
   "exec": "tsx server.ts",
-  "ignore": ["data/"],
+  "ignore": ["data/", "**/*.test.ts"],
   "verbose": true
 }

@@ -5,6 +5,7 @@ import { EditorView } from '@codemirror/view'
 import { useTheme } from '../lib/theme/theme-provider'
 import { useEditorSettings } from '../lib/editor-settings'
 import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
+import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
 
 interface LoreWizardProps {
   parentNodeId: number
@@ -23,9 +24,10 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
 
   const [prompt, setPrompt] = useState('')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
+  const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState('')
-  const [webSearch, setWebSearch] = useState<'none' | 'low' | 'medium' | 'high'>('none')
+  const [webSearch, setWebSearch] = useState('none')
   const [content, setContent] = useState('')
   const [name, setName] = useState('New lore item')
   const [generating, setGenerating] = useState(false)
@@ -41,12 +43,17 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
     fetch('/api/ai/config')
       .then(r => r.json())
       .then((data: { current_engine?: string | null; [key: string]: unknown }) => {
-        const engine = data.current_engine
+        const engine = data.current_engine ?? null
+        setCurrentEngine(engine)
         if (!engine) return
-        const engineData = data[engine] as { available_models?: string[] } | undefined
+        const engineData = data[engine] as {
+          available_models?: string[]
+          last_model?: string | null
+        } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
-        if (models.length > 0) setSelectedModel(models[0])
+        const last = engineData?.last_model
+        setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
       })
       .catch(() => {})
   }, [])
@@ -69,6 +76,13 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
       const data = await res.json() as { content?: string; error?: string }
       if (res.ok) {
         setContent(data.content ?? '')
+        if (selectedModel && currentEngine) {
+          void fetch('/api/ai/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel } }),
+          })
+        }
       } else {
         setError(data.error ?? 'Unknown error')
       }
@@ -103,6 +117,8 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
     }
   }
 
+  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Prompt textarea */}
@@ -125,17 +141,30 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
           Include existing lore
         </label>
 
-        <select
-          value={webSearch}
-          onChange={e => setWebSearch(e.target.value as typeof webSearch)}
-          className="text-sm border border-border rounded px-2 py-0.5 bg-background"
-          title="Web search"
-        >
-          <option value="none">No web search</option>
-          <option value="low">Web: low</option>
-          <option value="medium">Web: medium</option>
-          <option value="high">Web: high</option>
-        </select>
+        {engineDef?.webSearch === 'contextSize' && (
+          <select
+            value={webSearch}
+            onChange={e => setWebSearch(e.target.value)}
+            className="text-sm border border-border rounded px-2 py-0.5 bg-background"
+            title="Web search"
+          >
+            <option value="none">No web search</option>
+            <option value="low">Web: low</option>
+            <option value="medium">Web: medium</option>
+            <option value="high">Web: high</option>
+          </select>
+        )}
+        {engineDef?.webSearch === 'boolean' && (
+          <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={webSearch !== 'none'}
+              onChange={e => setWebSearch(e.target.checked ? 'on' : 'none')}
+              className="accent-primary"
+            />
+            Web search
+          </label>
+        )}
 
         {availableModels.length > 0 && (
           <select

@@ -3,7 +3,7 @@ import type OpenAI from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import { createYandexClient } from '../lib/yandex-client.js'
-import { createGrokClient } from '../lib/grok-client.js'
+import { grokGenerate } from '../lib/grok-client.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -155,30 +155,29 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     const maxFiles = engineDef.maxFilesPerRequest ?? 10
     // Default model — falls back if available_models not cached yet
     const model = requestedModel?.trim() || 'grok-3'
-    const client = createGrokClient(apiKey)
 
     try {
-      // Build user message — attach file IDs if lore was synced
+      // Build user message content for the Responses API
       const attachableFileIds = engineFileIds.slice(0, maxFiles)
-      const userContent: unknown[] = [{ type: 'text', text: prompt.trim() }]
-
+      const userContent: Array<{ type: 'input_text'; text: string } | { type: 'input_file'; file_id: string }> = [
+        { type: 'input_text', text: prompt.trim() },
+      ]
       if (includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
         for (const fileId of attachableFileIds) {
-          // xAI Grok uses { type: 'file', file_id: '...' } (not OpenAI's nested { file: { file_id } })
-          userContent.push({ type: 'file', file_id: fileId })
+          userContent.push({ type: 'input_file', file_id: fileId })
         }
       }
 
-      const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+      const requestParams: Record<string, unknown> = {
         model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent as OpenAI.Chat.Completions.ChatCompletionContentPart[] },
-        ],
+        instructions: systemPrompt,
+        input: [{ role: 'user', content: userContent }],
+      }
+      if (webSearch && webSearch !== 'none') {
+        requestParams.tools = [{ type: 'web_search' }]
       }
 
-      const completion = await client.chat.completions.create(requestParams)
-      const content = completion.choices[0]?.message?.content ?? ''
+      const content = await grokGenerate(apiKey, requestParams)
       return res.json({ content })
     } catch (e) {
       return res.status(500).json({ error: String(e) })

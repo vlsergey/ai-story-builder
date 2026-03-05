@@ -78,6 +78,13 @@ export interface AiEngineDefinition {
    * to at most this many files before uploading (level-2 collapse).
    */
   maxFilesPerRequest: number | null
+  /**
+   * Web search support mode for lore generation:
+   * - 'none': not supported — no UI shown
+   * - 'contextSize': dropdown none/low/medium/high (Yandex)
+   * - 'boolean': checkbox on/off (Grok)
+   */
+  webSearch: 'none' | 'contextSize' | 'boolean'
 }
 
 /** Capability keys in display order. Labels and descriptions are in i18n locale files. */
@@ -104,6 +111,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       { key: 'api_key', type: 'password' },
     ],
     maxFilesPerRequest: 10,
+    webSearch: 'boolean',
   },
   {
     id: 'yandex',
@@ -120,6 +128,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
       { key: 'folder_id', type: 'text' },
     ],
     maxFilesPerRequest: null,
+    webSearch: 'contextSize',
   },
 ]
 

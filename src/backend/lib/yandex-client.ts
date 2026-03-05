@@ -59,7 +59,8 @@ export function makeLoggingFetch(
     }
 
     if (verboseLogging) {
-      console.log(`[${providerName}] REQ ${method.trim()} ${shortUrl}`)
+      const ts = new Date().toISOString()
+      console.log(`[${providerName}] [${ts}] REQ ${method.trim()} ${shortUrl}`)
       console.log(`[${providerName}] REQ headers: ${JSON.stringify(maskedHeaders(init?.headers))}`)
       if (init?.body && typeof init.body === 'string') {
         console.log(`[${providerName}] REQ body: ${init.body}`)
@@ -70,7 +71,7 @@ export function makeLoggingFetch(
     try {
       response = await globalThis.fetch(url, init)
     } catch (e) {
-      console.error(`[${providerName}] ${method} ${shortUrl}${reqSize} — ERROR after ${Date.now() - start}ms: ${e}`)
+      console.error(`[${providerName}] [${new Date().toISOString()}] ${method} ${shortUrl}${reqSize} — ERROR after ${Date.now() - start}ms: ${e}`)
       throw e
     }
 
@@ -79,7 +80,8 @@ export function makeLoggingFetch(
     const respSize = contentLength ? ` resp:${contentLength}B` : ''
     const traceId = response.headers.get('x-server-trace-id') ?? ''
     const traceStr = traceId ? ` trace:${traceId}` : ''
-    console.log(`[${providerName}] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`)
+    const ts = new Date().toISOString()
+    console.log(`[${providerName}] [${ts}] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`)
 
     if (verboseLogging) {
       response.clone().text().then(body => {
