@@ -21,6 +21,12 @@ export interface LoreVersionRow {
   version: number
   content: string
   status: string
+  /** 'manual' | 'ai' — how this version was created */
+  source: string
+  /** The AI prompt used when source='ai', null otherwise */
+  prompt: string | null
+  /** The AI engine response ID when source='ai', null otherwise */
+  response_id: string | null
   created_at: string
 }
 

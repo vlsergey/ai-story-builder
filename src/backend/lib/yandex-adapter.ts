@@ -7,7 +7,7 @@ export class YandexAdapter implements AiEngineAdapter {
     req: GenerateResponseRequest,
     onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
-  ): Promise<void> {
+  ): Promise<{ response_id?: string }> {
     const apiKey = req.config.yandex?.api_key?.trim()
     const folderId = req.config.yandex?.folder_id?.trim()
     if (!apiKey || !folderId) throw new Error('Yandex api_key and folder_id are required')
@@ -52,5 +52,6 @@ export class YandexAdapter implements AiEngineAdapter {
     const completion = await client.chat.completions.create(requestParams)
     onDelta(completion.choices[0]?.message?.content ?? '')
     onThinking('done')
+    return {}
   }
 }

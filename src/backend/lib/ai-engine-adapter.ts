@@ -44,7 +44,7 @@ export interface AiEngineAdapter {
     req: GenerateResponseRequest,
     onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
-  ): Promise<void>
+  ): Promise<{ response_id?: string }>
 }
 
 import { GrokAdapter } from './grok-adapter.js'

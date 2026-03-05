@@ -25,7 +25,7 @@ export async function grokGenerate(
   params: Record<string, unknown>,
   onThinking?: (status: string, detail?: string) => void,
   onDelta?: (text: string) => void,
-): Promise<string> {
+): Promise<{ text: string; response_id?: string }> {
   const client = createGrokClient(apiKey)
 
   const stream = await client.responses.create({
@@ -34,6 +34,7 @@ export async function grokGenerate(
   } as ResponseCreateParamsStreaming)
 
   let text = ''
+  let responseId: string | undefined
 
   for await (const event of stream) {
     if (isVerboseLogging()) {
@@ -42,6 +43,12 @@ export async function grokGenerate(
     }
 
     switch (event.type) {
+      case 'response.created': {
+        const resp = (event as unknown as { response?: { id?: string } }).response
+        if (resp?.id) responseId = resp.id
+        break
+      }
+
       case 'response.output_text.delta':
         text += event.delta
         onDelta?.(event.delta)
@@ -128,5 +135,5 @@ export async function grokGenerate(
     }
   }
 
-  return text
+  return { text, response_id: responseId }
 }

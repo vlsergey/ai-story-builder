@@ -166,7 +166,7 @@ function mockGrokResponse(content = JSON.stringify({ name: 'Lore item', content:
   mockGrokGenerate.mockImplementationOnce(
     async (_apiKey: string, _params: Record<string, unknown>, _onThinking?: (status: string) => void, onDelta?: (text: string) => void) => {
       onDelta?.(content)
-      return content
+      return { text: content, response_id: 'test-response-id' }
     }
   )
 }

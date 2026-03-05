@@ -9,12 +9,12 @@ import 'dockview/dist/styles/dockview.css'
 import LoreSection from './LoreSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
-import LoreWizard from './LoreWizard'
 import PlanEditor from './PlanEditor'
 import SettingsPanel from './SettingsPanel'
 import { LoreNode, PlanNodeTree } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
+import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -47,14 +47,14 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   const { setPreference } = useTheme()
 
   /**
-   * Returns the group that should receive editor-type panels (lore-editor, lore-wizard, settings).
+   * Returns the group that should receive editor-type panels (lore-editor, settings).
    * Prefers an existing editor group; falls back to the watermark (empty) group; then undefined.
    */
   function findEditorGroup(api: any): any {
     return (
       api.groups.find((g: any) =>
         g.panels.some((p: any) =>
-          p.id.startsWith('lore-editor-') || p.id.startsWith('lore-wizard-') || p.id === 'settings'
+          p.id.startsWith('lore-editor-') || p.id === 'settings'
         )
       ) ?? api.groups.find((g: any) => g.panels.length === 0)
     )
@@ -95,22 +95,19 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     })
   }
 
-  /** Opens (or activates) a lore-wizard tab for the given node in the center group. */
-  function openLoreWizard(node: LoreNode) {
-    const api = dockviewRef.current
-    if (!api) return
-    const panelId = `lore-wizard-${node.id}`
-    const existing = api.getPanel(panelId)
-    if (existing) { existing.api.setActive(); return }
-    const editorGroup = findEditorGroup(api)
-    api.addPanel({
-      id: panelId,
-      component: 'lore-wizard',
-      tabComponent: 'loreEditorTab',
-      title: `AI Wizard → ${node.name}`,
-      params: { parentNodeId: node.id, parentNodeName: node.name },
-      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
-    })
+  /** Creates a new blank child node under the given parent, then opens it in LoreEditor. */
+  async function openLoreWizard(node: LoreNode) {
+    try {
+      const r = await fetch('/api/lore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: node.id, name: 'New lore item' }),
+      })
+      if (!r.ok) return
+      const { id } = await r.json() as { id: number }
+      window.dispatchEvent(new Event(LORE_TREE_REFRESH_EVENT))
+      openLoreEditor({ id, name: 'New lore item', parent_id: node.id } as LoreNode)
+    } catch { /* ignore */ }
   }
 
   // Load saved theme preference from the project settings
@@ -349,19 +346,12 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
         <LoreSection
           onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
           onOpenLoreNode={openLoreEditor}
-          onOpenLoreWizard={openLoreWizard}
+          onOpenLoreWizard={node => void openLoreWizard(node)}
         />
       </div>
     ),
     'lore-editor': (props: any) => (
       <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
-    ),
-    'lore-wizard': (props: any) => (
-      <LoreWizard
-        parentNodeId={props.params?.parentNodeId}
-        parentNodeName={props.params?.parentNodeName}
-        panelApi={props.api}
-      />
     ),
     plan: () => (
       <div className="p-2 h-full">
@@ -373,7 +363,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     editor: () => (
       <div className="p-2 h-full">
         {selectedLoreNode ? (
-          <LoreEditor loreNode={selectedLoreNode} />
+          <LoreEditor nodeId={selectedLoreNode.id} />
         ) : selectedPlanNode ? (
           <PlanEditor planNode={selectedPlanNode} />
         ) : (
@@ -406,11 +396,11 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     const targetGroup = event.group
     if (!targetGroup) return
     const isEditorGroup = targetGroup.panels.some(
-      (p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('lore-wizard-') || p.id === 'settings'
+      (p: any) => p.id.startsWith('lore-editor-') || p.id === 'settings'
     )
     if (!isEditorGroup) return
     const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
-    if (!draggedPanelId?.startsWith('lore-editor-') && !draggedPanelId?.startsWith('lore-wizard-') && draggedPanelId !== 'settings') {
+    if (!draggedPanelId?.startsWith('lore-editor-') && draggedPanelId !== 'settings') {
       event.preventDefault()
     }
   }

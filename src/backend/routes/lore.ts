@@ -195,7 +195,16 @@ router.get('/:id', (req: Request, res: Response) => {
 
 // PATCH /lore/:id — update name and/or content of a node
 router.patch('/:id', express.json(), (req: Request, res: Response) => {
-  const { name, content } = req.body as { name?: string; content?: string }
+  const { name, content, source, prompt: versionPrompt, response_id: versionResponseId } = req.body as {
+    name?: string
+    content?: string
+    /** 'manual' (default) | 'ai' — source of the content change, only used when content is provided */
+    source?: string
+    /** AI prompt used when source='ai' */
+    prompt?: string
+    /** AI engine response ID when source='ai' */
+    response_id?: string
+  }
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
@@ -234,7 +243,25 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
       }
     }
     params.push(req.params.id)
-    db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+    db.transaction(() => {
+      db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+      if (hasContent) {
+        const { v } = db
+          .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
+          .get(req.params.id) as { v: number }
+        const vSource = source ?? 'manual'
+        db.prepare(
+          'INSERT INTO lore_versions (lore_node_id, version, content, source, prompt, response_id) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(
+          req.params.id,
+          v + 1,
+          content!,
+          vSource,
+          vSource === 'ai' ? (versionPrompt ?? null) : null,
+          vSource === 'ai' ? (versionResponseId ?? null) : null,
+        )
+      }
+    })()
     db.close()
     res.json(hasContent
       ? { ok: true, word_count: wordCount, char_count: charCount, byte_count: byteCount, ai_sync_info: updatedSyncInfo }

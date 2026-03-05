@@ -5,6 +5,7 @@ export interface GenerateLoreOptions {
   webSearch?: string
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
+  onDone?: (data: { response_id?: string }) => void
   signal?: AbortSignal
 }
 
@@ -43,6 +44,7 @@ export async function generateLoreStream(options: GenerateLoreOptions): Promise<
         const data = JSON.parse(line.slice(6)) as Record<string, unknown>
         if (currentEvent === 'thinking') options.onThinking?.(data.status as string, data.detail as string | undefined)
         else if (currentEvent === 'partial_json') options.onPartialJson?.(data)
+        else if (currentEvent === 'done') options.onDone?.(data as { response_id?: string })
         else if (currentEvent === 'error') throw new Error(data.message as string)
         currentEvent = ''
       }

@@ -6,7 +6,7 @@ export class GrokAdapter implements AiEngineAdapter {
     req: GenerateResponseRequest,
     onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
-  ): Promise<void> {
+  ): Promise<{ response_id?: string }> {
     const apiKey = req.config.grok?.api_key?.trim()
     if (!apiKey) throw new Error('Grok api_key is required')
 
@@ -42,7 +42,8 @@ export class GrokAdapter implements AiEngineAdapter {
     }
 
     onThinking('generating')
-    await grokGenerate(apiKey, requestParams, onThinking, onDelta)
+    const { response_id } = await grokGenerate(apiKey, requestParams, onThinking, onDelta)
     onThinking('done')
+    return { response_id }
   }
 }

@@ -16,10 +16,6 @@ vi.mock('../components/LoreSection', () => ({
   }
 }));
 
-vi.mock('../components/LoreWizard', () => ({
-  default: () => <div>Lore Wizard</div>
-}));
-
 vi.mock('../components/PlanSection', () => ({
   default: () => <div data-testid="plan-section">Plan Section</div>
 }));
@@ -61,8 +57,12 @@ describe('Layout', () => {
       showErrorDialog: vi.fn(),
     }
 
-    vi.stubGlobal('fetch', (_url: unknown, opts?: unknown) => {
+    vi.stubGlobal('fetch', (url: unknown, opts?: unknown) => {
       if (opts && (opts as RequestInit).method === 'POST') {
+        // POST /api/lore returns a new node id for the wizard flow
+        if (typeof url === 'string' && url.includes('/api/lore')) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99 }) } as Response)
+        }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       }
       // null → restoreLayout falls through to setupDefaultLayout
@@ -176,46 +176,50 @@ describe('Layout', () => {
     })
   })
 
-  it('lore editor opens in the wizard group when no empty group exists', async () => {
+  it('lore editor created by wizard and another editor share the same group', async () => {
     const { container } = render(<Layout {...mockProps} />)
     await screen.findByTestId('folder-section')
 
+    const mockParent = {
+      id: 1, name: 'Characters', parent_id: null, content: null,
+      position: 0, status: 'ACTIVE', to_be_deleted: 0,
+      latest_version_status: null, created_at: '', children: [],
+    }
     const mockNode = {
       id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
       latest_version_status: null, created_at: '', children: [],
     }
 
-    // Open wizard — fills the empty center group
-    act(() => { capturedOnOpenLoreWizard?.(mockNode) })
+    // Open via wizard — creates node id=99, then opens lore-editor-99 filling the empty center group
+    await act(async () => { capturedOnOpenLoreWizard?.(mockParent) })
     await waitFor(() => {
-      expect(screen.getByText('AI Wizard → Dragon Lore')).toBeInTheDocument()
+      expect(screen.getByText('New lore item')).toBeInTheDocument()
     })
 
-    // Open editor next to it — should land in the same (center) group
+    // Open another editor next to it — should land in the same (center) group
     act(() => { capturedOnOpenLoreNode?.(mockNode) })
     await waitFor(() => {
-      expect(container.querySelector('.dv-default-tab-action')).toBeInTheDocument()
+      expect(container.querySelectorAll('.dv-default-tab-action').length).toBeGreaterThanOrEqual(2)
     })
 
-    // Close editor — center group now holds only the wizard (no empty group exists)
+    // Close the editor for mockNode — center group now holds only the wizard-created editor
     await act(async () => {
-      // Find the editor tab's close button — it's the second tab (wizard + editor)
       const closeButtons = container.querySelectorAll<HTMLElement>('.dv-default-tab-action')
       fireEvent.click(closeButtons[closeButtons.length - 1])
     })
 
-    // Re-open editor — must land in the same group as the wizard, NOT the lore-tree group
+    // Re-open editor for mockNode — must land in the same group as the wizard-created editor
     act(() => { capturedOnOpenLoreNode?.(mockNode) })
 
     await waitFor(() => {
       expect(screen.getByText('Dragon Lore')).toBeInTheDocument()
     })
 
-    // Both the wizard tab and editor tab must share the same .dv-groupview container
-    const wizardTab = screen.getByText('AI Wizard → Dragon Lore')
+    // Both tabs must share the same .dv-groupview container
+    const wizardCreatedTab = screen.getByText('New lore item')
     const editorTab = screen.getByText('Dragon Lore')
-    expect(wizardTab.closest('.dv-groupview')).toBe(editorTab.closest('.dv-groupview'))
+    expect(wizardCreatedTab.closest('.dv-groupview')).toBe(editorTab.closest('.dv-groupview'))
   })
 
   it('saves layout to database when reset-layouts IPC action fires', async () => {

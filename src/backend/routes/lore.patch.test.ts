@@ -46,6 +46,18 @@ function setupDb(): string {
       created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (parent_id, name)
     );
+    CREATE TABLE lore_versions (
+      id           INTEGER PRIMARY KEY,
+      lore_node_id INTEGER NOT NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
+      version      INTEGER NOT NULL,
+      content      TEXT NOT NULL,
+      status       TEXT NOT NULL DEFAULT 'ACTIVE',
+      source       TEXT NOT NULL DEFAULT 'manual',
+      prompt       TEXT NULL,
+      response_id  TEXT NULL,
+      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (lore_node_id, version)
+    );
     INSERT INTO lore_nodes (id, parent_id, name) VALUES
       (1, NULL, 'root'),
       (2, 1,    'chapter');
@@ -140,5 +152,71 @@ describe('PATCH /lore/:id', () => {
 
     const syncInfo = JSON.parse(row.ai_sync_info) as { yandex: { content_updated_at?: string } }
     expect(syncInfo.yandex.content_updated_at).toBeDefined()
+  })
+
+  it('creates a manual lore_versions entry when content is saved', async () => {
+    await request(app).patch('/lore/2').send({ content: 'First content' })
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const rows = db.prepare('SELECT * FROM lore_versions WHERE lore_node_id = 2 ORDER BY version').all() as Array<{
+      version: number; content: string; source: string; prompt: string | null; response_id: string | null
+    }>
+    db.close()
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].version).toBe(1)
+    expect(rows[0].content).toBe('First content')
+    expect(rows[0].source).toBe('manual')
+    expect(rows[0].prompt).toBeNull()
+    expect(rows[0].response_id).toBeNull()
+  })
+
+  it('increments version on each content save', async () => {
+    await request(app).patch('/lore/2').send({ content: 'v1' })
+    await request(app).patch('/lore/2').send({ content: 'v2' })
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const rows = db.prepare('SELECT version FROM lore_versions WHERE lore_node_id = 2 ORDER BY version').all() as { version: number }[]
+    db.close()
+
+    expect(rows.map(r => r.version)).toEqual([1, 2])
+  })
+
+  it('creates an ai lore_versions entry with prompt and response_id when source is ai', async () => {
+    await request(app).patch('/lore/2').send({
+      content: 'AI content',
+      source: 'ai',
+      prompt: 'Describe a dragon',
+      response_id: 'resp-abc123',
+    })
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const row = db.prepare('SELECT * FROM lore_versions WHERE lore_node_id = 2').get() as {
+      content: string; source: string; prompt: string | null; response_id: string | null
+    }
+    db.close()
+
+    expect(row.content).toBe('AI content')
+    expect(row.source).toBe('ai')
+    expect(row.prompt).toBe('Describe a dragon')
+    expect(row.response_id).toBe('resp-abc123')
+  })
+
+  it('does not create a version when only name is updated', async () => {
+    await request(app).patch('/lore/2').send({ name: 'New Name' })
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM lore_versions WHERE lore_node_id = 2').get() as { c: number }).c
+    db.close()
+
+    expect(count).toBe(0)
   })
 })

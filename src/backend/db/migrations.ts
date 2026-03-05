@@ -133,7 +133,15 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   (db) => {
     db.exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('text_language', 'ru-RU')`)
   },
-  // version 4 → 5: reset Grok sync state
+  // version 4 → 5: add source, prompt, response_id to lore_versions
+  (db) => {
+    db.exec(`
+      ALTER TABLE lore_versions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
+      ALTER TABLE lore_versions ADD COLUMN prompt TEXT NULL;
+      ALTER TABLE lore_versions ADD COLUMN response_id TEXT NULL;
+    `)
+  },
+  // version 5 → 6: reset Grok sync state
   // Files uploaded before this migration may have been created without purpose:'assistants',
   // making them unusable with the Responses API file attachment. Clear all grok entries so the
   // next sync re-uploads every file with the correct purpose.

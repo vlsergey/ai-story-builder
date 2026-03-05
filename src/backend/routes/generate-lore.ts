@@ -123,7 +123,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   }
 
   try {
-    await adapter.generateResponse(
+    const { response_id } = await adapter.generateResponse(
       {
         prompt: prompt.trim(),
         systemPrompt,
@@ -138,7 +138,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,
     )
-    sse('done', {})
+    sse('done', response_id ? { response_id } : {})
   } catch (e) {
     sse('error', { message: String(e) })
   }
