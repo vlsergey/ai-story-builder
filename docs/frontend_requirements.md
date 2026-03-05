@@ -49,38 +49,70 @@ A dockview panel (`id='lore-editor-{nodeId}'`) opened from the Lore Tree by doub
 
 **Props:** `nodeId: number`, `panelApi?: { setTitle: (t: string) => void }`
 
-**Two modes** (toggled within the panel, not separate panels):
+**Four modes** (4-state machine, animated transitions via `grid-template-rows` / `max-height`):
 
-#### Generate mode (default)
+| Mode | Code | Open condition |
+|------|------|----------------|
+| A – Generate | `'generate'` | `changes_status IS NULL` + empty content |
+| B – Edit + initiate improvement | `'edit'` | `changes_status IS NULL` + non-empty content |
+| C – AI streaming (locked) | `'review_locked'` | Entered programmatically during improvement |
+| D – Review diff (unlocked) | `'review_unlocked'` | After AI completes; or on open when `changes_status='review'` |
 
-**Layout (flex-col, full height):**
-- Prompt `<textarea>` (h-1/5) with placeholder "Describe what to generate…"
-- Toolbar row:
-  - "Include existing lore" checkbox (checked by default)
-  - Web search control — depends on active engine's `webSearch` capability:
-    - `'contextSize'` (Yandex): `<select>` with options none/low/medium/high
-    - `'boolean'` (Grok): checkbox
-  - Model `<select>` (shown when `available_models.length > 0`); restored to last-used model
-  - **"Generate"** button (when content is empty) or **"Regenerate"** button (when content is present)
-    - If the latest `lore_version` has `source='manual'` and content is non-empty: confirmation dialog warns that manual changes will be overwritten
-- Name `<input>` (between controls and editor, with "Saving…"/"Saved" indicator)
-- CodeMirror Markdown editor (flex-1)
-- **"Improve with AI…"** button (bottom, shown only when content is non-empty and not generating)
+**Mode transitions:**
+- `A → B`: clicking "Improve with AI…" button (bottom, only when hasContent)
+- `B → C`: clicking "Improve" in the improve form (force-flush save, stream AI)
+- `C → D`: AI streaming completes, result saved with `start_review=true` PATCH
+- `D → C`: clicking "Repeat improvement" in compact instruction bar
+- `D → B`: clicking "Accept changes", or auto-accept when all hunks resolved in per-lines diff
 
-#### Improve mode (entered by clicking "Improve with AI…")
+**Layout (flex-col, full height) — all sections always in DOM, animated via CSS transitions:**
 
-**Layout (flex-col, full height):**
-- Improvement instruction `<textarea>` (h-1/5), collapses to a single compact line during generation
-- Same toolbar row (model, web search, "Include existing lore")
-- **"Improve"** + **"Cancel"** buttons
-- Name `<input>` + "Saving…"/"Saved" indicator
-- CodeMirror Markdown editor (flex-1, new content streams in)
+```
+[A] GENERATE CONTROLS  (grid 1fr↔0fr, mode A only)
+    prompt textarea + aiControls row + Generate button
 
-**Behaviour (both modes):**
-- On mount: loads node via `GET /api/lore/:id`; fetches `GET /api/lore/:id/latest` to read the latest version's `source`; fetches `GET /api/ai/config` for engine/model
-- **Generate/Regenerate**: `POST /api/ai/generate-lore` with `{ prompt, includeExistingLore, model?, webSearch?, mode: 'generate' }`; streams `partial_json` events to update name + content live; on done, saves via `PATCH /api/lore/:id` with `{ content, name?, source: 'ai', prompt, response_id }`
-- **Improve**: same as Generate but with `{ mode: 'improve', baseContent: currentContent }`; backend uses different system prompt embedding the current text
-- **Manual edits** (name or content): autosaved with 1 s debounce; content saves create a new `lore_versions` entry with `source='manual'`
+[C/D] COMPACT INSTRUCTION BAR  (grid 1fr↔0fr, modes C/D)
+    instruction input + Repeat/Generating… button
+    aiControls row
+
+STATUS ROWS  (always visible when active)
+    thinking spinner/checkmark + error message
+
+NAME FIELD  (always visible)
+    name input + Saving…/Saved indicator
+
+[C/D] TAB BAR  (grid 1fr↔0fr, modes C/D; tabs disabled in C)
+    "New version" | "Side by side" | "Per lines"
+
+CONTENT AREA  (flex-1)
+    A/B: CodeMirror (editable)
+    C/D tab "new": CodeMirror (read-only in C, editable in D)
+    C/D tab "side": LoreDiffView split (read-only)
+    C/D tab "lines": LoreDiffView unified (hunk accept/reject)
+
+[A→B] УЛУЧШИТЬ BUTTON  (max-height 52px↔0px, mode A + hasContent)
+
+[B] IMPROVE FORM  (max-height 50vh↔0px, mode B)
+    instruction textarea + aiControls + Cancel + Improve buttons
+
+[D] ACCEPT BAR  (grid 1fr↔0fr, mode D)
+    "Accept changes" button
+```
+
+**LoreDiffView component** (`src/frontend/src/components/LoreDiffView.tsx`):
+- Props: `oldText`, `newText`, `viewType: 'split'|'unified'`, `onChange?`, `onAllResolved?`
+- Split view: side-by-side two-column layout; left = old with removed lines (red), right = new with added lines (green); read-only
+- Unified view: hunks with per-hunk Accept/Reject buttons; context lines shown between hunks; recomputes result content on each decision; calls `onAllResolved` when all hunks decided
+- Uses `diff.diffLines` from the `diff` npm package (already a dependency)
+
+**Behaviour:**
+- On mount: loads node via `GET /api/lore/:id` (including `changes_status`, `review_base_content`); fetches `GET /api/lore/:id/latest` for `source` and `prompt`; fetches `GET /api/ai/config` for engine/model
+- **Generate** (mode A): streams AI with `mode:'generate'`; on done, saves via `PATCH` with `source:'ai'`; transitions to mode B
+- **Improve** (mode B→C): force-flush pending saves; capture content as `reviewBaseContent`; stream AI with `mode:'improve', baseContent:reviewBaseContent`; on done, `PATCH { start_review: true, source: 'ai', prompt, content }` — backend atomically saves old content as `review_base_content`, sets `changes_status='review'`, creates version; transitions to mode D
+- **Repeat improvement** (mode D→C): same stream but `baseContent = reviewBaseContent` (unchanged original); no `start_review` in PATCH (review already active, baseline preserved); transitions back to D
+- **Mode D auto-save** (new-version tab, 1 s debounce): `PATCH { content, source:'manual', skip_version: true }` — updates content without creating a version
+- **Accept changes** (mode D→B): `PATCH { accept_review: true, content }` — backend clears `changes_status`/`review_base_content`; if content differs from latest version, creates new `'manual'` version; transitions to mode B
+- **Manual edits** (name or content in modes A/B): autosaved with 1 s debounce; content saves create a new `lore_versions` entry with `source='manual'`
 - Persists selected model via `POST /api/ai/config` after each generation
 
 **Wand button in LoreTree toolbar:**

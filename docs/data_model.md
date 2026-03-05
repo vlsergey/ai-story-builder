@@ -72,6 +72,8 @@ emerges from usage.
   - `status` TEXT NOT NULL DEFAULT 'ACTIVE'   -- ACTIVE
   - `to_be_deleted` INTEGER NOT NULL DEFAULT 0   -- 1 = pending removal after next AI sync
   - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+  - `changes_status` TEXT NULL — review workflow state: NULL (not in review) | `'review'` (AI improvement pending user acceptance)
+  - `review_base_content` TEXT NULL — snapshot of `content` captured when the first AI improvement started; serves as the "old" side of diffs in review mode; set once per review session, never changed on repeat improvements, cleared on accept
   - Unique constraint on (`parent_id`, `name`)
 
 `AiEngineSyncRecord` (value in `ai_sync_info` JSON map):

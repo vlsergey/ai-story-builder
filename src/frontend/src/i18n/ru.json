@@ -66,6 +66,13 @@
   "lore.cancel_improve": "Отмена",
   "lore.generate_placeholder": "Опишите, что нужно сгенерировать…",
   "lore.improve_placeholder": "Опишите, что нужно улучшить…",
+  "lore.tab_new": "Новый вариант",
+  "lore.tab_sidebyside": "Бок о бок",
+  "lore.tab_perlines": "По строкам",
+  "lore.hunk_accept": "Принять",
+  "lore.hunk_reject": "Отклонить",
+  "lore.repeat_improve": "Повторить улучшение",
+  "lore.accept_changes": "Принять изменения",
 
   "thinking.generating": "Генерирую…",
   "thinking.reasoning": "Рассуждаю…",

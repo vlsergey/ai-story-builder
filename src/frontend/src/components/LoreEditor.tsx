@@ -9,14 +9,17 @@ import { useLocale } from '../lib/locale'
 import { dispatchLoreNodeSaved } from '../lib/lore-events'
 import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
 import { generateLoreStream } from '../lib/generate-lore-stream'
+import LoreDiffView from './LoreDiffView'
 
 interface LoreEditorProps {
   nodeId: number
-  /** Dockview panel API — used to update the tab title on rename */
   panelApi?: { setTitle: (title: string) => void }
 }
 
-/** Strips the `gpt://folder_id/` prefix from Yandex model URIs for display. */
+/** 'generate' = mode A; 'edit' = mode B; 'review_locked' = mode C; 'review_unlocked' = mode D */
+type EditorMode = 'generate' | 'edit' | 'review_locked' | 'review_unlocked'
+type DiffTab = 'new' | 'sidebyside' | 'perlines'
+
 function shortModelName(modelId: string): string {
   return modelId.replace(/^gpt:\/\/[^/]+\//, '')
 }
@@ -32,11 +35,17 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   const [loading, setLoading] = useState(true)
   const [nameDirty, setNameDirty] = useState(false)
   const [contentDirty, setContentDirty] = useState(false)
-  /** Source of the latest saved version ('ai' | 'manual' | null if no versions yet) */
-  const [latestVersionSource, setLatestVersionSource] = useState<string | null>(null)
 
   const nameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Editor mode ────────────────────────────────────────────────────────────
+  const [editorMode, setEditorMode] = useState<EditorMode>('generate')
+  /** Content before the first improvement; used as 'old' side of diffs in modes C/D */
+  const [reviewBaseContent, setReviewBaseContent] = useState('')
+  const [selectedTab, setSelectedTab] = useState<DiffTab>('new')
+  /** Latest content computed from per-lines hunk decisions */
+  const [hunkResolvedContent, setHunkResolvedContent] = useState('')
 
   // ── AI engine config ────────────────────────────────────────────────────────
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
@@ -45,40 +54,60 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   const [webSearch, setWebSearch] = useState('none')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
 
-  // ── Generate mode state ────────────────────────────────────────────────────
+  // ── Generate mode (A) ──────────────────────────────────────────────────────
   const [generatePrompt, setGeneratePrompt] = useState('')
 
-  // ── Improve mode state ─────────────────────────────────────────────────────
-  const [mode, setMode] = useState<'generate' | 'improve'>('generate')
+  // ── Improve instruction (modes B, C, D) ────────────────────────────────────
   const [improveInstruction, setImproveInstruction] = useState('')
 
-  // ── Shared generation state ────────────────────────────────────────────────
+  // ── Generation state ───────────────────────────────────────────────────────
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
   const [thinkingDetail, setThinkingDetail] = useState<string | null>(null)
   const [thinkingDone, setThinkingDone] = useState(false)
 
-  // ── Load node data + latest version source ─────────────────────────────────
+  // ── Load node ──────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
     setNameDirty(false)
     setContentDirty(false)
-    setMode('generate')
     setGeneratePrompt('')
     setImproveInstruction('')
+    setReviewBaseContent('')
+    setSelectedTab('new')
+    setEditorMode('generate')
+    setGenError(null)
+    setThinkingStatus(null)
+    setThinkingDone(false)
+
     Promise.all([
-      fetch(`/api/lore/${nodeId}`).then(r => r.json() as Promise<{ name: string; content: string | null }>),
-      fetch(`/api/lore/${nodeId}/latest`).then(r => r.json() as Promise<{ source?: string } | null>).catch(() => null),
+      fetch(`/api/lore/${nodeId}`).then(r => r.json() as Promise<{
+        name: string
+        content: string | null
+        changes_status: string | null
+        review_base_content: string | null
+      }>),
+      fetch(`/api/lore/${nodeId}/latest`)
+        .then(r => r.json() as Promise<{ source?: string; prompt?: string | null } | null>)
+        .catch(() => null),
     ]).then(([node, latestVersion]) => {
       setName(node.name)
       setContent(node.content ?? '')
-      setLatestVersionSource(latestVersion?.source ?? null)
+      if (node.changes_status === 'review') {
+        setReviewBaseContent(node.review_base_content ?? '')
+        setImproveInstruction(latestVersion?.prompt ?? '')
+        setEditorMode('review_unlocked')
+      } else if (node.content && node.content.trim().length > 0) {
+        setEditorMode('edit')
+      } else {
+        setEditorMode('generate')
+      }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [nodeId])
 
-  // ── Load AI engine config ──────────────────────────────────────────────────
+  // ── Load AI config ─────────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/ai/config')
       .then(r => r.json())
@@ -101,7 +130,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
   }, [])
 
-  // ── Manual name change (autosave with debounce) ────────────────────────────
+  // ── Name autosave ──────────────────────────────────────────────────────────
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value
     setName(value)
@@ -122,30 +151,61 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     }, 1000)
   }
 
-  // ── Manual content change (autosave with debounce) ─────────────────────────
+  // ── Content autosave ───────────────────────────────────────────────────────
+  // In mode D (review_unlocked): skip_version so history stays clean during review
   function handleContentChange(value: string) {
     setContent(value)
     setContentDirty(true)
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
     contentTimerRef.current = setTimeout(() => {
+      const body: Record<string, unknown> = { content: value, source: 'manual' }
+      if (editorMode === 'review_unlocked') body['skip_version'] = true
       fetch(`/api/lore/${nodeId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: value, source: 'manual' }),
+        body: JSON.stringify(body),
       }).then(r => r.json())
-        .then((data: { ok: boolean; word_count: number; char_count: number; byte_count: number; ai_sync_info?: Record<string, { last_synced_at: string; file_id?: string; content_updated_at?: string }> | null }) => {
+        .then((data: { ok: boolean; word_count: number; char_count: number; byte_count: number; ai_sync_info?: Record<string, unknown> | null }) => {
           setContentDirty(false)
-          setLatestVersionSource('manual')
-          dispatchLoreNodeSaved({ id: nodeId, wordCount: data.word_count, charCount: data.char_count, byteCount: data.byte_count, aiSyncInfo: data.ai_sync_info ?? null })
+          dispatchLoreNodeSaved({
+            id: nodeId,
+            wordCount: data.word_count,
+            charCount: data.char_count,
+            byteCount: data.byte_count,
+            aiSyncInfo: data.ai_sync_info as Record<string, { last_synced_at: string; file_id?: string; content_updated_at?: string }> | null ?? null,
+          })
         }).catch(() => setContentDirty(false))
     }, 1000)
   }
 
-  // ── Shared generate/improve logic ──────────────────────────────────────────
-  async function runGeneration(opts: { mode: 'generate' | 'improve'; prompt: string; baseContent?: string }) {
-    // Cancel any pending manual-edit saves
-    if (nameTimerRef.current) { clearTimeout(nameTimerRef.current); nameTimerRef.current = null; setNameDirty(false) }
-    if (contentTimerRef.current) { clearTimeout(contentTimerRef.current); contentTimerRef.current = null; setContentDirty(false) }
+  // ── Force-flush pending content save before AI calls ─────────────────────
+  async function flushContentSave(currentContent: string): Promise<void> {
+    if (contentTimerRef.current) {
+      clearTimeout(contentTimerRef.current)
+      contentTimerRef.current = null
+    }
+    setContentDirty(false)
+    await fetch(`/api/lore/${nodeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: currentContent, source: 'manual' }),
+    })
+  }
+
+  // ── Save last-used model ───────────────────────────────────────────────────
+  function saveLastModel() {
+    if (selectedModel && currentEngine) {
+      void fetch('/api/ai/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel } }),
+      })
+    }
+  }
+
+  // ── Mode A: Generate from scratch ─────────────────────────────────────────
+  function handleGenerate() {
+    if (!generatePrompt.trim()) return
     setContent('')
     setName('')
     setThinkingStatus(null)
@@ -154,20 +214,88 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     setGenerating(true)
     setGenError(null)
 
-    let finalName = ''
-    let finalContent = ''
-    let responseId: string | undefined
+    let finalName = '', finalContent = '', responseId: string | undefined
+
+    generateLoreStream({
+      prompt: generatePrompt,
+      includeExistingLore,
+      model: selectedModel || undefined,
+      webSearch,
+      mode: 'generate',
+      onThinking: (status, detail) => {
+        if (status === 'done') setThinkingDone(true)
+        else { setThinkingStatus(status); setThinkingDone(false) }
+        setThinkingDetail(detail ?? null)
+      },
+      onPartialJson: (partial) => {
+        if (typeof partial.name === 'string') { setName(partial.name); finalName = partial.name }
+        if (typeof partial.content === 'string') { setContent(partial.content); finalContent = partial.content }
+      },
+      onDone: (data) => { responseId = data.response_id },
+    }).then(async () => {
+      if (finalName.trim() || finalContent) {
+        const patchBody: Record<string, unknown> = { content: finalContent, source: 'ai', prompt: generatePrompt }
+        if (responseId) patchBody['response_id'] = responseId
+        if (finalName.trim()) patchBody['name'] = finalName.trim()
+        const r = await fetch(`/api/lore/${nodeId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchBody),
+        })
+        const data = await r.json() as { ok: boolean; word_count?: number; char_count?: number; byte_count?: number; ai_sync_info?: Record<string, unknown> | null }
+        if (data.ok) {
+          if (finalName.trim()) panelApi?.setTitle(finalName.trim())
+          dispatchLoreNodeSaved({
+            id: nodeId,
+            name: finalName.trim() || undefined,
+            wordCount: data.word_count,
+            charCount: data.char_count,
+            byteCount: data.byte_count,
+            aiSyncInfo: data.ai_sync_info as Record<string, { last_synced_at: string }> | null ?? null,
+          })
+          setEditorMode('edit')
+        }
+      }
+      saveLastModel()
+    }).catch(e => setGenError(String(e)))
+      .finally(() => setGenerating(false))
+  }
+
+  // ── Mode B→C or D→C: Improve with AI ──────────────────────────────────────
+  async function handleImprove() {
+    if (!improveInstruction.trim()) return
+
+    // Capture mode before any state changes (closure preserves this)
+    const fromReview = editorMode === 'review_unlocked'
+    const baseForStream = fromReview ? reviewBaseContent : content
+
+    if (!fromReview) {
+      // First improvement: save current content as baseline
+      setReviewBaseContent(content)
+      if (contentDirty) await flushContentSave(content)
+    }
+
+    setContent('')
+    setThinkingStatus(null)
+    setThinkingDetail(null)
+    setThinkingDone(false)
+    setGenerating(true)
+    setGenError(null)
+    setEditorMode('review_locked')
+    setSelectedTab('new')
+
+    let finalName = '', finalContent = '', responseId: string | undefined
 
     try {
       await generateLoreStream({
-        prompt: opts.prompt,
+        prompt: improveInstruction,
         includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
-        mode: opts.mode,
-        baseContent: opts.baseContent,
+        mode: 'improve',
+        baseContent: baseForStream,
         onThinking: (status, detail) => {
-          if (status === 'done') { setThinkingDone(true) }
+          if (status === 'done') setThinkingDone(true)
           else { setThinkingStatus(status); setThinkingDone(false) }
           setThinkingDetail(detail ?? null)
         },
@@ -178,73 +306,84 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         onDone: (data) => { responseId = data.response_id },
       })
 
-      // Save the AI-generated content to this node
-      if (finalName.trim() || finalContent) {
-        const patchBody: Record<string, unknown> = {
-          content: finalContent,
-          source: 'ai',
-          prompt: opts.prompt,
-        }
-        if (responseId) patchBody['response_id'] = responseId
-        if (finalName.trim()) patchBody['name'] = finalName.trim()
-
-        const r = await fetch(`/api/lore/${nodeId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patchBody),
-        })
-        const data = await r.json() as {
-          ok: boolean; word_count?: number; char_count?: number; byte_count?: number;
-          ai_sync_info?: Record<string, { last_synced_at: string; file_id?: string; content_updated_at?: string }> | null
-        }
-        if (data.ok) {
-          setLatestVersionSource('ai')
-          if (finalName.trim()) panelApi?.setTitle(finalName.trim())
-          dispatchLoreNodeSaved({
-            id: nodeId,
-            name: finalName.trim() || undefined,
-            wordCount: data.word_count,
-            charCount: data.char_count,
-            byteCount: data.byte_count,
-            aiSyncInfo: data.ai_sync_info ?? null,
-          })
-        }
+      const patchBody: Record<string, unknown> = {
+        content: finalContent,
+        source: 'ai',
+        prompt: improveInstruction,
       }
+      if (responseId) patchBody['response_id'] = responseId
+      if (finalName.trim()) patchBody['name'] = finalName.trim()
+      if (!fromReview) patchBody['start_review'] = true  // First improvement: capture baseline in DB
 
-      if (selectedModel && currentEngine) {
-        void fetch('/api/ai/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel } }),
+      const r = await fetch(`/api/lore/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody),
+      })
+      const data = await r.json() as { ok: boolean; word_count?: number; char_count?: number; byte_count?: number; ai_sync_info?: Record<string, unknown> | null }
+      if (data.ok) {
+        if (finalName.trim()) panelApi?.setTitle(finalName.trim())
+        dispatchLoreNodeSaved({
+          id: nodeId,
+          name: finalName.trim() || undefined,
+          wordCount: data.word_count,
+          charCount: data.char_count,
+          byteCount: data.byte_count,
+          aiSyncInfo: data.ai_sync_info as Record<string, { last_synced_at: string }> | null ?? null,
         })
       }
+
+      saveLastModel()
+      setEditorMode('review_unlocked')
+      setHunkResolvedContent(finalContent)
     } catch (e) {
       setGenError(String(e))
+      // Revert to edit mode so user can retry
+      setEditorMode(fromReview ? 'review_unlocked' : 'edit')
     } finally {
       setGenerating(false)
     }
   }
 
-  // ── Handle "Generate / Regenerate" click ───────────────────────────────────
-  function handleGenerate() {
-    if (!generatePrompt.trim()) return
-    // Warn if content was manually edited and is non-empty
-    if (latestVersionSource === 'manual' && content.trim()) {
-      if (!window.confirm(t('lore.overwrite_warning'))) return
+  // ── Mode D→B: Accept changes ───────────────────────────────────────────────
+  async function acceptChanges(contentToAccept: string) {
+    const r = await fetch(`/api/lore/${nodeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accept_review: true, content: contentToAccept }),
+    })
+    const data = await r.json() as { ok: boolean; word_count?: number; char_count?: number; byte_count?: number; ai_sync_info?: Record<string, unknown> | null }
+    if (data.ok) {
+      dispatchLoreNodeSaved({
+        id: nodeId,
+        wordCount: data.word_count,
+        charCount: data.char_count,
+        byteCount: data.byte_count,
+        aiSyncInfo: data.ai_sync_info as Record<string, { last_synced_at: string }> | null ?? null,
+      })
     }
-    void runGeneration({ mode: 'generate', prompt: generatePrompt })
+    setContent(contentToAccept)
+    setEditorMode('edit')
+    setReviewBaseContent('')
+    setSelectedTab('new')
   }
 
-  // ── Handle "Улучшить" click ────────────────────────────────────────────────
-  function handleImprove() {
-    if (!improveInstruction.trim()) return
-    void runGeneration({ mode: 'improve', prompt: improveInstruction, baseContent: content })
+  function handleAcceptChanges() {
+    void acceptChanges(content)
+  }
+
+  // Called by LoreDiffView (unified) when all hunks resolved
+  async function handleAllHunksResolved() {
+    const resolved = hunkResolvedContent || content
+    await acceptChanges(resolved)
   }
 
   const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
   const hasContent = content.trim().length > 0
+  const isReview = editorMode === 'review_locked' || editorMode === 'review_unlocked'
+  const isLocked = editorMode === 'review_locked'
 
-  // ── Shared AI controls row (model, web search, include lore) ───────────────
+  // ── Shared AI controls row ─────────────────────────────────────────────────
   const aiControls = (
     <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap">
       <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
@@ -312,13 +451,12 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
-      {/* ── TOP BLOCK: Generate controls — collapses upward when switching to improve mode ── */}
+      {/* ── [A] GENERATE CONTROLS — mode 'generate' only ──────────────────────── */}
       <div
         style={{
           display: 'grid',
-          gridTemplateRows: mode === 'improve' ? '0fr' : '1fr',
-          transition: 'grid-template-rows 300ms ease-in-out, opacity 200ms ease-in-out',
-          opacity: mode === 'improve' ? 0 : 1,
+          gridTemplateRows: editorMode === 'generate' ? '1fr' : '0fr',
+          transition: 'grid-template-rows 300ms ease-in-out',
         }}
         className="shrink-0"
       >
@@ -343,7 +481,39 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         </div>
       </div>
 
-      {/* ── Status rows — always visible between controls and content ─────────── */}
+      {/* ── [C/D] COMPACT INSTRUCTION BAR — modes C and D ────────────────────── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: isReview ? '1fr' : '0fr',
+          transition: 'grid-template-rows 300ms ease-in-out',
+        }}
+        className="shrink-0"
+      >
+        <div className="overflow-hidden min-h-0">
+          <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border">
+            <input
+              type="text"
+              value={improveInstruction}
+              onChange={e => setImproveInstruction(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !isLocked) void handleImprove() }}
+              placeholder={t('lore.improve_placeholder')}
+              disabled={isLocked}
+              className="flex-1 text-sm bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed min-w-0"
+            />
+            <button
+              onClick={handleImprove}
+              disabled={isLocked || !improveInstruction.trim()}
+              className="shrink-0 px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLocked ? 'Generating…' : t('lore.repeat_improve')}
+            </button>
+          </div>
+          {aiControls}
+        </div>
+      </div>
+
+      {/* ── STATUS ROWS — always visible ────────────────────────────────────── */}
       {thinkingStatus !== null && (
         <div className="flex items-start gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
           <div className="mt-0.5 shrink-0">
@@ -367,7 +537,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         </div>
       )}
 
-      {/* ── Name field ────────────────────────────────────────────────────────── */}
+      {/* ── NAME FIELD — always visible ─────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border shrink-0">
         <input
           className="flex-1 text-sm font-semibold bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5 transition-colors"
@@ -381,41 +551,109 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         </span>
       </div>
 
-      {/* ── Content editor ────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <CodeMirror
-          value={content}
-          height="100%"
-          extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
-          theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
-          onChange={handleContentChange}
-          className="h-full text-sm"
-          basicSetup={{
-            lineNumbers: false,
-            foldGutter: false,
-            highlightActiveLine: true,
-          }}
-        />
+      {/* ── [C/D] TAB BAR — visible in review modes ──────────────────────────── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: isReview ? '1fr' : '0fr',
+          transition: 'grid-template-rows 300ms ease-in-out',
+        }}
+        className="shrink-0"
+      >
+        <div className="overflow-hidden min-h-0">
+          <div className="flex border-b border-border">
+            {(['new', 'sidebyside', 'perlines'] as DiffTab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => !isLocked && setSelectedTab(tab)}
+                disabled={isLocked}
+                className={`px-3 py-1.5 text-sm border-r border-border last:border-r-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  selectedTab === tab
+                    ? 'bg-background text-foreground font-medium'
+                    : 'bg-muted text-muted-foreground hover:bg-background/70'
+                }`}
+              >
+                {tab === 'new' ? t('lore.tab_new')
+                  : tab === 'sidebyside' ? t('lore.tab_sidebyside')
+                  : t('lore.tab_perlines')}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* ── "Улучшить" button (generate mode, content present, not generating) ── */}
-      {mode === 'generate' && hasContent && !generating && (
-        <div className="flex justify-end px-2 py-1.5 border-t border-border shrink-0">
+      {/* ── CONTENT AREA — flex-1 ─────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+
+        {/* Modes A/B: editable CodeMirror */}
+        {!isReview && (
+          <CodeMirror
+            value={content}
+            height="100%"
+            extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
+            theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
+            onChange={handleContentChange}
+            className="h-full text-sm"
+            basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: true }}
+          />
+        )}
+
+        {/* Mode C (locked) / D (unlocked) "new" tab: CodeMirror */}
+        {isReview && selectedTab === 'new' && (
+          <CodeMirror
+            value={content}
+            height="100%"
+            extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
+            theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
+            onChange={isLocked ? undefined : handleContentChange}
+            readOnly={isLocked}
+            className="h-full text-sm"
+            basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: true }}
+          />
+        )}
+
+        {/* C/D "side-by-side" tab */}
+        {isReview && selectedTab === 'sidebyside' && (
+          <LoreDiffView
+            oldText={reviewBaseContent}
+            newText={content}
+            viewType="split"
+          />
+        )}
+
+        {/* C/D "per-lines" tab */}
+        {isReview && selectedTab === 'perlines' && (
+          <LoreDiffView
+            key={`${reviewBaseContent.length}-${content.length}`}
+            oldText={reviewBaseContent}
+            newText={content}
+            viewType="unified"
+            onChange={v => setHunkResolvedContent(v)}
+            onAllResolved={handleAllHunksResolved}
+          />
+        )}
+      </div>
+
+      {/* ── [A→B] "УЛУЧШИТЬ" BUTTON — mode A with content ────────────────────── */}
+      <div
+        className="overflow-hidden shrink-0 border-t border-border transition-[max-height] duration-300 ease-in-out"
+        style={{ maxHeight: editorMode === 'generate' && hasContent && !generating ? '52px' : '0px' }}
+      >
+        <div className="flex justify-end px-2 py-1.5">
           <button
-            onClick={() => setMode('improve')}
+            onClick={() => setEditorMode('edit')}
             className="px-3 py-1 text-sm rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             {t('lore.improve_with_ai')}
           </button>
         </div>
-      )}
+      </div>
 
-      {/* ── BOTTOM BLOCK: Improve controls — slides in from below ─────────────── */}
+      {/* ── [B] IMPROVE FORM — mode B (edit) ─────────────────────────────────── */}
       <div
         className="overflow-hidden shrink-0 transition-[max-height] duration-300 ease-in-out border-t border-border"
-        style={{ maxHeight: mode === 'improve' ? '60vh' : '0px' }}
+        style={{ maxHeight: editorMode === 'edit' ? '50vh' : '0px' }}
       >
-        {/* Instruction textarea — compact (one line) while generating, full textarea otherwise */}
         {generating ? (
           <div className="px-2 py-1.5 text-sm text-muted-foreground border-b border-border truncate">
             {improveInstruction}
@@ -432,7 +670,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         <div className="flex items-center justify-end gap-2 px-2 py-1">
           {!generating && (
             <button
-              onClick={() => { setMode('generate'); setImproveInstruction('') }}
+              onClick={() => { setEditorMode('generate'); setImproveInstruction('') }}
               className="px-3 py-1 text-sm rounded border border-border hover:bg-muted text-muted-foreground"
             >
               {t('lore.cancel_improve')}
@@ -445,6 +683,27 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
           >
             {generating ? 'Generating…' : t('lore.improve')}
           </button>
+        </div>
+      </div>
+
+      {/* ── [D] ACCEPT BAR — mode D (review_unlocked) ────────────────────────── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: editorMode === 'review_unlocked' ? '1fr' : '0fr',
+          transition: 'grid-template-rows 300ms ease-in-out',
+        }}
+        className="shrink-0 border-t border-border"
+      >
+        <div className="overflow-hidden min-h-0">
+          <div className="flex items-center justify-end px-2 py-1.5">
+            <button
+              onClick={handleAcceptChanges}
+              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {t('lore.accept_changes')}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -160,6 +160,13 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       ALTER TABLE lore_versions ADD COLUMN response_id TEXT NULL;
     `)
   },
+  // version 6 → 7: add review workflow columns to lore_nodes
+  (db) => {
+    db.exec(`
+      ALTER TABLE lore_nodes ADD COLUMN changes_status TEXT NULL;
+      ALTER TABLE lore_nodes ADD COLUMN review_base_content TEXT NULL;
+    `)
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length

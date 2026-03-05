@@ -195,7 +195,10 @@ router.get('/:id', (req: Request, res: Response) => {
 
 // PATCH /lore/:id — update name and/or content of a node
 router.patch('/:id', express.json(), (req: Request, res: Response) => {
-  const { name, content, source, prompt: versionPrompt, response_id: versionResponseId } = req.body as {
+  const {
+    name, content, source, prompt: versionPrompt, response_id: versionResponseId,
+    start_review, skip_version, accept_review,
+  } = req.body as {
     name?: string
     content?: string
     /** 'manual' (default) | 'ai' — source of the content change, only used when content is provided */
@@ -204,13 +207,21 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
     prompt?: string
     /** AI engine response ID when source='ai' */
     response_id?: string
+    /** When true: capture current content as review_base_content, set changes_status='review'.
+     *  Must be combined with a content update. */
+    start_review?: boolean
+    /** When true: update lore_nodes content/counts but skip inserting into lore_versions. */
+    skip_version?: boolean
+    /** When true: clear changes_status and review_base_content.
+     *  If content is provided and differs from latest version, create a new 'manual' version. */
+    accept_review?: boolean
   }
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   const hasName = typeof name === 'string' && name.trim().length > 0
   const hasContent = content !== undefined
-  if (!hasName && !hasContent) return res.status(400).json({ error: 'name or content required' })
+  if (!hasName && !hasContent && !accept_review) return res.status(400).json({ error: 'name or content required' })
   try {
     const db = new Database(dbPath)
     const sets: string[] = []
@@ -242,24 +253,61 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
         } catch { /* ignore malformed JSON */ }
       }
     }
-    params.push(req.params.id)
+
+    // For start_review: read current node state before the transaction so we can decide
+    // whether to capture review_base_content (only on first improvement, not on repeat).
+    if (start_review && hasContent) {
+      const cur = db
+        .prepare('SELECT content, changes_status FROM lore_nodes WHERE id = ?')
+        .get(req.params.id) as { content: string | null; changes_status: string | null } | undefined
+      sets.push('changes_status = ?'); params.push('review')
+      if (!cur || cur.changes_status !== 'review') {
+        // First improvement: capture current content as baseline for diffs
+        sets.push('review_base_content = ?'); params.push(cur?.content ?? '')
+      }
+      // Repeat improvement: don't touch review_base_content (keep original baseline)
+    }
+
+    if (accept_review) {
+      sets.push('changes_status = ?'); params.push(null)
+      sets.push('review_base_content = ?'); params.push(null)
+    }
+
     db.transaction(() => {
-      db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
-      if (hasContent) {
-        const { v } = db
-          .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
-          .get(req.params.id) as { v: number }
-        const vSource = source ?? 'manual'
-        db.prepare(
-          'INSERT INTO lore_versions (lore_node_id, version, content, source, prompt, response_id) VALUES (?, ?, ?, ?, ?, ?)'
-        ).run(
-          req.params.id,
-          v + 1,
-          content!,
-          vSource,
-          vSource === 'ai' ? (versionPrompt ?? null) : null,
-          vSource === 'ai' ? (versionResponseId ?? null) : null,
-        )
+      if (sets.length > 0) {
+        db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params, req.params.id)
+      }
+
+      if (hasContent && !skip_version) {
+        if (accept_review) {
+          // Only create a new version if content differs from latest saved version
+          const latest = db
+            .prepare('SELECT content FROM lore_versions WHERE lore_node_id = ? ORDER BY version DESC LIMIT 1')
+            .get(req.params.id) as { content: string } | undefined
+          if (!latest || latest.content !== content) {
+            const { v } = db
+              .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
+              .get(req.params.id) as { v: number }
+            db.prepare(
+              'INSERT INTO lore_versions (lore_node_id, version, content, source, prompt, response_id) VALUES (?, ?, ?, ?, ?, ?)'
+            ).run(req.params.id, v + 1, content!, 'manual', null, null)
+          }
+        } else {
+          const { v } = db
+            .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
+            .get(req.params.id) as { v: number }
+          const vSource = source ?? 'manual'
+          db.prepare(
+            'INSERT INTO lore_versions (lore_node_id, version, content, source, prompt, response_id) VALUES (?, ?, ?, ?, ?, ?)'
+          ).run(
+            req.params.id,
+            v + 1,
+            content!,
+            vSource,
+            vSource === 'ai' ? (versionPrompt ?? null) : null,
+            vSource === 'ai' ? (versionResponseId ?? null) : null,
+          )
+        }
       }
     })()
     db.close()

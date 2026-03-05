@@ -66,6 +66,13 @@
   "lore.cancel_improve": "Cancel",
   "lore.generate_placeholder": "Describe what to generate…",
   "lore.improve_placeholder": "Describe what to improve…",
+  "lore.tab_new": "New version",
+  "lore.tab_sidebyside": "Side by side",
+  "lore.tab_perlines": "Per lines",
+  "lore.hunk_accept": "Accept",
+  "lore.hunk_reject": "Reject",
+  "lore.repeat_improve": "Repeat improvement",
+  "lore.accept_changes": "Accept changes",
 
   "thinking.generating": "Generating…",
   "thinking.reasoning": "Reasoning…",

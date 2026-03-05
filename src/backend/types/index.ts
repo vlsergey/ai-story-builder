@@ -13,6 +13,10 @@ export interface LoreNodeRow {
   status: string
   to_be_deleted: number
   created_at: string
+  /** NULL | 'review' — current review workflow state */
+  changes_status: string | null
+  /** Content before the first improvement started; set once when review begins, cleared on accept */
+  review_base_content: string | null
 }
 
 export interface LoreVersionRow {

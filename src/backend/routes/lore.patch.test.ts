@@ -44,6 +44,8 @@ function setupDb(): string {
       status              TEXT NOT NULL DEFAULT 'ACTIVE',
       to_be_deleted       INTEGER NOT NULL DEFAULT 0,
       created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+      changes_status      TEXT NULL,
+      review_base_content TEXT NULL,
       UNIQUE (parent_id, name)
     );
     CREATE TABLE lore_versions (
@@ -58,9 +60,9 @@ function setupDb(): string {
       created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (lore_node_id, version)
     );
-    INSERT INTO lore_nodes (id, parent_id, name) VALUES
-      (1, NULL, 'root'),
-      (2, 1,    'chapter');
+    INSERT INTO lore_nodes (id, parent_id, name, content) VALUES
+      (1, NULL, 'root', NULL),
+      (2, 1,    'chapter', NULL);
   `)
   db.close()
   return file
@@ -218,5 +220,165 @@ describe('PATCH /lore/:id', () => {
     db.close()
 
     expect(count).toBe(0)
+  })
+
+  it('start_review captures current content as review_base_content and sets changes_status=review', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    // Pre-set existing content in the DB
+    const db = new Database(testDbPath)
+    db.prepare("UPDATE lore_nodes SET content = ? WHERE id = 2").run('Original content')
+    db.close()
+
+    const res = await request(app)
+      .patch('/lore/2')
+      .send({ content: 'AI improved content', source: 'ai', prompt: 'Make it better', start_review: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database2 = require('better-sqlite3')
+    const db2 = new Database2(testDbPath, { readonly: true })
+    const row = db2.prepare('SELECT content, changes_status, review_base_content FROM lore_nodes WHERE id = 2').get() as {
+      content: string; changes_status: string | null; review_base_content: string | null
+    }
+    db2.close()
+
+    expect(row.content).toBe('AI improved content')
+    expect(row.changes_status).toBe('review')
+    expect(row.review_base_content).toBe('Original content')
+  })
+
+  it('start_review also creates a version entry', async () => {
+    const res = await request(app)
+      .patch('/lore/2')
+      .send({ content: 'AI content', source: 'ai', prompt: 'Improve', start_review: true })
+
+    expect(res.status).toBe(200)
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const rows = db.prepare('SELECT * FROM lore_versions WHERE lore_node_id = 2').all() as Array<{
+      version: number; source: string; prompt: string | null
+    }>
+    db.close()
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].source).toBe('ai')
+    expect(rows[0].prompt).toBe('Improve')
+  })
+
+  it('start_review does not overwrite review_base_content when already in review', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath)
+    db.prepare("UPDATE lore_nodes SET content = ?, changes_status = 'review', review_base_content = ? WHERE id = 2")
+      .run('First AI result', 'Original content')
+    db.close()
+
+    // Second improvement (repeat): send start_review again with new AI content
+    const res = await request(app)
+      .patch('/lore/2')
+      .send({ content: 'Second AI result', source: 'ai', start_review: true })
+
+    expect(res.status).toBe(200)
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database2 = require('better-sqlite3')
+    const db2 = new Database2(testDbPath, { readonly: true })
+    const row = db2.prepare('SELECT review_base_content FROM lore_nodes WHERE id = 2').get() as {
+      review_base_content: string | null
+    }
+    db2.close()
+
+    // review_base_content must remain the original (not overwritten with 'First AI result')
+    expect(row.review_base_content).toBe('Original content')
+  })
+
+  it('skip_version updates content without creating a lore_versions entry', async () => {
+    const res = await request(app)
+      .patch('/lore/2')
+      .send({ content: 'Edited during review', skip_version: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+    expect(res.body.word_count).toBe(3)
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM lore_versions WHERE lore_node_id = 2').get() as { c: number }).c
+    const node = db.prepare('SELECT content FROM lore_nodes WHERE id = 2').get() as { content: string }
+    db.close()
+
+    expect(count).toBe(0)
+    expect(node.content).toBe('Edited during review')
+  })
+
+  it('accept_review clears changes_status and review_base_content', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath)
+    db.prepare("UPDATE lore_nodes SET changes_status = 'review', review_base_content = 'Old' WHERE id = 2").run()
+    db.close()
+
+    const res = await request(app)
+      .patch('/lore/2')
+      .send({ accept_review: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database2 = require('better-sqlite3')
+    const db2 = new Database2(testDbPath, { readonly: true })
+    const row = db2.prepare('SELECT changes_status, review_base_content FROM lore_nodes WHERE id = 2').get() as {
+      changes_status: string | null; review_base_content: string | null
+    }
+    db2.close()
+
+    expect(row.changes_status).toBeNull()
+    expect(row.review_base_content).toBeNull()
+  })
+
+  it('accept_review with content creates a new version only if content differs from latest', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath)
+    // Set up: in review with an existing version
+    db.prepare("UPDATE lore_nodes SET content = 'AI text', changes_status = 'review', review_base_content = 'Old text' WHERE id = 2").run()
+    db.prepare("INSERT INTO lore_versions (lore_node_id, version, content, source) VALUES (2, 1, 'AI text', 'ai')").run()
+    db.close()
+
+    // Accept with the same content (no new version expected)
+    const resSame = await request(app)
+      .patch('/lore/2')
+      .send({ accept_review: true, content: 'AI text' })
+    expect(resSame.status).toBe(200)
+
+    // Accept with different content (new version expected)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database2 = require('better-sqlite3')
+    const db2 = new Database2(testDbPath)
+    db2.prepare("UPDATE lore_nodes SET changes_status = 'review', review_base_content = 'Old text' WHERE id = 2").run()
+    db2.close()
+
+    const resDiff = await request(app)
+      .patch('/lore/2')
+      .send({ accept_review: true, content: 'Edited AI text' })
+    expect(resDiff.status).toBe(200)
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database3 = require('better-sqlite3')
+    const db3 = new Database3(testDbPath, { readonly: true })
+    const rows = db3.prepare('SELECT version, source FROM lore_versions WHERE lore_node_id = 2 ORDER BY version').all() as Array<{
+      version: number; source: string
+    }>
+    db3.close()
+
+    expect(rows).toHaveLength(2)
+    expect(rows[1].source).toBe('manual')
   })
 })
