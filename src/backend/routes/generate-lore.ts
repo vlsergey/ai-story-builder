@@ -5,6 +5,20 @@ import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 
+const LORE_RESPONSE_SCHEMA: JsonSchemaSpec = {
+  name: 'lore_node',
+  description: 'A lore item with a short name and content in markdown format',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Short name or title for the lore item (1–10 words)' },
+      content: { type: 'string', description: 'Full content of the lore item in markdown format' },
+    },
+    required: ['name', 'content'],
+    additionalProperties: false,
+  },
+}
+
 let Database: typeof import('better-sqlite3') | null = null
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -22,18 +36,18 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore, model: requestedModel, webSearch, responseSchema } = req.body as {
+  const { prompt, includeExistingLore, model: requestedModel, webSearch } = req.body as {
     prompt?: string
     includeExistingLore?: boolean
     model?: string
     webSearch?: string
-    responseSchema?: JsonSchemaSpec
   }
+  const responseSchema = LORE_RESPONSE_SCHEMA
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
   let engine: string | undefined
   let config: AiConfigStore = {}
-  let textLanguage = 'ru-RU'
+  let textLanguage: string | undefined
   const engineFileIds: string[] = []
 
   try {
@@ -48,7 +62,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
     }
-    if (langRow?.value) textLanguage = langRow.value
+    textLanguage = langRow?.value || undefined
 
     // Collect uploaded file IDs for the active engine.
     // Note: no word_count filter — Grok group-leader nodes may have word_count=0
@@ -81,13 +95,10 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
   }
 
-  const systemPrompt = responseSchema
-    ? `You are a creative writing assistant. Generate a lore item for a story.\n` +
-      `Language: ${textLanguage}.\n` +
-      `Respond with a JSON object matching the provided schema. No explanations, no preamble.`
-    : `You are a creative writing assistant. Generate a lore item for a story.\n` +
-      `Write the result in Markdown format. Language: ${textLanguage}.\n` +
-      `Respond with only the lore content — no explanations, no preamble.`
+  const systemPrompt =
+    `You are a creative writing assistant. Generate a lore item for a story.\n` +
+    (textLanguage ? `Language: ${textLanguage}.\n` : '') +
+    `Respond with a JSON object matching the provided schema. No explanations, no preamble.`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -97,13 +108,11 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 
   let accumulated = ''
-  const onDelta = responseSchema
-    ? (chunk: string) => {
-        accumulated += chunk
-        const partial = parsePartialJson(accumulated) as Record<string, unknown>
-        sse('partial_json', partial)
-      }
-    : (chunk: string) => sse('delta', { text: chunk })
+  const onDelta = (chunk: string) => {
+    accumulated += chunk
+    const partial = parsePartialJson(accumulated) as Record<string, unknown>
+    sse('partial_json', partial)
+  }
 
   try {
     await adapter.generateResponse(

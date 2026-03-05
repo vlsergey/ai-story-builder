@@ -147,22 +147,18 @@ function parseSseEvents(body: string): Array<{ event: string; data: Record<strin
   return events
 }
 
-function sseText(events: ReturnType<typeof parseSseEvents>): string {
-  return events.filter(e => e.event === 'delta').map(e => e.data.text as string).join('')
-}
-
 function ssePartialJson(events: ReturnType<typeof parseSseEvents>): Record<string, unknown> {
   const partials = events.filter(e => e.event === 'partial_json')
   return (partials[partials.length - 1]?.data ?? {}) as Record<string, unknown>
 }
 
-function mockYandexResponse(content = 'Generated lore text') {
+function mockYandexResponse(content = JSON.stringify({ name: 'Lore item', content: 'Generated lore text' })) {
   mockChatCreate.mockResolvedValueOnce({
     choices: [{ message: { content } }],
   })
 }
 
-function mockGrokResponse(content = 'Generated lore text') {
+function mockGrokResponse(content = JSON.stringify({ name: 'Lore item', content: 'Generated lore text' })) {
   mockGrokGenerate.mockImplementationOnce(
     async (_apiKey: string, _params: Record<string, unknown>, _onThinking?: (status: string) => void, onDelta?: (text: string) => void) => {
       onDelta?.(content)
@@ -219,13 +215,15 @@ describe('POST /ai/generate-lore', () => {
 
   it('returns generated content for Grok engine', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
-    mockGrokResponse('A brave hero named Arin.')
+    mockGrokResponse(JSON.stringify({ name: 'Arin', content: 'A brave hero named Arin.' }))
 
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toMatch(/text\/event-stream/)
     const events = parseSseEvents(res.text)
-    expect(sseText(events)).toBe('A brave hero named Arin.')
+    const last = ssePartialJson(events)
+    expect(last.name).toBe('Arin')
+    expect(last.content).toBe('A brave hero named Arin.')
     expect(events.some(e => e.event === 'thinking' && e.data.status === 'done')).toBe(true)
   })
 
@@ -377,13 +375,15 @@ describe('POST /ai/generate-lore', () => {
 
   it('returns generated content for Yandex engine', async () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
-    mockYandexResponse('Yandex lore result')
+    mockYandexResponse(JSON.stringify({ name: 'World', content: 'Yandex lore result' }))
 
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Create a world' })
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toMatch(/text\/event-stream/)
     const events = parseSseEvents(res.text)
-    expect(sseText(events)).toBe('Yandex lore result')
+    const last = ssePartialJson(events)
+    expect(last.name).toBe('World')
+    expect(last.content).toBe('Yandex lore result')
     expect(events.some(e => e.event === 'thinking' && e.data.status === 'done')).toBe(true)
   })
 
@@ -401,7 +401,7 @@ describe('POST /ai/generate-lore', () => {
 
   it('uses text_language from settings in the system prompt', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key', textLanguage: 'en-US' })
-    mockGrokResponse('English lore')
+    mockGrokResponse()
 
     await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a wizard' })
 
@@ -409,14 +409,14 @@ describe('POST /ai/generate-lore', () => {
     expect(params.instructions).toContain('en-US')
   })
 
-  it('defaults to ru-RU when text_language is not set', async () => {
+  it('omits Language line in system prompt when text_language is not set', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
-    mockGrokResponse('Russian lore')
+    mockGrokResponse()
 
     await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
-    expect(params.instructions).toContain('ru-RU')
+    expect(params.instructions).not.toContain('Language:')
   })
 
   // ─── 7. Grok web search ────────────────────────────────────────────────────
@@ -441,30 +441,15 @@ describe('POST /ai/generate-lore', () => {
     expect(params.tools).toBeUndefined()
   })
 
-  // ─── 8. Structured JSON output (responseSchema) ────────────────────────────
+  // ─── 8. Structured JSON output ─────────────────────────────────────────────
 
-  const LORE_SCHEMA = {
-    name: 'lore_node',
-    description: 'A lore item with a short name and markdown body',
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: 'Short name or title for the lore item (1–10 words)' },
-        content: { type: 'string', description: 'Full markdown body of the lore item' },
-      },
-      required: ['name', 'content'],
-      additionalProperties: false,
-    },
-  }
-
-  it('emits partial_json events (not delta) when responseSchema is provided for Grok', async () => {
+  it('emits partial_json events (not delta) for Grok', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     const jsonResponse = JSON.stringify({ name: 'Arin the Brave', content: '## Hero\nA brave warrior.' })
     mockGrokResponse(jsonResponse)
 
     const res = await request(app).post('/ai/generate-lore').send({
       prompt: 'Describe a hero',
-      responseSchema: LORE_SCHEMA,
     })
 
     expect(res.status).toBe(200)
@@ -486,14 +471,13 @@ describe('POST /ai/generate-lore', () => {
     expect(params.text?.format?.type).toBe('json_schema')
   })
 
-  it('emits partial_json events (not delta) when responseSchema is provided for Yandex', async () => {
+  it('emits partial_json events (not delta) for Yandex', async () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
     const jsonResponse = JSON.stringify({ name: 'Mystic Forest', content: '## Forest\nA place of wonder.' })
     mockYandexResponse(jsonResponse)
 
     const res = await request(app).post('/ai/generate-lore').send({
       prompt: 'Describe a location',
-      responseSchema: LORE_SCHEMA,
     })
 
     expect(res.status).toBe(200)
