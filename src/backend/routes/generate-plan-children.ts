@@ -64,6 +64,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   let engine: string | undefined
   let config: AiConfigStore = {}
   let textLanguage: string | undefined
+  const engineFileIds: string[] = []
 
   try {
     const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
@@ -77,6 +78,20 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
     }
     textLanguage = langRow?.value
+
+    if (includeExistingLore && engine) {
+      const nodes = db.prepare(
+        'SELECT ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL AND to_be_deleted = 0'
+      ).all() as { ai_sync_info: string }[]
+      for (const node of nodes) {
+        try {
+          const info = JSON.parse(node.ai_sync_info) as Record<string, { file_id?: string }>
+          const fileId = info[engine]?.file_id
+          if (fileId) engineFileIds.push(fileId)
+        } catch { /* ignore */ }
+      }
+    }
+
     if (!textLanguage) { db.close(); return res.status(400).json({ error: 'text_language is not configured' }) }
     db.close()
   } catch (e) {
@@ -137,7 +152,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
         model: requestedModel?.trim() ?? '',
         includeExistingLore: includeExistingLore ?? false,
         webSearch: webSearch ?? 'none',
-        engineFileIds: [],
+        engineFileIds,
         engineDef,
         config,
         responseSchema: PLAN_CHILDREN_SCHEMA,
