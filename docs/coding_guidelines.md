@@ -30,4 +30,9 @@ To keep the project maintainable and scalable, follow these rules:
 
 * **Engine-agnostic API endpoints** – API routes must not be tied to a specific AI engine (e.g. no `/api/ai/yandex/…` paths). All engine-specific operations should be exposed through engine-agnostic endpoints (e.g. `POST /api/ai/sync-lore`) that read the `current_backend` value from the project settings and dispatch to the appropriate adapter. This keeps the frontend and route structure independent of which engine is active. Engine-specific logic lives in adapter functions/modules, not in the route path.
 
+* **External resource lifecycle** – When integrating with a third-party API (AI engine, storage service, etc.), always investigate and implement the full lifecycle of every resource created: upload, update, **and delete**. Never silently ignore deletion failures as a workaround. If a provider API does not expose a deletion endpoint:
+  * Research alternative cleanup paths (e.g. removing the resource from an index/collection, deleting a parent container that cascades, using an expiration/TTL mechanism).
+  * If no automated cleanup path exists, document the limitation explicitly in the code with a `// TODO:` comment and consider exposing a manual cleanup action in the UI so the user can remove orphaned resources.
+  * Do **not** treat "deletion not supported" as "ignore silently" — orphaned billable resources (files, embeddings, indices) have real cost implications for the user.
+
 These guidelines are part of the project's acceptance criteria and should be reviewed when adding new features.
