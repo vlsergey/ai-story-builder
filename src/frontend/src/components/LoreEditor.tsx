@@ -81,22 +81,18 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     setThinkingStatus(null)
     setThinkingDone(false)
 
-    Promise.all([
-      fetch(`/api/lore/${nodeId}`).then(r => r.json() as Promise<{
-        name: string
-        content: string | null
-        changes_status: string | null
-        review_base_content: string | null
-      }>),
-      fetch(`/api/lore/${nodeId}/latest`)
-        .then(r => r.json() as Promise<{ source?: string; prompt?: string | null } | null>)
-        .catch(() => null),
-    ]).then(([node, latestVersion]) => {
+    fetch(`/api/lore/${nodeId}`).then(r => r.json() as Promise<{
+      name: string
+      content: string | null
+      changes_status: string | null
+      review_base_content: string | null
+      last_improve_instruction: string | null
+    }>).then(node => {
       setName(node.name)
       setContent(node.content ?? '')
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content ?? '')
-        setImproveInstruction(latestVersion?.prompt ?? '')
+        setImproveInstruction(node.last_improve_instruction ?? '')
         setEditorMode('review_unlocked')
       } else if (node.content && node.content.trim().length > 0) {
         setEditorMode('edit')
@@ -152,18 +148,15 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   }
 
   // ── Content autosave ───────────────────────────────────────────────────────
-  // In mode D (review_unlocked): skip_version so history stays clean during review
   function handleContentChange(value: string) {
     setContent(value)
     setContentDirty(true)
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
     contentTimerRef.current = setTimeout(() => {
-      const body: Record<string, unknown> = { content: value, source: 'manual' }
-      if (editorMode === 'review_unlocked') body['skip_version'] = true
       fetch(`/api/lore/${nodeId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ content: value }),
       }).then(r => r.json())
         .then((data: { ok: boolean; word_count: number; char_count: number; byte_count: number; ai_sync_info?: Record<string, unknown> | null }) => {
           setContentDirty(false)
@@ -188,7 +181,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     await fetch(`/api/lore/${nodeId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: currentContent, source: 'manual' }),
+      body: JSON.stringify({ content: currentContent }),
     })
   }
 
@@ -234,8 +227,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       onDone: (data) => { responseId = data.response_id },
     }).then(async () => {
       if (finalName.trim() || finalContent) {
-        const patchBody: Record<string, unknown> = { content: finalContent, source: 'ai', prompt: generatePrompt }
-        if (responseId) patchBody['response_id'] = responseId
+        const patchBody: Record<string, unknown> = { content: finalContent }
         if (finalName.trim()) patchBody['name'] = finalName.trim()
         const r = await fetch(`/api/lore/${nodeId}`, {
           method: 'PATCH',
@@ -306,14 +298,12 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         onDone: (data) => { responseId = data.response_id },
       })
 
-      const patchBody: Record<string, unknown> = {
-        content: finalContent,
-        source: 'ai',
-        prompt: improveInstruction,
-      }
-      if (responseId) patchBody['response_id'] = responseId
+      const patchBody: Record<string, unknown> = { content: finalContent }
       if (finalName.trim()) patchBody['name'] = finalName.trim()
-      if (!fromReview) patchBody['start_review'] = true  // First improvement: capture baseline in DB
+      if (!fromReview) {
+        patchBody['start_review'] = true  // First improvement: capture baseline in DB
+        patchBody['prompt'] = improveInstruction  // Save instruction for review state restore
+      }
 
       const r = await fetch(`/api/lore/${nodeId}`, {
         method: 'PATCH',

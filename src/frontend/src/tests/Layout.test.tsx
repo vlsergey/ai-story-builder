@@ -141,7 +141,7 @@ describe('Layout', () => {
     const mockNode = {
       id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
-      latest_version_status: null, created_at: '', children: [],
+created_at: '', children: [],
     }
     act(() => { capturedOnOpenLoreNode?.(mockNode) })
 
@@ -157,7 +157,7 @@ describe('Layout', () => {
     const mockNode = {
       id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
-      latest_version_status: null, created_at: '', children: [],
+created_at: '', children: [],
     }
     act(() => { capturedOnOpenLoreNode?.(mockNode) })
 
@@ -183,12 +183,12 @@ describe('Layout', () => {
     const mockParent = {
       id: 1, name: 'Characters', parent_id: null, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
-      latest_version_status: null, created_at: '', children: [],
+created_at: '', children: [],
     }
     const mockNode = {
       id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
-      latest_version_status: null, created_at: '', children: [],
+created_at: '', children: [],
     }
 
     // Open via wizard — creates node id=99, then opens lore-editor-99 filling the empty center group

@@ -15,7 +15,7 @@ export type LoreStatMode = 'none' | 'words' | 'chars' | 'bytes'
 /**
  * Unified lore tree node.
  * - A node with children acts as a folder/section.
- * - A node with latest_version_status !== null has content (acts as an item).
+ * - A node with content !== null and content.trim().length > 0 has content (acts as an item).
  * - A node can be both (section with its own overview text).
  */
 export interface LoreNode {
@@ -31,19 +31,8 @@ export interface LoreNode {
   status: string
   /** 1 = marked for deletion, 0 = active */
   to_be_deleted: number
-  /** Status of the latest lore_version, null if no versions exist */
-  latest_version_status: string | null
   created_at: string
   children: LoreNode[]
-}
-
-export interface LoreVersion {
-  id: number
-  lore_node_id: number
-  version: number
-  content: string
-  status: string
-  created_at: string
 }
 
 export interface PlanNodeTree {
@@ -54,16 +43,6 @@ export interface PlanNodeTree {
   position: number
   created_at: string
   children: PlanNodeTree[]
-}
-
-export interface PlanNodeVersion {
-  id: number
-  plan_node_id: number
-  version: number
-  instruction: string
-  result: string | null
-  status: string
-  created_at: string
 }
 
 export interface StoryPart {

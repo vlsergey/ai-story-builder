@@ -43,28 +43,6 @@ router.post('/generate', express.json(), (req: Request, res: Response) => {
   }
 })
 
-// GET /plan_node_versions/:id/generated_parts
-router.get(
-  '/plan_node_versions/:id/generated_parts',
-  (req: Request, res: Response) => {
-    const dbPath = getCurrentDbPath()
-    if (!dbPath) return res.status(400).json({ error: 'no project open' })
-    if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-    try {
-      const db = new Database(dbPath, { readonly: true })
-      const rows = db
-        .prepare(
-          'SELECT id, version, content, status, parent_version_id, is_obsolete, created_at FROM story_parts WHERE plan_node_version_id = ?',
-        )
-        .all(req.params.id)
-      db.close()
-      res.json(rows)
-    } catch (e) {
-      res.status(500).json({ error: String(e) })
-    }
-  },
-)
-
 // PUT /generated_parts/:id
 router.put('/generated_parts/:id', express.json(), (req: Request, res: Response) => {
   const { content } = req.body as { content?: string }

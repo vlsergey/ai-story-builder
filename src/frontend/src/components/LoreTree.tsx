@@ -446,10 +446,8 @@ export default function LoreTree({
   async function handleExport() {
     for (const nodeId of selectedNodeIds) {
       const node = findNode(nodeId, tree)
-      if (!node) continue
-      const version = await fetch(`/api/lore/${nodeId}/latest`).then(r => r.json())
-      if (!version?.content) continue
-      const blob = new Blob([version.content], { type: 'text/plain' })
+      if (!node?.content?.trim()) continue
+      const blob = new Blob([node.content], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url; a.download = `${node.name}.txt`; a.click()
@@ -533,7 +531,7 @@ export default function LoreTree({
   const oneSelected = selectedNodeIds.size === 1
   const anySelected = selectedNodeIds.size >= 1
   const canSort = [...selectedNodeIds].some(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
-  const hasContent = anySelected && [...selectedNodeIds].some(id => findNode(id, tree)?.latest_version_status !== null)
+  const hasContent = anySelected && [...selectedNodeIds].some(id => { const n = findNode(id, tree); return !!(n?.content?.trim()) })
   const deletableCount = [...selectedNodeIds].filter(id => {
     const n = findNode(id, tree)
     return n?.parent_id !== null && !n?.to_be_deleted
@@ -700,7 +698,7 @@ export default function LoreTree({
             const node = item.data
             if (!node) return <>{children}</>
             const isDeleted = !!node.to_be_deleted
-            const hasVersions = node.latest_version_status !== null
+            const hasVersions = !!(node.content?.trim())
             const Icon = node.parent_id === null ? Library : nodeIcon(node)
 
             const statText = statMode !== 'none' ? formatStat(subtreeStat(node, statMode), statMode) : ''

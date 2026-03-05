@@ -167,6 +167,14 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       ALTER TABLE lore_nodes ADD COLUMN review_base_content TEXT NULL;
     `)
   },
+  // version 7 → 8: remove lore_versions and plan_node_versions tables; add last_improve_instruction to lore_nodes
+  (db) => {
+    db.exec(`
+      DROP TABLE IF EXISTS lore_versions;
+      DROP TABLE IF EXISTS plan_node_versions;
+      ALTER TABLE lore_nodes ADD COLUMN last_improve_instruction TEXT NULL;
+    `)
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length

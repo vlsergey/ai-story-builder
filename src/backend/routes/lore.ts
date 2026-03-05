@@ -44,7 +44,7 @@ function countBytes(text: string): number {
 
 // ── Tree ──────────────────────────────────────────────────────────────────────
 
-// GET /lore/tree — full lore tree with latest version status per node
+// GET /lore/tree — full lore tree
 router.get('/tree', (_req: Request, res: Response) => {
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   const dbPath = getCurrentDbPath()
@@ -52,14 +52,11 @@ router.get('/tree', (_req: Request, res: Response) => {
   try {
     const db = new Database(dbPath, { readonly: true })
     const rows = db.prepare(`
-      SELECT n.id, n.parent_id, n.name, n.position, n.status, n.to_be_deleted, n.created_at,
-        n.word_count, n.char_count, n.byte_count, n.ai_sync_info,
-        (SELECT lv.status FROM lore_versions lv
-         WHERE lv.lore_node_id = n.id ORDER BY lv.version DESC LIMIT 1
-        ) AS latest_version_status
+      SELECT n.id, n.parent_id, n.name, n.content, n.position, n.status, n.to_be_deleted, n.created_at,
+        n.word_count, n.char_count, n.byte_count, n.ai_sync_info, n.changes_status, n.review_base_content
       FROM lore_nodes n
       ORDER BY n.parent_id NULLS FIRST, n.position, n.name
-    `).all() as (LoreNodeRow & { latest_version_status: string | null })[]
+    `).all() as LoreNodeRow[]
     db.close()
 
     const map = new Map<number, LoreTreeNode>()
@@ -95,41 +92,16 @@ router.post('/import', upload.single('file'), (req: Request, res: Response) => {
     const content = fs.readFileSync(req.file.path, 'utf8')
     const name = req.file.originalname
     const db = new Database(dbPath)
+    const wordCount = countWords(content)
+    const charCount = countChars(content)
+    const byteCount = countBytes(content)
     const info = db
-      .prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
-      .run(parent_id, name)
+      .prepare('INSERT INTO lore_nodes (parent_id, name, content, word_count, char_count, byte_count) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(parent_id, name, content, wordCount, charCount, byteCount)
     const nodeId = info.lastInsertRowid
-    db.prepare('INSERT INTO lore_versions (lore_node_id, version, content) VALUES (?, 1, ?)').run(nodeId, content)
     db.close()
     try { fs.unlinkSync(req.file.path) } catch (_) {}
     res.json({ id: nodeId })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
-
-// ── Restore a version ─────────────────────────────────────────────────────────
-
-// POST /lore/restore/:version_id — make a copy of an old version as the new latest
-router.post('/restore/:version_id', (_req: Request, res: Response) => {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath)
-    const old = db
-      .prepare('SELECT lore_node_id, content FROM lore_versions WHERE id = ?')
-      .get(_req.params.version_id) as { lore_node_id: number; content: string } | undefined
-    if (!old) return res.status(404).json({ error: 'version not found' })
-    const cur = db
-      .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
-      .get(old.lore_node_id) as { v: number }
-    const next = (cur?.v ?? 0) + 1
-    db.prepare('INSERT INTO lore_versions (lore_node_id, version, content) VALUES (?, ?, ?)').run(
-      old.lore_node_id, next, old.content,
-    )
-    db.close()
-    res.json({ restoredVersion: next })
   } catch (e) {
     res.status(500).json({ error: String(e) })
   }
@@ -196,24 +168,17 @@ router.get('/:id', (req: Request, res: Response) => {
 // PATCH /lore/:id — update name and/or content of a node
 router.patch('/:id', express.json(), (req: Request, res: Response) => {
   const {
-    name, content, source, prompt: versionPrompt, response_id: versionResponseId,
-    start_review, skip_version, accept_review,
+    name, content, prompt,
+    start_review, accept_review,
   } = req.body as {
     name?: string
     content?: string
-    /** 'manual' (default) | 'ai' — source of the content change, only used when content is provided */
-    source?: string
-    /** AI prompt used when source='ai' */
+    /** AI improve instruction; stored to last_improve_instruction when start_review=true */
     prompt?: string
-    /** AI engine response ID when source='ai' */
-    response_id?: string
     /** When true: capture current content as review_base_content, set changes_status='review'.
-     *  Must be combined with a content update. */
+     *  Must be combined with a content update. Also saves prompt to last_improve_instruction. */
     start_review?: boolean
-    /** When true: update lore_nodes content/counts but skip inserting into lore_versions. */
-    skip_version?: boolean
-    /** When true: clear changes_status and review_base_content.
-     *  If content is provided and differs from latest version, create a new 'manual' version. */
+    /** When true: clear changes_status, review_base_content, and last_improve_instruction. */
     accept_review?: boolean
   }
   const dbPath = getCurrentDbPath()
@@ -261,6 +226,7 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
         .prepare('SELECT content, changes_status FROM lore_nodes WHERE id = ?')
         .get(req.params.id) as { content: string | null; changes_status: string | null } | undefined
       sets.push('changes_status = ?'); params.push('review')
+      sets.push('last_improve_instruction = ?'); params.push(prompt ?? null)
       if (!cur || cur.changes_status !== 'review') {
         // First improvement: capture current content as baseline for diffs
         sets.push('review_base_content = ?'); params.push(cur?.content ?? '')
@@ -271,45 +237,12 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
     if (accept_review) {
       sets.push('changes_status = ?'); params.push(null)
       sets.push('review_base_content = ?'); params.push(null)
+      sets.push('last_improve_instruction = ?'); params.push(null)
     }
 
-    db.transaction(() => {
-      if (sets.length > 0) {
-        db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params, req.params.id)
-      }
-
-      if (hasContent && !skip_version) {
-        if (accept_review) {
-          // Only create a new version if content differs from latest saved version
-          const latest = db
-            .prepare('SELECT content FROM lore_versions WHERE lore_node_id = ? ORDER BY version DESC LIMIT 1')
-            .get(req.params.id) as { content: string } | undefined
-          if (!latest || latest.content !== content) {
-            const { v } = db
-              .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
-              .get(req.params.id) as { v: number }
-            db.prepare(
-              'INSERT INTO lore_versions (lore_node_id, version, content, source, prompt, response_id) VALUES (?, ?, ?, ?, ?, ?)'
-            ).run(req.params.id, v + 1, content!, 'manual', null, null)
-          }
-        } else {
-          const { v } = db
-            .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
-            .get(req.params.id) as { v: number }
-          const vSource = source ?? 'manual'
-          db.prepare(
-            'INSERT INTO lore_versions (lore_node_id, version, content, source, prompt, response_id) VALUES (?, ?, ?, ?, ?, ?)'
-          ).run(
-            req.params.id,
-            v + 1,
-            content!,
-            vSource,
-            vSource === 'ai' ? (versionPrompt ?? null) : null,
-            vSource === 'ai' ? (versionResponseId ?? null) : null,
-          )
-        }
-      }
-    })()
+    if (sets.length > 0) {
+      db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params, req.params.id)
+    }
     db.close()
     res.json(hasContent
       ? { ok: true, word_count: wordCount, char_count: charCount, byte_count: byteCount, ai_sync_info: updatedSyncInfo }
@@ -446,7 +379,7 @@ router.post('/:id/move', express.json(), (req: Request, res: Response) => {
   }
 })
 
-// POST /lore/:id/duplicate — copy node and its latest version content
+// POST /lore/:id/duplicate — copy node and its content
 router.post('/:id/duplicate', (req: Request, res: Response) => {
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -454,8 +387,8 @@ router.post('/:id/duplicate', (req: Request, res: Response) => {
   try {
     const db = new Database(dbPath)
     const src = db
-      .prepare('SELECT parent_id, name FROM lore_nodes WHERE id = ?')
-      .get(req.params.id) as { parent_id: number | null; name: string } | undefined
+      .prepare('SELECT parent_id, name, content FROM lore_nodes WHERE id = ?')
+      .get(req.params.id) as { parent_id: number | null; name: string; content: string | null } | undefined
     if (!src) return res.status(404).json({ error: 'node not found' })
 
     const baseName = src.name + ' copy'
@@ -467,75 +400,19 @@ router.post('/:id/duplicate', (req: Request, res: Response) => {
     let n = 2
     while (usedNames.has(newName)) newName = `${baseName} ${n++}`
 
-    const info = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)').run(src.parent_id, newName)
-    const newId = info.lastInsertRowid
-
-    const latest = db
-      .prepare('SELECT content FROM lore_versions WHERE lore_node_id = ? ORDER BY version DESC LIMIT 1')
-      .get(req.params.id) as { content: string } | undefined
-    if (latest) {
-      db.prepare('INSERT INTO lore_versions (lore_node_id, version, content) VALUES (?, 1, ?)').run(newId, latest.content)
+    let info
+    if (src.content) {
+      const wordCount = countWords(src.content)
+      const charCount = countChars(src.content)
+      const byteCount = countBytes(src.content)
+      info = db.prepare(
+        'INSERT INTO lore_nodes (parent_id, name, content, word_count, char_count, byte_count) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(src.parent_id, newName, src.content, wordCount, charCount, byteCount)
+    } else {
+      info = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)').run(src.parent_id, newName)
     }
     db.close()
-    res.json({ id: newId })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
-
-// ── Versions ──────────────────────────────────────────────────────────────────
-
-// GET /lore/:id/versions
-router.get('/:id/versions', (req: Request, res: Response) => {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath, { readonly: true })
-    const rows = db
-      .prepare('SELECT id, version, content, status, created_at FROM lore_versions WHERE lore_node_id = ? ORDER BY version DESC')
-      .all(req.params.id)
-    db.close()
-    res.json(rows)
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
-
-// POST /lore/:id/versions
-router.post('/:id/versions', express.json(), (req: Request, res: Response) => {
-  const { content } = req.body as { content?: string }
-  const dbPath = getCurrentDbPath()
-  if (!dbPath || content === undefined) return res.status(400).json({ error: 'content required and db must be open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath)
-    const cur = db
-      .prepare('SELECT COALESCE(MAX(version),0) AS v FROM lore_versions WHERE lore_node_id = ?')
-      .get(req.params.id) as { v: number }
-    const next = (cur?.v ?? 0) + 1
-    const info = db
-      .prepare('INSERT INTO lore_versions (lore_node_id, version, content) VALUES (?, ?, ?)')
-      .run(req.params.id, next, content)
-    db.close()
-    res.json({ id: info.lastInsertRowid, version: next })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
-
-// GET /lore/:id/latest
-router.get('/:id/latest', (req: Request, res: Response) => {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath, { readonly: true })
-    const row = db
-      .prepare('SELECT * FROM lore_versions WHERE lore_node_id = ? ORDER BY version DESC LIMIT 1')
-      .get(req.params.id)
-    db.close()
-    res.json(row ?? null)
+    res.json({ id: info.lastInsertRowid })
   } catch (e) {
     res.status(500).json({ error: String(e) })
   }

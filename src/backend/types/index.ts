@@ -17,21 +17,8 @@ export interface LoreNodeRow {
   changes_status: string | null
   /** Content before the first improvement started; set once when review begins, cleared on accept */
   review_base_content: string | null
-}
-
-export interface LoreVersionRow {
-  id: number
-  lore_node_id: number
-  version: number
-  content: string
-  status: string
-  /** 'manual' | 'ai' — how this version was created */
-  source: string
-  /** The AI prompt used when source='ai', null otherwise */
-  prompt: string | null
-  /** The AI engine response ID when source='ai', null otherwise */
-  response_id: string | null
-  created_at: string
+  /** Last AI improve instruction used; stored for restoring review state on reopen */
+  last_improve_instruction: string | null
 }
 
 export interface PlanNodeRow {
@@ -40,18 +27,6 @@ export interface PlanNodeRow {
   title: string
   content: string | null
   position: number
-  created_at: string
-}
-
-export interface PlanNodeVersionRow {
-  id: number
-  plan_node_id: number
-  version: number
-  instruction: string
-  result: string | null
-  status: string
-  parent_version_id: number | null
-  is_obsolete: boolean
   created_at: string
 }
 
@@ -108,7 +83,6 @@ export interface SettingRow {
 /** Full lore tree node (returned by GET /lore/tree).
  *  ai_sync_info is delivered as a parsed object (not raw JSON string). */
 export interface LoreTreeNode extends Omit<LoreNodeRow, 'ai_sync_info'> {
-  latest_version_status: string | null
   ai_sync_info: Record<string, AiEngineSyncRecord> | null
   children: LoreTreeNode[]
 }

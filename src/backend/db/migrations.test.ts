@@ -39,30 +39,14 @@ describe('migrateDatabase', () => {
     ).map((r) => r.name)
 
     expect(tables).toContain('lore_nodes')
-    expect(tables).toContain('lore_versions')
+    expect(tables).not.toContain('lore_versions')
     expect(tables).toContain('plan_nodes')
-    expect(tables).toContain('plan_node_versions')
+    expect(tables).not.toContain('plan_node_versions')
     expect(tables).toContain('story_parts')
     expect(tables).toContain('card_definitions')
     expect(tables).toContain('card_values')
     expect(tables).toContain('ai_calls')
     expect(tables).toContain('settings')
-
-    db.close()
-  })
-
-  it('plan_node_versions has instruction and result columns (not summary/notes)', () => {
-    const db = inMemoryDb()
-    migrateDatabase(db)
-
-    const cols = (
-      db.pragma('table_info(plan_node_versions)') as { name: string }[]
-    ).map((c) => c.name)
-
-    expect(cols).toContain('instruction')
-    expect(cols).toContain('result')
-    expect(cols).not.toContain('summary')
-    expect(cols).not.toContain('notes')
 
     db.close()
   })
