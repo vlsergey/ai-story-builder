@@ -304,7 +304,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
         if (result.action === 'delete') {
           if (oldFileId) {
             try {
-              await client.files.del(oldFileId)
+              await client.files.delete(oldFileId)
             } catch (e: unknown) {
               if ((e as { status?: number })?.status !== 404) {
                 throw new Error(`Delete Grok file ${oldFileId} for group "${group.level2NodeName}" failed:\n${formatApiError(e)}`)
@@ -315,7 +315,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
           // Delete old file first to avoid orphans
           if (oldFileId) {
             try {
-              await client.files.del(oldFileId)
+              await client.files.delete(oldFileId)
             } catch (e: unknown) {
               if ((e as { status?: number })?.status !== 404) {
                 throw new Error(`Delete old Grok file ${oldFileId} for group "${group.level2NodeName}" failed:\n${formatApiError(e)}`)
@@ -446,7 +446,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
       // Delete old remote file before uploading new version (avoids orphaned files on partial failure)
       if (node.yandexSync?.file_id) {
         try {
-          await client.files.del(node.yandexSync.file_id)
+          await client.files.delete(node.yandexSync.file_id)
         } catch (e: unknown) {
           if ((e as { status?: number })?.status !== 404) {
             throw new Error(`Delete old file ${node.yandexSync.file_id} for node "${node.name}" (id=${node.id}):\n${formatApiError(e)}`)
@@ -471,7 +471,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     for (const node of toDelete) {
       if (node.yandexSync?.file_id) {
         try {
-          await client.files.del(node.yandexSync.file_id)
+          await client.files.delete(node.yandexSync.file_id)
         } catch (e: unknown) {
           if ((e as { status?: number })?.status !== 404) {
             throw new Error(`Delete file ${node.yandexSync.file_id} failed:\n${formatApiError(e)}`)
