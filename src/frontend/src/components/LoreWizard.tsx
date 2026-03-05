@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
+import { Loader2, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../lib/theme/theme-provider'
 import { useEditorSettings } from '../lib/editor-settings'
+import { useLocale } from '../lib/locale'
 import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
 import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
+import { generateLoreStream } from '../lib/generate-lore-stream'
 
 interface LoreWizardProps {
   parentNodeId: number
@@ -21,6 +24,7 @@ function shortModelName(modelId: string): string {
 export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: LoreWizardProps) {
   const { resolvedTheme } = useTheme()
   const { wordWrap } = useEditorSettings()
+  const { t } = useLocale()
 
   const [prompt, setPrompt] = useState('')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
@@ -33,6 +37,8 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
+  const [thinkingDone, setThinkingDone] = useState(false)
 
   useEffect(() => {
     panelApi?.setTitle(`AI Wizard → ${parentNodeName}`)
@@ -60,31 +66,29 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
 
   async function handleGenerate() {
     if (!prompt.trim()) return
+    setContent('')
+    setThinkingStatus(null)
+    setThinkingDone(false)
     setGenerating(true)
     setError(null)
     try {
-      const res = await fetch('/api/ai/generate-lore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          includeExistingLore,
-          ...(selectedModel ? { model: selectedModel } : {}),
-          webSearch,
-        }),
+      await generateLoreStream({
+        prompt,
+        includeExistingLore,
+        model: selectedModel || undefined,
+        webSearch,
+        onThinking: (status) => {
+          if (status === 'done') { setThinkingDone(true) }
+          else { setThinkingStatus(status); setThinkingDone(false) }
+        },
+        onDelta: (text) => setContent(prev => prev + text),
       })
-      const data = await res.json() as { content?: string; error?: string }
-      if (res.ok) {
-        setContent(data.content ?? '')
-        if (selectedModel && currentEngine) {
-          void fetch('/api/ai/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel } }),
-          })
-        }
-      } else {
-        setError(data.error ?? 'Unknown error')
+      if (selectedModel && currentEngine) {
+        void fetch('/api/ai/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel } }),
+        })
       }
     } catch (e) {
       setError(String(e))
@@ -187,6 +191,16 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
           {generating ? 'Generating…' : 'Generate'}
         </button>
       </div>
+
+      {/* Thinking status row */}
+      {thinkingStatus !== null && (
+        <div className="flex items-center gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
+          {thinkingDone
+            ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            : <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
+          <span>{t(`thinking.${thinkingDone ? 'done' : thinkingStatus}`)}</span>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (

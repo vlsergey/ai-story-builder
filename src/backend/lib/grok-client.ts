@@ -18,10 +18,13 @@ export function createGrokClient(apiKey: string): OpenAI {
 /**
  * Calls the xAI Responses API in streaming mode and returns the full text output.
  * Logs reasoning summary and web search events to the console.
+ * Optional callbacks allow the caller to react to thinking status changes and text deltas.
  */
 export async function grokGenerate(
   apiKey: string,
   params: Record<string, unknown>,
+  onThinking?: (status: string) => void,
+  onDelta?: (text: string) => void,
 ): Promise<string> {
   const client = createGrokClient(apiKey)
 
@@ -36,11 +39,13 @@ export async function grokGenerate(
     switch (event.type) {
       case 'response.output_text.delta':
         text += event.delta
+        onDelta?.(event.delta)
         break
 
       case 'response.reasoning_summary_text.done':
         if (event.text) {
           console.log(`[Grok] reasoning summary:\n${event.text}`)
+          onThinking?.('reasoning_done')
         }
         break
 
@@ -52,14 +57,17 @@ export async function grokGenerate(
 
       case 'response.web_search_call.in_progress':
         console.log('[Grok] web search: in progress')
+        onThinking?.('web_search_in_progress')
         break
 
       case 'response.web_search_call.searching':
         console.log('[Grok] web search: searching')
+        onThinking?.('web_search_searching')
         break
 
       case 'response.web_search_call.completed':
         console.log('[Grok] web search: completed')
+        onThinking?.('web_search_completed')
         break
 
       case 'response.failed':

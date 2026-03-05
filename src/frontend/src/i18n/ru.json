@@ -58,6 +58,13 @@
   "settings.debug.verboseAiLogging": "Подробное логирование AI запросов",
   "settings.debug.verboseAiLoggingDescription": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции.",
 
+  "thinking.generating": "Генерирую…",
+  "thinking.web_search_in_progress": "Веб-поиск: запускаю…",
+  "thinking.web_search_searching": "Веб-поиск: ищу…",
+  "thinking.web_search_completed": "Веб-поиск завершён",
+  "thinking.reasoning_done": "Размышления завершены",
+  "thinking.done": "Генерация завершена",
+
   "ageRating.G.longLabel": "Все возрасты",
   "ageRating.PG.longLabel": "С 7 лет",
   "ageRating.12.longLabel": "С 12 лет",

@@ -1,9 +1,8 @@
 import express, { Request, Response, Router } from 'express'
-import type OpenAI from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import { createYandexClient } from '../lib/yandex-client.js'
-import { grokGenerate } from '../lib/grok-client.js'
+import type { AiConfigStore } from '../lib/lore-generate-adapter.js'
+import { getLoreAdapter } from '../lib/lore-generate-adapter.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -14,22 +13,6 @@ try {
 }
 
 const router: Router = express.Router()
-
-interface YandexConfig {
-  api_key?: string
-  folder_id?: string
-  search_index_id?: string
-}
-
-interface GrokConfig {
-  api_key?: string
-}
-
-interface AiConfigStore {
-  yandex?: YandexConfig
-  grok?: GrokConfig
-  [key: string]: unknown
-}
 
 // ─── POST /generate-lore ───────────────────────────────────────────────────
 
@@ -49,8 +32,6 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   let engine: string | undefined
   let config: AiConfigStore = {}
   let textLanguage = 'ru-RU'
-
-  // Collect per-engine file IDs from lore nodes (for file-attachment path)
   const engineFileIds: string[] = []
 
   try {
@@ -93,98 +74,43 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
   }
 
+  const adapter = getLoreAdapter(engine)
+  if (!adapter) {
+    return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
+  }
+
   const systemPrompt =
     `You are a creative writing assistant. Generate a lore item for a story.\n` +
     `Write the result in Markdown format. Language: ${textLanguage}.\n` +
     `Respond with only the lore content — no explanations, no preamble.`
 
-  // ── Yandex ────────────────────────────────────────────────────────────────
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('X-Accel-Buffering', 'no')
 
-  if (engine === 'yandex') {
-    const apiKey = config.yandex?.api_key?.trim()
-    const folderId = config.yandex?.folder_id?.trim()
-    if (!apiKey || !folderId) {
-      return res.status(400).json({ error: 'Yandex api_key and folder_id are required' })
-    }
+  const sse = (event: string, data: unknown) =>
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 
-    const model = requestedModel?.trim() || `gpt://${folderId}/yandexgpt/latest`
-    const client = createYandexClient(apiKey, folderId)
-
-    try {
-      const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt.trim() },
-        ],
-      }
-
-      const tools: unknown[] = []
-
-      if (includeExistingLore) {
-        const searchIndexId = config.yandex?.search_index_id
-        if (engineDef.capabilities.knowledgeBaseAttachment && searchIndexId) {
-          tools.push({ type: 'file_search', file_search: { vector_store_ids: [searchIndexId] } })
-        }
-      }
-
-      if (webSearch && webSearch !== 'none') {
-        tools.push({ type: 'web_search', web_search: { search_context_size: webSearch } })
-      }
-
-      if (tools.length > 0) {
-        ;(requestParams as unknown as Record<string, unknown>)['tools'] = tools
-      }
-
-      const completion = await client.chat.completions.create(requestParams)
-      const content = completion.choices[0]?.message?.content ?? ''
-      return res.json({ content })
-    } catch (e) {
-      return res.status(500).json({ error: String(e) })
-    }
+  try {
+    await adapter.generateLore(
+      {
+        prompt: prompt.trim(),
+        systemPrompt,
+        model: requestedModel?.trim() ?? '',
+        includeExistingLore: includeExistingLore ?? false,
+        webSearch: webSearch ?? 'none',
+        engineFileIds,
+        engineDef,
+        config,
+      },
+      (status) => sse('thinking', { status }),
+      (text) => sse('delta', { text }),
+    )
+    sse('done', {})
+  } catch (e) {
+    sse('error', { message: String(e) })
   }
-
-  // ── Grok ──────────────────────────────────────────────────────────────────
-
-  if (engine === 'grok') {
-    const apiKey = config.grok?.api_key?.trim()
-    if (!apiKey) {
-      return res.status(400).json({ error: 'Grok api_key is required' })
-    }
-
-    const maxFiles = engineDef.maxFilesPerRequest ?? 10
-    // Default model — falls back if available_models not cached yet
-    const model = requestedModel?.trim() || 'grok-3'
-
-    try {
-      // Build user message content for the Responses API
-      const attachableFileIds = engineFileIds.slice(0, maxFiles)
-      const userContent: Array<{ type: 'input_text'; text: string } | { type: 'input_file'; file_id: string }> = [
-        { type: 'input_text', text: prompt.trim() },
-      ]
-      if (includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
-        for (const fileId of attachableFileIds) {
-          userContent.push({ type: 'input_file', file_id: fileId })
-        }
-      }
-
-      const requestParams: Record<string, unknown> = {
-        model,
-        instructions: systemPrompt,
-        input: [{ role: 'user', content: userContent }],
-      }
-      if (webSearch && webSearch !== 'none') {
-        requestParams.tools = [{ type: 'web_search' }]
-      }
-
-      const content = await grokGenerate(apiKey, requestParams)
-      return res.json({ content })
-    } catch (e) {
-      return res.status(500).json({ error: String(e) })
-    }
-  }
-
-  return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
+  res.end()
 })
 
 export default router

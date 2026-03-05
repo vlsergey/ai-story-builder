@@ -58,6 +58,13 @@
   "settings.debug.verboseAiLogging": "Verbose AI request logging",
   "settings.debug.verboseAiLoggingDescription": "Prints full request headers (API key masked) and body to the server console for every AI API call. Use when diagnosing AI integration issues.",
 
+  "thinking.generating": "Generating…",
+  "thinking.web_search_in_progress": "Web search: starting…",
+  "thinking.web_search_searching": "Web search: searching…",
+  "thinking.web_search_completed": "Web search: complete",
+  "thinking.reasoning_done": "Reasoning complete",
+  "thinking.done": "Generation complete",
+
   "ageRating.G.longLabel": "All Ages",
   "ageRating.PG.longLabel": "Ages 7+",
   "ageRating.12.longLabel": "Ages 12+",

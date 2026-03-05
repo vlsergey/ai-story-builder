@@ -134,6 +134,23 @@ function setupDb(opts?: {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function parseSseEvents(body: string): Array<{ event: string; data: Record<string, unknown> }> {
+  const events: Array<{ event: string; data: Record<string, unknown> }> = []
+  let event = ''
+  for (const line of body.split('\n')) {
+    if (line.startsWith('event: ')) event = line.slice(7).trim()
+    else if (line.startsWith('data: ')) {
+      events.push({ event, data: JSON.parse(line.slice(6)) as Record<string, unknown> })
+      event = ''
+    }
+  }
+  return events
+}
+
+function sseText(events: ReturnType<typeof parseSseEvents>): string {
+  return events.filter(e => e.event === 'delta').map(e => e.data.text as string).join('')
+}
+
 function mockYandexResponse(content = 'Generated lore text') {
   mockChatCreate.mockResolvedValueOnce({
     choices: [{ message: { content } }],
@@ -141,7 +158,12 @@ function mockYandexResponse(content = 'Generated lore text') {
 }
 
 function mockGrokResponse(content = 'Generated lore text') {
-  mockGrokGenerate.mockResolvedValueOnce(content)
+  mockGrokGenerate.mockImplementationOnce(
+    async (_apiKey: string, _params: Record<string, unknown>, _onThinking?: (status: string) => void, onDelta?: (text: string) => void) => {
+      onDelta?.(content)
+      return content
+    }
+  )
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -196,14 +218,20 @@ describe('POST /ai/generate-lore', () => {
 
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
     expect(res.status).toBe(200)
-    expect(res.body.content).toBe('A brave hero named Arin.')
+    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
+    const events = parseSseEvents(res.text)
+    expect(sseText(events)).toBe('A brave hero named Arin.')
+    expect(events.some(e => e.event === 'thinking' && e.data.status === 'done')).toBe(true)
   })
 
-  it('returns 400 when Grok api_key is missing', async () => {
+  it('returns SSE error when Grok api_key is missing', async () => {
     testDbPath = setupDb({ currentEngine: 'grok' }) // no grokApiKey in config
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'test' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('Grok api_key is required')
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
+    const events = parseSseEvents(res.text)
+    const errorEvent = events.find(e => e.event === 'error')
+    expect(errorEvent?.data.message).toContain('Grok api_key is required')
   })
 
   // ─── 3. Grok file attachment format ───────────────────────────────────────
@@ -348,14 +376,20 @@ describe('POST /ai/generate-lore', () => {
 
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Create a world' })
     expect(res.status).toBe(200)
-    expect(res.body.content).toBe('Yandex lore result')
+    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
+    const events = parseSseEvents(res.text)
+    expect(sseText(events)).toBe('Yandex lore result')
+    expect(events.some(e => e.event === 'thinking' && e.data.status === 'done')).toBe(true)
   })
 
-  it('returns 400 when Yandex api_key or folder_id is missing', async () => {
+  it('returns SSE error when Yandex api_key or folder_id is missing', async () => {
     testDbPath = setupDb({ currentEngine: 'yandex' }) // no credentials
     const res = await request(app).post('/ai/generate-lore').send({ prompt: 'test' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('Yandex api_key and folder_id are required')
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
+    const events = parseSseEvents(res.text)
+    const errorEvent = events.find(e => e.event === 'error')
+    expect(errorEvent?.data.message).toContain('Yandex api_key and folder_id are required')
   })
 
   // ─── 6. text_language setting ─────────────────────────────────────────────
