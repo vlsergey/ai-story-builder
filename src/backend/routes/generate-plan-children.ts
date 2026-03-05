@@ -22,7 +22,7 @@ const PLAN_CHILDREN_SCHEMA: JsonSchemaSpec = {
           type: 'object',
           properties: {
             name: { type: 'string', description: 'Short title for the child node (1–10 words)' },
-            description: { type: 'string', description: 'Detailed content for this child node in markdown format (~500–1000 words)' },
+            description: { type: 'string', description: 'Content for this child node in plain text format' },
           },
           required: ['name', 'description'],
           additionalProperties: false,
@@ -50,10 +50,11 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, parentTitle, parentContent, model: requestedModel, webSearch } = req.body as {
+  const { prompt, parentTitle, parentContent, includeExistingLore, model: requestedModel, webSearch } = req.body as {
     prompt?: string
     parentTitle?: string
     parentContent?: string
+    includeExistingLore?: boolean
     model?: string
     webSearch?: string
   }
@@ -123,7 +124,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
         prompt: prompt.trim(),
         systemPrompt,
         model: requestedModel?.trim() ?? '',
-        includeExistingLore: false,
+        includeExistingLore: includeExistingLore ?? false,
         webSearch: webSearch ?? 'none',
         engineFileIds: [],
         engineDef,

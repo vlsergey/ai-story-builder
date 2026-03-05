@@ -50,6 +50,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [webSearch, setWebSearch] = useState('none')
+  const [includeExistingLore, setIncludeExistingLore] = useState(true)
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -207,6 +208,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
 
     generatePlanStream({
       prompt: generatePrompt,
+      includeExistingLore,
       model: selectedModel || undefined,
       webSearch,
       mode: 'generate',
@@ -274,6 +276,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
     try {
       await generatePlanStream({
         prompt: improveInstruction,
+        includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
         mode: 'improve',
@@ -401,6 +404,16 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
           ))}
         </select>
       )}
+      <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
+        <input
+          type="checkbox"
+          checked={includeExistingLore}
+          onChange={e => setIncludeExistingLore(e.target.checked)}
+          className="accent-primary"
+          disabled={generating}
+        />
+        Include existing lore
+      </label>
     </div>
   )
 

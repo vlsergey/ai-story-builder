@@ -38,6 +38,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [webSearch, setWebSearch] = useState('none')
+  const [includeExistingLore, setIncludeExistingLore] = useState(true)
 
   // Generation state
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
@@ -103,6 +104,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         prompt: prompt.trim(),
         parentTitle,
         parentContent,
+        includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
         onThinking: (status, detail) => {
@@ -277,6 +279,15 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
                 ))}
               </select>
             )}
+            <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={includeExistingLore}
+                onChange={e => setIncludeExistingLore(e.target.checked)}
+                className="accent-primary"
+              />
+              Include existing lore
+            </label>
             <button
               onClick={handleGenerate}
               disabled={!prompt.trim()}

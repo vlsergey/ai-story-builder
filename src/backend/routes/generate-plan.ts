@@ -35,8 +35,9 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, model: requestedModel, webSearch, mode, baseContent } = req.body as {
+  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent } = req.body as {
     prompt?: string
+    includeExistingLore?: boolean
     model?: string
     webSearch?: string
     mode?: 'generate' | 'improve'
@@ -106,7 +107,7 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
         prompt: prompt.trim(),
         systemPrompt,
         model: requestedModel?.trim() ?? '',
-        includeExistingLore: false,
+        includeExistingLore: includeExistingLore ?? false,
         webSearch: webSearch ?? 'none',
         engineFileIds: [],
         engineDef,

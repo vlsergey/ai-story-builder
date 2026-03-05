@@ -1,5 +1,6 @@
 export interface GeneratePlanOptions {
   prompt: string
+  includeExistingLore?: boolean
   model?: string
   webSearch?: string
   /** 'generate' (default) | 'improve' */
@@ -18,6 +19,7 @@ export async function generatePlanStream(options: GeneratePlanOptions): Promise<
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prompt: options.prompt,
+      includeExistingLore: options.includeExistingLore,
       model: options.model,
       webSearch: options.webSearch,
       mode: options.mode,
