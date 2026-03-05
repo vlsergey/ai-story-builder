@@ -35,13 +35,14 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent } = req.body as {
+  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent, maxTokens } = req.body as {
     prompt?: string
     includeExistingLore?: boolean
     model?: string
     webSearch?: string
     mode?: 'generate' | 'improve'
     baseContent?: string
+    maxTokens?: number
   }
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
@@ -128,6 +129,7 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
         engineDef,
         config,
         responseSchema: PLAN_RESPONSE_SCHEMA,
+        maxTokens: maxTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,

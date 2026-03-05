@@ -22,7 +22,7 @@ const PLAN_CHILDREN_SCHEMA: JsonSchemaSpec = {
           type: 'object',
           properties: {
             title: { type: 'string', description: 'Subsection heading (1–10 words)' },
-            content: { type: 'string', description: 'Body text / detailed notes for this subsection in Markdown format' },
+            content: { type: 'string', description: 'Body text / detailed notes for this subsection in plain text format' },
           },
           required: ['title', 'content'],
           additionalProperties: false,
@@ -50,7 +50,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, parentTitle, parentContent, isRoot, includeExistingLore, model: requestedModel, webSearch } = req.body as {
+  const { prompt, parentTitle, parentContent, isRoot, includeExistingLore, model: requestedModel, webSearch, maxTokens } = req.body as {
     prompt?: string
     parentTitle?: string
     parentContent?: string
@@ -58,6 +58,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
     includeExistingLore?: boolean
     model?: string
     webSearch?: string
+    maxTokens?: number
   }
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
@@ -156,6 +157,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
         engineDef,
         config,
         responseSchema: PLAN_CHILDREN_SCHEMA,
+        maxTokens: maxTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,

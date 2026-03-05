@@ -40,6 +40,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
   const [selectedModel, setSelectedModel] = useState('')
   const [webSearch, setWebSearch] = useState('none')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
+  const [maxTokens, setMaxTokens] = useState(16384)
 
   // Generation state
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
@@ -77,11 +78,17 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         const engine = data.current_engine ?? null
         setCurrentEngine(engine)
         if (!engine) return
-        const engineData = data[engine] as { available_models?: string[]; last_model?: string | null } | undefined
+        const engineData = data[engine] as {
+          available_models?: string[]; last_model?: string | null
+          last_max_tokens_plan_children?: number | null
+        } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
         const last = engineData?.last_model
         setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
+        if (typeof engineData?.last_max_tokens_plan_children === 'number' && engineData.last_max_tokens_plan_children > 0) {
+          setMaxTokens(engineData.last_max_tokens_plan_children)
+        }
       })
       .catch(() => {})
   }, [])
@@ -110,6 +117,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
+        maxTokens,
         onThinking: (status, detail) => {
           if (status === 'done') setThinkingDone(true)
           else { setThinkingStatus(status); setThinkingDone(false) }
@@ -134,12 +142,12 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
       setProposedChildren(finalItems)
       setParentDescription(finalDescription)
 
-      // Save last-used model
-      if (selectedModel && currentEngine) {
+      // Save last-used model and max tokens
+      if (currentEngine) {
         void fetch('/api/ai/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel } }),
+          body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan_children: maxTokens } }),
         })
       }
 
@@ -290,6 +298,18 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
                 className="accent-primary"
               />
               Include existing lore
+            </label>
+            <label className="flex items-center gap-1.5 text-sm shrink-0">
+              <span className="text-muted-foreground">Max tokens</span>
+              <input
+                type="number"
+                min={1}
+                max={131072}
+                step={256}
+                value={maxTokens}
+                onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 16384)}
+                className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background"
+              />
             </label>
             <button
               onClick={handleGenerate}

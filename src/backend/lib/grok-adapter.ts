@@ -25,6 +25,7 @@ export class GrokAdapter implements AiEngineAdapter {
       model: req.model || 'grok-3',
       instructions: req.systemPrompt,
       input: [{ role: 'user', content: userContent }],
+      ...(req.maxTokens != null ? { max_output_tokens: req.maxTokens } : {}),
     }
     if (req.webSearch && req.webSearch !== 'none') {
       requestParams.tools = [{ type: 'web_search' }]

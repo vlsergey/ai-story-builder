@@ -6,6 +6,7 @@ export interface GeneratePlanChildrenOptions {
   includeExistingLore?: boolean
   model?: string
   webSearch?: string
+  maxTokens?: number
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
   onDone?: (data: { response_id?: string }) => void
@@ -24,6 +25,7 @@ export async function generatePlanChildrenStream(options: GeneratePlanChildrenOp
       includeExistingLore: options.includeExistingLore,
       model: options.model,
       webSearch: options.webSearch,
+      maxTokens: options.maxTokens,
     }),
     signal: options.signal,
   })

@@ -51,6 +51,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
   const [selectedModel, setSelectedModel] = useState('')
   const [webSearch, setWebSearch] = useState('none')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
+  const [maxTokens, setMaxTokens] = useState(2048)
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -109,11 +110,17 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         const engine = data.current_engine ?? null
         setCurrentEngine(engine)
         if (!engine) return
-        const engineData = data[engine] as { available_models?: string[]; last_model?: string | null } | undefined
+        const engineData = data[engine] as {
+          available_models?: string[]; last_model?: string | null
+          last_max_tokens_plan?: number | null
+        } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
         const last = engineData?.last_model
         setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
+        if (typeof engineData?.last_max_tokens_plan === 'number' && engineData.last_max_tokens_plan > 0) {
+          setMaxTokens(engineData.last_max_tokens_plan)
+        }
       })
       .catch(() => {})
   }, [])
@@ -182,13 +189,13 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
     })
   }
 
-  // ── Save last-used model ───────────────────────────────────────────────────
+  // ── Save last-used model and max tokens ────────────────────────────────────
   function saveLastModel() {
-    if (selectedModel && currentEngine) {
+    if (currentEngine) {
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan: maxTokens } }),
       })
     }
   }
@@ -211,6 +218,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       includeExistingLore,
       model: selectedModel || undefined,
       webSearch,
+      maxTokens,
       mode: 'generate',
       onThinking: (status, detail) => {
         if (status === 'done') setThinkingDone(true)
@@ -279,6 +287,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
+        maxTokens,
         mode: 'improve',
         baseContent: baseForStream,
         onThinking: (status, detail) => {
@@ -413,6 +422,19 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
           disabled={generating}
         />
         Include existing lore
+      </label>
+      <label className="flex items-center gap-1.5 text-sm shrink-0">
+        <span className="text-muted-foreground">Max tokens</span>
+        <input
+          type="number"
+          min={1}
+          max={131072}
+          step={256}
+          value={maxTokens}
+          onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 2048)}
+          disabled={generating}
+          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+        />
       </label>
     </div>
   )

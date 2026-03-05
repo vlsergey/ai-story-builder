@@ -27,6 +27,8 @@ export interface GenerateResponseRequest {
   config: AiConfigStore
   /** When provided, adapters request structured JSON output; route emits partial_json SSE events. */
   responseSchema?: JsonSchemaSpec
+  /** Maximum number of output tokens. If undefined the engine uses its default. */
+  maxTokens?: number
 }
 
 /**

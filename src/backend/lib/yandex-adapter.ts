@@ -21,6 +21,7 @@ export class YandexAdapter implements AiEngineAdapter {
         { role: 'system', content: req.systemPrompt },
         { role: 'user', content: req.prompt },
       ],
+      ...(req.maxTokens != null ? { max_tokens: req.maxTokens } : {}),
     }
 
     if (req.responseSchema) {
