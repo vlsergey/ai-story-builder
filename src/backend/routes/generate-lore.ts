@@ -110,9 +110,15 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 
   let accumulated = ''
+  let lastEmittedJson = ''
   const onDelta = (chunk: string) => {
     accumulated += chunk
     const partial = parsePartialJson(accumulated) as Record<string, unknown>
+    // Skip the SSE write when the parsed result hasn't changed — avoids
+    // sending a 100-byte SSE frame for every 2-4 byte input chunk.
+    const json = JSON.stringify(partial)
+    if (json === lastEmittedJson) return
+    lastEmittedJson = json
     sse('partial_json', partial)
   }
 
