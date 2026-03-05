@@ -49,7 +49,6 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   const [generatePrompt, setGeneratePrompt] = useState('')
 
   // ── Improve mode state ─────────────────────────────────────────────────────
-  /** 'generate' = normal (prompt + generate btn at top) | 'improve' = improvement instruction at top */
   const [mode, setMode] = useState<'generate' | 'improve'>('generate')
   const [improveInstruction, setImproveInstruction] = useState('')
 
@@ -302,9 +301,49 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     </div>
   )
 
-  // ── Thinking / error status rows ────────────────────────────────────────────
-  const statusRows = (
-    <>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span className="text-muted-foreground text-sm">Loading…</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+
+      {/* ── TOP BLOCK: Generate controls — collapses upward when switching to improve mode ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: mode === 'improve' ? '0fr' : '1fr',
+          transition: 'grid-template-rows 300ms ease-in-out, opacity 200ms ease-in-out',
+          opacity: mode === 'improve' ? 0 : 1,
+        }}
+        className="shrink-0"
+      >
+        <div className="overflow-hidden min-h-0">
+          <textarea
+            value={generatePrompt}
+            onChange={e => setGeneratePrompt(e.target.value)}
+            placeholder={t('lore.generate_placeholder')}
+            disabled={generating}
+            className="h-[20vh] min-h-[80px] w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
+          />
+          {aiControls}
+          <div className="flex items-center justify-end px-2 py-1 border-b border-border">
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !generatePrompt.trim()}
+              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? 'Generating…' : (hasContent ? t('lore.regenerate') : t('lore.generate'))}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Status rows — always visible between controls and content ─────────── */}
       {thinkingStatus !== null && (
         <div className="flex items-start gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
           <div className="mt-0.5 shrink-0">
@@ -327,86 +366,8 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
           {genError}
         </div>
       )}
-    </>
-  )
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <span className="text-muted-foreground text-sm">Loading…</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-
-      {/* ── Generate mode: prompt area ─────────────────────────────────────── */}
-      {mode === 'generate' && (
-        <>
-          <textarea
-            value={generatePrompt}
-            onChange={e => setGeneratePrompt(e.target.value)}
-            placeholder={t('lore.generate_placeholder')}
-            disabled={generating}
-            className="h-1/5 w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0 disabled:opacity-60"
-          />
-          {aiControls}
-          {/* Generate / Regenerate button row */}
-          <div className="flex items-center justify-end px-2 py-1 border-b border-border shrink-0">
-            <button
-              onClick={handleGenerate}
-              disabled={generating || !generatePrompt.trim()}
-              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {generating ? 'Generating…' : (hasContent ? t('lore.regenerate') : t('lore.generate'))}
-            </button>
-          </div>
-          {statusRows}
-        </>
-      )}
-
-      {/* ── Improve mode: instruction area ─────────────────────────────────── */}
-      {mode === 'improve' && (
-        <>
-          {/* Instruction — compact (one line) while generating, full textarea otherwise */}
-          {generating ? (
-            <div className="px-2 py-1.5 text-sm text-muted-foreground border-b border-border shrink-0 truncate">
-              {improveInstruction}
-            </div>
-          ) : (
-            <textarea
-              value={improveInstruction}
-              onChange={e => setImproveInstruction(e.target.value)}
-              placeholder={t('lore.improve_placeholder')}
-              className="h-1/5 w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
-              autoFocus
-            />
-          )}
-          {aiControls}
-          {/* Improve / Cancel button row */}
-          <div className="flex items-center justify-end gap-2 px-2 py-1 border-b border-border shrink-0">
-            {!generating && (
-              <button
-                onClick={() => { setMode('generate'); setImproveInstruction('') }}
-                className="px-3 py-1 text-sm rounded border border-border hover:bg-muted text-muted-foreground"
-              >
-                {t('lore.cancel_improve')}
-              </button>
-            )}
-            <button
-              onClick={handleImprove}
-              disabled={generating || !improveInstruction.trim()}
-              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {generating ? 'Generating…' : t('lore.improve')}
-            </button>
-          </div>
-          {statusRows}
-        </>
-      )}
-
-      {/* ── Name field (between controls and content) ──────────────────────── */}
+      {/* ── Name field ────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border shrink-0">
         <input
           className="flex-1 text-sm font-semibold bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5 transition-colors"
@@ -420,7 +381,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         </span>
       </div>
 
-      {/* ── Content editor ─────────────────────────────────────────────────── */}
+      {/* ── Content editor ────────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <CodeMirror
           value={content}
@@ -437,17 +398,56 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         />
       </div>
 
-      {/* ── "Improve with AI" button (bottom, only in generate mode when content is present) ── */}
+      {/* ── "Улучшить" button (generate mode, content present, not generating) ── */}
       {mode === 'generate' && hasContent && !generating && (
-        <div className="flex justify-start px-2 py-1.5 border-t border-border shrink-0">
+        <div className="flex justify-end px-2 py-1.5 border-t border-border shrink-0">
           <button
             onClick={() => setMode('improve')}
-            className="text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+            className="px-3 py-1 text-sm rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             {t('lore.improve_with_ai')}
           </button>
         </div>
       )}
+
+      {/* ── BOTTOM BLOCK: Improve controls — slides in from below ─────────────── */}
+      <div
+        className="overflow-hidden shrink-0 transition-[max-height] duration-300 ease-in-out border-t border-border"
+        style={{ maxHeight: mode === 'improve' ? '60vh' : '0px' }}
+      >
+        {/* Instruction textarea — compact (one line) while generating, full textarea otherwise */}
+        {generating ? (
+          <div className="px-2 py-1.5 text-sm text-muted-foreground border-b border-border truncate">
+            {improveInstruction}
+          </div>
+        ) : (
+          <textarea
+            value={improveInstruction}
+            onChange={e => setImproveInstruction(e.target.value)}
+            placeholder={t('lore.improve_placeholder')}
+            className="h-[15vh] min-h-[80px] w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        )}
+        {aiControls}
+        <div className="flex items-center justify-end gap-2 px-2 py-1">
+          {!generating && (
+            <button
+              onClick={() => { setMode('generate'); setImproveInstruction('') }}
+              className="px-3 py-1 text-sm rounded border border-border hover:bg-muted text-muted-foreground"
+            >
+              {t('lore.cancel_improve')}
+            </button>
+          )}
+          <button
+            onClick={handleImprove}
+            disabled={generating || !improveInstruction.trim()}
+            className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {generating ? 'Generating…' : t('lore.improve')}
+          </button>
+        </div>
+      </div>
+
     </div>
   )
 }
