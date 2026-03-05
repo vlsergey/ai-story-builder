@@ -47,7 +47,11 @@ export async function generatePlanChildrenStream(options: GeneratePlanChildrenOp
         if (currentEvent === 'thinking') options.onThinking?.(data.status as string, data.detail as string | undefined)
         else if (currentEvent === 'partial_json') options.onPartialJson?.(data)
         else if (currentEvent === 'done') options.onDone?.(data as { response_id?: string })
-        else if (currentEvent === 'error') throw new Error(data.message as string)
+        else if (currentEvent === 'error') {
+          const err = new Error(data.message as string)
+          if (data.stack) err.stack = data.stack as string
+          throw err
+        }
         currentEvent = ''
       }
     }

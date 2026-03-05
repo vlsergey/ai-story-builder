@@ -94,8 +94,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   const systemPrompt =
     `You are a creative writing assistant helping to structure a story plan.\n` +
     `Language: ${textLanguage}.\n` +
-    `The user wants to split a plan node titled "${parentTitle ?? 'Plan node'}" into sub-items.\n` +
-    `Create approximately 5–10 child items totalling ~5000 words across all descriptions.\n` +
+    `The user wants to create/split a plan node titled "${parentTitle ?? 'Plan node'}" into sub-items.\n` +
     `Each item should have a concise title and a detailed description in Markdown format.\n` +
     `Respond with a JSON object matching the provided schema. No explanations, no preamble.` +
     parentContext
@@ -136,7 +135,10 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
     )
     sse('done', response_id ? { response_id } : {})
   } catch (e) {
-    sse('error', { message: String(e) })
+    const message = e instanceof Error ? e.message : String(e)
+    const stack = e instanceof Error ? e.stack : undefined
+    console.error('[generate-plan-children] error:', stack ?? message)
+    sse('error', { message, stack })
   }
   res.end()
 })

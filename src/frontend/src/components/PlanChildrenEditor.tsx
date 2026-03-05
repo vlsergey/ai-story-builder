@@ -43,7 +43,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
   const [thinkingDetail, setThinkingDetail] = useState<string | null>(null)
   const [thinkingDone, setThinkingDone] = useState(false)
-  const [genError, setGenError] = useState<string | null>(null)
+  const [genError, setGenError] = useState<{ message: string; stack?: string } | null>(null)
 
   // "Replace all" confirmation state
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
@@ -134,7 +134,10 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
 
       setMode('review')
     } catch (e) {
-      setGenError(String(e))
+      const message = e instanceof Error ? e.message : String(e)
+      const stack = e instanceof Error && e.stack ? e.stack : undefined
+      console.error('[PlanChildrenEditor] generation error:', e)
+      setGenError({ message, stack })
       setMode('idle')
     }
   }
@@ -184,7 +187,8 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
       setProposedChildren([])
       setPrompt('')
     } catch (e) {
-      setGenError(String(e))
+      const message = e instanceof Error ? e.message : String(e)
+      setGenError({ message })
     } finally {
       setApplying(false)
       setShowReplaceConfirm(false)
@@ -208,8 +212,14 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
 
       {/* Error */}
       {genError && (
-        <div className="px-2 py-1 text-xs text-destructive bg-destructive/10 border-b border-destructive/20 shrink-0">
-          {genError}
+        <div className="px-2 py-2 text-xs text-destructive bg-destructive/10 border-b border-destructive/20 shrink-0 space-y-1">
+          <div className="font-medium">{genError.message}</div>
+          {genError.stack && (
+            <details className="opacity-70">
+              <summary className="cursor-pointer select-none">Stack trace</summary>
+              <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[10px] leading-tight">{genError.stack}</pre>
+            </details>
+          )}
         </div>
       )}
 
