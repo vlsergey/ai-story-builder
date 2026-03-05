@@ -43,34 +43,49 @@ Since this is a **local, single-user Electron application**, the chosen pattern 
 
 All shared event names and detail types live in `src/frontend/src/lib/lore-events.ts`.
 
-### LoreWizard Panel
+### LoreEditor Panel
 
-A dockview panel (`id='lore-wizard-{nodeId}'`) opened from the Lore toolbar via a wand button when a node is selected and an AI engine is configured.
+A dockview panel (`id='lore-editor-{nodeId}'`) opened from the Lore Tree by double-clicking a node or via the "AI Wizard" wand button (which first creates a blank child node and then opens LoreEditor for it).
 
-**Props:** `parentNodeId: number`, `parentNodeName: string`, `panelApi?: { setTitle: (t: string) => void }`
+**Props:** `nodeId: number`, `panelApi?: { setTitle: (t: string) => void }`
+
+**Two modes** (toggled within the panel, not separate panels):
+
+#### Generate mode (default)
 
 **Layout (flex-col, full height):**
-- Prompt `<textarea>` (h-1/4) with placeholder text
+- Prompt `<textarea>` (h-1/5) with placeholder "Describe what to generate…"
 - Toolbar row:
-  - "Include existing lore" checkbox (always enabled, **checked by default**)
-  - Web search control — depends on active engine's `webSearch` capability (from `BUILTIN_ENGINES`):
+  - "Include existing lore" checkbox (checked by default)
+  - Web search control — depends on active engine's `webSearch` capability:
     - `'contextSize'` (Yandex): `<select>` with options none/low/medium/high
-    - `'boolean'` (Grok): checkbox "Web search"
-    - `'none'`: control not shown
-  - Model `<select>` (shown when `available_models.length > 0`); restored to last-used model for the engine on load
-  - "Generate" button; the backend decides how lore is grounded based on engine capabilities
-- CodeMirror Markdown editor (flex-1) displaying and allowing editing of the AI response
-- Footer row: name `<input>` + "Save" button
+    - `'boolean'` (Grok): checkbox
+  - Model `<select>` (shown when `available_models.length > 0`); restored to last-used model
+  - **"Generate"** button (when content is empty) or **"Regenerate"** button (when content is present)
+    - If the latest `lore_version` has `source='manual'` and content is non-empty: confirmation dialog warns that manual changes will be overwritten
+- Name `<input>` (between controls and editor, with "Saving…"/"Saved" indicator)
+- CodeMirror Markdown editor (flex-1)
+- **"Improve with AI…"** button (bottom, shown only when content is non-empty and not generating)
 
-**Behaviour:**
-- On mount: sets panel title to `'AI Wizard → {parentNodeName}'`; fetches `GET /api/ai/config` to determine active engine, available models, and last-used model (`last_model`); restores `last_model` if still in the available model list
-- **Generate**: `POST /api/ai/generate-lore` with `{ prompt, includeExistingLore, model?, webSearch? }`; on success populates CodeMirror with `data.content` and persists selected model via `POST /api/ai/config`; shows inline error on failure
-- **Save**: creates a new lore node via `POST /api/lore` (child of `parentNodeId`, with the given name), then saves content via `PATCH /api/lore/:id`; dispatches `LORE_TREE_REFRESH_EVENT` so the tree reloads
+#### Improve mode (entered by clicking "Improve with AI…")
+
+**Layout (flex-col, full height):**
+- Improvement instruction `<textarea>` (h-1/5), collapses to a single compact line during generation
+- Same toolbar row (model, web search, "Include existing lore")
+- **"Improve"** + **"Cancel"** buttons
+- Name `<input>` + "Saving…"/"Saved" indicator
+- CodeMirror Markdown editor (flex-1, new content streams in)
+
+**Behaviour (both modes):**
+- On mount: loads node via `GET /api/lore/:id`; fetches `GET /api/lore/:id/latest` to read the latest version's `source`; fetches `GET /api/ai/config` for engine/model
+- **Generate/Regenerate**: `POST /api/ai/generate-lore` with `{ prompt, includeExistingLore, model?, webSearch?, mode: 'generate' }`; streams `partial_json` events to update name + content live; on done, saves via `PATCH /api/lore/:id` with `{ content, name?, source: 'ai', prompt, response_id }`
+- **Improve**: same as Generate but with `{ mode: 'improve', baseContent: currentContent }`; backend uses different system prompt embedding the current text
+- **Manual edits** (name or content): autosaved with 1 s debounce; content saves create a new `lore_versions` entry with `source='manual'`
+- Persists selected model via `POST /api/ai/config` after each generation
 
 **Wand button in LoreTree toolbar:**
-- Shows `Wand2` icon at the start of the toolbar (before the separator)
-- Enabled only when exactly one node is selected **and** an AI engine is configured (`currentAiEngine != null`)
-- Tooltip: `'Create with AI'` / `'Create with AI (no engine configured)'`
+- Shows `Wand2` icon; enabled only when exactly one node is selected and an AI engine is configured
+- Action: `POST /api/lore` to create a blank child node, then opens `LoreEditor` for the new node
 
 ### New Project Form
 

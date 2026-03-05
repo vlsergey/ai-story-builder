@@ -58,6 +58,15 @@
   "settings.debug.verboseAiLogging": "Подробное логирование AI запросов",
   "settings.debug.verboseAiLoggingDescription": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции.",
 
+  "lore.generate": "Сгенерировать",
+  "lore.regenerate": "Перегенерировать",
+  "lore.overwrite_warning": "Ваши правки будут заменены. Перегенерировать?",
+  "lore.improve_with_ai": "Улучшить с помощью AI…",
+  "lore.improve": "Улучшить",
+  "lore.cancel_improve": "Отмена",
+  "lore.generate_placeholder": "Опишите, что нужно сгенерировать…",
+  "lore.improve_placeholder": "Опишите, что нужно улучшить…",
+
   "thinking.generating": "Генерирую…",
   "thinking.reasoning": "Рассуждаю…",
   "thinking.reading_attachment": "Читаю вложения…",

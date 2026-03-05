@@ -472,6 +472,43 @@ describe('POST /ai/generate-lore', () => {
     expect(params.text?.format?.type).toBe('json_schema')
   })
 
+  // ─── 9. Improve mode ──────────────────────────────────────────────────────
+
+  it('includes baseContent in system prompt when mode=improve', async () => {
+    testDbPath = setupDb({ grokApiKey: 'grok-key' })
+    mockGrokResponse()
+
+    await request(app).post('/ai/generate-lore').send({
+      prompt: 'Make it longer',
+      mode: 'improve',
+      baseContent: 'A short hero description.',
+    })
+
+    const params = mockGrokGenerate.mock.calls[0][1] as {
+      instructions: string
+      input: Array<{ role: string; content: Array<{ type: string; text?: string }> }>
+    }
+    // System prompt should reference "improve" and include the base content
+    expect(params.instructions).toContain('Improve the following lore item')
+    expect(params.instructions).toContain('A short hero description.')
+    // The user's improvement instruction goes in the user message input
+    const userText = params.input.find(m => m.role === 'user')?.content.find(c => c.type === 'input_text')?.text
+    expect(userText).toContain('Make it longer')
+  })
+
+  it('uses generate system prompt when mode=generate (default)', async () => {
+    testDbPath = setupDb({ grokApiKey: 'grok-key' })
+    mockGrokResponse()
+
+    await request(app).post('/ai/generate-lore').send({
+      prompt: 'Create a wizard',
+    })
+
+    const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
+    expect(params.instructions).toContain('Generate a lore item')
+    expect(params.instructions).not.toContain('Improve')
+  })
+
   it('emits partial_json events (not delta) for Yandex', async () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
     const jsonResponse = JSON.stringify({ name: 'Mystic Forest', content: '## Forest\nA place of wonder.' })

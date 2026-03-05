@@ -58,6 +58,15 @@
   "settings.debug.verboseAiLogging": "Verbose AI request logging",
   "settings.debug.verboseAiLoggingDescription": "Prints full request headers (API key masked) and body to the server console for every AI API call. Use when diagnosing AI integration issues.",
 
+  "lore.generate": "Generate",
+  "lore.regenerate": "Regenerate",
+  "lore.overwrite_warning": "Your manual changes will be overwritten. Regenerate?",
+  "lore.improve_with_ai": "Improve with AI…",
+  "lore.improve": "Improve",
+  "lore.cancel_improve": "Cancel",
+  "lore.generate_placeholder": "Describe what to generate…",
+  "lore.improve_placeholder": "Describe what to improve…",
+
   "thinking.generating": "Generating…",
   "thinking.reasoning": "Reasoning…",
   "thinking.reading_attachment": "Reading attachments…",

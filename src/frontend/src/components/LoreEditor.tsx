@@ -26,48 +26,60 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   const { wordWrap } = useEditorSettings()
   const { t } = useLocale()
 
-  // Node data
+  // ── Node data ──────────────────────────────────────────────────────────────
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
-
-  // Dirty tracking for manual saves
   const [nameDirty, setNameDirty] = useState(false)
   const [contentDirty, setContentDirty] = useState(false)
-  const dirty = nameDirty || contentDirty
+  /** Source of the latest saved version ('ai' | 'manual' | null if no versions yet) */
+  const [latestVersionSource, setLatestVersionSource] = useState<string | null>(null)
 
   const nameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // AI generation state
-  const [prompt, setPrompt] = useState('')
-  const [includeExistingLore, setIncludeExistingLore] = useState(true)
+  // ── AI engine config ────────────────────────────────────────────────────────
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [webSearch, setWebSearch] = useState('none')
+  const [includeExistingLore, setIncludeExistingLore] = useState(true)
+
+  // ── Generate mode state ────────────────────────────────────────────────────
+  const [generatePrompt, setGeneratePrompt] = useState('')
+
+  // ── Improve mode state ─────────────────────────────────────────────────────
+  /** 'generate' = normal (prompt + generate btn at top) | 'improve' = improvement instruction at top */
+  const [mode, setMode] = useState<'generate' | 'improve'>('generate')
+  const [improveInstruction, setImproveInstruction] = useState('')
+
+  // ── Shared generation state ────────────────────────────────────────────────
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
   const [thinkingDetail, setThinkingDetail] = useState<string | null>(null)
   const [thinkingDone, setThinkingDone] = useState(false)
 
-  // Load node data
+  // ── Load node data + latest version source ─────────────────────────────────
   useEffect(() => {
     setLoading(true)
     setNameDirty(false)
     setContentDirty(false)
-    fetch(`/api/lore/${nodeId}`)
-      .then(r => r.json())
-      .then((node: { name: string; content: string | null }) => {
-        setName(node.name)
-        setContent(node.content ?? '')
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    setMode('generate')
+    setGeneratePrompt('')
+    setImproveInstruction('')
+    Promise.all([
+      fetch(`/api/lore/${nodeId}`).then(r => r.json() as Promise<{ name: string; content: string | null }>),
+      fetch(`/api/lore/${nodeId}/latest`).then(r => r.json() as Promise<{ source?: string } | null>).catch(() => null),
+    ]).then(([node, latestVersion]) => {
+      setName(node.name)
+      setContent(node.content ?? '')
+      setLatestVersionSource(latestVersion?.source ?? null)
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [nodeId])
 
-  // Load AI engine config
+  // ── Load AI engine config ──────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/ai/config')
       .then(r => r.json())
@@ -75,10 +87,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         const engine = data.current_engine ?? null
         setCurrentEngine(engine)
         if (!engine) return
-        const engineData = data[engine] as {
-          available_models?: string[]
-          last_model?: string | null
-        } | undefined
+        const engineData = data[engine] as { available_models?: string[]; last_model?: string | null } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
         const last = engineData?.last_model
@@ -87,12 +96,13 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       .catch(() => {})
   }, [])
 
-  // Clear timers on unmount
+  // ── Clear timers on unmount ────────────────────────────────────────────────
   useEffect(() => () => {
     if (nameTimerRef.current) clearTimeout(nameTimerRef.current)
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
   }, [])
 
+  // ── Manual name change (autosave with debounce) ────────────────────────────
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value
     setName(value)
@@ -113,6 +123,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     }, 1000)
   }
 
+  // ── Manual content change (autosave with debounce) ─────────────────────────
   function handleContentChange(value: string) {
     setContent(value)
     setContentDirty(true)
@@ -125,18 +136,17 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       }).then(r => r.json())
         .then((data: { ok: boolean; word_count: number; char_count: number; byte_count: number; ai_sync_info?: Record<string, { last_synced_at: string; file_id?: string; content_updated_at?: string }> | null }) => {
           setContentDirty(false)
+          setLatestVersionSource('manual')
           dispatchLoreNodeSaved({ id: nodeId, wordCount: data.word_count, charCount: data.char_count, byteCount: data.byte_count, aiSyncInfo: data.ai_sync_info ?? null })
         }).catch(() => setContentDirty(false))
     }, 1000)
   }
 
-  async function handleGenerate() {
-    if (!prompt.trim()) return
+  // ── Shared generate/improve logic ──────────────────────────────────────────
+  async function runGeneration(opts: { mode: 'generate' | 'improve'; prompt: string; baseContent?: string }) {
     // Cancel any pending manual-edit saves
-    if (nameTimerRef.current) { clearTimeout(nameTimerRef.current); nameTimerRef.current = null }
-    if (contentTimerRef.current) { clearTimeout(contentTimerRef.current); contentTimerRef.current = null }
-    setNameDirty(false)
-    setContentDirty(false)
+    if (nameTimerRef.current) { clearTimeout(nameTimerRef.current); nameTimerRef.current = null; setNameDirty(false) }
+    if (contentTimerRef.current) { clearTimeout(contentTimerRef.current); contentTimerRef.current = null; setContentDirty(false) }
     setContent('')
     setName('')
     setThinkingStatus(null)
@@ -151,10 +161,12 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
 
     try {
       await generateLoreStream({
-        prompt,
+        prompt: opts.prompt,
         includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
+        mode: opts.mode,
+        baseContent: opts.baseContent,
         onThinking: (status, detail) => {
           if (status === 'done') { setThinkingDone(true) }
           else { setThinkingStatus(status); setThinkingDone(false) }
@@ -172,7 +184,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         const patchBody: Record<string, unknown> = {
           content: finalContent,
           source: 'ai',
-          prompt: prompt.trim(),
+          prompt: opts.prompt,
         }
         if (responseId) patchBody['response_id'] = responseId
         if (finalName.trim()) patchBody['name'] = finalName.trim()
@@ -187,6 +199,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
           ai_sync_info?: Record<string, { last_synced_at: string; file_id?: string; content_updated_at?: string }> | null
         }
         if (data.ok) {
+          setLatestVersionSource('ai')
           if (finalName.trim()) panelApi?.setTitle(finalName.trim())
           dispatchLoreNodeSaved({
             id: nodeId,
@@ -213,100 +226,85 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     }
   }
 
-  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <span className="text-muted-foreground text-sm">Loading…</span>
-      </div>
-    )
+  // ── Handle "Generate / Regenerate" click ───────────────────────────────────
+  function handleGenerate() {
+    if (!generatePrompt.trim()) return
+    // Warn if content was manually edited and is non-empty
+    if (latestVersionSource === 'manual' && content.trim()) {
+      if (!window.confirm(t('lore.overwrite_warning'))) return
+    }
+    void runGeneration({ mode: 'generate', prompt: generatePrompt })
   }
 
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Title bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+  // ── Handle "Улучшить" click ────────────────────────────────────────────────
+  function handleImprove() {
+    if (!improveInstruction.trim()) return
+    void runGeneration({ mode: 'improve', prompt: improveInstruction, baseContent: content })
+  }
+
+  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
+  const hasContent = content.trim().length > 0
+
+  // ── Shared AI controls row (model, web search, include lore) ───────────────
+  const aiControls = (
+    <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap">
+      <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
         <input
-          className="flex-1 text-base font-semibold bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5 transition-colors"
-          value={name}
-          onChange={handleNameChange}
-          placeholder="Node name"
-          aria-label="Node name"
+          type="checkbox"
+          checked={includeExistingLore}
+          onChange={e => setIncludeExistingLore(e.target.checked)}
+          className="accent-primary"
+          disabled={generating}
         />
-        <span className="text-xs text-muted-foreground shrink-0 w-14 text-right">
-          {dirty ? 'Saving…' : 'Saved'}
-        </span>
-      </div>
+        Include existing lore
+      </label>
 
-      {/* Prompt textarea */}
-      <textarea
-        value={prompt}
-        onChange={e => setPrompt(e.target.value)}
-        placeholder="Describe what to generate…"
-        className="h-1/5 w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
-      />
-
-      {/* AI controls row */}
-      <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap">
+      {engineDef?.webSearch === 'contextSize' && (
+        <select
+          value={webSearch}
+          onChange={e => setWebSearch(e.target.value)}
+          disabled={generating}
+          className="text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+          title="Web search"
+        >
+          <option value="none">No web search</option>
+          <option value="low">Web: low</option>
+          <option value="medium">Web: medium</option>
+          <option value="high">Web: high</option>
+        </select>
+      )}
+      {engineDef?.webSearch === 'boolean' && (
         <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
           <input
             type="checkbox"
-            checked={includeExistingLore}
-            onChange={e => setIncludeExistingLore(e.target.checked)}
+            checked={webSearch !== 'none'}
+            onChange={e => setWebSearch(e.target.checked ? 'on' : 'none')}
             className="accent-primary"
+            disabled={generating}
           />
-          Include existing lore
+          Web search
         </label>
+      )}
 
-        {engineDef?.webSearch === 'contextSize' && (
-          <select
-            value={webSearch}
-            onChange={e => setWebSearch(e.target.value)}
-            className="text-sm border border-border rounded px-2 py-0.5 bg-background"
-            title="Web search"
-          >
-            <option value="none">No web search</option>
-            <option value="low">Web: low</option>
-            <option value="medium">Web: medium</option>
-            <option value="high">Web: high</option>
-          </select>
-        )}
-        {engineDef?.webSearch === 'boolean' && (
-          <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-            <input
-              type="checkbox"
-              checked={webSearch !== 'none'}
-              onChange={e => setWebSearch(e.target.checked ? 'on' : 'none')}
-              className="accent-primary"
-            />
-            Web search
-          </label>
-        )}
-
-        {availableModels.length > 0 && (
-          <select
-            value={selectedModel}
-            onChange={e => setSelectedModel(e.target.value)}
-            className="text-sm border border-border rounded px-2 py-0.5 bg-background max-w-[200px]"
-            title="Model"
-          >
-            {availableModels.map(m => (
-              <option key={m} value={m}>{shortModelName(m)}</option>
-            ))}
-          </select>
-        )}
-
-        <button
-          onClick={() => void handleGenerate()}
-          disabled={generating || !prompt.trim()}
-          className="ml-auto px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+      {availableModels.length > 0 && (
+        <select
+          value={selectedModel}
+          onChange={e => setSelectedModel(e.target.value)}
+          disabled={generating}
+          className="text-sm border border-border rounded px-2 py-0.5 bg-background max-w-[200px] disabled:opacity-50"
+          title="Model"
         >
-          {generating ? 'Generating…' : 'Generate'}
-        </button>
-      </div>
+          {availableModels.map(m => (
+            <option key={m} value={m}>{shortModelName(m)}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  )
 
-      {/* Thinking status row */}
+  // ── Thinking / error status rows ────────────────────────────────────────────
+  const statusRows = (
+    <>
       {thinkingStatus !== null && (
         <div className="flex items-start gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
           <div className="mt-0.5 shrink-0">
@@ -324,15 +322,105 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
           </div>
         </div>
       )}
-
-      {/* Error banner */}
       {genError && (
         <div className="px-2 py-1 text-xs text-destructive bg-destructive/10 border-b border-destructive/20 shrink-0">
           {genError}
         </div>
       )}
+    </>
+  )
 
-      {/* Content editor */}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span className="text-muted-foreground text-sm">Loading…</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+
+      {/* ── Generate mode: prompt area ─────────────────────────────────────── */}
+      {mode === 'generate' && (
+        <>
+          <textarea
+            value={generatePrompt}
+            onChange={e => setGeneratePrompt(e.target.value)}
+            placeholder={t('lore.generate_placeholder')}
+            disabled={generating}
+            className="h-1/5 w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0 disabled:opacity-60"
+          />
+          {aiControls}
+          {/* Generate / Regenerate button row */}
+          <div className="flex items-center justify-end px-2 py-1 border-b border-border shrink-0">
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !generatePrompt.trim()}
+              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? 'Generating…' : (hasContent ? t('lore.regenerate') : t('lore.generate'))}
+            </button>
+          </div>
+          {statusRows}
+        </>
+      )}
+
+      {/* ── Improve mode: instruction area ─────────────────────────────────── */}
+      {mode === 'improve' && (
+        <>
+          {/* Instruction — compact (one line) while generating, full textarea otherwise */}
+          {generating ? (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground border-b border-border shrink-0 truncate">
+              {improveInstruction}
+            </div>
+          ) : (
+            <textarea
+              value={improveInstruction}
+              onChange={e => setImproveInstruction(e.target.value)}
+              placeholder={t('lore.improve_placeholder')}
+              className="h-1/5 w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+              autoFocus
+            />
+          )}
+          {aiControls}
+          {/* Improve / Cancel button row */}
+          <div className="flex items-center justify-end gap-2 px-2 py-1 border-b border-border shrink-0">
+            {!generating && (
+              <button
+                onClick={() => { setMode('generate'); setImproveInstruction('') }}
+                className="px-3 py-1 text-sm rounded border border-border hover:bg-muted text-muted-foreground"
+              >
+                {t('lore.cancel_improve')}
+              </button>
+            )}
+            <button
+              onClick={handleImprove}
+              disabled={generating || !improveInstruction.trim()}
+              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? 'Generating…' : t('lore.improve')}
+            </button>
+          </div>
+          {statusRows}
+        </>
+      )}
+
+      {/* ── Name field (between controls and content) ──────────────────────── */}
+      <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border shrink-0">
+        <input
+          className="flex-1 text-sm font-semibold bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5 transition-colors"
+          value={name}
+          onChange={handleNameChange}
+          placeholder="Node name"
+          aria-label="Node name"
+        />
+        <span className="text-xs text-muted-foreground shrink-0 w-14 text-right">
+          {(nameDirty || contentDirty) ? 'Saving…' : 'Saved'}
+        </span>
+      </div>
+
+      {/* ── Content editor ─────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <CodeMirror
           value={content}
@@ -348,6 +436,18 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
           }}
         />
       </div>
+
+      {/* ── "Improve with AI" button (bottom, only in generate mode when content is present) ── */}
+      {mode === 'generate' && hasContent && !generating && (
+        <div className="flex justify-start px-2 py-1.5 border-t border-border shrink-0">
+          <button
+            onClick={() => setMode('improve')}
+            className="text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+          >
+            {t('lore.improve_with_ai')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

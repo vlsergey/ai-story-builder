@@ -3,6 +3,10 @@ export interface GenerateLoreOptions {
   includeExistingLore?: boolean
   model?: string
   webSearch?: string
+  /** 'generate' (default) | 'improve' */
+  mode?: 'generate' | 'improve'
+  /** The current content to improve; only used when mode='improve' */
+  baseContent?: string
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
   onDone?: (data: { response_id?: string }) => void
@@ -18,6 +22,8 @@ export async function generateLoreStream(options: GenerateLoreOptions): Promise<
       includeExistingLore: options.includeExistingLore,
       model: options.model,
       webSearch: options.webSearch,
+      mode: options.mode,
+      baseContent: options.baseContent,
     }),
     signal: options.signal,
   })
