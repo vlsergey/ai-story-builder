@@ -44,6 +44,11 @@ export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
 export interface AiEngineCapabilities {
   /** Upload documents to persistent AI storage. */
   fileUpload: boolean
+  /**
+   * Delete previously uploaded files via the provider API.
+   * xAI Grok does not support this yet — files can only be created, not deleted.
+   */
+  fileDeletion: boolean
   /** Attach uploaded files to specific requests. */
   fileAttachment: boolean
   /**
@@ -90,6 +95,7 @@ export interface AiEngineDefinition {
 /** Capability keys in display order. Labels and descriptions are in i18n locale files. */
 export const CAPABILITY_KEYS: Array<keyof AiEngineCapabilities> = [
   'fileUpload',
+  'fileDeletion',
   'fileAttachment',
   'knowledgeBase',
   'knowledgeBaseAttachment',
@@ -103,6 +109,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
     ageRating: 'NC21',
     capabilities: {
       fileUpload: true,
+      fileDeletion: false,
       fileAttachment: true,
       knowledgeBase: false,
       knowledgeBaseAttachment: false,
@@ -119,6 +126,7 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
     ageRating: '12',
     capabilities: {
       fileUpload: true,
+      fileDeletion: true,
       fileAttachment: true,
       knowledgeBase: true,
       knowledgeBaseAttachment: true,

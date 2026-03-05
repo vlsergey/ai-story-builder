@@ -18,9 +18,10 @@ vi.mock('../db/state.js', () => ({
 
 // ─── OpenAI mock ──────────────────────────────────────────────────────────────
 
-const { mockFilesCreate, mockFilesDel, mockVsCreate, mockVsDel, mockVsRetrieve, mockToFile } = vi.hoisted(() => ({
+const { mockFilesCreate, mockFilesDel, mockFilesRetrieve, mockVsCreate, mockVsDel, mockVsRetrieve, mockToFile } = vi.hoisted(() => ({
   mockFilesCreate: vi.fn(),
   mockFilesDel: vi.fn(),
+  mockFilesRetrieve: vi.fn(),
   mockVsCreate: vi.fn(),
   mockVsDel: vi.fn(),
   mockVsRetrieve: vi.fn(),
@@ -29,7 +30,7 @@ const { mockFilesCreate, mockFilesDel, mockVsCreate, mockVsDel, mockVsRetrieve, 
 
 vi.mock('openai', () => ({
   default: class {
-    files = { create: mockFilesCreate, delete: mockFilesDel }
+    files = { create: mockFilesCreate, delete: mockFilesDel, retrieve: mockFilesRetrieve }
     vectorStores = { create: mockVsCreate, del: mockVsDel, retrieve: mockVsRetrieve }
   },
   toFile: mockToFile,
@@ -686,15 +687,14 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    mockFilesDel.mockResolvedValueOnce({ deleted: true })
     mockFilesCreate.mockResolvedValueOnce({ id: 'new-grok-file' })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.uploaded).toBe(1)
 
-    // Old file should have been deleted
-    expect(mockFilesDel).toHaveBeenCalledWith('old-file')
+    // Grok does not support file deletion — old file is left as-is
+    expect(mockFilesDel).not.toHaveBeenCalled()
 
     // Verify new file_id stored on level-2 node
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -721,16 +721,16 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    mockFilesDel.mockResolvedValueOnce({ deleted: true })
     mockFilesCreate.mockResolvedValueOnce({ id: 'updated-grok-file' })
 
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.uploaded).toBe(1)
     expect(mockFilesCreate).toHaveBeenCalledOnce()
+    expect(mockFilesDel).not.toHaveBeenCalled()
   })
 
-  it('Grok: deletes remote file when group has no content', async () => {
+  it('Grok: marks group as deleted locally but does NOT call files.delete (no fileDeletion capability)', async () => {
     const syncedAt = '2025-01-01T12:00:00.000Z'
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
@@ -743,13 +743,11 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    mockFilesDel.mockResolvedValueOnce({ deleted: true })
-
     const res = await request(app).post('/ai/sync-lore')
     expect(res.status).toBe(200)
     expect(res.body.deleted).toBe(1)
     expect(res.body.uploaded).toBe(0)
-    expect(mockFilesDel).toHaveBeenCalledWith('old-empty-file')
+    expect(mockFilesDel).not.toHaveBeenCalled()
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
@@ -795,5 +793,48 @@ describe('POST /ai/sync-lore', () => {
     expect(content).toContain('Continent details')
     expect(content).toContain('### City')
     expect(content).toContain('City info')
+  })
+
+  // ─── 405 fallback: retrieve check (Yandex, which supports fileDeletion) ────
+
+  it('Yandex: treats 405 on delete as success when retrieve returns 404', async () => {
+    testDbPath = setupDb({
+      apiKey: 'yandex-key',
+      folderId: 'folder-1',
+      nodes: [
+        { id: 1, parent_id: null, name: 'EmptyNode', content: null, word_count: 0,
+          ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2024-01-01T00:00:00.000Z', file_id: 'old-405-file' } }) },
+      ],
+    })
+
+    // delete returns 405
+    mockFilesDel.mockRejectedValueOnce(Object.assign(new Error('HTTP 405'), { status: 405 }))
+    // retrieve returns 404 → file is already gone
+    mockFilesRetrieve.mockRejectedValueOnce(Object.assign(new Error('HTTP 404'), { status: 404 }))
+    mockVsCreate.mockResolvedValueOnce({ id: 'vs-1', status: 'completed' })
+
+    const res = await request(app).post('/ai/sync-lore')
+    expect(res.status).toBe(200)
+    expect(mockFilesRetrieve).toHaveBeenCalledWith('old-405-file')
+  })
+
+  it('Yandex: throws when 405 on delete and retrieve confirms file still exists', async () => {
+    testDbPath = setupDb({
+      apiKey: 'yandex-key',
+      folderId: 'folder-1',
+      nodes: [
+        { id: 1, parent_id: null, name: 'EmptyNode', content: null, word_count: 0,
+          ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2024-01-01T00:00:00.000Z', file_id: 'still-there' } }) },
+      ],
+    })
+
+    // delete returns 405
+    mockFilesDel.mockRejectedValueOnce(Object.assign(new Error('HTTP 405'), { status: 405 }))
+    // retrieve succeeds → file still present
+    mockFilesRetrieve.mockResolvedValueOnce({ id: 'still-there' })
+
+    const res = await request(app).post('/ai/sync-lore')
+    expect(res.status).toBe(500)
+    expect(res.body.error).toContain('405')
   })
 })

@@ -40,6 +40,8 @@
 
   "capability.fileUpload.label": "File Upload",
   "capability.fileUpload.description": "Upload documents (PDF, TXT, etc.) to persistent AI storage. Uploaded files can be reused across multiple requests without re-uploading.",
+  "capability.fileDeletion.label": "File Deletion",
+  "capability.fileDeletion.description": "Delete previously uploaded files via the provider API to free storage and avoid orphaned billable resources.",
   "capability.fileAttachment.label": "File Attachment",
   "capability.fileAttachment.description": "Reference an uploaded file in a specific request so the model can read its contents directly.",
   "capability.knowledgeBase.label": "Knowledge Base",

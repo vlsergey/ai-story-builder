@@ -91,4 +91,49 @@ describe('migrateDatabase', () => {
 
     db.close()
   })
+
+  it('migration 4→5: clears grok key from ai_sync_info, preserving other engine data', () => {
+    const db = inMemoryDb()
+    migrateDatabase(db)
+
+    // Insert nodes with various ai_sync_info states
+    db.prepare(`
+      INSERT INTO lore_nodes (id, name, ai_sync_info) VALUES
+        (1, 'GrokOnly',   '{"grok":{"file_id":"f1","last_synced_at":"2025-01-01T00:00:00.000Z"}}'),
+        (2, 'GrokAndYandex', '{"grok":{"file_id":"f2","last_synced_at":"2025-01-01T00:00:00.000Z"},"yandex":{"file_id":"y1","last_synced_at":"2025-01-01T00:00:00.000Z"}}'),
+        (3, 'YandexOnly', '{"yandex":{"file_id":"y2","last_synced_at":"2025-01-01T00:00:00.000Z"}}'),
+        (4, 'NullInfo',   NULL)
+    `).run()
+
+    // Re-run the migration step (simulate applying it to existing data)
+    const rows = db
+      .prepare("SELECT id, ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL")
+      .all() as { id: number; ai_sync_info: string }[]
+    const update = db.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
+    for (const row of rows) {
+      const info = JSON.parse(row.ai_sync_info) as Record<string, unknown>
+      if (!('grok' in info)) continue
+      delete info['grok']
+      const newValue = Object.keys(info).length > 0 ? JSON.stringify(info) : null
+      update.run(newValue, row.id)
+    }
+
+    const getInfo = (id: number) => {
+      const r = db.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = ?').get(id) as { ai_sync_info: string | null }
+      return r.ai_sync_info
+    }
+
+    // grok-only → NULL
+    expect(getInfo(1)).toBeNull()
+    // grok+yandex → yandex only
+    const mixed = JSON.parse(getInfo(2)!) as Record<string, unknown>
+    expect(mixed).not.toHaveProperty('grok')
+    expect(mixed).toHaveProperty('yandex')
+    // yandex-only → unchanged
+    expect(getInfo(3)).toContain('yandex')
+    // null → still null
+    expect(getInfo(4)).toBeNull()
+
+    db.close()
+  })
 })

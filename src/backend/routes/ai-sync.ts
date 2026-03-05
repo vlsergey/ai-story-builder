@@ -112,25 +112,39 @@ function buildFileContent(
 function formatApiError(e: unknown): string {
   if (e != null && typeof e === 'object' && 'status' in e && 'message' in e) {
     const apiErr = e as { status: number; message: string; error?: unknown; headers?: unknown }
-    const parts: string[] = [`HTTP ${apiErr.status} ${apiErr.message}`]
+
+    // Extract synthetic request-context headers injected by makeLoggingFetch.
+    let requestMethod: string | undefined
+    let requestUrl: string | undefined
+    const allHeaderEntries: [string, string][] = []
+
     if (apiErr.headers) {
-      // headers can be a Fetch API Headers object or a plain object
-      const entries: [string, string][] = []
       const h = apiErr.headers as Record<string, string> & { entries?: () => Iterable<[string, string]> }
       if (typeof h.entries === 'function') {
-        for (const [k, v] of h.entries()) entries.push([k, v])
+        for (const [k, v] of h.entries()) allHeaderEntries.push([k, v])
       } else {
-        entries.push(...Object.entries(h) as [string, string][])
+        allHeaderEntries.push(...Object.entries(h) as [string, string][])
       }
-      const safeHeaders = entries
-        .filter(([k]) => !['authorization', 'api-key', 'x-api-key'].includes(k.toLowerCase()))
-        .map(([k, v]) => `  ${k}: ${v}`)
-        .join('\n')
-      if (safeHeaders) parts.push(`Response headers:\n${safeHeaders}`)
+      requestMethod = allHeaderEntries.find(([k]) => k.toLowerCase() === 'x-request-method')?.[1]
+      requestUrl = allHeaderEntries.find(([k]) => k.toLowerCase() === 'x-request-url')?.[1]
     }
+
+    const prefix = requestMethod && requestUrl ? `${requestMethod} ${requestUrl}\n` : ''
+    const parts: string[] = [`${prefix}HTTP ${apiErr.status} ${apiErr.message}`]
+
+    const hiddenHeaders = new Set(['authorization', 'api-key', 'x-api-key', 'x-request-url', 'x-request-method'])
+    const safeHeaders = allHeaderEntries
+      .filter(([k]) => !hiddenHeaders.has(k.toLowerCase()))
+      .map(([k, v]) => `  ${k}: ${v}`)
+      .join('\n')
+    if (safeHeaders) parts.push(`Response headers:\n${safeHeaders}`)
+
     if (apiErr.error != null) {
       parts.push(`Body: ${typeof apiErr.error === 'string' ? apiErr.error : JSON.stringify(apiErr.error, null, 2)}`)
+    } else {
+      parts.push('Body: (empty)')
     }
+
     return parts.join('\n')
   }
   return String(e)
@@ -191,6 +205,35 @@ function grokGroupNeedsReupload(
   }
 
   return false
+}
+
+/**
+ * Deletes a remote file, ignoring 404 (already gone).
+ * On 405 (Method Not Allowed), verifies via retrieve: if the file returns 404,
+ * it is already absent and the deletion is treated as a success; otherwise the
+ * original 405 error is re-thrown.
+ */
+async function deleteFileIfExists(client: OpenAI, fileId: string, context: string): Promise<void> {
+  try {
+    await client.files.delete(fileId)
+  } catch (e: unknown) {
+    const status = (e as { status?: number })?.status
+    if (status === 404) return
+    if (status === 405) {
+      // Some providers return 405 for certain file states; verify the file is gone.
+      try {
+        const fileInfo = await client.files.retrieve(fileId)
+        // File still exists — log its details and re-throw original error.
+        console.warn(`[AI Sync] DELETE ${fileId} returned 405 but file still exists: ${JSON.stringify(fileInfo)}`)
+        throw new Error(`Delete file ${fileId} failed (HTTP 405, file still present):\n${context}\n${formatApiError(e)}`)
+      } catch (retrieveErr: unknown) {
+        if ((retrieveErr as { status?: number })?.status === 404) return
+        // If retrieve itself returned a new meaningful error, throw that; otherwise re-throw original.
+        throw new Error(`Delete file ${fileId} failed (HTTP 405, retrieve check also failed):\n${context}\n${formatApiError(e)}`)
+      }
+    }
+    throw new Error(`Delete file ${fileId} failed:\n${context}\n${formatApiError(e)}`)
+  }
 }
 
 async function waitForVectorStore(
@@ -302,25 +345,13 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
         const oldFileId = l2SyncMap['grok']?.file_id
 
         if (result.action === 'delete') {
-          if (oldFileId) {
-            try {
-              await client.files.delete(oldFileId)
-            } catch (e: unknown) {
-              if ((e as { status?: number })?.status !== 404) {
-                throw new Error(`Delete Grok file ${oldFileId} for group "${group.level2NodeName}" failed:\n${formatApiError(e)}`)
-              }
-            }
+          if (oldFileId && engineDef.capabilities.fileDeletion) {
+            await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}"`)
           }
         } else if (result.action === 'upload') {
-          // Delete old file first to avoid orphans
-          if (oldFileId) {
-            try {
-              await client.files.delete(oldFileId)
-            } catch (e: unknown) {
-              if ((e as { status?: number })?.status !== 404) {
-                throw new Error(`Delete old Grok file ${oldFileId} for group "${group.level2NodeName}" failed:\n${formatApiError(e)}`)
-              }
-            }
+          // Delete old file first to avoid orphans (only if provider supports deletion)
+          if (oldFileId && engineDef.capabilities.fileDeletion) {
+            await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}" (pre-upload cleanup)`)
           }
           try {
             const uploaded = await client.files.create({
@@ -445,13 +476,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
 
       // Delete old remote file before uploading new version (avoids orphaned files on partial failure)
       if (node.yandexSync?.file_id) {
-        try {
-          await client.files.delete(node.yandexSync.file_id)
-        } catch (e: unknown) {
-          if ((e as { status?: number })?.status !== 404) {
-            throw new Error(`Delete old file ${node.yandexSync.file_id} for node "${node.name}" (id=${node.id}):\n${formatApiError(e)}`)
-          }
-        }
+        await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id}, pre-upload cleanup)`)
       }
 
       try {
@@ -470,13 +495,7 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
     // Step 5 — delete remote files
     for (const node of toDelete) {
       if (node.yandexSync?.file_id) {
-        try {
-          await client.files.delete(node.yandexSync.file_id)
-        } catch (e: unknown) {
-          if ((e as { status?: number })?.status !== 404) {
-            throw new Error(`Delete file ${node.yandexSync.file_id} failed:\n${formatApiError(e)}`)
-          }
-        }
+        await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id})`)
       }
     }
 

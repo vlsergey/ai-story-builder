@@ -133,6 +133,25 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   (db) => {
     db.exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('text_language', 'ru-RU')`)
   },
+  // version 4 → 5: reset Grok sync state
+  // Files uploaded before this migration may have been created without purpose:'assistants',
+  // making them unusable with the Responses API file attachment. Clear all grok entries so the
+  // next sync re-uploads every file with the correct purpose.
+  (db) => {
+    const rows = db
+      .prepare("SELECT id, ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL")
+      .all() as { id: number; ai_sync_info: string }[]
+    const update = db.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
+    for (const row of rows) {
+      try {
+        const info = JSON.parse(row.ai_sync_info) as Record<string, unknown>
+        if (!('grok' in info)) continue
+        delete info['grok']
+        const newValue = Object.keys(info).length > 0 ? JSON.stringify(info) : null
+        update.run(newValue, row.id)
+      } catch { /* skip malformed JSON */ }
+    }
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length

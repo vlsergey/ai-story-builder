@@ -64,6 +64,12 @@ export function makeLoggingFetch(
       console.log(`[${providerName}] REQ headers: ${JSON.stringify(maskedHeaders(init?.headers))}`)
       if (init?.body && typeof init.body === 'string') {
         console.log(`[${providerName}] REQ body: ${init.body}`)
+      } else if (init?.body instanceof FormData) {
+        const fields: Record<string, string> = {}
+        for (const [k, v] of (init.body as FormData).entries()) {
+          fields[k] = v instanceof Blob ? `<Blob size=${v.size} type=${v.type}>` : String(v)
+        }
+        console.log(`[${providerName}] REQ multipart: ${JSON.stringify(fields)}`)
       }
     }
 
@@ -82,6 +88,23 @@ export function makeLoggingFetch(
     const traceStr = traceId ? ` trace:${traceId}` : ''
     const ts = new Date().toISOString()
     console.log(`[${providerName}] [${ts}] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`)
+
+    if (!response.ok) {
+      // Eagerly read body so it can be included in the error details.
+      const bodyText = await response.text()
+      if (verboseLogging) {
+        console.log(`[${providerName}] RESP body: ${bodyText}`)
+      }
+      // Embed request context as synthetic headers so formatApiError can report them.
+      const augmented = new Headers(response.headers)
+      augmented.set('x-request-url', String(url))
+      augmented.set('x-request-method', (init?.method ?? 'GET').toUpperCase())
+      return new Response(bodyText, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: augmented,
+      })
+    }
 
     if (verboseLogging) {
       response.clone().text().then(body => {

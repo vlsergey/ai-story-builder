@@ -40,6 +40,8 @@
 
   "capability.fileUpload.label": "Загрузка файлов",
   "capability.fileUpload.description": "Загрузка документов (PDF, TXT и др.) в постоянное хранилище AI. Загруженные файлы можно использовать повторно в нескольких запросах без повторной загрузки.",
+  "capability.fileDeletion.label": "Удаление файлов",
+  "capability.fileDeletion.description": "Удаление ранее загруженных файлов через API провайдера для освобождения хранилища и предотвращения появления бесхозных платных ресурсов.",
   "capability.fileAttachment.label": "Прикрепление файлов",
   "capability.fileAttachment.description": "Ссылка на загруженный файл в конкретном запросе для прямого чтения содержимого моделью.",
   "capability.knowledgeBase.label": "База знаний",
