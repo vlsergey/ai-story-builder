@@ -276,8 +276,13 @@ export default function LoreTree({
         focusedItem: pendingRenameId,
       },
     }))
-    treeRef.current?.scrollToItem(pendingRenameId)
     treeRef.current?.startRenamingItem(pendingRenameId)
+    const id = pendingRenameId
+    setTimeout(() => {
+      containerRef.current
+        ?.querySelector(`[data-rct-item-id="${id}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 0)
     setPendingRenameId(null)
   }, [pendingRenameId, items])
 
