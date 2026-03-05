@@ -49,7 +49,9 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
   const [applying, setApplying] = useState(false)
 
-  const partialRef = useRef<Record<string, unknown>>({})
+  // Live partial results shown during streaming
+  const [streamingItems, setStreamingItems] = useState<ProposedChild[]>([])
+  const [streamingDescription, setStreamingDescription] = useState('')
 
   // Load node on mount
   useEffect(() => {
@@ -90,7 +92,8 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
     setThinkingStatus(null)
     setThinkingDetail(null)
     setThinkingDone(false)
-    partialRef.current = {}
+    setStreamingItems([])
+    setStreamingDescription('')
 
     let finalItems: ProposedChild[] = []
     let finalDescription = ''
@@ -108,13 +111,16 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
           setThinkingDetail(detail ?? null)
         },
         onPartialJson: (partial) => {
-          partialRef.current = partial
-          if (typeof partial.description === 'string') finalDescription = partial.description
+          if (typeof partial.description === 'string') {
+            finalDescription = partial.description
+            setStreamingDescription(partial.description)
+          }
           if (Array.isArray(partial.items)) {
             finalItems = (partial.items as { name?: string; description?: string }[]).map(item => ({
               name: typeof item.name === 'string' ? item.name : '',
               description: typeof item.description === 'string' ? item.description : '',
             }))
+            setStreamingItems(finalItems)
           }
         },
         onDone: () => {},
@@ -284,25 +290,50 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
 
       {/* ── STREAMING mode ────────────────────────────────────────────────────── */}
       {mode === 'streaming' && (
-        <div className="flex flex-col flex-1 min-h-0 overflow-auto p-3 gap-2">
-          {thinkingStatus !== null && (
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <div className="mt-0.5 shrink-0">
-                {thinkingDone
-                  ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  : <Loader2 className="h-4 w-4 animate-spin" />}
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Thinking status bar */}
+          <div className="shrink-0 px-3 py-2 border-b border-border">
+            {thinkingStatus !== null ? (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <div className="mt-0.5 shrink-0">
+                  {thinkingDone
+                    ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    : <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+                <div className="min-w-0">
+                  <div>{t(`thinking.${thinkingDone ? 'done' : thinkingStatus}`)}</div>
+                  {thinkingDetail && (
+                    <div className="text-xs text-muted-foreground/70 truncate" title={thinkingDetail}>
+                      {thinkingDetail}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0">
-                <div>{t(`thinking.${thinkingDone ? 'done' : thinkingStatus}`)}</div>
-                {thinkingDetail && (
-                  <div className="text-xs text-muted-foreground/70 truncate" title={thinkingDetail}>
-                    {thinkingDetail}
-                  </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                <span>Generating sub-items…</span>
+              </div>
+            )}
+          </div>
+
+          {/* Live partial results */}
+          <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
+            {streamingDescription && (
+              <div className="p-2 bg-muted rounded text-sm text-muted-foreground">{streamingDescription}</div>
+            )}
+            {streamingItems.length > 0 && (
+              <div className="text-xs text-muted-foreground font-medium">{streamingItems.length} sub-items so far…</div>
+            )}
+            {streamingItems.map((item, i) => (
+              <div key={i} className="border border-border rounded p-3 space-y-1 opacity-80">
+                <div className="text-sm font-semibold">{item.name || <span className="italic text-muted-foreground">…</span>}</div>
+                {item.description && (
+                  <div className="text-xs text-muted-foreground whitespace-pre-wrap">{item.description}</div>
                 )}
               </div>
-            </div>
-          )}
-          <div className="text-sm text-muted-foreground italic">Generating sub-items…</div>
+            ))}
+          </div>
         </div>
       )}
 
