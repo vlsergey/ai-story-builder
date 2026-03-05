@@ -106,7 +106,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
       `Language: ${textLanguage}.\n` +
       `Respond with a JSON object matching the provided schema. Refine the name only if necessary. ` +
       `Output the full improved text in Markdown format — never omit or abbreviate any part of the text, even unchanged sections. No explanations, no preamble.\n\n` +
-      `Current text:\n---\n${baseContent}\n---`
+      `Current text:\n<current_text>\n${baseContent}\n</current_text>`
     : `You are a creative writing assistant. Generate a lore item for a story.\n` +
       `Language: ${textLanguage}.\n` +
       `Respond with a JSON object matching the provided schema. No explanations, no preamble.`
