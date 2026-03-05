@@ -159,6 +159,10 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
   fs.mkdirSync(projectsDir, { recursive: true })
   const dbPath = path.join(projectsDir, `${safeName}.sqlite`)
 
+  const defaultNodes = text_language.startsWith('ru')
+    ? { root: 'Лор истории', children: ['Персонажи', 'Локации', 'Способности', 'Заклинания', 'Бестиарий', 'Задания'] }
+    : { root: 'Story Lore',  children: ['Characters', 'Locations', 'Abilities', 'Spells', 'Bestiary', 'Quests'] }
+
   if (fs.existsSync(dbPath)) {
     try {
       const db = openProjectDatabase(dbPath) // runs migrations on any existing DB
@@ -166,10 +170,9 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
       const hasRoot = db.prepare('SELECT id FROM lore_nodes WHERE parent_id IS NULL LIMIT 1').get()
       if (!hasRoot) {
         const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
-        const root = insertNode.run(null, 'Story Lore')
+        const root = insertNode.run(null, defaultNodes.root)
         const rootId = root.lastInsertRowid
-        const defaults = ['Characters', 'Locations', 'Abilities', 'Spells', 'Bestiary', 'Quests']
-        for (const f of defaults) insertNode.run(rootId, f)
+        for (const f of defaultNodes.children) insertNode.run(rootId, f)
       }
       db.close()
     } catch (e) {
@@ -185,10 +188,9 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
 
     // Insert root node and default children into lore_nodes table
     const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
-    const root = insertNode.run(null, 'Story Lore')
+    const root = insertNode.run(null, defaultNodes.root)
     const rootId = root.lastInsertRowid
-    const defaults = ['Characters', 'Locations', 'Abilities', 'Spells', 'Bestiary', 'Quests']
-    for (const f of defaults) insertNode.run(rootId, f)
+    for (const f of defaultNodes.children) insertNode.run(rootId, f)
 
     // Store basic settings
     const setSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
