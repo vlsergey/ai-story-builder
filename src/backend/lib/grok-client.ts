@@ -126,6 +126,16 @@ export async function grokGenerate(
         onThinking?.('web_search_completed')
         break
 
+      case 'response.output_item.done': {
+        const item = (event as unknown as { item?: { type?: string; action?: { query?: string } } }).item
+        if (item?.type === 'web_search_call') {
+          const query = item.action?.query
+          console.log(`[Grok] web search done: ${query ?? '(no query)'}`)
+          onThinking?.('web_search_completed', query)
+        }
+        break
+      }
+
       case 'response.failed':
         throw new Error(`Grok response failed: ${JSON.stringify((event.response as { error?: unknown }).error ?? {})}`)
 

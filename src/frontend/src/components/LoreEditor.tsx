@@ -9,7 +9,7 @@ import { useLocale } from '../lib/locale'
 import { dispatchLoreNodeSaved } from '../lib/lore-events'
 import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
 import { generateLoreStream } from '../lib/generate-lore-stream'
-import LoreDiffView from './LoreDiffView'
+import DiffViewAndAccept from './DiffViewAndAccept'
 
 interface LoreEditorProps {
   nodeId: number
@@ -44,9 +44,6 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   /** Content before the first improvement; used as 'old' side of diffs in modes C/D */
   const [reviewBaseContent, setReviewBaseContent] = useState('')
   const [selectedTab, setSelectedTab] = useState<DiffTab>('new')
-  /** Latest content computed from per-lines hunk decisions */
-  const [hunkResolvedContent, setHunkResolvedContent] = useState('')
-
   // ── AI engine config ────────────────────────────────────────────────────────
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<string[]>([])
@@ -325,7 +322,6 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
 
       saveLastModel()
       setEditorMode('review_unlocked')
-      setHunkResolvedContent(finalContent)
     } catch (e) {
       setGenError(String(e))
       // Revert to edit mode so user can retry
@@ -362,10 +358,9 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     void acceptChanges(content)
   }
 
-  // Called by LoreDiffView (unified) when all hunks resolved
+  // Called by DiffViewAndAccept when all hunks resolved
   async function handleAllHunksResolved() {
-    const resolved = hunkResolvedContent || content
-    await acceptChanges(resolved)
+    await acceptChanges(content)
   }
 
   const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
@@ -481,20 +476,20 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         className="shrink-0"
       >
         <div className="overflow-hidden min-h-0">
-          <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border">
-            <input
-              type="text"
-              value={improveInstruction}
-              onChange={e => setImproveInstruction(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !isLocked) void handleImprove() }}
-              placeholder={t('lore.improve_placeholder')}
-              disabled={isLocked}
-              className="flex-1 text-sm bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed min-w-0"
-            />
+          <textarea
+            value={improveInstruction}
+            onChange={e => setImproveInstruction(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !isLocked) { e.preventDefault(); void handleImprove() } }}
+            placeholder={t('lore.improve_placeholder')}
+            disabled={isLocked}
+            rows={2}
+            className="w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+          <div className="flex items-center justify-end px-2 py-1 border-b border-border">
             <button
               onClick={handleImprove}
               disabled={isLocked || !improveInstruction.trim()}
-              className="shrink-0 px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLocked ? 'Generating…' : t('lore.repeat_improve')}
             </button>
@@ -604,21 +599,24 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
 
         {/* C/D "side-by-side" tab */}
         {isReview && selectedTab === 'sidebyside' && (
-          <LoreDiffView
+          <DiffViewAndAccept
             oldText={reviewBaseContent}
             newText={content}
             viewType="split"
+            onChange={v => setContent(v)}
+            onBaseChange={v => setReviewBaseContent(v)}
+            onAllResolved={handleAllHunksResolved}
           />
         )}
 
         {/* C/D "per-lines" tab */}
         {isReview && selectedTab === 'perlines' && (
-          <LoreDiffView
-            key={`${reviewBaseContent.length}-${content.length}`}
+          <DiffViewAndAccept
             oldText={reviewBaseContent}
             newText={content}
             viewType="unified"
-            onChange={v => setHunkResolvedContent(v)}
+            onChange={v => setContent(v)}
+            onBaseChange={v => setReviewBaseContent(v)}
             onAllResolved={handleAllHunksResolved}
           />
         )}
