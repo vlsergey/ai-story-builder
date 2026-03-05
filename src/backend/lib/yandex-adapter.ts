@@ -1,8 +1,8 @@
 import type OpenAI from 'openai'
-import type { LoreGenerateAdapter, LoreGenerateRequest } from './lore-generate-adapter.js'
+import type { AiEngineAdapter, LoreGenerateRequest } from './ai-engine-adapter.js'
 import { createYandexClient } from './yandex-client.js'
 
-export class YandexLoreAdapter implements LoreGenerateAdapter {
+export class YandexAdapter implements AiEngineAdapter {
   async generateLore(
     req: LoreGenerateRequest,
     onThinking: (status: string) => void,

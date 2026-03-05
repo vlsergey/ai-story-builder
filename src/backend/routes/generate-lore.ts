@@ -1,8 +1,8 @@
 import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import type { AiConfigStore } from '../lib/lore-generate-adapter.js'
-import { getLoreAdapter } from '../lib/lore-generate-adapter.js'
+import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
+import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -74,7 +74,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
   }
 
-  const adapter = getLoreAdapter(engine)
+  const adapter = getEngineAdapter(engine)
   if (!adapter) {
     return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
   }

@@ -20,13 +20,16 @@ export interface LoreGenerateRequest {
 }
 
 /**
- * Engine-agnostic interface for lore generation.
- * Each engine adapter implements this and owns the full SSE lifecycle:
+ * Engine-agnostic adapter interface. One implementation per AI provider.
+ * New operations (e.g. rewriteChapter, summarise) are added as additional
+ * methods here rather than creating separate per-operation adapter files.
+ *
+ * generateLore() owns the full SSE lifecycle:
  *   onThinking('generating') → ... → onDelta(chunk) → ... → onThinking('done')
  * The route calls sse('done', {}) + res.end() after this resolves.
  * Throws on unrecoverable errors (the route will emit sse('error', ...)).
  */
-export interface LoreGenerateAdapter {
+export interface AiEngineAdapter {
   generateLore(
     req: LoreGenerateRequest,
     onThinking: (status: string) => void,
@@ -34,12 +37,12 @@ export interface LoreGenerateAdapter {
   ): Promise<void>
 }
 
-import { GrokLoreAdapter } from './grok-adapter.js'
-import { YandexLoreAdapter } from './yandex-adapter.js'
+import { GrokAdapter } from './grok-adapter.js'
+import { YandexAdapter } from './yandex-adapter.js'
 
 /** Returns the adapter for the given engine ID, or null if unsupported. */
-export function getLoreAdapter(engineId: string): LoreGenerateAdapter | null {
-  if (engineId === 'grok') return new GrokLoreAdapter()
-  if (engineId === 'yandex') return new YandexLoreAdapter()
+export function getEngineAdapter(engineId: string): AiEngineAdapter | null {
+  if (engineId === 'grok') return new GrokAdapter()
+  if (engineId === 'yandex') return new YandexAdapter()
   return null
 }

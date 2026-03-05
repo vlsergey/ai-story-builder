@@ -1,7 +1,7 @@
-import type { LoreGenerateAdapter, LoreGenerateRequest } from './lore-generate-adapter.js'
+import type { AiEngineAdapter, LoreGenerateRequest } from './ai-engine-adapter.js'
 import { grokGenerate } from './grok-client.js'
 
-export class GrokLoreAdapter implements LoreGenerateAdapter {
+export class GrokAdapter implements AiEngineAdapter {
   async generateLore(
     req: LoreGenerateRequest,
     onThinking: (status: string) => void,
