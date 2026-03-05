@@ -51,13 +51,20 @@ A dockview panel (`id='lore-wizard-{nodeId}'`) opened from the Lore toolbar via 
 
 **Layout (flex-col, full height):**
 - Prompt `<textarea>` (h-1/4) with placeholder text
-- Toolbar row: "Include existing lore" checkbox (always enabled, **checked by default**) + "Generate" button; the backend decides how lore is grounded based on engine capabilities
+- Toolbar row:
+  - "Include existing lore" checkbox (always enabled, **checked by default**)
+  - Web search control — depends on active engine's `webSearch` capability (from `BUILTIN_ENGINES`):
+    - `'contextSize'` (Yandex): `<select>` with options none/low/medium/high
+    - `'boolean'` (Grok): checkbox "Web search"
+    - `'none'`: control not shown
+  - Model `<select>` (shown when `available_models.length > 0`); restored to last-used model for the engine on load
+  - "Generate" button; the backend decides how lore is grounded based on engine capabilities
 - CodeMirror Markdown editor (flex-1) displaying and allowing editing of the AI response
 - Footer row: name `<input>` + "Save" button
 
 **Behaviour:**
-- On mount: sets panel title to `'AI Wizard → {parentNodeName}'`
-- **Generate**: `POST /api/ai/generate-lore` with `{ prompt, includeExistingLore }`; populates CodeMirror with `data.content`; shows inline error on failure
+- On mount: sets panel title to `'AI Wizard → {parentNodeName}'`; fetches `GET /api/ai/config` to determine active engine, available models, and last-used model (`last_model`); restores `last_model` if still in the available model list
+- **Generate**: `POST /api/ai/generate-lore` with `{ prompt, includeExistingLore, model?, webSearch? }`; on success populates CodeMirror with `data.content` and persists selected model via `POST /api/ai/config`; shows inline error on failure
 - **Save**: creates a new lore node via `POST /api/lore` (child of `parentNodeId`, with the given name), then saves content via `PATCH /api/lore/:id`; dispatches `LORE_TREE_REFRESH_EVENT` so the tree reloads
 
 **Wand button in LoreTree toolbar:**
