@@ -9,6 +9,10 @@ export function setVerboseLogging(v: boolean): void {
   verboseLogging = v
 }
 
+export function isVerboseLogging(): boolean {
+  return verboseLogging
+}
+
 /** Masks the token in an Authorization header value, keeping the scheme visible. */
 function maskAuth(value: string): string {
   return value.replace(/^(Bearer\s+)\S+$/i, '$1***')
@@ -106,7 +110,10 @@ export function makeLoggingFetch(
       })
     }
 
-    if (verboseLogging) {
+    // For SSE streaming responses, skip body dump here — the caller (e.g. grokGenerate)
+    // logs individual events as they arrive, which is more useful than a bulk dump at the end.
+    const isSse = response.headers.get('content-type')?.includes('text/event-stream') ?? false
+    if (verboseLogging && !isSse) {
       response.clone().text().then(body => {
         console.log(`[${providerName}] RESP body: ${body}`)
       }).catch(() => {})

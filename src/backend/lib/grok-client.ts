@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js'
-import { makeLoggingFetch } from './yandex-client.js'
+import { makeLoggingFetch, isVerboseLogging } from './yandex-client.js'
 
 const GROK_BASE = 'https://api.x.ai/v1'
 
@@ -36,22 +36,45 @@ export async function grokGenerate(
   let text = ''
 
   for await (const event of stream) {
+    if (isVerboseLogging()) {
+      const { type, ...rest } = event as { type: string; [k: string]: unknown }
+      console.log(`[Grok] SSE ${type} ${JSON.stringify(rest)}`)
+    }
+
     switch (event.type) {
       case 'response.output_text.delta':
         text += event.delta
         onDelta?.(event.delta)
         break
 
+      case 'response.reasoning_summary_text.delta': {
+        const delta = (event as unknown as { delta?: string }).delta ?? ''
+        if (delta) {
+          console.log(`[Grok] reasoning delta: ${delta}`)
+          onThinking?.('reasoning')
+        }
+        break
+      }
+
       case 'response.reasoning_summary_text.done':
         if (event.text) {
-          console.log(`[Grok] reasoning summary:\n${event.text}`)
+          console.log(`[Grok] reasoning summary done:\n${event.text}`)
           onThinking?.('reasoning_done')
         }
         break
 
+      case 'response.reasoning_text.delta': {
+        const delta = (event as unknown as { delta?: string }).delta ?? ''
+        if (delta) {
+          console.log(`[Grok] reasoning text delta: ${delta}`)
+          onThinking?.('reasoning')
+        }
+        break
+      }
+
       case 'response.reasoning_text.done':
-        if (event.text) {
-          console.log(`[Grok] reasoning:\n${event.text}`)
+        if ((event as unknown as { text?: string }).text) {
+          console.log(`[Grok] reasoning text done:\n${(event as unknown as { text: string }).text}`)
         }
         break
 

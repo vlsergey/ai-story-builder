@@ -59,6 +59,7 @@
   "settings.debug.verboseAiLoggingDescription": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции.",
 
   "thinking.generating": "Генерирую…",
+  "thinking.reasoning": "Рассуждаю…",
   "thinking.web_search_in_progress": "Веб-поиск: запускаю…",
   "thinking.web_search_searching": "Веб-поиск: ищу…",
   "thinking.web_search_completed": "Веб-поиск завершён",
