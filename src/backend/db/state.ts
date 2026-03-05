@@ -25,6 +25,32 @@ export function getCurrentDbPath(): string | null {
 
 export function setCurrentDbPath(p: string | null): void {
   currentDbPath = p
+  const s = readAppSettings()
+  if (p) {
+    s.lastOpenedPath = p
+  } else {
+    delete s.lastOpenedPath
+  }
+  writeAppSettings(s)
+}
+
+/**
+ * Reads lastOpenedPath from app_settings.json and restores it as currentDbPath
+ * if the file still exists on disk. Returns the restored path, or null.
+ * Called once on server startup so that backend restarts are transparent.
+ */
+export function restoreLastOpenedProject(): string | null {
+  const last = readAppSettings().lastOpenedPath
+  if (!last) return null
+  try {
+    fs.accessSync(last)
+    currentDbPath = last
+    console.log(`[state] restored last opened project: ${last}`)
+    return last
+  } catch {
+    console.log(`[state] last opened project no longer accessible, skipping: ${last}`)
+    return null
+  }
 }
 
 export function readAppSettings(): AppSettings {

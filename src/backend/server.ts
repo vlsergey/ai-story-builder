@@ -10,7 +10,8 @@ import settingsRouter from './routes/settings.js'
 import aiConfigRouter from './routes/ai-config.js'
 import aiSyncRouter from './routes/ai-sync.js'
 import generateLoreRouter from './routes/generate-lore.js'
-import { getDataDir } from './db/state.js'
+import { getDataDir, restoreLastOpenedProject } from './db/state.js'
+import { applyRuntimeSettings } from './routes/projects.js'
 
 const app = express()
 // Use port 3001 for development (Vite dev server takes 3000), 3000 for production
@@ -31,6 +32,10 @@ function getDistPath(): string {
 
 // Ensure upload folder exists
 fs.mkdirSync(path.join(getDataDir(), 'uploads'), { recursive: true })
+
+// Restore the last opened project so backend restarts are transparent in dev
+const restoredPath = restoreLastOpenedProject()
+if (restoredPath) applyRuntimeSettings(restoredPath)
 
 app.use(express.json())
 

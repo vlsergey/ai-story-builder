@@ -51,7 +51,7 @@ function getProjectInitialData(dbPath: string): ProjectInitialData {
 }
 
 /** Reads runtime flags (e.g. verbose_ai_logging) from the project DB and applies them. */
-function applyRuntimeSettings(dbPath: string): void {
+export function applyRuntimeSettings(dbPath: string): void {
   if (!Database) return
   try {
     const db = new Database(dbPath, { readonly: true })

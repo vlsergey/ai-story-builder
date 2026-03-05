@@ -125,4 +125,6 @@ export interface ProjectInitialData {
 
 export interface AppSettings {
   recent: string[]
+  /** Last successfully opened project path — restored on backend restart. */
+  lastOpenedPath?: string
 }
