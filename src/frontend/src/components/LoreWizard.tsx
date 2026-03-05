@@ -10,6 +10,20 @@ import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
 import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
 import { generateLoreStream } from '../lib/generate-lore-stream'
 
+const LORE_RESPONSE_SCHEMA = {
+  name: 'lore_node',
+  description: 'A lore item with a short name and markdown body',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Short name or title for the lore item (1–10 words)' },
+      content: { type: 'string', description: 'Full markdown body of the lore item' },
+    },
+    required: ['name', 'content'],
+    additionalProperties: false,
+  },
+}
+
 interface LoreWizardProps {
   parentNodeId: number
   parentNodeName: string
@@ -67,6 +81,7 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
   async function handleGenerate() {
     if (!prompt.trim()) return
     setContent('')
+    setName('')
     setThinkingStatus(null)
     setThinkingDone(false)
     setGenerating(true)
@@ -77,11 +92,15 @@ export default function LoreWizard({ parentNodeId, parentNodeName, panelApi }: L
         includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
+        responseSchema: LORE_RESPONSE_SCHEMA,
         onThinking: (status) => {
           if (status === 'done') { setThinkingDone(true) }
           else { setThinkingStatus(status); setThinkingDone(false) }
         },
-        onDelta: (text) => setContent(prev => prev + text),
+        onPartialJson: (partial) => {
+          if (typeof partial.name === 'string') setName(partial.name)
+          if (typeof partial.content === 'string') setContent(partial.content)
+        },
       })
       if (selectedModel && currentEngine) {
         void fetch('/api/ai/config', {

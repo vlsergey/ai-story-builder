@@ -1,10 +1,10 @@
 import type OpenAI from 'openai'
-import type { AiEngineAdapter, ResponseGenerateRequest } from './ai-engine-adapter.js'
+import type { AiEngineAdapter, GenerateResponseRequest } from './ai-engine-adapter.js'
 import { createYandexClient } from './yandex-client.js'
 
 export class YandexAdapter implements AiEngineAdapter {
-  async generateLore(
-    req: ResponseGenerateRequest,
+  async generateResponse(
+    req: GenerateResponseRequest,
     onThinking: (status: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void> {
@@ -21,6 +21,17 @@ export class YandexAdapter implements AiEngineAdapter {
         { role: 'system', content: req.systemPrompt },
         { role: 'user', content: req.prompt },
       ],
+    }
+
+    if (req.responseSchema) {
+      ;(requestParams as unknown as Record<string, unknown>)['response_format'] = {
+        type: 'json_schema',
+        json_schema: {
+          name: req.responseSchema.name,
+          schema: req.responseSchema.schema,
+          strict: true,
+        },
+      }
     }
 
     const tools: unknown[] = []

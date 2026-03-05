@@ -1,9 +1,9 @@
-import type { AiEngineAdapter, ResponseGenerateRequest } from './ai-engine-adapter.js'
+import type { AiEngineAdapter, GenerateResponseRequest } from './ai-engine-adapter.js'
 import { grokGenerate } from './grok-client.js'
 
 export class GrokAdapter implements AiEngineAdapter {
-  async generateLore(
-    req: ResponseGenerateRequest,
+  async generateResponse(
+    req: GenerateResponseRequest,
     onThinking: (status: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void> {
@@ -28,6 +28,17 @@ export class GrokAdapter implements AiEngineAdapter {
     }
     if (req.webSearch && req.webSearch !== 'none') {
       requestParams.tools = [{ type: 'web_search' }]
+    }
+    if (req.responseSchema) {
+      requestParams['text'] = {
+        format: {
+          type: 'json_schema',
+          name: req.responseSchema.name,
+          ...(req.responseSchema.description ? { description: req.responseSchema.description } : {}),
+          strict: true,
+          schema: req.responseSchema.schema,
+        },
+      }
     }
 
     onThinking('generating')

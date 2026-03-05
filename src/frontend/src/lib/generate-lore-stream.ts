@@ -1,10 +1,18 @@
+export interface JsonSchemaSpec {
+  name: string
+  description?: string
+  schema: Record<string, unknown>
+}
+
 export interface GenerateLoreOptions {
   prompt: string
   includeExistingLore?: boolean
   model?: string
   webSearch?: string
+  responseSchema?: JsonSchemaSpec
   onThinking?: (status: string) => void
   onDelta?: (text: string) => void
+  onPartialJson?: (data: Record<string, unknown>) => void
   signal?: AbortSignal
 }
 
@@ -17,6 +25,7 @@ export async function generateLoreStream(options: GenerateLoreOptions): Promise<
       includeExistingLore: options.includeExistingLore,
       model: options.model,
       webSearch: options.webSearch,
+      responseSchema: options.responseSchema,
     }),
     signal: options.signal,
   })
@@ -40,10 +49,11 @@ export async function generateLoreStream(options: GenerateLoreOptions): Promise<
     for (const line of lines) {
       if (line.startsWith('event: ')) { currentEvent = line.slice(7).trim() }
       else if (line.startsWith('data: ')) {
-        const data = JSON.parse(line.slice(6)) as Record<string, string>
-        if (currentEvent === 'thinking') options.onThinking?.(data.status)
-        else if (currentEvent === 'delta') options.onDelta?.(data.text)
-        else if (currentEvent === 'error') throw new Error(data.message)
+        const data = JSON.parse(line.slice(6)) as Record<string, unknown>
+        if (currentEvent === 'thinking') options.onThinking?.(data.status as string)
+        else if (currentEvent === 'delta') options.onDelta?.(data.text as string)
+        else if (currentEvent === 'partial_json') options.onPartialJson?.(data)
+        else if (currentEvent === 'error') throw new Error(data.message as string)
         currentEvent = ''
       }
     }

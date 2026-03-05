@@ -151,6 +151,11 @@ function sseText(events: ReturnType<typeof parseSseEvents>): string {
   return events.filter(e => e.event === 'delta').map(e => e.data.text as string).join('')
 }
 
+function ssePartialJson(events: ReturnType<typeof parseSseEvents>): Record<string, unknown> {
+  const partials = events.filter(e => e.event === 'partial_json')
+  return (partials[partials.length - 1]?.data ?? {}) as Record<string, unknown>
+}
+
 function mockYandexResponse(content = 'Generated lore text') {
   mockChatCreate.mockResolvedValueOnce({
     choices: [{ message: { content } }],
@@ -434,5 +439,79 @@ describe('POST /ai/generate-lore', () => {
 
     const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
     expect(params.tools).toBeUndefined()
+  })
+
+  // ─── 8. Structured JSON output (responseSchema) ────────────────────────────
+
+  const LORE_SCHEMA = {
+    name: 'lore_node',
+    description: 'A lore item with a short name and markdown body',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Short name or title for the lore item (1–10 words)' },
+        content: { type: 'string', description: 'Full markdown body of the lore item' },
+      },
+      required: ['name', 'content'],
+      additionalProperties: false,
+    },
+  }
+
+  it('emits partial_json events (not delta) when responseSchema is provided for Grok', async () => {
+    testDbPath = setupDb({ grokApiKey: 'grok-key' })
+    const jsonResponse = JSON.stringify({ name: 'Arin the Brave', content: '## Hero\nA brave warrior.' })
+    mockGrokResponse(jsonResponse)
+
+    const res = await request(app).post('/ai/generate-lore').send({
+      prompt: 'Describe a hero',
+      responseSchema: LORE_SCHEMA,
+    })
+
+    expect(res.status).toBe(200)
+    const events = parseSseEvents(res.text)
+
+    // No delta events when schema is used
+    expect(events.some(e => e.event === 'delta')).toBe(false)
+
+    // partial_json events present
+    expect(events.some(e => e.event === 'partial_json')).toBe(true)
+
+    // Last partial_json has correct fields
+    const last = ssePartialJson(events)
+    expect(last.name).toBe('Arin the Brave')
+    expect(last.content).toBe('## Hero\nA brave warrior.')
+
+    // Grok was called with json_schema format
+    const params = mockGrokGenerate.mock.calls[0][1] as { text?: { format?: { type?: string } } }
+    expect(params.text?.format?.type).toBe('json_schema')
+  })
+
+  it('emits partial_json events (not delta) when responseSchema is provided for Yandex', async () => {
+    testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
+    const jsonResponse = JSON.stringify({ name: 'Mystic Forest', content: '## Forest\nA place of wonder.' })
+    mockYandexResponse(jsonResponse)
+
+    const res = await request(app).post('/ai/generate-lore').send({
+      prompt: 'Describe a location',
+      responseSchema: LORE_SCHEMA,
+    })
+
+    expect(res.status).toBe(200)
+    const events = parseSseEvents(res.text)
+
+    // No delta events when schema is used
+    expect(events.some(e => e.event === 'delta')).toBe(false)
+
+    // partial_json events present
+    expect(events.some(e => e.event === 'partial_json')).toBe(true)
+
+    // Last partial_json has correct fields
+    const last = ssePartialJson(events)
+    expect(last.name).toBe('Mystic Forest')
+    expect(last.content).toBe('## Forest\nA place of wonder.')
+
+    // Yandex was called with json_schema response_format
+    const params = mockChatCreate.mock.calls[0][0] as { response_format?: { type?: string } }
+    expect(params.response_format?.type).toBe('json_schema')
   })
 })

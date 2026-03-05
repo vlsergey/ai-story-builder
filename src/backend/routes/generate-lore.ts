@@ -1,7 +1,8 @@
 import express, { Request, Response, Router } from 'express'
+import { parse as parsePartialJson } from 'best-effort-json-parser'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
+import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 
 let Database: typeof import('better-sqlite3') | null = null
@@ -21,11 +22,12 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore, model: requestedModel, webSearch } = req.body as {
+  const { prompt, includeExistingLore, model: requestedModel, webSearch, responseSchema } = req.body as {
     prompt?: string
     includeExistingLore?: boolean
     model?: string
     webSearch?: string
+    responseSchema?: JsonSchemaSpec
   }
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
@@ -79,10 +81,13 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     return res.status(400).json({ error: `Lore generation is not supported for engine '${engine}'` })
   }
 
-  const systemPrompt =
-    `You are a creative writing assistant. Generate a lore item for a story.\n` +
-    `Write the result in Markdown format. Language: ${textLanguage}.\n` +
-    `Respond with only the lore content — no explanations, no preamble.`
+  const systemPrompt = responseSchema
+    ? `You are a creative writing assistant. Generate a lore item for a story.\n` +
+      `Language: ${textLanguage}.\n` +
+      `Respond with a JSON object matching the provided schema. No explanations, no preamble.`
+    : `You are a creative writing assistant. Generate a lore item for a story.\n` +
+      `Write the result in Markdown format. Language: ${textLanguage}.\n` +
+      `Respond with only the lore content — no explanations, no preamble.`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -91,8 +96,17 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   const sse = (event: string, data: unknown) =>
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 
+  let accumulated = ''
+  const onDelta = responseSchema
+    ? (chunk: string) => {
+        accumulated += chunk
+        const partial = parsePartialJson(accumulated) as Record<string, unknown>
+        sse('partial_json', partial)
+      }
+    : (chunk: string) => sse('delta', { text: chunk })
+
   try {
-    await adapter.generateLore(
+    await adapter.generateResponse(
       {
         prompt: prompt.trim(),
         systemPrompt,
@@ -102,9 +116,10 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
         engineFileIds,
         engineDef,
         config,
+        responseSchema,
       },
       (status) => sse('thinking', { status }),
-      (text) => sse('delta', { text }),
+      onDelta,
     )
     sse('done', {})
   } catch (e) {

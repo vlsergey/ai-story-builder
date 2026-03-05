@@ -1,12 +1,20 @@
 import type { AiEngineDefinition } from '../../shared/ai-engines.js'
 
+export interface JsonSchemaSpec {
+  /** Identifier used in the API call (no spaces, e.g. "lore_node") */
+  name: string
+  description?: string
+  /** Full JSON Schema object (type:"object", properties, required, additionalProperties:false) */
+  schema: Record<string, unknown>
+}
+
 export interface AiConfigStore {
   yandex?: { api_key?: string; folder_id?: string; search_index_id?: string }
   grok?: { api_key?: string }
   [key: string]: unknown
 }
 
-export interface ResponseGenerateRequest {
+export interface GenerateResponseRequest {
   prompt: string
   systemPrompt: string
   /** Requested model ID, or empty string to use the engine default. */
@@ -17,6 +25,8 @@ export interface ResponseGenerateRequest {
   engineFileIds: string[]
   engineDef: AiEngineDefinition
   config: AiConfigStore
+  /** When provided, adapters request structured JSON output; route emits partial_json SSE events. */
+  responseSchema?: JsonSchemaSpec
 }
 
 /**
@@ -24,14 +34,14 @@ export interface ResponseGenerateRequest {
  * New operations (e.g. rewriteChapter, summarise) are added as additional
  * methods here rather than creating separate per-operation adapter files.
  *
- * generateLore() owns the full SSE lifecycle:
+ * generateResponse() owns the full SSE lifecycle:
  *   onThinking('generating') → ... → onDelta(chunk) → ... → onThinking('done')
  * The route calls sse('done', {}) + res.end() after this resolves.
  * Throws on unrecoverable errors (the route will emit sse('error', ...)).
  */
 export interface AiEngineAdapter {
-  generateLore(
-    req: ResponseGenerateRequest,
+  generateResponse(
+    req: GenerateResponseRequest,
     onThinking: (status: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void>
