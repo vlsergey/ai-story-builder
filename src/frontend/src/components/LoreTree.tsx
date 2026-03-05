@@ -625,11 +625,11 @@ export default function LoreTree({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-2">
-      <div className="flex items-center gap-0.5 border-b border-border pb-1.5">
+    <div ref={containerRef} className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center gap-0.5 border-b border-border pb-1.5 shrink-0">
         {toolbarItems.map(renderToolbarItem)}
       </div>
-      <div className="overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto">
         <ControlledTreeEnvironment<ItemData>
           items={items}
           getItemTitle={item => item.data?.name ?? ''}
