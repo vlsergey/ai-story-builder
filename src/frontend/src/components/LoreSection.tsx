@@ -10,7 +10,7 @@ interface LoreSectionProps {
 
 export default function LoreSection({ onSelectLoreNode, onOpenLoreNode, onOpenLoreWizard }: LoreSectionProps) {
   return (
-    <div>
+    <div className="h-full">
       <LoreTree
         onSelectLoreNode={onSelectLoreNode}
         onOpenLoreNode={onOpenLoreNode}
