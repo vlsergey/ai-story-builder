@@ -97,6 +97,15 @@ router.post('/open', express.json(), (req: Request, res: Response) => {
 
   try {
     const db = openProjectDatabase(dbPath) // runs any pending migrations
+    // Auto-create root plan node if none exist
+    const planCount = (db.prepare('SELECT COUNT(*) AS c FROM plan_nodes').get() as { c: number }).c
+    if (planCount === 0) {
+      const titleRow = db
+        .prepare("SELECT value FROM settings WHERE key = 'project_title'")
+        .get() as { value: string } | undefined
+      const rootTitle = titleRow?.value ?? 'Plan'
+      db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(rootTitle)
+    }
     db.close()
   } catch (e) {
     return res.status(500).json({ error: 'failed to open database: ' + String(e) })
@@ -197,6 +206,9 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
     setSetting.run('project_title', name)
     setSetting.run('locale', 'en')
     setSetting.run('text_language', text_language)
+
+    // Create root plan node
+    db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(name)
 
     db.close()
 

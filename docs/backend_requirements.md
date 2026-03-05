@@ -50,6 +50,26 @@
   - **Grok**: uses xAI Responses API (`POST /v1/responses`) in **streaming mode** via the OpenAI SDK `client.responses.create({ stream: true })`; accumulates `response.output_text.delta` events; logs reasoning summary and web search events to the console; `model` defaults to `'grok-3'`; file attachments use `{ type: 'input_file', file_id }` format; web search uses `tools: [{ type: 'web_search' }]`
   - Returns `{ content: string }` on success or `{ error: string }` with HTTP 500 on failure
 - AI config (`GET /api/ai/config`) also returns `last_model` per engine (`null` if not set); the frontend saves the last-used model after a successful generation via `POST /api/ai/config` with `{ engine, fields: { last_model } }`
+- Plan generation API (`POST /api/ai/generate-plan`):
+  - Same structure as generate-lore; JSON schema returns `{ title: string, content: string }`
+  - Supports `mode: 'generate' | 'improve'` and `baseContent` (for improve mode)
+  - No `includeExistingLore` parameter
+- Plan children generation API (`POST /api/ai/generate-plan-children`):
+  - Request body: `{ prompt, parentTitle, parentContent, model?, webSearch? }`
+  - System prompt instructs AI to create ~5–10 child items totalling ~5 000 words
+  - JSON schema: `{ description: string, items: [{ name: string, description: string }] }`
+  - Returns same SSE format as other generation endpoints
+- Plan nodes CRUD API (`/api/plan/*`):
+  - `GET /api/plan/nodes` — full tree (all columns including stats + review fields)
+  - `GET /api/plan/nodes/:id` — single node with all fields
+  - `POST /api/plan/nodes` — create node; body: `{ parent_id?, title, position?, content? }`
+  - `PATCH /api/plan/nodes/:id` — update title/content; supports `start_review`, `accept_review` flags (same semantics as lore PATCH)
+  - `DELETE /api/plan/nodes/:id` — hard delete (root node protected; children cascade via FK)
+  - `PATCH /api/plan/nodes/:id/move` — reparent node; body: `{ parent_id }`
+  - `POST /api/plan/nodes/reorder-children` — set positions; body: `{ child_ids: number[] }`
+- Root plan node auto-creation:
+  - When a project is opened (`POST /api/project/open`) and `plan_nodes` is empty, a root node is automatically inserted with `title = project_title` (fallback: `'Plan'`)
+  - When a project is created (`POST /api/project/create`), a root plan node is inserted with `title = name`
 - Project creation (`POST /api/project/create`):
   - Accepts optional `text_language` field in request body (default `'ru-RU'`)
   - Stores `text_language` as a project setting alongside `project_title`

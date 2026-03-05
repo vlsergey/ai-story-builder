@@ -10,8 +10,9 @@ import LoreSection from './LoreSection'
 import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
+import PlanChildrenEditor from './PlanChildrenEditor'
 import SettingsPanel from './SettingsPanel'
-import { LoreNode, PlanNodeTree } from '../types/models'
+import type { LoreNode } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
 import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
@@ -40,21 +41,19 @@ const WelcomeWatermark = () => (
  * Each area is a placeholder component with descriptive comments to make extension straightforward.
  */
 export default function Layout({ onClose, initialLayout }: { onClose: () => void; initialLayout: unknown | null }) {
-  // Use local state to track selected lore item and pass dbPath into child components
-  const [selectedLoreNode, setSelectedLoreNode] = React.useState<LoreNode | null>(null)
-  const [selectedPlanNode, setSelectedPlanNode] = React.useState<PlanNodeTree | null>(null)
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
 
   /**
-   * Returns the group that should receive editor-type panels (lore-editor, settings).
+   * Returns the group that should receive editor-type panels (lore-editor, plan-editor, settings).
    * Prefers an existing editor group; falls back to the watermark (empty) group; then undefined.
    */
   function findEditorGroup(api: any): any {
     return (
       api.groups.find((g: any) =>
         g.panels.some((p: any) =>
-          p.id.startsWith('lore-editor-') || p.id === 'settings'
+          p.id.startsWith('lore-editor-') || p.id.startsWith('plan-editor-') ||
+          p.id.startsWith('plan-children-editor-') || p.id === 'settings'
         )
       ) ?? api.groups.find((g: any) => g.panels.length === 0)
     )
@@ -91,6 +90,42 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       tabComponent: 'loreEditorTab',
       title: node.name,
       params: { nodeId: node.id },
+      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
+    })
+  }
+
+  /** Opens (or activates) a plan-editor tab for the given node. */
+  function openPlanEditor(nodeId: number) {
+    const api = dockviewRef.current
+    if (!api) return
+    const panelId = `plan-editor-${nodeId}`
+    const existing = api.getPanel(panelId)
+    if (existing) { existing.api.setActive(); return }
+    const editorGroup = findEditorGroup(api)
+    api.addPanel({
+      id: panelId,
+      component: 'plan-editor',
+      tabComponent: 'loreEditorTab',
+      title: `Plan node #${nodeId}`,
+      params: { nodeId },
+      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
+    })
+  }
+
+  /** Opens (or activates) a plan-children-editor tab for the given node. */
+  function openPlanChildrenEditor(nodeId: number) {
+    const api = dockviewRef.current
+    if (!api) return
+    const panelId = `plan-children-editor-${nodeId}`
+    const existing = api.getPanel(panelId)
+    if (existing) { existing.api.setActive(); return }
+    const editorGroup = findEditorGroup(api)
+    api.addPanel({
+      id: panelId,
+      component: 'plan-children-editor',
+      tabComponent: 'loreEditorTab',
+      title: `Split: #${nodeId}`,
+      params: { nodeId },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
   }
@@ -344,7 +379,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     lore: () => (
       <div className="p-2 h-full">
         <LoreSection
-          onSelectLoreNode={node => { setSelectedPlanNode(null); setSelectedLoreNode(node) }}
+          onSelectLoreNode={() => {}}
           onOpenLoreNode={openLoreEditor}
           onOpenLoreWizard={node => void openLoreWizard(node)}
         />
@@ -356,24 +391,23 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     plan: () => (
       <div className="p-2 h-full">
         <PlanSection
-          onSelectNode={node => { setSelectedLoreNode(null); setSelectedPlanNode(node) }}
+          onOpenEditor={openPlanEditor}
+          onOpenChildrenEditor={openPlanChildrenEditor}
         />
       </div>
     ),
-    editor: () => (
-      <div className="p-2 h-full">
-        {selectedLoreNode ? (
-          <LoreEditor nodeId={selectedLoreNode.id} />
-        ) : selectedPlanNode ? (
-          <PlanEditor planNode={selectedPlanNode} />
-        ) : (
-          <div className="flex items-center justify-center h-full select-none">
-            <span className="text-3xl font-bold text-muted-foreground/40 tracking-wide">
-              AI Story Builder
-            </span>
-          </div>
-        )}
-      </div>
+    'plan-editor': (props: any) => (
+      <PlanEditor
+        nodeId={props.params?.nodeId}
+        panelApi={props.api}
+        onOpenChildrenEditor={openPlanChildrenEditor}
+      />
+    ),
+    'plan-children-editor': (props: any) => (
+      <PlanChildrenEditor
+        nodeId={props.params?.nodeId}
+        panelApi={props.api}
+      />
     ),
     cards: () => (
       <div className="p-2 h-full">
@@ -396,11 +430,16 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     const targetGroup = event.group
     if (!targetGroup) return
     const isEditorGroup = targetGroup.panels.some(
-      (p: any) => p.id.startsWith('lore-editor-') || p.id === 'settings'
+      (p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('plan-editor-') ||
+        p.id.startsWith('plan-children-editor-') || p.id === 'settings'
     )
     if (!isEditorGroup) return
     const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
-    if (!draggedPanelId?.startsWith('lore-editor-') && draggedPanelId !== 'settings') {
+    const isEditorPanel = draggedPanelId?.startsWith('lore-editor-') ||
+      draggedPanelId?.startsWith('plan-editor-') ||
+      draggedPanelId?.startsWith('plan-children-editor-') ||
+      draggedPanelId === 'settings'
+    if (!isEditorPanel) {
       event.preventDefault()
     }
   }

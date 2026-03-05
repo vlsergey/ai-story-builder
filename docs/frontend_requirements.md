@@ -87,8 +87,8 @@ NAME FIELD  (always visible)
 CONTENT AREA  (flex-1)
     A/B: CodeMirror (editable)
     C/D tab "new": CodeMirror (read-only in C, editable in D)
-    C/D tab "side": LoreDiffView split (read-only)
-    C/D tab "lines": LoreDiffView unified (hunk accept/reject)
+    C/D tab "side": DiffViewAndAccept split (read-only)
+    C/D tab "lines": DiffViewAndAccept unified (hunk accept/reject)
 
 [A→B] УЛУЧШИТЬ BUTTON  (max-height 52px↔0px, mode A + hasContent)
 
@@ -99,7 +99,7 @@ CONTENT AREA  (flex-1)
     "Accept changes" button
 ```
 
-**LoreDiffView component** (`src/frontend/src/components/LoreDiffView.tsx`):
+**DiffViewAndAccept component** (`src/frontend/src/components/DiffViewAndAccept.tsx`):
 - Props: `oldText`, `newText`, `viewType: 'split'|'unified'`, `onChange?`, `onAllResolved?`
 - Split view: side-by-side two-column layout; left = old with removed lines (red), right = new with added lines (green); read-only
 - Unified view: hunks with per-hunk Accept/Reject buttons; context lines shown between hunks; recomputes result content on each decision; calls `onAllResolved` when all hunks decided
@@ -142,6 +142,75 @@ A singleton dockview panel (`id='settings'`) that opens in the editor group by d
 - **Model selection is NOT in engine config** — models are chosen per-operation
 
 **AI Engine capability definitions** live in a shared frontend module (e.g., `src/frontend/src/lib/ai-engines.ts`) so they can be imported by both SettingsPanel and future panels.
+
+### PlanTree Panel
+
+A dockview panel (`id='plan-panel'`) in the left sidebar. Implemented with `react-complex-tree` `ControlledTreeEnvironment` (same architecture as LoreTree).
+
+**Props:** `onOpenEditor?: (nodeId: number) => void`, `onOpenChildrenEditor?: (nodeId: number) => void`
+
+**Toolbar actions:** Create child node, Rename (F2), Open editor (Enter / double-click), Split into sub-items, Delete (with confirm)
+
+**Stats toggle**: cycle through none / words / chars / bytes (same as LoreTree)
+
+**Events:**
+- Listens to `PLAN_NODE_SAVED_EVENT` → updates local stats without re-fetching the full tree
+- Listens to `PLAN_TREE_REFRESH_EVENT` → re-fetches full tree (used after PlanChildrenEditor applies changes)
+
+**Drag-and-drop:** full DnD support for reparenting and reordering (`PATCH /api/plan/nodes/:id/move`, `POST /api/plan/nodes/reorder-children`)
+
+**Keyboard shortcuts:** F2 rename, Enter open editor, Delete key with confirm dialog
+
+### PlanEditor Panel
+
+A dockview panel (`id='plan-editor-{nodeId}'`) with the same 4-mode flow as LoreEditor.
+
+**Props:** `nodeId: number`, `panelApi?: { setTitle: (t: string) => void }`, `onOpenChildrenEditor?: (nodeId: number) => void`
+
+**Differences from LoreEditor:**
+- Title field instead of name field (uses `plan_nodes.title`)
+- Calls `/api/plan/nodes/:id` for GET/PATCH
+- Uses `generatePlanStream` (calls `POST /api/ai/generate-plan`)
+- No "Include existing lore" toggle
+- In **edit mode** (mode B): "Split into sub-items…" button → `onOpenChildrenEditor(nodeId)`
+- Dispatches `PLAN_NODE_SAVED_EVENT` / `PLAN_TREE_REFRESH_EVENT`
+- Restores `review_unlocked` mode on open when `changes_status='review'`
+
+**Four modes** (identical state machine to LoreEditor):
+- A (generate): prompt textarea + AI controls + Generate button
+- B (edit + improve): CodeMirror + improve form + "Split into sub-items…" button
+- C (review_locked): streaming AI, UI locked
+- D (review_unlocked): DiffViewAndAccept tabs, Accept bar
+
+### PlanChildrenEditor Panel
+
+A dockview panel (`id='plan-children-editor-{nodeId}'`) for AI-assisted sub-node generation.
+
+**Props:** `nodeId: number`, `panelApi?: { setTitle: (t: string) => void }`
+
+**Three modes:** `idle → streaming → review`
+
+**Idle:** textarea for split instructions, AI controls (model + web search), "Generate sub-items" button
+
+**Streaming:** locked UI with thinking status indicator
+
+**Review:** editable list of proposed children (title + description per item); two action buttons:
+- **"Add to existing"** (`plan.add_to_existing`): `POST /api/plan/nodes` for each item (appended to existing children)
+- **"Replace all"** (`plan.replace_all`): inline confirmation dialog → on confirm: deletes all existing children, then creates new ones
+
+After acceptance: `dispatchPlanTreeRefresh()` so PlanTree reloads.
+
+**JSON schema** from AI: `{ description: string, items: [{ name: string, description: string }] }`
+
+### Plan Events
+
+Shared event constants and dispatch helpers in `src/frontend/src/lib/plan-events.ts`:
+- `PLAN_NODE_SAVED_EVENT` / `dispatchPlanNodeSaved({ id, title?, wordCount?, charCount?, byteCount? })`
+- `PLAN_TREE_REFRESH_EVENT` / `dispatchPlanTreeRefresh()`
+
+### Possible Future Features
+
+- Per-item diff view for plan children generation — compare proposed vs existing child list item-by-item (non-trivial to implement)
 
 ### Additional Technical Requirements
 * Centralized API client with easy backend switching (Grok / Yandex / Local / Mock)

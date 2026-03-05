@@ -1,15 +1,18 @@
 import React from 'react'
 import PlanTree from './PlanTree'
-import type { PlanNodeTree } from '../types/models'
 
 interface PlanSectionProps {
-  onSelectNode: (node: PlanNodeTree) => void
+  onOpenEditor?: (nodeId: number) => void
+  onOpenChildrenEditor?: (nodeId: number) => void
 }
 
-export default function PlanSection({ onSelectNode }: PlanSectionProps) {
+export default function PlanSection({ onOpenEditor, onOpenChildrenEditor }: PlanSectionProps) {
   return (
-    <div>
-      <PlanTree onSelectNode={onSelectNode} />
+    <div className="h-full">
+      <PlanTree
+        onOpenEditor={onOpenEditor}
+        onOpenChildrenEditor={onOpenChildrenEditor}
+      />
     </div>
   )
 }

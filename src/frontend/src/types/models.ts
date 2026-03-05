@@ -42,6 +42,15 @@ export interface PlanNodeTree {
   content: string | null
   position: number
   created_at: string
+  word_count: number
+  char_count: number
+  byte_count: number
+  /** NULL | 'review' — current review workflow state */
+  changes_status: string | null
+  /** Content before the first improvement started */
+  review_base_content: string | null
+  /** Last AI improve instruction used */
+  last_improve_instruction: string | null
   children: PlanNodeTree[]
 }
 

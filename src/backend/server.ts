@@ -10,6 +10,8 @@ import settingsRouter from './routes/settings.js'
 import aiConfigRouter from './routes/ai-config.js'
 import aiSyncRouter from './routes/ai-sync.js'
 import generateLoreRouter from './routes/generate-lore.js'
+import generatePlanRouter from './routes/generate-plan.js'
+import generatePlanChildrenRouter from './routes/generate-plan-children.js'
 import { getDataDir, restoreLastOpenedProject } from './db/state.js'
 import { applyRuntimeSettings } from './routes/projects.js'
 
@@ -61,6 +63,8 @@ app.use('/api/settings', settingsRouter)
 app.use('/api/ai', aiConfigRouter)
 app.use('/api/ai', aiSyncRouter)
 app.use('/api/ai', generateLoreRouter)
+app.use('/api/ai', generatePlanRouter)
+app.use('/api/ai', generatePlanChildrenRouter)
 
 app.get('/api/hello', (_req, res) => {
   res.json({ message: 'hello from backend' })

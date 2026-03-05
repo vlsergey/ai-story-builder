@@ -7,10 +7,6 @@ import PlanTree from '../components/PlanTree';
 global.fetch = vi.fn() as unknown as typeof fetch;
 
 describe('PlanTree', () => {
-  const mockProps = {
-    onSelectNode: vi.fn()
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -21,7 +17,7 @@ describe('PlanTree', () => {
     });
 
     expect(() => {
-      render(<PlanTree {...mockProps} />);
+      render(<PlanTree />);
     }).not.toThrow();
   });
 
@@ -31,7 +27,7 @@ describe('PlanTree', () => {
     });
 
     expect(() => {
-      render(<PlanTree {...mockProps} />);
+      render(<PlanTree />);
     }).not.toThrow();
   });
 
@@ -41,7 +37,7 @@ describe('PlanTree', () => {
     });
 
     expect(() => {
-      render(<PlanTree {...mockProps} />);
+      render(<PlanTree />);
     }).not.toThrow();
   });
 });
