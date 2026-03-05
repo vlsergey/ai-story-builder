@@ -4,6 +4,8 @@ export interface GeneratePlanOptions {
   model?: string
   webSearch?: string
   maxTokens?: number
+  maxCompletionTokens?: number
+  minWords?: number
   /** 'generate' (default) | 'improve' */
   mode?: 'generate' | 'improve'
   /** The current content to improve; only used when mode='improve' */
@@ -26,6 +28,8 @@ export async function generatePlanStream(options: GeneratePlanOptions): Promise<
       mode: options.mode,
       baseContent: options.baseContent,
       maxTokens: options.maxTokens,
+      maxCompletionTokens: options.maxCompletionTokens,
+      minWords: options.minWords,
     }),
     signal: options.signal,
   })

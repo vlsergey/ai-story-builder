@@ -35,7 +35,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, parentTitle, parentContent, isRoot, includeExistingLore, model: requestedModel, webSearch, maxTokens } = req.body as {
+  const { prompt, parentTitle, parentContent, isRoot, includeExistingLore, model: requestedModel, webSearch, maxTokens, maxCompletionTokens } = req.body as {
     prompt?: string
     parentTitle?: string
     parentContent?: string
@@ -44,6 +44,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
     model?: string
     webSearch?: string
     maxTokens?: number
+    maxCompletionTokens?: number
   }
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
@@ -98,11 +99,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   const systemPrompt = isRoot
     ? `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
-      `Your task is to produce a **top-level annotated outline** for an entire literary work titled "${sectionTitle}".\n` +
-      `Begin with a brief overall overview/synopsis paragraph (no heading).\n` +
-      `Then use ## Markdown headings for each major part (chapter, act, or equivalent unit).\n` +
-      `Under each heading write a rich body: synopsis, character arcs, key themes, scene-by-scene notes — enough detail that a writer can start drafting directly from it.\n` +
-      `No explanations, no preamble, no JSON — respond in Markdown only.` +
+      `No explanations, no preamble — respond in Markdown only.` +
       parentContext
     : `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
@@ -110,7 +107,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
       `Begin with a brief synopsis of this section as a whole (no heading).\n` +
       `Then use ## Markdown headings for each logically coherent subsection.\n` +
       `Under each heading write a rich body: scene descriptions, character motivations, dialogue hints, pacing notes — enough detail that a writer can start drafting directly from it.\n` +
-      `No explanations, no preamble, no JSON — respond in Markdown only.` +
+      `No explanations, no preamble — respond in Markdown only.` +
       parentContext
 
   res.setHeader('Content-Type', 'text/event-stream')
@@ -143,6 +140,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
         engineDef,
         config,
         maxTokens: maxTokens ?? undefined,
+        maxCompletionTokens: maxCompletionTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,

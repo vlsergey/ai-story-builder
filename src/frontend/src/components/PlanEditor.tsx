@@ -52,6 +52,8 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
   const [webSearch, setWebSearch] = useState('none')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
   const [maxTokens, setMaxTokens] = useState(2048)
+  const [maxCompletionTokens, setMaxCompletionTokens] = useState(0)
+  const [minWords, setMinWords] = useState(0)
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -113,6 +115,8 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
           last_max_tokens_plan?: number | null
+          last_max_completion_tokens_plan?: number | null
+          last_min_words_plan?: number | null
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
@@ -120,6 +124,12 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
         if (typeof engineData?.last_max_tokens_plan === 'number' && engineData.last_max_tokens_plan > 0) {
           setMaxTokens(engineData.last_max_tokens_plan)
+        }
+        if (typeof engineData?.last_max_completion_tokens_plan === 'number' && engineData.last_max_completion_tokens_plan >= 0) {
+          setMaxCompletionTokens(engineData.last_max_completion_tokens_plan)
+        }
+        if (typeof engineData?.last_min_words_plan === 'number' && engineData.last_min_words_plan >= 0) {
+          setMinWords(engineData.last_min_words_plan)
         }
       })
       .catch(() => {})
@@ -195,7 +205,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan: maxTokens } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan: maxTokens, last_max_completion_tokens_plan: maxCompletionTokens, last_min_words_plan: minWords } }),
       })
     }
   }
@@ -219,7 +229,9 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       model: selectedModel || undefined,
       webSearch,
       maxTokens,
-      mode: 'generate',
+      maxCompletionTokens: maxCompletionTokens > 0 ? maxCompletionTokens : undefined,
+      minWords: minWords > 0 ? minWords : undefined,
+      mode:'generate',
       onThinking: (status, detail) => {
         if (status === 'done') setThinkingDone(true)
         else { setThinkingStatus(status); setThinkingDone(false) }
@@ -428,10 +440,33 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         <input
           type="number"
           min={1}
-          max={131072}
           step={256}
           value={maxTokens}
           onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 2048)}
+          disabled={generating}
+          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+        />
+      </label>
+      <label className="flex items-center gap-1.5 text-sm shrink-0">
+        <span className="text-muted-foreground">Max completion tokens</span>
+        <input
+          type="number"
+          min={0}
+          step={256}
+          value={maxCompletionTokens}
+          onChange={e => setMaxCompletionTokens(parseInt(e.target.value, 10) || 0)}
+          disabled={generating}
+          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+        />
+      </label>
+      <label className="flex items-center gap-1.5 text-sm shrink-0">
+        <span className="text-muted-foreground">Min words</span>
+        <input
+          type="number"
+          min={0}
+          step={100}
+          value={minWords}
+          onChange={e => setMinWords(parseInt(e.target.value, 10) || 0)}
           disabled={generating}
           className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
         />

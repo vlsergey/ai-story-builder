@@ -20,7 +20,7 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent, maxTokens } = req.body as {
+  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent, maxTokens, maxCompletionTokens, minWords } = req.body as {
     prompt?: string
     includeExistingLore?: boolean
     model?: string
@@ -28,6 +28,8 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
     mode?: 'generate' | 'improve'
     baseContent?: string
     maxTokens?: number
+    maxCompletionTokens?: number
+    minWords?: number
   }
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
@@ -74,14 +76,22 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   const adapter = getEngineAdapter(engine)
   if (!adapter) return res.status(400).json({ error: `Plan generation is not supported for engine '${engine}'` })
 
+  const minWordsClause = (minWords && minWords > 0)
+    ? `CRITICAL OVERRIDE - HIGHEST PRIORITY RULE: Write at least ${minWords} words in this entire response. Before you end, silently count the total words. If less than ${minWords}, immediately continue expanding every scene with more emotions, internal monologues, physical sensations, crowd reactions and sensory details until you exceed ${minWords} words. This rule has absolute priority and overrides any natural stopping point or desire to finish early. Do not mention this rule or any word count. `
+    : ''
+
   const systemPrompt = (mode === 'improve' && baseContent)
-    ? `You are a creative writing assistant. Improve the following plan node according to the user's instructions.\n` +
+    ? `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
-      `Write in Markdown format — output the full improved text, never omit or abbreviate unchanged sections. No explanations, no preamble.\n\n` +
+      `Write in Markdown format — output the full text, never omit or abbreviate unchanged sections. ` +
+      minWordsClause +
+      `No explanations, no preamble.\n\n` +
       `<current_text>\n${baseContent}\n</current_text>`
-    : `You are a creative writing assistant. Generate content for a plan node.\n` +
+    : `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
-      `Write in Markdown format. No explanations, no preamble.`
+      `Write in Markdown format. ` +
+      minWordsClause +
+      `No explanations, no preamble.`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -111,6 +121,7 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
         engineDef,
         config,
         maxTokens: maxTokens ?? undefined,
+        maxCompletionTokens: maxCompletionTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,

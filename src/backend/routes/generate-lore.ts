@@ -36,7 +36,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent, maxTokens } = req.body as {
+  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent, maxTokens, maxCompletionTokens } = req.body as {
     prompt?: string
     includeExistingLore?: boolean
     model?: string
@@ -46,6 +46,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     /** The existing content to improve; only used when mode='improve' */
     baseContent?: string
     maxTokens?: number
+    maxCompletionTokens?: number
   }
   const responseSchema = LORE_RESPONSE_SCHEMA
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
@@ -145,6 +146,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
         config,
         responseSchema,
         maxTokens: maxTokens ?? undefined,
+        maxCompletionTokens: maxCompletionTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,

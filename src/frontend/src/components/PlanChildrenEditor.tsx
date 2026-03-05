@@ -41,6 +41,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
   const [webSearch, setWebSearch] = useState('none')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
   const [maxTokens, setMaxTokens] = useState(16384)
+  const [maxCompletionTokens, setMaxCompletionTokens] = useState(0)
 
   // Generation state
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
@@ -81,6 +82,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
           last_max_tokens_plan_children?: number | null
+          last_max_completion_tokens_plan_children?: number | null
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
@@ -88,6 +90,9 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
         if (typeof engineData?.last_max_tokens_plan_children === 'number' && engineData.last_max_tokens_plan_children > 0) {
           setMaxTokens(engineData.last_max_tokens_plan_children)
+        }
+        if (typeof engineData?.last_max_completion_tokens_plan_children === 'number' && engineData.last_max_completion_tokens_plan_children >= 0) {
+          setMaxCompletionTokens(engineData.last_max_completion_tokens_plan_children)
         }
       })
       .catch(() => {})
@@ -118,6 +123,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         model: selectedModel || undefined,
         webSearch,
         maxTokens,
+        maxCompletionTokens: maxCompletionTokens > 0 ? maxCompletionTokens : undefined,
         onThinking: (status, detail) => {
           if (status === 'done') setThinkingDone(true)
           else { setThinkingStatus(status); setThinkingDone(false) }
@@ -147,7 +153,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         void fetch('/api/ai/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan_children: maxTokens } }),
+          body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan_children: maxTokens, last_max_completion_tokens_plan_children: maxCompletionTokens } }),
         })
       }
 
@@ -304,10 +310,20 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
               <input
                 type="number"
                 min={1}
-                max={131072}
                 step={256}
                 value={maxTokens}
                 onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 16384)}
+                className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-sm shrink-0">
+              <span className="text-muted-foreground">Max completion tokens</span>
+              <input
+                type="number"
+                min={0}
+                step={256}
+                value={maxCompletionTokens}
+                onChange={e => setMaxCompletionTokens(parseInt(e.target.value, 10) || 0)}
                 className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background"
               />
             </label>

@@ -51,6 +51,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   const [webSearch, setWebSearch] = useState('none')
   const [includeExistingLore, setIncludeExistingLore] = useState(true)
   const [maxTokens, setMaxTokens] = useState(2048)
+  const [maxCompletionTokens, setMaxCompletionTokens] = useState(0)
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -112,6 +113,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
           last_max_tokens_lore?: number | null
+          last_max_completion_tokens_lore?: number | null
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
@@ -119,6 +121,9 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
         if (typeof engineData?.last_max_tokens_lore === 'number' && engineData.last_max_tokens_lore > 0) {
           setMaxTokens(engineData.last_max_tokens_lore)
+        }
+        if (typeof engineData?.last_max_completion_tokens_lore === 'number' && engineData.last_max_completion_tokens_lore >= 0) {
+          setMaxCompletionTokens(engineData.last_max_completion_tokens_lore)
         }
       })
       .catch(() => {})
@@ -195,7 +200,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_lore: maxTokens } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_lore: maxTokens, last_max_completion_tokens_lore: maxCompletionTokens } }),
       })
     }
   }
@@ -219,7 +224,8 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       model: selectedModel || undefined,
       webSearch,
       maxTokens,
-      mode: 'generate',
+      maxCompletionTokens: maxCompletionTokens > 0 ? maxCompletionTokens : undefined,
+      mode:'generate',
       onThinking: (status, detail) => {
         if (status === 'done') setThinkingDone(true)
         else { setThinkingStatus(status); setThinkingDone(false) }
@@ -436,10 +442,21 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         <input
           type="number"
           min={1}
-          max={131072}
           step={256}
           value={maxTokens}
           onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 2048)}
+          disabled={generating}
+          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+        />
+      </label>
+      <label className="flex items-center gap-1.5 text-sm shrink-0">
+        <span className="text-muted-foreground">Max completion tokens</span>
+        <input
+          type="number"
+          min={0}
+          step={256}
+          value={maxCompletionTokens}
+          onChange={e => setMaxCompletionTokens(parseInt(e.target.value, 10) || 0)}
           disabled={generating}
           className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
         />

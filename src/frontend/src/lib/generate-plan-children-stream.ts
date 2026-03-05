@@ -7,6 +7,7 @@ export interface GeneratePlanChildrenOptions {
   model?: string
   webSearch?: string
   maxTokens?: number
+  maxCompletionTokens?: number
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
   onDone?: (data: { response_id?: string }) => void
@@ -26,6 +27,7 @@ export async function generatePlanChildrenStream(options: GeneratePlanChildrenOp
       model: options.model,
       webSearch: options.webSearch,
       maxTokens: options.maxTokens,
+      maxCompletionTokens: options.maxCompletionTokens,
     }),
     signal: options.signal,
   })

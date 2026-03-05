@@ -29,6 +29,8 @@ export interface GenerateResponseRequest {
   responseSchema?: JsonSchemaSpec
   /** Maximum number of output tokens. If undefined the engine uses its default. */
   maxTokens?: number
+  /** Maximum number of completion (generation) tokens. If undefined the engine uses its default. */
+  maxCompletionTokens?: number
   /**
    * When true (default), adapters apply API-level JSON schema enforcement
    * (text.format for Grok, response_format for Yandex).

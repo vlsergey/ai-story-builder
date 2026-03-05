@@ -4,6 +4,7 @@ export interface GenerateLoreOptions {
   model?: string
   webSearch?: string
   maxTokens?: number
+  maxCompletionTokens?: number
   /** 'generate' (default) | 'improve' */
   mode?: 'generate' | 'improve'
   /** The current content to improve; only used when mode='improve' */
@@ -26,6 +27,7 @@ export async function generateLoreStream(options: GenerateLoreOptions): Promise<
       mode: options.mode,
       baseContent: options.baseContent,
       maxTokens: options.maxTokens,
+      maxCompletionTokens: options.maxCompletionTokens,
     }),
     signal: options.signal,
   })
