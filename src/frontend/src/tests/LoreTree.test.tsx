@@ -272,6 +272,97 @@ describe('LoreTree', () => {
     expect(screen.queryByText('Old Name')).toBeNull();
   });
 
+  // ── Grok collapsed-tree sync icons ────────────────────────────────────────
+
+  it('shows synced icon on Grok group-leader node with word_count=0 after collapsed sync', async () => {
+    // After a Grok sync, a level-2 category node can have word_count=0 (no own text)
+    // but still carry a file_id because its subtree was collapsed into that file.
+    // It should show "synced", not "not synced" or nothing.
+    const syncedAt = '2025-01-01T12:00:00.000Z'
+    const { container } = renderWithSettings(
+      [{
+        id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+        latest_version_status: null, word_count: 0, char_count: 0, byte_count: 0,
+        to_be_deleted: 0, ai_sync_info: null,
+        children: [{
+          id: 2, parent_id: 1, name: 'Characters', status: 'ACTIVE',
+          latest_version_status: null,
+          // Group leader: no own text but file uploaded for the whole subtree
+          word_count: 0, char_count: 0, byte_count: 0,
+          to_be_deleted: 0,
+          ai_sync_info: { grok: { file_id: 'grok-f1', last_synced_at: syncedAt, content_updated_at: syncedAt } },
+          children: [{
+            id: 3, parent_id: 2, name: 'Hero', status: 'ACTIVE',
+            latest_version_status: null, word_count: 5, char_count: 20, byte_count: 20,
+            to_be_deleted: 0,
+            ai_sync_info: { grok: { merged_into_parent: true, last_synced_at: syncedAt, content_updated_at: syncedAt } },
+            children: [],
+          }],
+        }],
+      }],
+      { currentAiEngine: 'grok' }
+    )
+    await screen.findByText('Characters')
+    // All items in the tree should show "synced" (green checkmark), none should show "not synced"
+    expect(container.querySelector('[aria-label="not synced"]')).toBeNull()
+    const synced = container.querySelectorAll('[aria-label="synced"]')
+    expect(synced.length).toBeGreaterThan(0)
+  })
+
+  it('shows needs-sync on group-leader node when content updated after last sync', async () => {
+    const { container } = renderWithSettings(
+      [{
+        id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+        latest_version_status: null, word_count: 0, char_count: 0, byte_count: 0,
+        to_be_deleted: 0, ai_sync_info: null,
+        children: [{
+          id: 2, parent_id: 1, name: 'Characters', status: 'ACTIVE',
+          latest_version_status: null, word_count: 0, char_count: 0, byte_count: 0,
+          to_be_deleted: 0,
+          ai_sync_info: {
+            grok: {
+              file_id: 'grok-f1',
+              last_synced_at: '2025-01-01T00:00:00Z',
+              content_updated_at: '2025-06-01T00:00:00Z', // updated after sync
+            },
+          },
+          children: [],
+        }],
+      }],
+      { currentAiEngine: 'grok' }
+    )
+    await screen.findByText('Characters')
+    expect(container.querySelector('[aria-label="not synced"]')).not.toBeNull()
+  })
+
+  it('shows no sync icon on root when all children are synced via Grok', async () => {
+    // Root has word_count=0 and no ai_sync_info.
+    // subtreeSyncState should aggregate children → synced → green on root too.
+    const syncedAt = '2025-01-01T12:00:00.000Z'
+    const { container } = renderWithSettings(
+      [{
+        id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+        latest_version_status: null, word_count: 0, char_count: 0, byte_count: 0,
+        to_be_deleted: 0, ai_sync_info: null,
+        children: [{
+          id: 2, parent_id: 1, name: 'World', status: 'ACTIVE',
+          latest_version_status: null, word_count: 5, char_count: 20, byte_count: 20,
+          to_be_deleted: 0,
+          ai_sync_info: { grok: { file_id: 'grok-f1', last_synced_at: syncedAt, content_updated_at: syncedAt } },
+          children: [],
+        }],
+      }],
+      { currentAiEngine: 'grok' }
+    )
+    await screen.findByText('Root')
+    // Root has no sync icon (syncState='none' for own node), but its subtree is synced
+    // → subtreeSyncState returns 'synced' → root shows the green checkmark
+    expect(container.querySelector('[aria-label="not synced"]')).toBeNull()
+    // There should be synced icons (for Root via subtree and for World directly)
+    const synced = container.querySelectorAll('[aria-label="synced"]')
+    expect(synced.length).toBeGreaterThanOrEqual(1)
+  })
+
   // ── Keyboard interception ──────────────────────────────────────────────────
 
   it('does not intercept Enter key when focus is outside the lore tree', async () => {

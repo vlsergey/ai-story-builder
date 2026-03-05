@@ -67,10 +67,12 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     }
     if (langRow?.value) textLanguage = langRow.value
 
-    // Collect uploaded file IDs for the active engine
+    // Collect uploaded file IDs for the active engine.
+    // Note: no word_count filter — Grok group-leader nodes may have word_count=0
+    // (category with no own text) but still carry a file_id for their subtree.
     if (includeExistingLore && engine) {
       const nodes = db.prepare(
-        'SELECT ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL AND to_be_deleted = 0 AND word_count > 0'
+        'SELECT ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL AND to_be_deleted = 0'
       ).all() as { ai_sync_info: string }[]
       for (const node of nodes) {
         try {
@@ -162,7 +164,8 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
 
       if (includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
         for (const fileId of attachableFileIds) {
-          userContent.push({ type: 'file', file: { file_id: fileId } })
+          // xAI Grok uses { type: 'file', file_id: '...' } (not OpenAI's nested { file: { file_id } })
+          userContent.push({ type: 'file', file_id: fileId })
         }
       }
 

@@ -162,7 +162,16 @@ function nodeSyncState(node: LoreNode, engine: string): 'none' | 'needs-sync' | 
 
   const wordCount = node.word_count ?? 0
   if (wordCount === 0) {
-    return syncRecord ? 'needs-sync' : 'none'
+    // No own content — only needs attention if a remote file exists for this node
+    // (e.g. Yandex: content was cleared after upload; needs remote cleanup).
+    // A node with no file_id (never uploaded, or already cleaned up) requires nothing.
+    // A Grok group-leader with word_count=0 but file_id (file covers entire subtree) is
+    // treated as synced if content hasn't changed since the last sync.
+    if (!syncRecord?.file_id) return 'none'
+    if (syncRecord.content_updated_at && syncRecord.content_updated_at > syncRecord.last_synced_at) {
+      return 'needs-sync'
+    }
+    return 'synced'
   }
 
   // Non-empty, active node
