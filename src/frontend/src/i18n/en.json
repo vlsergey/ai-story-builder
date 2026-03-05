@@ -60,6 +60,7 @@
 
   "thinking.generating": "Generating…",
   "thinking.reasoning": "Reasoning…",
+  "thinking.reading_attachment": "Reading attachments…",
   "thinking.web_search_in_progress": "Web search: starting…",
   "thinking.web_search_searching": "Web search: searching…",
   "thinking.web_search_completed": "Web search: complete",

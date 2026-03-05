@@ -78,6 +78,28 @@ export async function grokGenerate(
         }
         break
 
+      case 'response.output_item.added': {
+        const item = (event as unknown as { item?: { type?: string; name?: string } }).item
+        if (item?.type === 'custom_tool_call') {
+          console.log(`[Grok] custom tool call: ${item.name ?? 'unknown'}`)
+          if (item.name === 'read_attachment') {
+            onThinking?.('reading_attachment')
+          }
+        }
+        break
+      }
+
+      case 'response.custom_tool_call_input.done': {
+        const input = (event as unknown as { input?: string }).input
+        if (input) {
+          try {
+            const parsed = JSON.parse(input) as { key?: string }
+            if (parsed.key) console.log(`[Grok] read_attachment key: ${parsed.key}`)
+          } catch { /* ignore */ }
+        }
+        break
+      }
+
       case 'response.web_search_call.in_progress':
         console.log('[Grok] web search: in progress')
         onThinking?.('web_search_in_progress')
