@@ -400,6 +400,10 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
             }
           }
         }
+
+        // Physically remove all nodes marked for deletion — both those that had a
+        // remote file (already deleted above) and those that never had one.
+        db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
       })()
       db2.close()
 
@@ -579,6 +583,10 @@ router.post('/sync-lore', async (_req: Request, res: Response) => {
 
       db2.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_config', ?)")
         .run(JSON.stringify(updatedConfig))
+
+      // Physically remove all nodes marked for deletion — both those that had a
+      // remote file (already deleted above) and those that never had one.
+      db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
     })()
 
     db2.close()

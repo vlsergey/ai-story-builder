@@ -343,7 +343,7 @@ describe('POST /ai/sync-lore', () => {
 
   // ─── 7. Deletes remote file for to_be_deleted=1 node ─────────────────────
 
-  it('deletes remote file for to_be_deleted=1 node and clears ai_sync_info.yandex', async () => {
+  it('deletes remote file for to_be_deleted=1 node and physically removes row from DB', async () => {
     testDbPath = setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
@@ -370,14 +370,43 @@ describe('POST /ai/sync-lore', () => {
     // Verify delete was called with the right file ID
     expect(mockFilesDel).toHaveBeenCalledWith('del-file')
 
-    // Verify ai_sync_info.yandex was cleared in DB
+    // Row must be physically removed from DB after sync
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = 30').get() as { ai_sync_info: string }
+    const row = db.prepare('SELECT id FROM lore_nodes WHERE id = 30').get()
     db.close()
-    const syncInfo = JSON.parse(row.ai_sync_info) as Record<string, unknown>
-    expect(syncInfo['yandex']).toBeUndefined()
+    expect(row).toBeUndefined()
+  })
+
+  it('Yandex: physically removes to_be_deleted=1 node that was never synced (no file_id)', async () => {
+    testDbPath = setupDb({
+      apiKey: 'AQVN-key',
+      folderId: 'b1g123',
+      nodes: [
+        {
+          id: 31,
+          name: 'Never Synced Node',
+          content: '',
+          word_count: 0,
+          to_be_deleted: 1,
+          ai_sync_info: null,
+        },
+      ],
+    })
+
+    const res = await request(app).post('/ai/sync-lore')
+    expect(res.status).toBe(200)
+    // No remote file to delete
+    expect(mockFilesDel).not.toHaveBeenCalled()
+
+    // Row must be physically removed from DB
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const row = db.prepare('SELECT id FROM lore_nodes WHERE id = 31').get()
+    db.close()
+    expect(row).toBeUndefined()
   })
 
   // ─── 8. Deletes remote file for emptied node (word_count=0) ──────────────
@@ -609,6 +638,35 @@ describe('POST /ai/sync-lore', () => {
   })
 
   // ─── Grok sync (collapsed tree) ──────────────────────────────────────────
+
+  it('Grok: physically removes to_be_deleted=1 nodes after sync', async () => {
+    testDbPath = setupDb({
+      grokApiKey: 'xai-key',
+      nodes: [
+        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
+        {
+          id: 2, parent_id: 1, name: 'Deleted Category', content: 'some text', word_count: 2,
+          to_be_deleted: 1,
+          ai_sync_info: JSON.stringify({ grok: { file_id: 'grok-del-file', last_synced_at: '2025-01-01T00:00:00.000Z', content_updated_at: '2025-01-01T00:00:00.000Z' } }),
+        },
+        {
+          id: 3, parent_id: 1, name: 'Never Synced Deleted', content: '', word_count: 0,
+          to_be_deleted: 1,
+          ai_sync_info: null,
+        },
+      ],
+    })
+
+    const res = await request(app).post('/ai/sync-lore')
+    expect(res.status).toBe(200)
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(testDbPath, { readonly: true })
+    const rows = db.prepare('SELECT id FROM lore_nodes WHERE to_be_deleted = 1').all() as { id: number }[]
+    db.close()
+    expect(rows).toHaveLength(0)
+  })
 
   it('Grok: uploads collapsed group for new nodes', async () => {
     // Tree: root(id=1) → category(id=2) → item(id=3)
