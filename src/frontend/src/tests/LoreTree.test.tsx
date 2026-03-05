@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LoreTree from '../components/LoreTree';
 import { LoreSettingsContext } from '../lib/lore-settings';
@@ -359,6 +359,52 @@ describe('LoreTree', () => {
     // There should be synced icons (for Root via subtree and for World directly)
     const synced = container.querySelectorAll('[aria-label="synced"]')
     expect(synced.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // ── Expand/collapse state ──────────────────────────────────────────────────
+
+  it('does not re-expand collapsed nodes when tree is refreshed', async () => {
+    const treeData: Partial<LoreNode>[] = [{
+      id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+      word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null,
+      children: [{
+        id: 2, parent_id: 1, name: 'Category', status: 'ACTIVE',
+        word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null,
+        children: [{
+          id: 3, parent_id: 2, name: 'Item', status: 'ACTIVE',
+          word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null, children: [],
+        }],
+      }],
+    }]
+
+    // First fetch: initial load
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ json: () => Promise.resolve(treeData) })
+    render(
+      <LoreSettingsContext.Provider value={{ statMode: 'none', currentAiEngine: null }}>
+        <LoreTree onSelectLoreNode={vi.fn()} />
+      </LoreSettingsContext.Provider>
+    )
+
+    // Initial load — all expanded, 'Item' is visible
+    await screen.findByText('Item')
+
+    // Collapse 'Category' by clicking its arrow button
+    const arrowBtn = screen.getByText('Category').closest('div')?.querySelector('button')
+    expect(arrowBtn).not.toBeNull()
+    fireEvent.click(arrowBtn!)
+
+    // 'Item' must disappear from DOM after collapse
+    await waitFor(() => expect(screen.queryByText('Item')).toBeNull())
+
+    // Simulate a tree refresh (e.g. after creating a child node)
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ json: () => Promise.resolve(treeData) })
+    window.dispatchEvent(new Event('lore-tree-refresh'))
+
+    // Wait for the second fetch to complete
+    await waitFor(() => expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2))
+
+    // 'Item' must remain hidden — refresh must NOT re-expand collapsed nodes
+    expect(screen.queryByText('Item')).toBeNull()
   })
 
   // ── Keyboard interception ──────────────────────────────────────────────────

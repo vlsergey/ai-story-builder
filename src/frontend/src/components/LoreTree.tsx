@@ -236,6 +236,8 @@ export default function LoreTree({
   const treeRef = useRef<TreeRef<ItemData>>(null)
   // Ref so the lore-node-saved handler always sees the latest tree without re-registration.
   const treeDataRef = useRef<LoreNode[]>(tree)
+  // Expand all nodes only on the very first load; subsequent fetches preserve user's collapse state.
+  const isFirstLoad = useRef(true)
 
   useEffect(() => { treeDataRef.current = tree }, [tree])
 
@@ -293,13 +295,16 @@ export default function LoreTree({
         if (!Array.isArray(data)) return
         setTree(data)
         setItems(buildItemsMap(data))
-        setViewState(prev => ({
-          ...prev,
-          'lore-tree': {
-            ...prev['lore-tree'],
-            expandedItems: collectAllIds(data),
-          },
-        }))
+        if (isFirstLoad.current) {
+          isFirstLoad.current = false
+          setViewState(prev => ({
+            ...prev,
+            'lore-tree': {
+              ...prev['lore-tree'],
+              expandedItems: collectAllIds(data),
+            },
+          }))
+        }
       })
       .catch(() => setTree([]))
   }
