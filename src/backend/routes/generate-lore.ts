@@ -62,7 +62,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
     }
-    textLanguage = langRow?.value || undefined
+    textLanguage = langRow?.value
 
     // Collect uploaded file IDs for the active engine.
     // Note: no word_count filter — Grok group-leader nodes may have word_count=0
@@ -79,6 +79,8 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
         } catch { /* ignore */ }
       }
     }
+
+    if (!textLanguage) { db.close(); return res.status(400).json({ error: 'text_language is not configured' }) }
 
     db.close()
   } catch (e) {
@@ -97,7 +99,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
 
   const systemPrompt =
     `You are a creative writing assistant. Generate a lore item for a story.\n` +
-    (textLanguage ? `Language: ${textLanguage}.\n` : '') +
+    `Language: ${textLanguage}.\n` +
     `Respond with a JSON object matching the provided schema. No explanations, no preamble.`
 
   res.setHeader('Content-Type', 'text/event-stream')

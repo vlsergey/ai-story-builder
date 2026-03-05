@@ -48,7 +48,8 @@ function setupDb(opts?: {
   folderId?: string
   searchIndexId?: string
   grokApiKey?: string
-  textLanguage?: string
+  /** Pass null to explicitly omit text_language from the DB (to test the "not configured" error). */
+  textLanguage?: string | null
   nodes?: Array<{
     id?: number
     parent_id?: number | null
@@ -107,8 +108,11 @@ function setupDb(opts?: {
     )
   }
 
-  if (opts?.textLanguage) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('text_language', ?)").run(opts.textLanguage)
+  // Default to 'ru-RU' so tests don't need to specify it explicitly.
+  // Pass null to leave text_language unset (for testing the "not configured" error).
+  const lang = opts?.textLanguage !== undefined ? opts.textLanguage : 'ru-RU'
+  if (lang !== null) {
+    db.prepare("INSERT INTO settings (key, value) VALUES ('text_language', ?)").run(lang)
   }
 
   const insertNode = db.prepare(
@@ -409,14 +413,11 @@ describe('POST /ai/generate-lore', () => {
     expect(params.instructions).toContain('en-US')
   })
 
-  it('omits Language line in system prompt when text_language is not set', async () => {
-    testDbPath = setupDb({ grokApiKey: 'grok-key' })
-    mockGrokResponse()
-
-    await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
-
-    const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
-    expect(params.instructions).not.toContain('Language:')
+  it('returns 400 when text_language is not configured', async () => {
+    testDbPath = setupDb({ grokApiKey: 'grok-key', textLanguage: null })
+    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('text_language is not configured')
   })
 
   // ─── 7. Grok web search ────────────────────────────────────────────────────
