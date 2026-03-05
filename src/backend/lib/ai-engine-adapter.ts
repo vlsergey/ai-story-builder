@@ -6,7 +6,7 @@ export interface AiConfigStore {
   [key: string]: unknown
 }
 
-export interface LoreGenerateRequest {
+export interface ResponseGenerateRequest {
   prompt: string
   systemPrompt: string
   /** Requested model ID, or empty string to use the engine default. */
@@ -31,7 +31,7 @@ export interface LoreGenerateRequest {
  */
 export interface AiEngineAdapter {
   generateLore(
-    req: LoreGenerateRequest,
+    req: ResponseGenerateRequest,
     onThinking: (status: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void>

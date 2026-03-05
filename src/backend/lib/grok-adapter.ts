@@ -1,9 +1,9 @@
-import type { AiEngineAdapter, LoreGenerateRequest } from './ai-engine-adapter.js'
+import type { AiEngineAdapter, ResponseGenerateRequest } from './ai-engine-adapter.js'
 import { grokGenerate } from './grok-client.js'
 
 export class GrokAdapter implements AiEngineAdapter {
   async generateLore(
-    req: LoreGenerateRequest,
+    req: ResponseGenerateRequest,
     onThinking: (status: string) => void,
     onDelta: (text: string) => void,
   ): Promise<void> {
