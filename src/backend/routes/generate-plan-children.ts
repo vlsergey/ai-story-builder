@@ -6,30 +6,30 @@ import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 
 const PLAN_CHILDREN_SCHEMA: JsonSchemaSpec = {
-  name: 'plan_children',
-  description: 'A structured list of child plan nodes to be created under a parent plan node',
+  name: 'plan_outline',
+  description: 'An annotated outline: a parent overview and an ordered list of subsections, each with a heading and detailed body text',
   schema: {
     type: 'object',
     properties: {
-      description: {
+      overview: {
         type: 'string',
-        description: 'Updated overview/description for the parent plan node',
+        description: 'Brief synopsis / updated overview of the parent section (2–5 sentences)',
       },
       items: {
         type: 'array',
-        description: 'List of child plan nodes to create',
+        description: 'Ordered list of subsections in the outline',
         items: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Short title for the child node (1–10 words)' },
-            description: { type: 'string', description: 'Content for this child node in plain text format' },
+            title: { type: 'string', description: 'Subsection heading (1–10 words)' },
+            content: { type: 'string', description: 'Body text / detailed notes for this subsection in Markdown format' },
           },
-          required: ['name', 'description'],
+          required: ['title', 'content'],
           additionalProperties: false,
         },
       },
     },
-    required: ['description', 'items'],
+    required: ['overview', 'items'],
     additionalProperties: false,
   },
 }
@@ -50,10 +50,11 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, parentTitle, parentContent, includeExistingLore, model: requestedModel, webSearch } = req.body as {
+  const { prompt, parentTitle, parentContent, isRoot, includeExistingLore, model: requestedModel, webSearch } = req.body as {
     prompt?: string
     parentTitle?: string
     parentContent?: string
+    isRoot?: boolean
     includeExistingLore?: boolean
     model?: string
     webSearch?: string
@@ -88,17 +89,27 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   const adapter = getEngineAdapter(engine)
   if (!adapter) return res.status(400).json({ error: `Plan generation is not supported for engine '${engine}'` })
 
+  const sectionTitle = parentTitle?.trim() || 'Untitled'
   const parentContext = parentContent?.trim()
-    ? `\n\nParent node current content:\n<parent_content>\n${parentContent}\n</parent_content>`
+    ? `\n\n<current_content>\n${parentContent.trim()}\n</current_content>`
     : ''
 
-  const systemPrompt =
-    `You are a creative writing assistant helping to structure a story plan.\n` +
-    `Language: ${textLanguage}.\n` +
-    `The user wants to create/split a plan node titled "${parentTitle ?? 'Plan node'}" into sub-items.\n` +
-    `Each item should have a concise title and a detailed description in Markdown format.\n` +
-    `Respond with a JSON object matching the provided schema. No explanations, no preamble.` +
-    parentContext
+  const systemPrompt = isRoot
+    ? `You are a creative writing assistant.\n` +
+      `Language: ${textLanguage}.\n` +
+      `Your task is to produce a **top-level annotated outline** for an entire literary work titled "${sectionTitle}".\n` +
+      `Generate a structured breakdown of its major parts (chapters, acts, or equivalent units).\n` +
+      `Each subsection must have a concise heading and a rich body: synopsis, character arcs, key themes, scene-by-scene notes — enough detail that a writer can start drafting directly from it.\n` +
+      `Also provide a brief overall overview/synopsis of the work in the "overview" field.\n` +
+      `Respond with a JSON object matching the provided schema. No explanations, no preamble outside the JSON.` +
+      parentContext
+    : `You are a creative writing assistant.\n` +
+      `Language: ${textLanguage}.\n` +
+      `Your task is to produce a **detailed breakdown** of the section titled "${sectionTitle}".\n` +
+      `Split it into logically coherent subsections. Each subsection must have a concise heading and a rich body: scene descriptions, character motivations, dialogue hints, pacing notes — enough detail that a writer can start drafting directly from it.\n` +
+      `Also provide a brief synopsis of the parent section as a whole in the "overview" field.\n` +
+      `Respond with a JSON object matching the provided schema. No explanations, no preamble outside the JSON.` +
+      parentContext
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')

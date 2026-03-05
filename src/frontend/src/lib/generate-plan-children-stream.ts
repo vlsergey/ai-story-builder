@@ -2,6 +2,7 @@ export interface GeneratePlanChildrenOptions {
   prompt: string
   parentTitle: string
   parentContent: string
+  isRoot?: boolean
   includeExistingLore?: boolean
   model?: string
   webSearch?: string
@@ -19,6 +20,7 @@ export async function generatePlanChildrenStream(options: GeneratePlanChildrenOp
       prompt: options.prompt,
       parentTitle: options.parentTitle,
       parentContent: options.parentContent,
+      isRoot: options.isRoot,
       includeExistingLore: options.includeExistingLore,
       model: options.model,
       webSearch: options.webSearch,

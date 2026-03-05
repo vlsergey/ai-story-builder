@@ -11,8 +11,8 @@ interface PlanChildrenEditorProps {
 }
 
 interface ProposedChild {
-  name: string
-  description: string
+  title: string
+  content: string
 }
 
 type EditorMode = 'idle' | 'streaming' | 'review'
@@ -26,6 +26,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
 
   const [parentTitle, setParentTitle] = useState('')
   const [parentContent, setParentContent] = useState('')
+  const [isRoot, setIsRoot] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const [mode, setMode] = useState<EditorMode>('idle')
@@ -57,10 +58,11 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
   // Load node on mount
   useEffect(() => {
     fetch(`/api/plan/nodes/${nodeId}`)
-      .then(r => r.json() as Promise<{ title: string; content: string | null }>)
+      .then(r => r.json() as Promise<{ title: string; content: string | null; parent_id: number | null }>)
       .then(node => {
         setParentTitle(node.title)
         setParentContent(node.content ?? '')
+        setIsRoot(node.parent_id === null)
         panelApi?.setTitle(`Split: ${node.title}`)
         setLoading(false)
       })
@@ -104,6 +106,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         prompt: prompt.trim(),
         parentTitle,
         parentContent,
+        isRoot,
         includeExistingLore,
         model: selectedModel || undefined,
         webSearch,
@@ -113,14 +116,14 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
           setThinkingDetail(detail ?? null)
         },
         onPartialJson: (partial) => {
-          if (typeof partial.description === 'string') {
-            finalDescription = partial.description
-            setStreamingDescription(partial.description)
+          if (typeof partial.overview === 'string') {
+            finalDescription = partial.overview
+            setStreamingDescription(partial.overview)
           }
           if (Array.isArray(partial.items)) {
-            finalItems = (partial.items as { name?: string; description?: string }[]).map(item => ({
-              name: typeof item.name === 'string' ? item.name : '',
-              description: typeof item.description === 'string' ? item.description : '',
+            finalItems = (partial.items as { title?: string; content?: string }[]).map(item => ({
+              title: typeof item.title === 'string' ? item.title : '',
+              content: typeof item.content === 'string' ? item.content : '',
             }))
             setStreamingItems(finalItems)
           }
@@ -183,8 +186,8 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             parent_id: nodeId,
-            title: child.name,
-            content: child.description,
+            title: child.title,
+            content: child.content,
             position: i,
           }),
         })
@@ -338,9 +341,9 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
             )}
             {streamingItems.map((item, i) => (
               <div key={i} className="border border-border rounded p-3 space-y-1 opacity-80">
-                <div className="text-sm font-semibold">{item.name || <span className="italic text-muted-foreground">…</span>}</div>
-                {item.description && (
-                  <div className="text-xs text-muted-foreground whitespace-pre-wrap">{item.description}</div>
+                <div className="text-sm font-semibold">{item.title || <span className="italic text-muted-foreground">…</span>}</div>
+                {item.content && (
+                  <div className="text-xs text-muted-foreground whitespace-pre-wrap">{item.content}</div>
                 )}
               </div>
             ))}
@@ -363,10 +366,10 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
               <div key={i} className="border border-border rounded p-3 space-y-2">
                 <input
                   className="w-full text-sm font-semibold bg-transparent border-b border-transparent focus:border-primary focus:outline-none px-0.5"
-                  value={child.name}
+                  value={child.title}
                   onChange={e => {
                     const next = [...proposedChildren]
-                    next[i] = { ...next[i], name: e.target.value }
+                    next[i] = { ...next[i], title: e.target.value }
                     setProposedChildren(next)
                   }}
                   placeholder="Title"
@@ -374,13 +377,13 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
                 <textarea
                   className="w-full text-sm resize-none border border-border rounded bg-background p-2 focus:outline-none focus:ring-1 focus:ring-ring"
                   rows={4}
-                  value={child.description}
+                  value={child.content}
                   onChange={e => {
                     const next = [...proposedChildren]
-                    next[i] = { ...next[i], description: e.target.value }
+                    next[i] = { ...next[i], content: e.target.value }
                     setProposedChildren(next)
                   }}
-                  placeholder="Description"
+                  placeholder="Content"
                 />
               </div>
             ))}
