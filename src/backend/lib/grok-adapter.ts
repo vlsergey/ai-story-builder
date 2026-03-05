@@ -30,7 +30,7 @@ export class GrokAdapter implements AiEngineAdapter {
     if (req.webSearch && req.webSearch !== 'none') {
       requestParams.tools = [{ type: 'web_search' }]
     }
-    if (req.responseSchema) {
+    if (req.responseSchema && req.stringFormat !== false) {
       requestParams['text'] = {
         format: {
           type: 'json_schema',

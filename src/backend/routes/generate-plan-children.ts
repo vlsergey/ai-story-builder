@@ -157,6 +157,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
         engineDef,
         config,
         responseSchema: PLAN_CHILDREN_SCHEMA,
+        stringFormat: false,
         maxTokens: maxTokens ?? undefined,
       },
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),

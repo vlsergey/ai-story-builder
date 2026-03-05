@@ -24,7 +24,7 @@ export class YandexAdapter implements AiEngineAdapter {
       ...(req.maxTokens != null ? { max_tokens: req.maxTokens } : {}),
     }
 
-    if (req.responseSchema) {
+    if (req.responseSchema && req.stringFormat !== false) {
       ;(requestParams as unknown as Record<string, unknown>)['response_format'] = {
         type: 'json_schema',
         json_schema: {
