@@ -16,13 +16,15 @@ export interface LoreNodeForCollapse {
 }
 
 export interface CollapsedGroup {
-  /** The level-2 node ID (direct child of root). */
+  /** The level-2 node ID (direct child of root), or the root ID for the root group. */
   level2NodeId: number
-  /** The level-2 node name. */
+  /** The level-2 node name, or the root name for the root group. */
   level2NodeName: string
   /**
    * Concatenated markdown content for the group.
    * Each included node is separated by a horizontal rule and preceded by a heading.
+   * Headings at depth 1 use the node name only; from depth 2 they include the
+   * ancestor path starting from the level-2 node (e.g. "Category / SubCat / Node").
    * Empty string when no active, non-empty nodes exist in the subtree.
    */
   content: string
@@ -37,9 +39,15 @@ export type CollapseLoreTreeResult = CollapsedGroup[] | { error: string }
 /**
  * Collapses the lore tree into level-2 groups for AI upload.
  *
+ * If the root node itself has non-empty content it is emitted as the first group
+ * with a `#` heading (level-1 heading, name only, no breadcrumb path).
+ *
  * Each direct child of root becomes one group. All its descendants are merged
- * in recursively, with markdown headings added for separation (level-2 → `#`,
- * level-3 → `##`, etc.).
+ * in recursively, with markdown headings:
+ *   - depth 1 (level-2 node): `# Name`
+ *   - depth 2 (level-3 node): `## Level2Name / Name`
+ *   - depth 3 (level-4 node): `### Level2Name / Level3Name / Name`
+ *   - and so on.
  *
  * Nodes with `to_be_deleted=1` or `word_count=0` are excluded from the content
  * but their IDs are still present in `allNodeIds` so callers can clean up
@@ -69,37 +77,55 @@ export function collapseLoreTree(
   // Level-2 = direct children of root
   const level2Ids = childrenMap.get(rootRow.id) ?? []
 
-  if (level2Ids.length > maxFiles) {
+  const rootHasContent = rootRow.to_be_deleted === 0 && rootRow.word_count > 0 && !!rootRow.content
+  // Root group (if any) takes one file slot
+  const effectiveMax = rootHasContent ? maxFiles - 1 : maxFiles
+
+  if (level2Ids.length > effectiveMax) {
     return {
       error:
         `Too many top-level lore categories (${level2Ids.length}). ` +
-        `Maximum is ${maxFiles} for this AI engine. ` +
+        `Maximum is ${effectiveMax} for this AI engine. ` +
         `Please reduce the number of top-level categories.`,
     }
   }
 
   const groups: CollapsedGroup[] = []
 
+  // Root group: include root content if non-empty (# heading, name only)
+  if (rootHasContent) {
+    groups.push({
+      level2NodeId: rootRow.id,
+      level2NodeName: rootRow.name,
+      content: `# ${rootRow.name}\n\n${rootRow.content!}`,
+      allNodeIds: [rootRow.id],
+      hasContent: true,
+    })
+  }
+
   for (const l2Id of level2Ids) {
     const l2Row = idToRow.get(l2Id)!
     const allNodeIds: number[] = []
     const contentParts: string[] = []
 
-    function collectNode(nodeId: number, depth: number): void {
+    function collectNode(nodeId: number, depth: number, ancestorPath: string[]): void {
       const row = idToRow.get(nodeId)!
       allNodeIds.push(nodeId)
+      const currentPath = [...ancestorPath, row.name]
 
       if (row.to_be_deleted === 0 && row.word_count > 0 && row.content) {
         const heading = '#'.repeat(depth)
-        contentParts.push(`${heading} ${row.name}\n\n${row.content}`)
+        // From depth 2 onwards include ancestor breadcrumbs in the heading
+        const headingText = depth >= 2 ? currentPath.join(' / ') : row.name
+        contentParts.push(`${heading} ${headingText}\n\n${row.content}`)
       }
 
       for (const childId of childrenMap.get(nodeId) ?? []) {
-        collectNode(childId, depth + 1)
+        collectNode(childId, depth + 1, currentPath)
       }
     }
 
-    collectNode(l2Id, 1)
+    collectNode(l2Id, 1, [])
 
     const content = contentParts.join('\n\n---\n\n')
     groups.push({

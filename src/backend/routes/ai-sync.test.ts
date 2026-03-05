@@ -847,9 +847,9 @@ describe('POST /ai/sync-lore', () => {
     const content = buf.toString('utf-8')
     expect(content).toContain('# World')
     expect(content).toContain('World overview')
-    expect(content).toContain('## Continent')
+    expect(content).toContain('## World / Continent')
     expect(content).toContain('Continent details')
-    expect(content).toContain('### City')
+    expect(content).toContain('### World / Continent / City')
     expect(content).toContain('City info')
   })
 

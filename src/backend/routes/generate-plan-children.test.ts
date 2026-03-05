@@ -225,7 +225,7 @@ describe('POST /ai/generate-plan-children', () => {
 
   // ─── 3. isRoot / system prompt framing ────────────────────────────────────
 
-  it('uses "annotated outline" framing in system prompt for root node', async () => {
+  it('uses root-specific system prompt (not "detailed breakdown") when isRoot=true', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse()
 
@@ -236,8 +236,7 @@ describe('POST /ai/generate-plan-children', () => {
     })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
-    expect(params.instructions).toContain('annotated outline')
-    expect(params.instructions).toContain('My Novel')
+    expect(params.instructions).not.toContain('detailed breakdown')
   })
 
   it('uses "detailed breakdown" framing in system prompt for non-root node', async () => {

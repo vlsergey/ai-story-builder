@@ -98,15 +98,28 @@ function buildFileContent(
   const nodePath = pathMap.get(row.id) ?? `/${row.name}`
   const parentName = row.parent_id ? (idToRow.get(row.parent_id)?.name ?? '') : ''
 
-  const lines = [
+  const frontmatter = [
     '---',
     `project: ${projectName}`,
     `path: ${nodePath}`,
     ...(parentName ? [`parent: ${parentName}`] : []),
     '---',
     '',
-  ]
-  return lines.join('\n') + (row.content ?? '')
+  ].join('\n')
+
+  // Build markdown heading. Path segments (after stripping leading '/'):
+  //   depth 0 = root → '# Name'
+  //   depth 1 = level-2 → '# Name'
+  //   depth 2 = level-3 → '## Level2 / Name'
+  //   depth 3 = level-4 → '### Level2 / Level3 / Name'
+  const segments = nodePath.split('/').filter(Boolean)
+  const depth = segments.length - 1 // 0 for root, 1 for l2, etc.
+  const headingLevel = Math.max(1, depth)
+  const hashes = '#'.repeat(headingLevel)
+  // From depth 2+: include ancestor path starting from level-2 (exclude root)
+  const headingText = depth >= 2 ? segments.slice(1).join(' / ') : row.name
+
+  return frontmatter + `${hashes} ${headingText}\n\n` + (row.content ?? '')
 }
 
 function formatApiError(e: unknown): string {
