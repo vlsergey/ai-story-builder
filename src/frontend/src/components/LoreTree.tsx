@@ -276,6 +276,7 @@ export default function LoreTree({
         focusedItem: pendingRenameId,
       },
     }))
+    treeRef.current?.scrollToItem(pendingRenameId)
     treeRef.current?.startRenamingItem(pendingRenameId)
     setPendingRenameId(null)
   }, [pendingRenameId, items])
