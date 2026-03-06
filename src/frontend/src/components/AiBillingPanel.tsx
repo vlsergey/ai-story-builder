@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { AI_CALL_COMPLETED_EVENT, type AiCallCompletedDetail } from '../lib/billing-events'
+import { useLocale } from '../lib/locale'
 
 // 1 tick = 1e-10 USD
 const USD_PER_TICK = 1e-10
@@ -36,7 +37,6 @@ interface LastRequest {
 
 interface PeriodTotals {
   cost_usd_ticks?: number | null
-  // xAI API may return various shapes; we try to extract known fields
   [key: string]: unknown
 }
 
@@ -54,9 +54,7 @@ interface BillingData {
 /** Tries to extract total cost_usd_ticks from whatever shape the xAI API returns for a period. */
 function extractCost(period: PeriodTotals | undefined): number | null {
   if (!period) return null
-  // Direct field
   if (typeof period.cost_usd_ticks === 'number') return period.cost_usd_ticks
-  // Inside a 'total' sub-object
   const total = period.total as Record<string, unknown> | undefined
   if (total && typeof total.cost_usd_ticks === 'number') return total.cost_usd_ticks
   return null
@@ -72,16 +70,10 @@ function extractCalls(period: PeriodTotals | undefined): number | null {
   return null
 }
 
-const PERIODS: Array<{ key: keyof NonNullable<BillingData['totals']>; label: string }> = [
-  { key: 'last_hour', label: 'Last hour' },
-  { key: 'last_24h', label: 'Last 24h' },
-  { key: 'last_7d', label: 'Last 7d' },
-  { key: 'last_30d', label: 'Last 30d' },
-]
-
 const POLL_INTERVAL_MS = 60_000
 
 export default function AiBillingPanel() {
+  const { t } = useLocale()
   const [lastRequest, setLastRequest] = useState<LastRequest | null>(null)
   const [billing, setBilling] = useState<BillingData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -107,7 +99,6 @@ export default function AiBillingPanel() {
     }, POLL_INTERVAL_MS)
   }
 
-  // Initial fetch + start polling
   useEffect(() => {
     void fetchBilling().then(schedulePoll)
     return () => {
@@ -115,7 +106,6 @@ export default function AiBillingPanel() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-fetch immediately when an AI call completes
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<AiCallCompletedDetail>).detail
@@ -131,7 +121,13 @@ export default function AiBillingPanel() {
     return () => window.removeEventListener(AI_CALL_COMPLETED_EVENT, handler)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasLastRequest = lastRequest != null
+  const periods: Array<{ key: keyof NonNullable<BillingData['totals']>; label: string }> = [
+    { key: 'last_hour', label: t('billing.last_hour') },
+    { key: 'last_24h',  label: t('billing.last_24h') },
+    { key: 'last_7d',   label: t('billing.last_7d') },
+    { key: 'last_30d',  label: t('billing.last_30d') },
+  ]
+
   const hasPeriodData = billing?.configured && billing.totals && !billing.error
 
   return (
@@ -139,52 +135,54 @@ export default function AiBillingPanel() {
       {/* Last request */}
       <section>
         <div className="flex items-center justify-between mb-1">
-          <span className="font-semibold text-foreground">Last request</span>
-          {loading && <span className="text-xs text-muted-foreground animate-pulse">updating…</span>}
+          <span className="font-semibold text-foreground">{t('billing.last_request')}</span>
+          {loading && <span className="text-xs text-muted-foreground animate-pulse">{t('billing.updating')}</span>}
         </div>
-        {hasLastRequest ? (
+        {lastRequest != null ? (
           <div className="rounded border border-border bg-muted/30 px-3 py-2 space-y-1">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cost</span>
+              <span className="text-muted-foreground">{t('billing.cost')}</span>
               <span className="font-mono font-semibold text-foreground">{formatCost(lastRequest.costUsdTicks)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Input tokens</span>
+              <span className="text-muted-foreground">{t('billing.input_tokens')}</span>
               <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensInput)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Output tokens</span>
+              <span className="text-muted-foreground">{t('billing.output_tokens')}</span>
               <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensOutput)}</span>
             </div>
             <div className="text-xs text-muted-foreground text-right">{timeAgo(lastRequest.timestamp)}</div>
           </div>
         ) : (
-          <p className="text-muted-foreground text-xs">No requests yet this session.</p>
+          <p className="text-muted-foreground text-xs">{t('billing.no_requests')}</p>
         )}
       </section>
 
       {/* Period statistics */}
       <section>
-        <div className="font-semibold text-foreground mb-1">Period statistics</div>
+        <div className="font-semibold text-foreground mb-1">{t('billing.period_stats')}</div>
         {!billing ? (
-          <p className="text-muted-foreground text-xs">Loading…</p>
+          <p className="text-muted-foreground text-xs">{t('billing.loading')}</p>
         ) : !billing.configured ? (
-          <p className="text-muted-foreground text-xs">
-            Configure <span className="font-medium">Management Key</span> and <span className="font-medium">Team ID</span> in Grok settings to view period statistics.
-          </p>
+          <p
+            className="text-muted-foreground text-xs"
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: t('billing.configure_hint') }}
+          />
         ) : billing.error ? (
-          <p className="text-destructive text-xs">Error: {billing.error}</p>
+          <p className="text-destructive text-xs">{t('billing.error')} {billing.error}</p>
         ) : hasPeriodData ? (
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="text-muted-foreground">
-                <th className="text-left font-normal pb-1">Period</th>
-                <th className="text-right font-normal pb-1">Calls</th>
-                <th className="text-right font-normal pb-1">Cost</th>
+                <th className="text-left font-normal pb-1">{t('billing.period')}</th>
+                <th className="text-right font-normal pb-1">{t('billing.calls')}</th>
+                <th className="text-right font-normal pb-1">{t('billing.cost')}</th>
               </tr>
             </thead>
             <tbody>
-              {PERIODS.map(({ key, label }) => {
+              {periods.map(({ key, label }) => {
                 const period = billing.totals?.[key]
                 const cost = extractCost(period)
                 const calls = extractCalls(period)
@@ -199,7 +197,7 @@ export default function AiBillingPanel() {
             </tbody>
           </table>
         ) : (
-          <p className="text-muted-foreground text-xs">No data.</p>
+          <p className="text-muted-foreground text-xs">{t('billing.no_data')}</p>
         )}
       </section>
 
@@ -207,7 +205,7 @@ export default function AiBillingPanel() {
         onClick={() => void fetchBilling().then(schedulePoll)}
         className="mt-auto self-start text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        ↺ Refresh
+        {t('billing.refresh')}
       </button>
     </div>
   )
