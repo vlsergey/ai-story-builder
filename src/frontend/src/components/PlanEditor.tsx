@@ -106,11 +106,11 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         if (!engine) return
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
-          settings_plan?: AiSettings
+          settings?: AiSettings
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
-        const saved = engineData?.settings_plan
+        const saved = engineData?.settings
         const savedModel = saved?.model ?? engineData?.last_model
         const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
         setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
@@ -188,7 +188,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { settings_plan: aiSettings } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { settings: aiSettings } }),
       })
     }
   }

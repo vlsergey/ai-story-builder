@@ -93,14 +93,14 @@ describe('GET /ai/config', () => {
     expect(res.body.yandex.last_model).toBe('gpt://b1g999/yandexgpt/latest')
   })
 
-  it('returns extra fields saved via POST (e.g. settings_lore object)', async () => {
+  it('returns extra fields saved via POST (e.g. settings object)', async () => {
     await request(app).post('/ai/config').send({
       engine: 'grok',
-      fields: { settings_lore: { model: 'grok-3', maxTokens: 4096, webSearch: 'none' } },
+      fields: { settings: { model: 'grok-3', maxTokens: 4096, webSearch: 'none' } },
     })
     const res = await request(app).get('/ai/config')
     expect(res.status).toBe(200)
-    expect(res.body.grok.settings_lore).toEqual({ model: 'grok-3', maxTokens: 4096, webSearch: 'none' })
+    expect(res.body.grok.settings).toEqual({ model: 'grok-3', maxTokens: 4096, webSearch: 'none' })
   })
 
   it('returns saved current_engine', async () => {

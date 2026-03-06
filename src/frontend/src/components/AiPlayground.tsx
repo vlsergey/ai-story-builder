@@ -31,11 +31,11 @@ export default function AiPlayground() {
         if (!engine) return
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
-          settings_playground?: AiSettings
+          settings?: AiSettings
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
-        const saved = engineData?.settings_playground
+        const saved = engineData?.settings
         const savedModel = saved?.model ?? engineData?.last_model
         const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
         setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
@@ -80,7 +80,7 @@ export default function AiPlayground() {
         void fetch('/api/ai/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { settings_playground: aiSettings } }),
+          body: JSON.stringify({ engine: currentEngine, fields: { settings: aiSettings } }),
         })
       }
     } catch (e) {
