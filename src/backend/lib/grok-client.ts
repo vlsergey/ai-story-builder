@@ -25,7 +25,7 @@ export async function grokGenerate(
   params: Record<string, unknown>,
   onThinking?: (status: string, detail?: string) => void,
   onDelta?: (text: string) => void,
-): Promise<{ text: string; response_id?: string }> {
+): Promise<{ text: string; response_id?: string; tokensInput?: number; tokensOutput?: number; costUsdTicks?: number }> {
   const client = createGrokClient(apiKey)
 
   const stream = await client.responses.create({
@@ -35,6 +35,9 @@ export async function grokGenerate(
 
   let text = ''
   let responseId: string | undefined
+  let tokensInput: number | undefined
+  let tokensOutput: number | undefined
+  let costUsdTicks: number | undefined
 
   for await (const event of stream) {
     if (isVerboseLogging()) {
@@ -136,6 +139,16 @@ export async function grokGenerate(
         break
       }
 
+      case 'response.completed': {
+        const usage = (event as unknown as { response?: { usage?: { input_tokens?: number; output_tokens?: number; cost_in_usd_ticks?: number } } }).response?.usage
+        if (usage) {
+          if (usage.input_tokens != null) tokensInput = usage.input_tokens
+          if (usage.output_tokens != null) tokensOutput = usage.output_tokens
+          if (usage.cost_in_usd_ticks != null) costUsdTicks = usage.cost_in_usd_ticks
+        }
+        break
+      }
+
       case 'response.failed':
         throw new Error(`Grok response failed: ${JSON.stringify((event.response as { error?: unknown }).error ?? {})}`)
 
@@ -145,5 +158,5 @@ export async function grokGenerate(
     }
   }
 
-  return { text, response_id: responseId }
+  return { text, response_id: responseId, tokensInput, tokensOutput, costUsdTicks }
 }

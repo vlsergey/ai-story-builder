@@ -45,7 +45,7 @@ describe('migrateDatabase', () => {
     expect(tables).toContain('story_parts')
     expect(tables).toContain('card_definitions')
     expect(tables).toContain('card_values')
-    expect(tables).toContain('ai_calls')
+    expect(tables).not.toContain('ai_calls') // dropped in migration v10→v11
     expect(tables).toContain('settings')
 
     db.close()

@@ -7,6 +7,7 @@ import { useTheme } from '../lib/theme/theme-provider'
 import { useEditorSettings } from '../lib/editor-settings'
 import { useLocale } from '../lib/locale'
 import { generateNodeStream } from '../lib/generate-node-stream'
+import { dispatchAiCallCompleted } from '../lib/billing-events'
 import { preserveScrollOnExternalUpdate } from '../lib/codemirror-preserve-scroll'
 import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
@@ -235,6 +236,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     // Content and primary field are cleared on the first streaming token so that
     // existing content is preserved if generation fails before producing anything.
     let firstTokenCleared = false
+    let lastCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number } = {}
 
     generateNodeStream(adapter.generateEndpoint, {
       prompt: generatePrompt,
@@ -257,7 +259,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         }
         if (typeof partial.content === 'string') { setContent(partial.content); finalContent = partial.content }
       },
-      onDone: () => {},
+      onDone: (data) => { lastCallData = data },
     }).then(async () => {
       if (finalPrimary.trim() || finalContent) {
         const patchBody: Record<string, unknown> = {
@@ -285,6 +287,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         }
       }
       saveAiSettings()
+      dispatchAiCallCompleted({ costUsdTicks: lastCallData.cost_usd_ticks, tokensInput: lastCallData.tokens_input, tokensOutput: lastCallData.tokens_output })
     }).catch(e => setGenError(String(e)))
       .finally(() => setGenerating(false))
   }
@@ -311,6 +314,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     setSelectedTab('new')
 
     let finalPrimary = '', finalContent = ''
+    let improveCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number } = {}
 
     try {
       await generateNodeStream(adapter.generateEndpoint, {
@@ -330,7 +334,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           }
           if (typeof partial.content === 'string') { setContent(partial.content); finalContent = partial.content }
         },
-        onDone: () => {},
+        onDone: (data) => { improveCallData = data },
       })
 
       const patchBody: Record<string, unknown> = {
@@ -361,6 +365,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       }
 
       saveAiSettings()
+      dispatchAiCallCompleted({ costUsdTicks: improveCallData.cost_usd_ticks, tokensInput: improveCallData.tokens_input, tokensOutput: improveCallData.tokens_output })
       setEditorMode('review_unlocked')
     } catch (e) {
       setGenError(String(e))

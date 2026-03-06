@@ -9,7 +9,7 @@ export interface GenerateNodeOptions {
   baseContent?: string
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
-  onDone?: (data: { response_id?: string }) => void
+  onDone?: (data: { response_id?: string; cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number }) => void
   signal?: AbortSignal
 }
 

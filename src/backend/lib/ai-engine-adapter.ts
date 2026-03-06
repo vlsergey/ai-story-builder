@@ -10,7 +10,7 @@ export interface JsonSchemaSpec {
 
 export interface AiConfigStore {
   yandex?: { api_key?: string; folder_id?: string; search_index_id?: string }
-  grok?: { api_key?: string }
+  grok?: { api_key?: string; management_key?: string; team_id?: string }
   [key: string]: unknown
 }
 
@@ -56,7 +56,7 @@ export interface AiEngineAdapter {
     req: GenerateResponseRequest,
     onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
-  ): Promise<{ response_id?: string }>
+  ): Promise<{ response_id?: string; tokensInput?: number; tokensOutput?: number; costUsdTicks?: number }>
 }
 
 import { GrokAdapter } from './grok-adapter.js'

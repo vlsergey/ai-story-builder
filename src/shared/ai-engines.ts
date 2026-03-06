@@ -116,6 +116,8 @@ export const BUILTIN_ENGINES: AiEngineDefinition[] = [
     },
     configFields: [
       { key: 'api_key', type: 'password' },
+      { key: 'management_key', type: 'password' },
+      { key: 'team_id', type: 'text' },
     ],
     maxFilesPerRequest: 10,
     webSearch: 'boolean',

@@ -54,6 +54,12 @@
   - Same structure as generate-lore; JSON schema returns `{ title: string, content: string }`
   - Supports `mode: 'generate' | 'improve'` and `baseContent` (for improve mode)
   - No `includeExistingLore` parameter
+- Billing API (`GET /api/ai/billing`):
+  - Reads Grok `management_key` and `team_id` from `ai_config.grok` in project settings
+  - If not configured: returns `{ configured: false }`
+  - If configured: calls `POST https://management-api.x.ai/v1/billing/teams/{team_id}/usage` for each of four periods (last 1h / 24h / 7d / 30d) using `{ start_time, end_time }` ISO 8601 range
+  - Returns `{ configured: true, totals: { last_hour, last_24h, last_7d, last_30d } }` with raw xAI API responses per period, or `{ configured: true, error: string }` on API failure
+- Generation endpoints (`/generate-lore`, `/generate-plan`, `/generate-plan-children`) include `cost_usd_ticks`, `tokens_input`, `tokens_output` in the SSE `done` event when available from the AI provider (Grok only; Yandex returns no cost data)
 - Plan children generation API (`POST /api/ai/generate-plan-children`):
   - Request body: `{ prompt, parentTitle, parentContent, model?, webSearch? }`
   - System prompt instructs AI to create ~5–10 child items totalling ~5 000 words

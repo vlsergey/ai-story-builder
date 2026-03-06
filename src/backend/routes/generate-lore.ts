@@ -130,7 +130,7 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   }
 
   try {
-    const { response_id } = await adapter.generateResponse(
+    const { response_id, tokensInput, tokensOutput, costUsdTicks } = await adapter.generateResponse(
       {
         prompt: prompt.trim(),
         systemPrompt,
@@ -147,7 +147,12 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
       (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
       onDelta,
     )
-    sse('done', response_id ? { response_id } : {})
+    const donePayload: Record<string, unknown> = {}
+    if (response_id) donePayload.response_id = response_id
+    if (costUsdTicks != null) donePayload.cost_usd_ticks = costUsdTicks
+    if (tokensInput != null) donePayload.tokens_input = tokensInput
+    if (tokensOutput != null) donePayload.tokens_output = tokensOutput
+    sse('done', donePayload)
   } catch (e) {
     sse('error', { message: String(e) })
   }

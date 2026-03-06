@@ -207,6 +207,10 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       ALTER TABLE plan_nodes ADD COLUMN last_generate_prompt TEXT NULL;
     `)
   },
+  // version 10 → 11: drop ai_calls table (was never populated, logging not used)
+  (db) => {
+    db.exec(`DROP TABLE IF EXISTS ai_calls`)
+  },
 ]
 
 export const CURRENT_VERSION = MIGRATIONS.length

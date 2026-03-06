@@ -208,6 +208,23 @@ Shared event constants and dispatch helpers in `src/frontend/src/lib/plan-events
 - `PLAN_NODE_SAVED_EVENT` / `dispatchPlanNodeSaved({ id, title?, wordCount?, charCount?, byteCount? })`
 - `PLAN_TREE_REFRESH_EVENT` / `dispatchPlanTreeRefresh()`
 
+### AI Billing Panel
+
+A non-draggable dockview panel (`id='billing-panel'`) positioned below the Cards panel on the right side. Cannot be moved to the editor group (same restriction as lore/plan/cards panels).
+
+**Default position:** below `cards-panel` in the right group.
+
+**Sections:**
+1. **Last request** — shows cost in USD, input/output token counts, and time-ago for the most recent AI generation in the current session. Data arrives via `AI_CALL_COMPLETED_EVENT` dispatched from `NodeEditor` after each generation/improve call.
+2. **Period statistics** — shows per-period totals (last hour / 24h / 7d / 30d) including call count and total cost. Sourced from the xAI Management API (`POST https://management-api.x.ai/v1/billing/teams/{team_id}/usage`). Requires `management_key` and `team_id` to be set in Grok settings. Polled every 60 seconds; also refreshed immediately on `AI_CALL_COMPLETED_EVENT`.
+3. **Refresh button** — manually triggers re-fetch.
+
+**Cost display:** 1 tick = 1×10⁻¹⁰ USD. Values displayed as `$0.00XXX` with adaptive precision.
+
+**Events:** `AI_CALL_COMPLETED_EVENT` (`ai-call-completed`) dispatched by `NodeEditor` with `{ costUsdTicks?, tokensInput?, tokensOutput? }` detail. Defined in `src/frontend/src/lib/billing-events.ts`.
+
+**Not configured state:** if `management_key` / `team_id` not set in Grok settings, the period statistics section shows a prompt to configure them.
+
 ### Possible Future Features
 
 - Per-item diff view for plan children generation — compare proposed vs existing child list item-by-item (non-trivial to implement)

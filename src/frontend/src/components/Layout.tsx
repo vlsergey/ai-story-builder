@@ -13,6 +13,7 @@ import PlanEditor from './PlanEditor'
 import PlanChildrenEditor from './PlanChildrenEditor'
 import SettingsPanel from './SettingsPanel'
 import AiPlayground from './AiPlayground'
+import AiBillingPanel from './AiBillingPanel'
 import type { LoreNode } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
@@ -305,6 +306,15 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       position: { referenceGroup: centerGroup, direction: 'right' },
       minimumWidth: 200,
     })
+
+    dockviewRef.current.addPanel({
+      id: 'billing-panel',
+      component: 'billing',
+      tabComponent: 'nonClosableTab',
+      title: 'AI Billing',
+      position: { referencePanel: 'cards-panel', direction: 'below' },
+      minimumHeight: 100,
+    })
   }
 
   const onReady = (event: any) => {
@@ -436,6 +446,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     ),
     settings: () => <SettingsPanel />,
     'ai-playground': () => <AiPlayground />,
+    billing: () => <AiBillingPanel />,
   };
 
   const tabComponents = {

@@ -33,9 +33,6 @@ router.post('/generate', express.json(), (req: Request, res: Response) => {
       )
       .run(plan_node_version_id, 1, generatedContent)
     const gid = g.lastInsertRowid
-    db.prepare(
-      'INSERT INTO ai_calls (backend, model, prompt, response_summary, related_story_part_id) VALUES (?, ?, ?, ?, ?)',
-    ).run('mock', 'mock', prompt ?? '', generatedContent.slice(0, 200), gid)
     db.close()
     res.json({ story_part_id: gid })
   } catch (e) {

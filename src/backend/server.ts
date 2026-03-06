@@ -13,6 +13,7 @@ import generateLoreRouter from './routes/generate-lore.js'
 import generatePlanRouter from './routes/generate-plan.js'
 import generatePlanChildrenRouter from './routes/generate-plan-children.js'
 import generatePlaygroundRouter from './routes/generate-playground.js'
+import aiBillingRouter from './routes/ai-billing.js'
 import { getDataDir, restoreLastOpenedProject } from './db/state.js'
 import { applyRuntimeSettings } from './routes/projects.js'
 
@@ -67,6 +68,7 @@ app.use('/api/ai', generateLoreRouter)
 app.use('/api/ai', generatePlanRouter)
 app.use('/api/ai', generatePlanChildrenRouter)
 app.use('/api/ai', generatePlaygroundRouter)
+app.use('/api/ai', aiBillingRouter)
 
 app.get('/api/hello', (_req, res) => {
   res.json({ message: 'hello from backend' })
