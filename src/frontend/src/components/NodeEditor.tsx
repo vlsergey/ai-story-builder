@@ -236,7 +236,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     // Content and primary field are cleared on the first streaming token so that
     // existing content is preserved if generation fails before producing anything.
     let firstTokenCleared = false
-    let lastCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number } = {}
+    let lastCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number; tokens_total?: number; cached_tokens?: number; reasoning_tokens?: number } = {}
 
     generateNodeStream(adapter.generateEndpoint, {
       prompt: generatePrompt,
@@ -287,7 +287,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         }
       }
       saveAiSettings()
-      dispatchAiCallCompleted({ costUsdTicks: lastCallData.cost_usd_ticks, tokensInput: lastCallData.tokens_input, tokensOutput: lastCallData.tokens_output })
+      dispatchAiCallCompleted({ costUsdTicks: lastCallData.cost_usd_ticks, tokensInput: lastCallData.tokens_input, tokensOutput: lastCallData.tokens_output, tokensTotal: lastCallData.tokens_total, cachedTokens: lastCallData.cached_tokens, reasoningTokens: lastCallData.reasoning_tokens })
     }).catch(e => setGenError(String(e)))
       .finally(() => setGenerating(false))
   }
@@ -314,7 +314,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     setSelectedTab('new')
 
     let finalPrimary = '', finalContent = ''
-    let improveCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number } = {}
+    let improveCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number; tokens_total?: number; cached_tokens?: number; reasoning_tokens?: number } = {}
 
     try {
       await generateNodeStream(adapter.generateEndpoint, {
@@ -365,7 +365,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       }
 
       saveAiSettings()
-      dispatchAiCallCompleted({ costUsdTicks: improveCallData.cost_usd_ticks, tokensInput: improveCallData.tokens_input, tokensOutput: improveCallData.tokens_output })
+      dispatchAiCallCompleted({ costUsdTicks: improveCallData.cost_usd_ticks, tokensInput: improveCallData.tokens_input, tokensOutput: improveCallData.tokens_output, tokensTotal: improveCallData.tokens_total, cachedTokens: improveCallData.cached_tokens, reasoningTokens: improveCallData.reasoning_tokens })
       setEditorMode('review_unlocked')
     } catch (e) {
       setGenError(String(e))

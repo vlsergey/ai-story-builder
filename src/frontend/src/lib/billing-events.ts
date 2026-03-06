@@ -4,6 +4,9 @@ export interface AiCallCompletedDetail {
   costUsdTicks?: number
   tokensInput?: number
   tokensOutput?: number
+  tokensTotal?: number
+  cachedTokens?: number
+  reasoningTokens?: number
 }
 
 /** Dispatched after any successful AI generation (generate or improve). */

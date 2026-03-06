@@ -32,6 +32,9 @@ interface LastRequest {
   costUsdTicks?: number
   tokensInput?: number
   tokensOutput?: number
+  tokensTotal?: number
+  cachedTokens?: number
+  reasoningTokens?: number
   timestamp: string
 }
 
@@ -114,6 +117,9 @@ export default function AiBillingPanel() {
         costUsdTicks: detail.costUsdTicks,
         tokensInput: detail.tokensInput,
         tokensOutput: detail.tokensOutput,
+        tokensTotal: detail.tokensTotal,
+        cachedTokens: detail.cachedTokens,
+        reasoningTokens: detail.reasoningTokens,
         timestamp: new Date().toISOString(),
       })
       void fetchBilling().then(schedulePoll)
@@ -146,11 +152,15 @@ export default function AiBillingPanel() {
               <span className="font-mono font-semibold text-foreground">{formatCost(lastRequest.costUsdTicks)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('billing.input_tokens')}</span>
+              <span className="text-muted-foreground">{t('billing.total_tokens')}</span>
+              <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensTotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground pl-3">{t('billing.input_tokens')}{lastRequest.cachedTokens ? ` (${t('billing.cached')}: ${formatTokens(lastRequest.cachedTokens)})` : ''}</span>
               <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensInput)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('billing.output_tokens')}</span>
+              <span className="text-muted-foreground pl-3">{t('billing.output_tokens')}{lastRequest.reasoningTokens ? ` (${t('billing.reasoning')}: ${formatTokens(lastRequest.reasoningTokens)})` : ''}</span>
               <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensOutput)}</span>
             </div>
             <div className="text-xs text-muted-foreground text-right">{timeAgo(lastRequest.timestamp)}</div>

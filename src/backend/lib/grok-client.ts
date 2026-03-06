@@ -25,7 +25,7 @@ export async function grokGenerate(
   params: Record<string, unknown>,
   onThinking?: (status: string, detail?: string) => void,
   onDelta?: (text: string) => void,
-): Promise<{ text: string; response_id?: string; tokensInput?: number; tokensOutput?: number; costUsdTicks?: number }> {
+): Promise<{ text: string; response_id?: string; tokensInput?: number; tokensOutput?: number; tokensTotal?: number; cachedTokens?: number; reasoningTokens?: number; costUsdTicks?: number }> {
   const client = createGrokClient(apiKey)
 
   const stream = await client.responses.create({
@@ -37,6 +37,9 @@ export async function grokGenerate(
   let responseId: string | undefined
   let tokensInput: number | undefined
   let tokensOutput: number | undefined
+  let tokensTotal: number | undefined
+  let cachedTokens: number | undefined
+  let reasoningTokens: number | undefined
   let costUsdTicks: number | undefined
 
   for await (const event of stream) {
@@ -140,11 +143,21 @@ export async function grokGenerate(
       }
 
       case 'response.completed': {
-        const usage = (event as unknown as { response?: { usage?: { input_tokens?: number; output_tokens?: number; cost_in_usd_ticks?: number } } }).response?.usage
+        const usage = (event as unknown as { response?: { usage?: {
+          input_tokens?: number
+          output_tokens?: number
+          total_tokens?: number
+          cost_in_usd_ticks?: number
+          input_tokens_details?: { cached_tokens?: number }
+          output_tokens_details?: { reasoning_tokens?: number }
+        } } }).response?.usage
         if (usage) {
           if (usage.input_tokens != null) tokensInput = usage.input_tokens
           if (usage.output_tokens != null) tokensOutput = usage.output_tokens
+          if (usage.total_tokens != null) tokensTotal = usage.total_tokens
           if (usage.cost_in_usd_ticks != null) costUsdTicks = usage.cost_in_usd_ticks
+          if (usage.input_tokens_details?.cached_tokens != null) cachedTokens = usage.input_tokens_details.cached_tokens
+          if (usage.output_tokens_details?.reasoning_tokens != null) reasoningTokens = usage.output_tokens_details.reasoning_tokens
         }
         break
       }
@@ -158,5 +171,5 @@ export async function grokGenerate(
     }
   }
 
-  return { text, response_id: responseId, tokensInput, tokensOutput, costUsdTicks }
+  return { text, response_id: responseId, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks }
 }

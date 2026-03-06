@@ -127,7 +127,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   }
 
   try {
-    const { response_id, tokensInput, tokensOutput, costUsdTicks } = await adapter.generateResponse(
+    const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
       {
         prompt: prompt.trim(),
         systemPrompt,
@@ -148,6 +148,9 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
     if (costUsdTicks != null) donePayload.cost_usd_ticks = costUsdTicks
     if (tokensInput != null) donePayload.tokens_input = tokensInput
     if (tokensOutput != null) donePayload.tokens_output = tokensOutput
+    if (tokensTotal != null) donePayload.tokens_total = tokensTotal
+    if (cachedTokens != null) donePayload.cached_tokens = cachedTokens
+    if (reasoningTokens != null) donePayload.reasoning_tokens = reasoningTokens
     sse('done', donePayload)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
