@@ -30,6 +30,11 @@ function readGrokManagementConfig(dbPath: string): { managementKey: string; team
   }
 }
 
+/** Formats a Date as "YYYY-MM-DD HH:MM:SS" in UTC (xAI billing API format). */
+function formatBillingDate(d: Date): string {
+  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+}
+
 /** Fetches usage totals from xAI Management API for a given time window. */
 async function fetchUsage(
   managementKey: string,
@@ -46,12 +51,18 @@ async function fetchUsage(
         'Authorization': `Bearer ${managementKey}`,
       },
       body: JSON.stringify({
-        analysisQuery: {
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
+        analyticsRequest: {
+          timeRange: {
+            startTime: formatBillingDate(startTime),
+            endTime: formatBillingDate(endTime),
+            timezone: 'Etc/GMT',
+          },
           timeUnit: 'TIME_UNIT_NONE',
-          values: ['AGGREGATION_SUM'],
+          values: [
+            { name: 'usd', aggregation: 'AGGREGATION_SUM' },
+          ],
           groupBy: [],
+          filters: [],
         },
       }),
     }
