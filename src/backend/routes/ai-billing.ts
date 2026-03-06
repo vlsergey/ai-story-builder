@@ -52,6 +52,7 @@ async function fetchUsage(
       timeUnit: 'TIME_UNIT_NONE',
       values: [
         { name: 'usd', aggregation: 'AGGREGATION_SUM' },
+        { name: 'usd_avg', aggregation: 'AGGREGATION_AVG' },
       ],
       groupBy: [],
       filters: [],
