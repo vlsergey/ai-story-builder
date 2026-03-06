@@ -12,6 +12,7 @@ import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
 import PlanChildrenEditor from './PlanChildrenEditor'
 import SettingsPanel from './SettingsPanel'
+import AiPlayground from './AiPlayground'
 import type { LoreNode } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
@@ -53,10 +54,26 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       api.groups.find((g: any) =>
         g.panels.some((p: any) =>
           p.id.startsWith('lore-editor-') || p.id.startsWith('plan-editor-') ||
-          p.id.startsWith('plan-children-editor-') || p.id === 'settings'
+          p.id.startsWith('plan-children-editor-') || p.id === 'settings' || p.id === 'ai-playground'
         )
       ) ?? api.groups.find((g: any) => g.panels.length === 0)
     )
+  }
+
+  /** Opens (or activates) the AI Playground singleton tab in the editor group. */
+  function openAiPlayground() {
+    const api = dockviewRef.current
+    if (!api) return
+    const existing = api.getPanel('ai-playground')
+    if (existing) { existing.api.setActive(); return }
+    const editorGroup = findEditorGroup(api)
+    api.addPanel({
+      id: 'ai-playground',
+      component: 'ai-playground',
+      tabComponent: 'loreEditorTab',
+      title: 'AI Playground',
+      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
+    })
   }
 
   /** Opens (or activates) the Settings singleton tab in the editor group. */
@@ -330,14 +347,16 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
   // Note: 'set-locale:*' is handled in LocaleProvider so it works on the start screen too.
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, openSettings })
-  menuActionsRef.current = { handleResetLayouts, onClose, openSettings }
+  const menuActionsRef = useRef({ handleResetLayouts, onClose, openSettings, openAiPlayground })
+  menuActionsRef.current = { handleResetLayouts, onClose, openSettings, openAiPlayground }
 
   useEffect(() => {
     if (!window.electronAPI) return
     const unsub = window.electronAPI.onMenuAction((action: string) => {
       if (action === 'open-settings') {
         menuActionsRef.current.openSettings()
+      } else if (action === 'open-ai-playground') {
+        menuActionsRef.current.openAiPlayground()
       } else if (action === 'reset-layouts') {
         menuActionsRef.current.handleResetLayouts()
       } else if (action === 'close-project') {
@@ -416,6 +435,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       </div>
     ),
     settings: () => <SettingsPanel />,
+    'ai-playground': () => <AiPlayground />,
   };
 
   const tabComponents = {
@@ -431,14 +451,14 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     if (!targetGroup) return
     const isEditorGroup = targetGroup.panels.some(
       (p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('plan-editor-') ||
-        p.id.startsWith('plan-children-editor-') || p.id === 'settings'
+        p.id.startsWith('plan-children-editor-') || p.id === 'settings' || p.id === 'ai-playground'
     )
     if (!isEditorGroup) return
     const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
     const isEditorPanel = draggedPanelId?.startsWith('lore-editor-') ||
       draggedPanelId?.startsWith('plan-editor-') ||
       draggedPanelId?.startsWith('plan-children-editor-') ||
-      draggedPanelId === 'settings'
+      draggedPanelId === 'settings' || draggedPanelId === 'ai-playground'
     if (!isEditorPanel) {
       event.preventDefault()
     }

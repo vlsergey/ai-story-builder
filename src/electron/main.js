@@ -10,6 +10,7 @@ const MENU_STRINGS = {
     closeProject: 'Close Project',
     view: 'View',
     settings: 'Settings',
+    aiPlayground: 'AI Playground',
     resetLayouts: 'Reset layouts',
     wordWrap: 'Word Wrap in Editors',
     showInLoreTree: 'Show in Lore Tree',
@@ -30,6 +31,7 @@ const MENU_STRINGS = {
     closeProject: 'Закрыть проект',
     view: 'Вид',
     settings: 'Настройки',
+    aiPlayground: 'Плейграунд ИИ',
     resetLayouts: 'Сбросить разметку',
     wordWrap: 'Перенос строк в редакторах',
     showInLoreTree: 'Показывать в дереве',
@@ -140,6 +142,10 @@ function buildApplicationMenu() {
     {
       label: s.settings,
       click: () => sendMenuAction('open-settings'),
+    },
+    {
+      label: s.aiPlayground,
+      click: () => sendMenuAction('open-ai-playground'),
     },
     { type: 'separator' },
     {

@@ -1,26 +1,22 @@
 import type { AiSettings } from '../../../shared/ai-settings.js'
 
-export interface GeneratePlanOptions {
+export interface GeneratePlaygroundOptions {
+  systemPrompt?: string
   prompt: string
   settings?: AiSettings
-  /** 'generate' (default) | 'improve' */
-  mode?: 'generate' | 'improve'
-  /** The current content to improve; only used when mode='improve' */
-  baseContent?: string
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
   onDone?: (data: { response_id?: string }) => void
   signal?: AbortSignal
 }
 
-export async function generatePlanStream(options: GeneratePlanOptions): Promise<void> {
-  const response = await fetch('/api/ai/generate-plan', {
+export async function generatePlaygroundStream(options: GeneratePlaygroundOptions): Promise<void> {
+  const response = await fetch('/api/ai/playground', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      systemPrompt: options.systemPrompt,
       prompt: options.prompt,
-      mode: options.mode,
-      baseContent: options.baseContent,
       settings: options.settings,
     }),
     signal: options.signal,

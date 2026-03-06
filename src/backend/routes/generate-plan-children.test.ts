@@ -162,7 +162,7 @@ describe('POST /ai/generate-plan-children', () => {
     await request(app).post('/ai/generate-plan-children').send({
       prompt: 'Split into chapters',
       parentTitle: 'Act 1',
-      includeExistingLore: true,
+      settings: { includeExistingLore: true },
     })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
@@ -186,7 +186,7 @@ describe('POST /ai/generate-plan-children', () => {
     await request(app).post('/ai/generate-plan-children').send({
       prompt: 'Split into chapters',
       parentTitle: 'Act 1',
-      includeExistingLore: false,
+      settings: { includeExistingLore: false },
     })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
@@ -214,7 +214,7 @@ describe('POST /ai/generate-plan-children', () => {
     await request(app).post('/ai/generate-plan-children').send({
       prompt: 'Split into chapters',
       parentTitle: 'Act 1',
-      includeExistingLore: true,
+      settings: { includeExistingLore: true },
     })
 
     const content = getGrokCallUserContent()

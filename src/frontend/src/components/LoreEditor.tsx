@@ -7,9 +7,10 @@ import { useTheme } from '../lib/theme/theme-provider'
 import { useEditorSettings } from '../lib/editor-settings'
 import { useLocale } from '../lib/locale'
 import { dispatchLoreNodeSaved } from '../lib/lore-events'
-import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
 import { generateLoreStream } from '../lib/generate-lore-stream'
+import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
+import type { AiSettings } from '../../../shared/ai-settings.js'
 
 interface LoreEditorProps {
   nodeId: number
@@ -19,10 +20,6 @@ interface LoreEditorProps {
 /** 'generate' = mode A; 'edit' = mode B; 'review_locked' = mode C; 'review_unlocked' = mode D */
 type EditorMode = 'generate' | 'edit' | 'review_locked' | 'review_unlocked'
 type DiffTab = 'new' | 'sidebyside' | 'perlines'
-
-function shortModelName(modelId: string): string {
-  return modelId.replace(/^gpt:\/\/[^/]+\//, '')
-}
 
 export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   const { resolvedTheme } = useTheme()
@@ -47,11 +44,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   // ── AI engine config ────────────────────────────────────────────────────────
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [selectedModel, setSelectedModel] = useState('')
-  const [webSearch, setWebSearch] = useState('none')
-  const [includeExistingLore, setIncludeExistingLore] = useState(true)
-  const [maxTokens, setMaxTokens] = useState(2048)
-  const [maxCompletionTokens, setMaxCompletionTokens] = useState(0)
+  const [aiSettings, setAiSettings] = useState<AiSettings>({ webSearch: 'none', includeExistingLore: true, maxTokens: 2048 })
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -118,13 +111,14 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
         const last = engineData?.last_model
-        setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
-        if (typeof engineData?.last_max_tokens_lore === 'number' && engineData.last_max_tokens_lore > 0) {
-          setMaxTokens(engineData.last_max_tokens_lore)
-        }
-        if (typeof engineData?.last_max_completion_tokens_lore === 'number' && engineData.last_max_completion_tokens_lore >= 0) {
-          setMaxCompletionTokens(engineData.last_max_completion_tokens_lore)
-        }
+        setAiSettings(prev => ({
+          ...prev,
+          model: last && models.includes(last) ? last : (models[0] ?? ''),
+          ...(typeof engineData?.last_max_tokens_lore === 'number' && engineData.last_max_tokens_lore > 0
+            ? { maxTokens: engineData.last_max_tokens_lore } : {}),
+          ...(typeof engineData?.last_max_completion_tokens_lore === 'number' && engineData.last_max_completion_tokens_lore > 0
+            ? { maxCompletionTokens: engineData.last_max_completion_tokens_lore } : {}),
+        }))
       })
       .catch(() => {})
   }, [])
@@ -200,7 +194,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_lore: maxTokens, last_max_completion_tokens_lore: maxCompletionTokens } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { last_model: aiSettings.model, last_max_tokens_lore: aiSettings.maxTokens, last_max_completion_tokens_lore: aiSettings.maxCompletionTokens ?? 0 } }),
       })
     }
   }
@@ -220,11 +214,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
 
     generateLoreStream({
       prompt: generatePrompt,
-      includeExistingLore,
-      model: selectedModel || undefined,
-      webSearch,
-      maxTokens,
-      maxCompletionTokens: maxCompletionTokens > 0 ? maxCompletionTokens : undefined,
+      settings: aiSettings,
       mode:'generate',
       onThinking: (status, detail) => {
         if (status === 'done') setThinkingDone(true)
@@ -292,10 +282,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     try {
       await generateLoreStream({
         prompt: improveInstruction,
-        includeExistingLore,
-        model: selectedModel || undefined,
-        webSearch,
-        maxTokens,
+        settings: aiSettings,
         mode: 'improve',
         baseContent: baseForStream,
         onThinking: (status, detail) => {
@@ -378,90 +365,18 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     await acceptChanges(content)
   }
 
-  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
   const hasContent = content.trim().length > 0
   const isReview = editorMode === 'review_locked' || editorMode === 'review_unlocked'
   const isLocked = editorMode === 'review_locked'
 
-  // ── Shared AI controls row ─────────────────────────────────────────────────
   const aiControls = (
-    <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap">
-      <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-        <input
-          type="checkbox"
-          checked={includeExistingLore}
-          onChange={e => setIncludeExistingLore(e.target.checked)}
-          className="accent-primary"
-          disabled={generating}
-        />
-        Include existing lore
-      </label>
-
-      {engineDef?.webSearch === 'contextSize' && (
-        <select
-          value={webSearch}
-          onChange={e => setWebSearch(e.target.value)}
-          disabled={generating}
-          className="text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-          title="Web search"
-        >
-          <option value="none">No web search</option>
-          <option value="low">Web: low</option>
-          <option value="medium">Web: medium</option>
-          <option value="high">Web: high</option>
-        </select>
-      )}
-      {engineDef?.webSearch === 'boolean' && (
-        <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-          <input
-            type="checkbox"
-            checked={webSearch !== 'none'}
-            onChange={e => setWebSearch(e.target.checked ? 'on' : 'none')}
-            className="accent-primary"
-            disabled={generating}
-          />
-          Web search
-        </label>
-      )}
-
-      {availableModels.length > 0 && (
-        <select
-          value={selectedModel}
-          onChange={e => setSelectedModel(e.target.value)}
-          disabled={generating}
-          className="text-sm border border-border rounded px-2 py-0.5 bg-background max-w-[200px] disabled:opacity-50"
-          title="Model"
-        >
-          {availableModels.map(m => (
-            <option key={m} value={m}>{shortModelName(m)}</option>
-          ))}
-        </select>
-      )}
-      <label className="flex items-center gap-1.5 text-sm shrink-0">
-        <span className="text-muted-foreground">Max tokens</span>
-        <input
-          type="number"
-          min={1}
-          step={256}
-          value={maxTokens}
-          onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 2048)}
-          disabled={generating}
-          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-        />
-      </label>
-      <label className="flex items-center gap-1.5 text-sm shrink-0">
-        <span className="text-muted-foreground">Max completion tokens</span>
-        <input
-          type="number"
-          min={0}
-          step={256}
-          value={maxCompletionTokens}
-          onChange={e => setMaxCompletionTokens(parseInt(e.target.value, 10) || 0)}
-          disabled={generating}
-          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-        />
-      </label>
-    </div>
+    <AiGenerationSettings
+      engineId={currentEngine}
+      availableModels={availableModels}
+      settings={aiSettings}
+      onSettingsChange={setAiSettings}
+      disabled={generating}
+    />
   )
 
   if (loading) {

@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
+import type { AiSettings } from '../../shared/ai-settings.js'
 import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 
@@ -35,17 +36,14 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, parentTitle, parentContent, isRoot, includeExistingLore, model: requestedModel, webSearch, maxTokens, maxCompletionTokens } = req.body as {
+  const { prompt, parentTitle, parentContent, isRoot, settings = {} } = req.body as {
     prompt?: string
     parentTitle?: string
     parentContent?: string
     isRoot?: boolean
-    includeExistingLore?: boolean
-    model?: string
-    webSearch?: string
-    maxTokens?: number
-    maxCompletionTokens?: number
+    settings?: AiSettings
   }
+  const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
   let engine: string | undefined

@@ -1,10 +1,8 @@
+import type { AiSettings } from '../../../shared/ai-settings.js'
+
 export interface GenerateLoreOptions {
   prompt: string
-  includeExistingLore?: boolean
-  model?: string
-  webSearch?: string
-  maxTokens?: number
-  maxCompletionTokens?: number
+  settings?: AiSettings
   /** 'generate' (default) | 'improve' */
   mode?: 'generate' | 'improve'
   /** The current content to improve; only used when mode='improve' */
@@ -21,13 +19,9 @@ export async function generateLoreStream(options: GenerateLoreOptions): Promise<
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prompt: options.prompt,
-      includeExistingLore: options.includeExistingLore,
-      model: options.model,
-      webSearch: options.webSearch,
       mode: options.mode,
       baseContent: options.baseContent,
-      maxTokens: options.maxTokens,
-      maxCompletionTokens: options.maxCompletionTokens,
+      settings: options.settings,
     }),
     signal: options.signal,
   })

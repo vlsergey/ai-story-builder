@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 import { useLocale } from '../lib/locale'
-import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
 import { generatePlanChildrenStream } from '../lib/generate-plan-children-stream'
 import { dispatchPlanTreeRefresh } from '../lib/plan-events'
+import AiGenerationSettings from './AiGenerationSettings'
+import type { AiSettings } from '../../../shared/ai-settings.js'
 
 interface PlanChildrenEditorProps {
   nodeId: number
@@ -16,10 +17,6 @@ interface ProposedChild {
 }
 
 type EditorMode = 'idle' | 'streaming' | 'review'
-
-function shortModelName(modelId: string): string {
-  return modelId.replace(/^gpt:\/\/[^/]+\//, '')
-}
 
 export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEditorProps) {
   const { t } = useLocale()
@@ -37,11 +34,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
   // AI config
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [selectedModel, setSelectedModel] = useState('')
-  const [webSearch, setWebSearch] = useState('none')
-  const [includeExistingLore, setIncludeExistingLore] = useState(true)
-  const [maxTokens, setMaxTokens] = useState(16384)
-  const [maxCompletionTokens, setMaxCompletionTokens] = useState(0)
+  const [aiSettings, setAiSettings] = useState<AiSettings>({ webSearch: 'none', includeExistingLore: true, maxTokens: 16384 })
 
   // Generation state
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
@@ -87,18 +80,17 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
         const last = engineData?.last_model
-        setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
-        if (typeof engineData?.last_max_tokens_plan_children === 'number' && engineData.last_max_tokens_plan_children > 0) {
-          setMaxTokens(engineData.last_max_tokens_plan_children)
-        }
-        if (typeof engineData?.last_max_completion_tokens_plan_children === 'number' && engineData.last_max_completion_tokens_plan_children >= 0) {
-          setMaxCompletionTokens(engineData.last_max_completion_tokens_plan_children)
-        }
+        setAiSettings(prev => ({
+          ...prev,
+          model: last && models.includes(last) ? last : (models[0] ?? ''),
+          ...(typeof engineData?.last_max_tokens_plan_children === 'number' && engineData.last_max_tokens_plan_children > 0
+            ? { maxTokens: engineData.last_max_tokens_plan_children } : {}),
+          ...(typeof engineData?.last_max_completion_tokens_plan_children === 'number' && engineData.last_max_completion_tokens_plan_children > 0
+            ? { maxCompletionTokens: engineData.last_max_completion_tokens_plan_children } : {}),
+        }))
       })
       .catch(() => {})
   }, [])
-
-  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
 
   async function handleGenerate() {
     if (!prompt.trim()) return
@@ -119,11 +111,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         parentTitle,
         parentContent,
         isRoot,
-        includeExistingLore,
-        model: selectedModel || undefined,
-        webSearch,
-        maxTokens,
-        maxCompletionTokens: maxCompletionTokens > 0 ? maxCompletionTokens : undefined,
+        settings: aiSettings,
         onThinking: (status, detail) => {
           if (status === 'done') setThinkingDone(true)
           else { setThinkingStatus(status); setThinkingDone(false) }
@@ -153,7 +141,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         void fetch('/api/ai/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan_children: maxTokens, last_max_completion_tokens_plan_children: maxCompletionTokens } }),
+          body: JSON.stringify({ engine: currentEngine, fields: { last_model: aiSettings.model, last_max_tokens_plan_children: aiSettings.maxTokens, last_max_completion_tokens_plan_children: aiSettings.maxCompletionTokens ?? 0 } }),
         })
       }
 
@@ -258,83 +246,20 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
             className="w-full h-[20vh] min-h-[80px] resize-none border border-border rounded bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
           />
 
-          {/* AI controls */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {engineDef?.webSearch === 'contextSize' && (
-              <select
-                value={webSearch}
-                onChange={e => setWebSearch(e.target.value)}
-                className="text-sm border border-border rounded px-2 py-0.5 bg-background"
-                title="Web search"
-              >
-                <option value="none">No web search</option>
-                <option value="low">Web: low</option>
-                <option value="medium">Web: medium</option>
-                <option value="high">Web: high</option>
-              </select>
-            )}
-            {engineDef?.webSearch === 'boolean' && (
-              <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={webSearch !== 'none'}
-                  onChange={e => setWebSearch(e.target.checked ? 'on' : 'none')}
-                  className="accent-primary"
-                />
-                Web search
-              </label>
-            )}
-            {availableModels.length > 0 && (
-              <select
-                value={selectedModel}
-                onChange={e => setSelectedModel(e.target.value)}
-                className="text-sm border border-border rounded px-2 py-0.5 bg-background max-w-[200px]"
-                title="Model"
-              >
-                {availableModels.map(m => (
-                  <option key={m} value={m}>{shortModelName(m)}</option>
-                ))}
-              </select>
-            )}
-            <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-              <input
-                type="checkbox"
-                checked={includeExistingLore}
-                onChange={e => setIncludeExistingLore(e.target.checked)}
-                className="accent-primary"
-              />
-              Include existing lore
-            </label>
-            <label className="flex items-center gap-1.5 text-sm shrink-0">
-              <span className="text-muted-foreground">Max tokens</span>
-              <input
-                type="number"
-                min={1}
-                step={256}
-                value={maxTokens}
-                onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 16384)}
-                className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background"
-              />
-            </label>
-            <label className="flex items-center gap-1.5 text-sm shrink-0">
-              <span className="text-muted-foreground">Max completion tokens</span>
-              <input
-                type="number"
-                min={0}
-                step={256}
-                value={maxCompletionTokens}
-                onChange={e => setMaxCompletionTokens(parseInt(e.target.value, 10) || 0)}
-                className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background"
-              />
-            </label>
-            <button
-              onClick={handleGenerate}
-              disabled={!prompt.trim()}
-              className="ml-auto px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t('plan.generate_children')}
-            </button>
-          </div>
+          <AiGenerationSettings
+            engineId={currentEngine}
+            availableModels={availableModels}
+            settings={aiSettings}
+            onSettingsChange={setAiSettings}
+            className="flex items-center gap-3 flex-wrap"
+          />
+          <button
+            onClick={handleGenerate}
+            disabled={!prompt.trim()}
+            className="self-end px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t('plan.generate_children')}
+          </button>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express'
 import { parse as parsePartialJson } from 'best-effort-json-parser'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
+import type { AiSettings } from '../../shared/ai-settings.js'
 import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 
@@ -11,7 +12,7 @@ const LORE_RESPONSE_SCHEMA: JsonSchemaSpec = {
   schema: {
     type: 'object',
     properties: {
-      name: { type: 'string', description: 'Short name or title for the lore item (1–10 words)' },
+      name: { type: 'string', description: 'Short name or title for the lore item (1–10 words) in plain text' },
       content: { type: 'string', description: 'Full content of the lore item in markdown format' },
     },
     required: ['name', 'content'],
@@ -36,18 +37,13 @@ router.post('/generate-lore', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, includeExistingLore, model: requestedModel, webSearch, mode, baseContent, maxTokens, maxCompletionTokens } = req.body as {
+  const { prompt, mode, baseContent, settings = {} } = req.body as {
     prompt?: string
-    includeExistingLore?: boolean
-    model?: string
-    webSearch?: string
-    /** 'generate' (default) | 'improve' — whether to generate from scratch or improve existing text */
     mode?: 'generate' | 'improve'
-    /** The existing content to improve; only used when mode='improve' */
     baseContent?: string
-    maxTokens?: number
-    maxCompletionTokens?: number
+    settings?: AiSettings
   }
+  const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
   const responseSchema = LORE_RESPONSE_SCHEMA
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 

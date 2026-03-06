@@ -7,9 +7,10 @@ import { useTheme } from '../lib/theme/theme-provider'
 import { useEditorSettings } from '../lib/editor-settings'
 import { useLocale } from '../lib/locale'
 import { dispatchPlanNodeSaved, dispatchPlanTreeRefresh } from '../lib/plan-events'
-import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
 import { generatePlanStream } from '../lib/generate-plan-stream'
+import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
+import type { AiSettings } from '../../../shared/ai-settings.js'
 
 interface PlanEditorProps {
   nodeId: number
@@ -20,10 +21,6 @@ interface PlanEditorProps {
 /** 'generate' = mode A; 'edit' = mode B; 'review_locked' = mode C; 'review_unlocked' = mode D */
 type EditorMode = 'generate' | 'edit' | 'review_locked' | 'review_unlocked'
 type DiffTab = 'new' | 'sidebyside' | 'perlines'
-
-function shortModelName(modelId: string): string {
-  return modelId.replace(/^gpt:\/\/[^/]+\//, '')
-}
 
 export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: PlanEditorProps) {
   const { resolvedTheme } = useTheme()
@@ -48,12 +45,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
   // ── AI engine config ────────────────────────────────────────────────────────
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [selectedModel, setSelectedModel] = useState('')
-  const [webSearch, setWebSearch] = useState('none')
-  const [includeExistingLore, setIncludeExistingLore] = useState(true)
-  const [maxTokens, setMaxTokens] = useState(2048)
-  const [maxCompletionTokens, setMaxCompletionTokens] = useState(0)
-  const [minWords, setMinWords] = useState(0)
+  const [aiSettings, setAiSettings] = useState<AiSettings>({ webSearch: 'none', includeExistingLore: true, maxTokens: 2048 })
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -121,16 +113,16 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
         const last = engineData?.last_model
-        setSelectedModel(last && models.includes(last) ? last : (models[0] ?? ''))
-        if (typeof engineData?.last_max_tokens_plan === 'number' && engineData.last_max_tokens_plan > 0) {
-          setMaxTokens(engineData.last_max_tokens_plan)
-        }
-        if (typeof engineData?.last_max_completion_tokens_plan === 'number' && engineData.last_max_completion_tokens_plan >= 0) {
-          setMaxCompletionTokens(engineData.last_max_completion_tokens_plan)
-        }
-        if (typeof engineData?.last_min_words_plan === 'number' && engineData.last_min_words_plan >= 0) {
-          setMinWords(engineData.last_min_words_plan)
-        }
+        setAiSettings(prev => ({
+          ...prev,
+          model: last && models.includes(last) ? last : (models[0] ?? ''),
+          ...(typeof engineData?.last_max_tokens_plan === 'number' && engineData.last_max_tokens_plan > 0
+            ? { maxTokens: engineData.last_max_tokens_plan } : {}),
+          ...(typeof engineData?.last_max_completion_tokens_plan === 'number' && engineData.last_max_completion_tokens_plan > 0
+            ? { maxCompletionTokens: engineData.last_max_completion_tokens_plan } : {}),
+          ...(typeof engineData?.last_min_words_plan === 'number' && engineData.last_min_words_plan > 0
+            ? { minWords: engineData.last_min_words_plan } : {}),
+        }))
       })
       .catch(() => {})
   }, [])
@@ -205,7 +197,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { last_model: selectedModel, last_max_tokens_plan: maxTokens, last_max_completion_tokens_plan: maxCompletionTokens, last_min_words_plan: minWords } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { last_model: aiSettings.model, last_max_tokens_plan: aiSettings.maxTokens, last_max_completion_tokens_plan: aiSettings.maxCompletionTokens ?? 0, last_min_words_plan: aiSettings.minWords ?? 0 } }),
       })
     }
   }
@@ -225,12 +217,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
 
     generatePlanStream({
       prompt: generatePrompt,
-      includeExistingLore,
-      model: selectedModel || undefined,
-      webSearch,
-      maxTokens,
-      maxCompletionTokens: maxCompletionTokens > 0 ? maxCompletionTokens : undefined,
-      minWords: minWords > 0 ? minWords : undefined,
+      settings: aiSettings,
       mode:'generate',
       onThinking: (status, detail) => {
         if (status === 'done') setThinkingDone(true)
@@ -296,10 +283,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
     try {
       await generatePlanStream({
         prompt: improveInstruction,
-        includeExistingLore,
-        model: selectedModel || undefined,
-        webSearch,
-        maxTokens,
+        settings: aiSettings,
         mode: 'improve',
         baseContent: baseForStream,
         onThinking: (status, detail) => {
@@ -378,100 +362,19 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
     await acceptChanges(content)
   }
 
-  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
   const hasContent = content.trim().length > 0
   const isReview = editorMode === 'review_locked' || editorMode === 'review_unlocked'
   const isLocked = editorMode === 'review_locked'
 
-  // ── Shared AI controls row ─────────────────────────────────────────────────
   const aiControls = (
-    <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap">
-      {engineDef?.webSearch === 'contextSize' && (
-        <select
-          value={webSearch}
-          onChange={e => setWebSearch(e.target.value)}
-          disabled={generating}
-          className="text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-          title="Web search"
-        >
-          <option value="none">No web search</option>
-          <option value="low">Web: low</option>
-          <option value="medium">Web: medium</option>
-          <option value="high">Web: high</option>
-        </select>
-      )}
-      {engineDef?.webSearch === 'boolean' && (
-        <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-          <input
-            type="checkbox"
-            checked={webSearch !== 'none'}
-            onChange={e => setWebSearch(e.target.checked ? 'on' : 'none')}
-            className="accent-primary"
-            disabled={generating}
-          />
-          Web search
-        </label>
-      )}
-      {availableModels.length > 0 && (
-        <select
-          value={selectedModel}
-          onChange={e => setSelectedModel(e.target.value)}
-          disabled={generating}
-          className="text-sm border border-border rounded px-2 py-0.5 bg-background max-w-[200px] disabled:opacity-50"
-          title="Model"
-        >
-          {availableModels.map(m => (
-            <option key={m} value={m}>{shortModelName(m)}</option>
-          ))}
-        </select>
-      )}
-      <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-        <input
-          type="checkbox"
-          checked={includeExistingLore}
-          onChange={e => setIncludeExistingLore(e.target.checked)}
-          className="accent-primary"
-          disabled={generating}
-        />
-        Include existing lore
-      </label>
-      <label className="flex items-center gap-1.5 text-sm shrink-0">
-        <span className="text-muted-foreground">Max tokens</span>
-        <input
-          type="number"
-          min={1}
-          step={256}
-          value={maxTokens}
-          onChange={e => setMaxTokens(parseInt(e.target.value, 10) || 2048)}
-          disabled={generating}
-          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-        />
-      </label>
-      <label className="flex items-center gap-1.5 text-sm shrink-0">
-        <span className="text-muted-foreground">Max completion tokens</span>
-        <input
-          type="number"
-          min={0}
-          step={256}
-          value={maxCompletionTokens}
-          onChange={e => setMaxCompletionTokens(parseInt(e.target.value, 10) || 0)}
-          disabled={generating}
-          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-        />
-      </label>
-      <label className="flex items-center gap-1.5 text-sm shrink-0">
-        <span className="text-muted-foreground">Min words</span>
-        <input
-          type="number"
-          min={0}
-          step={100}
-          value={minWords}
-          onChange={e => setMinWords(parseInt(e.target.value, 10) || 0)}
-          disabled={generating}
-          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-        />
-      </label>
-    </div>
+    <AiGenerationSettings
+      engineId={currentEngine}
+      availableModels={availableModels}
+      settings={aiSettings}
+      onSettingsChange={setAiSettings}
+      showMinWords
+      disabled={generating}
+    />
   )
 
   if (loading) {

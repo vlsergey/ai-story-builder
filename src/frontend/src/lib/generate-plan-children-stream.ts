@@ -1,13 +1,11 @@
+import type { AiSettings } from '../../../shared/ai-settings.js'
+
 export interface GeneratePlanChildrenOptions {
   prompt: string
   parentTitle: string
   parentContent: string
   isRoot?: boolean
-  includeExistingLore?: boolean
-  model?: string
-  webSearch?: string
-  maxTokens?: number
-  maxCompletionTokens?: number
+  settings?: AiSettings
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
   onDone?: (data: { response_id?: string }) => void
@@ -23,11 +21,7 @@ export async function generatePlanChildrenStream(options: GeneratePlanChildrenOp
       parentTitle: options.parentTitle,
       parentContent: options.parentContent,
       isRoot: options.isRoot,
-      includeExistingLore: options.includeExistingLore,
-      model: options.model,
-      webSearch: options.webSearch,
-      maxTokens: options.maxTokens,
-      maxCompletionTokens: options.maxCompletionTokens,
+      settings: options.settings,
     }),
     signal: options.signal,
   })

@@ -263,7 +263,7 @@ describe('POST /ai/generate-lore', () => {
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'Describe a hero',
-      includeExistingLore: true,
+      settings: { includeExistingLore: true },
     })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
@@ -302,7 +302,7 @@ describe('POST /ai/generate-lore', () => {
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'Tell me about the hero',
-      includeExistingLore: true,
+      settings: { includeExistingLore: true },
     })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
@@ -337,7 +337,7 @@ describe('POST /ai/generate-lore', () => {
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'test',
-      includeExistingLore: true,
+      settings: { includeExistingLore: true },
     })
 
     const params = mockGrokGenerate.mock.calls[0][1] as {
@@ -364,7 +364,7 @@ describe('POST /ai/generate-lore', () => {
 
     await request(app).post('/ai/generate-lore').send({
       prompt: 'test',
-      includeExistingLore: false,
+      settings: { includeExistingLore: false },
     })
 
     const params = mockGrokGenerate.mock.calls[0][1] as {
@@ -426,7 +426,7 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse('Lore with web info')
 
-    await request(app).post('/ai/generate-lore').send({ prompt: 'News', webSearch: 'on' })
+    await request(app).post('/ai/generate-lore').send({ prompt: 'News', settings: { webSearch: 'on' } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
     expect(params.tools).toEqual([{ type: 'web_search' }])
@@ -436,7 +436,7 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse('Normal lore')
 
-    await request(app).post('/ai/generate-lore').send({ prompt: 'Something', webSearch: 'none' })
+    await request(app).post('/ai/generate-lore').send({ prompt: 'Something', settings: { webSearch: 'none' } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
     expect(params.tools).toBeUndefined()
