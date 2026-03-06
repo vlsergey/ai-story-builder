@@ -87,7 +87,7 @@ export default function AiGenerationSettings({
           value={settings.maxTokens ?? 2048}
           onChange={e => { const v = parseInt(e.target.value, 10); if (v > 0) set({ maxTokens: v }) }}
           disabled={disabled}
-          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+          className="w-28 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
         />
       </label>
       <label className="flex items-center gap-1.5 text-sm shrink-0">
@@ -98,7 +98,7 @@ export default function AiGenerationSettings({
           value={settings.maxCompletionTokens ?? 0}
           onChange={e => { const v = parseInt(e.target.value, 10) || 0; set({ maxCompletionTokens: v > 0 ? v : undefined }) }}
           disabled={disabled}
-          className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+          className="w-28 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
         />
       </label>
       {showMinWords && (
@@ -110,7 +110,7 @@ export default function AiGenerationSettings({
             value={settings.minWords ?? 0}
             onChange={e => { const v = parseInt(e.target.value, 10) || 0; set({ minWords: v > 0 ? v : undefined }) }}
             disabled={disabled}
-            className="w-20 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+            className="w-28 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
           />
         </label>
       )}
