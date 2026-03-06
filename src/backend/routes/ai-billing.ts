@@ -46,8 +46,10 @@ async function fetchUsage(
         'Authorization': `Bearer ${managementKey}`,
       },
       body: JSON.stringify({
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
+        analysis_query: {
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+        },
       }),
     }
   )
