@@ -42,6 +42,23 @@ async function fetchUsage(
   startTime: Date,
   endTime: Date,
 ): Promise<Record<string, unknown>> {
+  const requestBody = {
+    analyticsRequest: {
+      timeRange: {
+        startTime: formatBillingDate(startTime),
+        endTime: formatBillingDate(endTime),
+        timezone: 'Etc/GMT',
+      },
+      timeUnit: 'TIME_UNIT_NONE',
+      values: [
+        { name: 'usd', aggregation: 'AGGREGATION_SUM' },
+        { name: 'count', aggregation: 'AGGREGATION_COUNT' },
+      ],
+      groupBy: [],
+      filters: [],
+    },
+  }
+  console.log('[billing] request:', JSON.stringify(requestBody))
   const response = await fetch(
     `${MANAGEMENT_API_BASE}/v1/billing/teams/${teamId}/usage`,
     {
@@ -50,28 +67,15 @@ async function fetchUsage(
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${managementKey}`,
       },
-      body: JSON.stringify({
-        analyticsRequest: {
-          timeRange: {
-            startTime: formatBillingDate(startTime),
-            endTime: formatBillingDate(endTime),
-            timezone: 'Etc/GMT',
-          },
-          timeUnit: 'TIME_UNIT_NONE',
-          values: [
-            { name: 'usd', aggregation: 'AGGREGATION_SUM' },
-          ],
-          groupBy: [],
-          filters: [],
-        },
-      }),
+      body: JSON.stringify(requestBody),
     }
   )
+  const responseText = await response.text()
+  console.log(`[billing] response ${response.status}:`, responseText)
   if (!response.ok) {
-    const err = await response.text()
-    throw new Error(`xAI billing API error ${response.status}: ${err}`)
+    throw new Error(`xAI billing API error ${response.status}: ${responseText}`)
   }
-  return await response.json() as Record<string, unknown>
+  return JSON.parse(responseText) as Record<string, unknown>
 }
 
 const router = express.Router()

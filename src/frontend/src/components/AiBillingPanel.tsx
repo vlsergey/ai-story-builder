@@ -35,39 +35,50 @@ interface LastRequest {
   timestamp: string
 }
 
-interface PeriodTotals {
-  cost_usd_ticks?: number | null
-  [key: string]: unknown
+/** xAI management API response: values[0]=usd, values[1]=count */
+interface XaiTimeSeries {
+  timeSeries?: Array<{
+    dataPoints?: Array<{
+      values?: number[]
+    }>
+  }>
 }
 
 interface BillingData {
   configured: boolean
   error?: string
   totals?: {
-    last_hour?: PeriodTotals
-    last_24h?: PeriodTotals
-    last_7d?: PeriodTotals
-    last_30d?: PeriodTotals
+    last_hour?: XaiTimeSeries
+    last_24h?: XaiTimeSeries
+    last_7d?: XaiTimeSeries
+    last_30d?: XaiTimeSeries
   }
 }
 
-/** Tries to extract total cost_usd_ticks from whatever shape the xAI API returns for a period. */
-function extractCost(period: PeriodTotals | undefined): number | null {
-  if (!period) return null
-  if (typeof period.cost_usd_ticks === 'number') return period.cost_usd_ticks
-  const total = period.total as Record<string, unknown> | undefined
-  if (total && typeof total.cost_usd_ticks === 'number') return total.cost_usd_ticks
-  return null
+function getDataPointValue(period: XaiTimeSeries | undefined, index: number): number | null {
+  const values = period?.timeSeries?.[0]?.dataPoints?.[0]?.values
+  if (!Array.isArray(values) || values[index] == null) return null
+  return values[index]
 }
 
-/** Tries to extract call count from a period. */
-function extractCalls(period: PeriodTotals | undefined): number | null {
-  if (!period) return null
-  if (typeof period.call_count === 'number') return period.call_count
-  if (typeof period.count === 'number') return period.count
-  const items = period.items as unknown[]
-  if (Array.isArray(items)) return items.length
-  return null
+/** Returns cost in USD from a period response (values[0]). */
+function extractCostUsd(period: XaiTimeSeries | undefined): number | null {
+  return getDataPointValue(period, 0)
+}
+
+/** Returns call count from a period response (values[1]). */
+function extractCalls(period: XaiTimeSeries | undefined): number | null {
+  const v = getDataPointValue(period, 1)
+  return v != null ? Math.round(v) : null
+}
+
+function formatUsd(usd: number | null | undefined): string {
+  if (usd == null) return '—'
+  if (usd === 0) return '$0.00'
+  if (usd < 0.000001) return `$${usd.toFixed(10).replace(/0+$/, '').replace(/\.$/, '')}`
+  if (usd < 0.001) return `$${usd.toFixed(7)}`
+  if (usd < 1) return `$${usd.toFixed(5)}`
+  return `$${usd.toFixed(2)}`
 }
 
 const POLL_INTERVAL_MS = 60_000
@@ -184,13 +195,13 @@ export default function AiBillingPanel() {
             <tbody>
               {periods.map(({ key, label }) => {
                 const period = billing.totals?.[key]
-                const cost = extractCost(period)
+                const costUsd = extractCostUsd(period)
                 const calls = extractCalls(period)
                 return (
                   <tr key={key} className="border-t border-border/50">
                     <td className="py-1 text-muted-foreground">{label}</td>
                     <td className="py-1 text-right font-mono">{calls != null ? calls : '—'}</td>
-                    <td className="py-1 text-right font-mono font-semibold">{formatCost(cost)}</td>
+                    <td className="py-1 text-right font-mono font-semibold">{formatUsd(costUsd)}</td>
                   </tr>
                 )
               })}
