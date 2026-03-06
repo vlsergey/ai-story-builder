@@ -93,6 +93,16 @@ describe('GET /ai/config', () => {
     expect(res.body.yandex.last_model).toBe('gpt://b1g999/yandexgpt/latest')
   })
 
+  it('returns extra fields saved via POST (e.g. settings_lore object)', async () => {
+    await request(app).post('/ai/config').send({
+      engine: 'grok',
+      fields: { settings_lore: { model: 'grok-3', maxTokens: 4096, webSearch: 'none' } },
+    })
+    const res = await request(app).get('/ai/config')
+    expect(res.status).toBe(200)
+    expect(res.body.grok.settings_lore).toEqual({ model: 'grok-3', maxTokens: 4096, webSearch: 'none' })
+  })
+
   it('returns saved current_engine', async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')

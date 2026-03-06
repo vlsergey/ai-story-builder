@@ -17,6 +17,7 @@ interface GrokConfig {
   api_key?: string
   available_models?: string[]
   last_model?: string
+  [key: string]: unknown
 }
 
 interface YandexConfig {
@@ -24,6 +25,7 @@ interface YandexConfig {
   folder_id?: string
   available_models?: string[]
   last_model?: string
+  [key: string]: unknown
 }
 
 interface AiConfigStore {
@@ -79,15 +81,17 @@ router.get('/config', (_req: Request, res: Response) => {
     res.json({
       current_engine: engineRow?.value ?? null,
       grok: {
-        api_key: config.grok?.api_key ?? '',
-        available_models: config.grok?.available_models ?? [],
-        last_model: config.grok?.last_model ?? null,
+        api_key: '',
+        available_models: [],
+        last_model: null,
+        ...(config.grok ?? {}),
       },
       yandex: {
-        api_key: config.yandex?.api_key ?? '',
-        folder_id: config.yandex?.folder_id ?? '',
-        available_models: config.yandex?.available_models ?? [],
-        last_model: config.yandex?.last_model ?? null,
+        api_key: '',
+        folder_id: '',
+        available_models: [],
+        last_model: null,
+        ...(config.yandex ?? {}),
       },
     })
   } catch (e) {
@@ -100,7 +104,7 @@ router.get('/config', (_req: Request, res: Response) => {
 // Body: { engine: string, fields: Record<string, string> }
 
 router.post('/config', express.json(), (req: Request, res: Response) => {
-  const { engine, fields } = req.body as { engine?: string; fields?: Record<string, string> }
+  const { engine, fields } = req.body as { engine?: string; fields?: Record<string, unknown> }
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })

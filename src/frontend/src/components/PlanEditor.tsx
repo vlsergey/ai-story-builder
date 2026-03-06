@@ -106,23 +106,14 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         if (!engine) return
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
-          last_max_tokens_plan?: number | null
-          last_max_completion_tokens_plan?: number | null
-          last_min_words_plan?: number | null
+          settings_plan?: AiSettings
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
-        const last = engineData?.last_model
-        setAiSettings(prev => ({
-          ...prev,
-          model: last && models.includes(last) ? last : (models[0] ?? ''),
-          ...(typeof engineData?.last_max_tokens_plan === 'number' && engineData.last_max_tokens_plan > 0
-            ? { maxTokens: engineData.last_max_tokens_plan } : {}),
-          ...(typeof engineData?.last_max_completion_tokens_plan === 'number' && engineData.last_max_completion_tokens_plan > 0
-            ? { maxCompletionTokens: engineData.last_max_completion_tokens_plan } : {}),
-          ...(typeof engineData?.last_min_words_plan === 'number' && engineData.last_min_words_plan > 0
-            ? { minWords: engineData.last_min_words_plan } : {}),
-        }))
+        const saved = engineData?.settings_plan
+        const savedModel = saved?.model ?? engineData?.last_model
+        const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
+        setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
       })
       .catch(() => {})
   }, [])
@@ -197,7 +188,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { last_model: aiSettings.model, last_max_tokens_plan: aiSettings.maxTokens, last_max_completion_tokens_plan: aiSettings.maxCompletionTokens ?? 0, last_min_words_plan: aiSettings.minWords ?? 0 } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { settings_plan: aiSettings } }),
       })
     }
   }

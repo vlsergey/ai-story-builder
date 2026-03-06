@@ -29,14 +29,16 @@ export default function AiPlayground() {
         const engine = data.current_engine ?? null
         setCurrentEngine(engine)
         if (!engine) return
-        const engineData = data[engine] as { available_models?: string[]; last_model?: string | null } | undefined
+        const engineData = data[engine] as {
+          available_models?: string[]; last_model?: string | null
+          settings_playground?: AiSettings
+        } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
-        const last = engineData?.last_model
-        setAiSettings(prev => ({
-          ...prev,
-          model: last && models.includes(last) ? last : (models[0] ?? ''),
-        }))
+        const saved = engineData?.settings_playground
+        const savedModel = saved?.model ?? engineData?.last_model
+        const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
+        setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
       })
       .catch(() => {})
   }, [])
@@ -74,6 +76,13 @@ export default function AiPlayground() {
         },
         onDone: () => {},
       })
+      if (currentEngine) {
+        void fetch('/api/ai/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ engine: currentEngine, fields: { settings_playground: aiSettings } }),
+        })
+      }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         setError(e instanceof Error ? e.message : String(e))

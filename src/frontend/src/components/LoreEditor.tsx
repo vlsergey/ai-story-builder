@@ -105,20 +105,14 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         if (!engine) return
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
-          last_max_tokens_lore?: number | null
-          last_max_completion_tokens_lore?: number | null
+          settings_lore?: AiSettings
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
-        const last = engineData?.last_model
-        setAiSettings(prev => ({
-          ...prev,
-          model: last && models.includes(last) ? last : (models[0] ?? ''),
-          ...(typeof engineData?.last_max_tokens_lore === 'number' && engineData.last_max_tokens_lore > 0
-            ? { maxTokens: engineData.last_max_tokens_lore } : {}),
-          ...(typeof engineData?.last_max_completion_tokens_lore === 'number' && engineData.last_max_completion_tokens_lore > 0
-            ? { maxCompletionTokens: engineData.last_max_completion_tokens_lore } : {}),
-        }))
+        const saved = engineData?.settings_lore
+        const savedModel = saved?.model ?? engineData?.last_model
+        const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
+        setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
       })
       .catch(() => {})
   }, [])
@@ -194,7 +188,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       void fetch('/api/ai/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { last_model: aiSettings.model, last_max_tokens_lore: aiSettings.maxTokens, last_max_completion_tokens_lore: aiSettings.maxCompletionTokens ?? 0 } }),
+        body: JSON.stringify({ engine: currentEngine, fields: { settings_lore: aiSettings } }),
       })
     }
   }

@@ -74,20 +74,14 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         if (!engine) return
         const engineData = data[engine] as {
           available_models?: string[]; last_model?: string | null
-          last_max_tokens_plan_children?: number | null
-          last_max_completion_tokens_plan_children?: number | null
+          settings_plan_children?: AiSettings
         } | undefined
         const models = engineData?.available_models ?? []
         setAvailableModels(models)
-        const last = engineData?.last_model
-        setAiSettings(prev => ({
-          ...prev,
-          model: last && models.includes(last) ? last : (models[0] ?? ''),
-          ...(typeof engineData?.last_max_tokens_plan_children === 'number' && engineData.last_max_tokens_plan_children > 0
-            ? { maxTokens: engineData.last_max_tokens_plan_children } : {}),
-          ...(typeof engineData?.last_max_completion_tokens_plan_children === 'number' && engineData.last_max_completion_tokens_plan_children > 0
-            ? { maxCompletionTokens: engineData.last_max_completion_tokens_plan_children } : {}),
-        }))
+        const saved = engineData?.settings_plan_children
+        const savedModel = saved?.model ?? engineData?.last_model
+        const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
+        setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
       })
       .catch(() => {})
   }, [])
@@ -141,7 +135,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         void fetch('/api/ai/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { last_model: aiSettings.model, last_max_tokens_plan_children: aiSettings.maxTokens, last_max_completion_tokens_plan_children: aiSettings.maxCompletionTokens ?? 0 } }),
+          body: JSON.stringify({ engine: currentEngine, fields: { settings_plan_children: aiSettings } }),
         })
       }
 
