@@ -46,9 +46,12 @@ async function fetchUsage(
         'Authorization': `Bearer ${managementKey}`,
       },
       body: JSON.stringify({
-        analysis_query: {
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
+        analysisQuery: {
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          timeUnit: 'TIME_UNIT_NONE',
+          values: ['AGGREGATION_SUM'],
+          groupBy: [],
         },
       }),
     }
