@@ -55,21 +55,11 @@ interface BillingData {
   }
 }
 
-function getDataPointValue(period: XaiTimeSeries | undefined, index: number): number | null {
-  const values = period?.timeSeries?.[0]?.dataPoints?.[0]?.values
-  if (!Array.isArray(values) || values[index] == null) return null
-  return values[index]
-}
-
 /** Returns cost in USD from a period response (values[0]). */
 function extractCostUsd(period: XaiTimeSeries | undefined): number | null {
-  return getDataPointValue(period, 0)
-}
-
-/** Returns call count from a period response (values[1]). */
-function extractCalls(period: XaiTimeSeries | undefined): number | null {
-  const v = getDataPointValue(period, 1)
-  return v != null ? Math.round(v) : null
+  const values = period?.timeSeries?.[0]?.dataPoints?.[0]?.values
+  if (!Array.isArray(values) || values[0] == null) return null
+  return values[0]
 }
 
 function formatUsd(usd: number | null | undefined): string {
@@ -188,7 +178,6 @@ export default function AiBillingPanel() {
             <thead>
               <tr className="text-muted-foreground">
                 <th className="text-left font-normal pb-1">{t('billing.period')}</th>
-                <th className="text-right font-normal pb-1">{t('billing.calls')}</th>
                 <th className="text-right font-normal pb-1">{t('billing.cost')}</th>
               </tr>
             </thead>
@@ -196,11 +185,9 @@ export default function AiBillingPanel() {
               {periods.map(({ key, label }) => {
                 const period = billing.totals?.[key]
                 const costUsd = extractCostUsd(period)
-                const calls = extractCalls(period)
                 return (
                   <tr key={key} className="border-t border-border/50">
                     <td className="py-1 text-muted-foreground">{label}</td>
-                    <td className="py-1 text-right font-mono">{calls != null ? calls : '—'}</td>
                     <td className="py-1 text-right font-mono font-semibold">{formatUsd(costUsd)}</td>
                   </tr>
                 )
