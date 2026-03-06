@@ -1,6 +1,6 @@
 import type { AiSettings } from '../../../shared/ai-settings.js'
 
-export interface GeneratePlanOptions {
+export interface GenerateNodeOptions {
   prompt: string
   settings?: AiSettings
   /** 'generate' (default) | 'improve' */
@@ -13,8 +13,11 @@ export interface GeneratePlanOptions {
   signal?: AbortSignal
 }
 
-export async function generatePlanStream(options: GeneratePlanOptions): Promise<void> {
-  const response = await fetch('/api/ai/generate-plan', {
+export async function generateNodeStream(
+  endpoint: string,
+  options: GenerateNodeOptions
+): Promise<void> {
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
