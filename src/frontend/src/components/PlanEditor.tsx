@@ -66,7 +66,6 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
     setLoading(true)
     setTitleDirty(false)
     setContentDirty(false)
-    setGeneratePrompt('')
     setImproveInstruction('')
     setReviewBaseContent('')
     setSelectedTab('new')
@@ -81,16 +80,21 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       changes_status: string | null
       review_base_content: string | null
       last_improve_instruction: string | null
+      last_generate_prompt: string | null
     }>).then(node => {
       setTitle(node.title)
       setContent(node.content ?? '')
+      setGeneratePrompt(node.last_generate_prompt ?? '')
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content ?? '')
         setImproveInstruction(node.last_improve_instruction ?? '')
         setEditorMode('review_unlocked')
-      } else if (node.content && node.content.trim().length > 0) {
+      } else if (node.content && node.content.trim().length > 0 && node.last_improve_instruction) {
+        // Has content AND has been improved before → restore improve mode
+        setImproveInstruction(node.last_improve_instruction)
         setEditorMode('edit')
       } else {
+        // No content, or content exists but improve was never used → generate mode
         setEditorMode('generate')
       }
       setLoading(false)
@@ -197,6 +201,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
   // ── Mode A: Generate from scratch ─────────────────────────────────────────
   function handleGenerate() {
     if (!generatePrompt.trim()) return
+    if (hasContent && !window.confirm(t('plan.overwrite_warning'))) return
     setContent('')
     setTitle('')
     setThinkingStatus(null)
@@ -223,7 +228,10 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
       onDone: () => {},
     }).then(async () => {
       if (finalTitle.trim() || finalContent) {
-        const patchBody: Record<string, unknown> = { content: finalContent }
+        const patchBody: Record<string, unknown> = {
+          content: finalContent,
+          last_generate_prompt: generatePrompt.trim(),
+        }
         if (finalTitle.trim()) patchBody['title'] = finalTitle.trim()
         const r = await fetch(`/api/plan/nodes/${nodeId}`, {
           method: 'PATCH',
@@ -290,11 +298,13 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
         onDone: () => {},
       })
 
-      const patchBody: Record<string, unknown> = { content: finalContent }
+      const patchBody: Record<string, unknown> = {
+        content: finalContent,
+        prompt: improveInstruction,  // Always save instruction (first improve or re-improve)
+      }
       if (finalTitle.trim()) patchBody['title'] = finalTitle.trim()
       if (!fromReview) {
         patchBody['start_review'] = true
-        patchBody['prompt'] = improveInstruction
       }
 
       const r = await fetch(`/api/plan/nodes/${nodeId}`, {

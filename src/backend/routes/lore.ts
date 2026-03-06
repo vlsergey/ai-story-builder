@@ -169,24 +169,28 @@ router.get('/:id', (req: Request, res: Response) => {
 router.patch('/:id', express.json(), (req: Request, res: Response) => {
   const {
     name, content, prompt,
-    start_review, accept_review,
+    start_review, accept_review, last_generate_prompt,
   } = req.body as {
     name?: string
     content?: string
-    /** AI improve instruction; stored to last_improve_instruction when start_review=true */
+    /** AI improve instruction; saved to last_improve_instruction (always when provided) */
     prompt?: string
     /** When true: capture current content as review_base_content, set changes_status='review'.
-     *  Must be combined with a content update. Also saves prompt to last_improve_instruction. */
+     *  Must be combined with a content update. */
     start_review?: boolean
     /** When true: clear changes_status, review_base_content, and last_improve_instruction. */
     accept_review?: boolean
+    /** Generate prompt (mode A); saved independently to last_generate_prompt */
+    last_generate_prompt?: string | null
   }
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   const hasName = typeof name === 'string' && name.trim().length > 0
   const hasContent = content !== undefined
-  if (!hasName && !hasContent && !accept_review) return res.status(400).json({ error: 'name or content required' })
+  const hasLastGeneratePrompt = last_generate_prompt !== undefined
+  if (!hasName && !hasContent && !accept_review && !hasLastGeneratePrompt && prompt === undefined)
+    return res.status(400).json({ error: 'name or content required' })
   try {
     const db = new Database(dbPath)
     const sets: string[] = []
@@ -217,6 +221,16 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
           updatedSyncInfo = syncInfo
         } catch { /* ignore malformed JSON */ }
       }
+    }
+
+    // Save generate prompt independently (mode A)
+    if (hasLastGeneratePrompt) {
+      sets.push('last_generate_prompt = ?'); params.push(last_generate_prompt ?? null)
+    }
+
+    // Save improve instruction whenever provided (first improve OR re-improve)
+    if (prompt !== undefined && !start_review) {
+      sets.push('last_improve_instruction = ?'); params.push(prompt ?? null)
     }
 
     // For start_review: read current node state before the transaction so we can decide

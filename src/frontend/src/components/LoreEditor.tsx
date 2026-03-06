@@ -65,7 +65,6 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
     setLoading(true)
     setNameDirty(false)
     setContentDirty(false)
-    setGeneratePrompt('')
     setImproveInstruction('')
     setReviewBaseContent('')
     setSelectedTab('new')
@@ -80,16 +79,22 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       changes_status: string | null
       review_base_content: string | null
       last_improve_instruction: string | null
+      last_generate_prompt: string | null
     }>).then(node => {
       setName(node.name)
       setContent(node.content ?? '')
+      setGeneratePrompt(node.last_generate_prompt ?? '')
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content ?? '')
         setImproveInstruction(node.last_improve_instruction ?? '')
         setEditorMode('review_unlocked')
-      } else if (node.content && node.content.trim().length > 0) {
+      } else if (node.content && node.content.trim().length > 0 && node.last_improve_instruction) {
+        // Has content AND has been improved before → restore improve mode
+        setImproveInstruction(node.last_improve_instruction)
         setEditorMode('edit')
       } else {
+        // No content, or content exists but improve was never used → generate mode
+        // (generate prompt is already set above so user can tweak and regenerate)
         setEditorMode('generate')
       }
       setLoading(false)
@@ -197,6 +202,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
   // ── Mode A: Generate from scratch ─────────────────────────────────────────
   function handleGenerate() {
     if (!generatePrompt.trim()) return
+    if (hasContent && !window.confirm(t('lore.overwrite_warning'))) return
     setContent('')
     setName('')
     setThinkingStatus(null)
@@ -223,7 +229,10 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
       onDone: (data) => { responseId = data.response_id },
     }).then(async () => {
       if (finalName.trim() || finalContent) {
-        const patchBody: Record<string, unknown> = { content: finalContent }
+        const patchBody: Record<string, unknown> = {
+          content: finalContent,
+          last_generate_prompt: generatePrompt.trim(),
+        }
         if (finalName.trim()) patchBody['name'] = finalName.trim()
         const r = await fetch(`/api/lore/${nodeId}`, {
           method: 'PATCH',
@@ -292,11 +301,13 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
         onDone: (data) => { responseId = data.response_id },
       })
 
-      const patchBody: Record<string, unknown> = { content: finalContent }
+      const patchBody: Record<string, unknown> = {
+        content: finalContent,
+        prompt: improveInstruction,  // Always save instruction (first improve or re-improve)
+      }
       if (finalName.trim()) patchBody['name'] = finalName.trim()
       if (!fromReview) {
         patchBody['start_review'] = true  // First improvement: capture baseline in DB
-        patchBody['prompt'] = improveInstruction  // Save instruction for review state restore
       }
 
       const r = await fetch(`/api/lore/${nodeId}`, {

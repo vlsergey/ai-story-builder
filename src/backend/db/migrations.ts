@@ -176,6 +176,7 @@ const MIGRATIONS: Array<(db: Database) => void> = [
     `)
   },
   // version 8 → 9: add stats + review workflow columns to plan_nodes; backfill counts
+  // (note: last_generate_prompt was added in the next migration step)
   (db) => {
     db.exec(`
       ALTER TABLE plan_nodes ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0;
@@ -198,6 +199,13 @@ const MIGRATIONS: Array<(db: Database) => void> = [
       const bytes = Buffer.byteLength(row.content, 'utf8')
       update.run(words, chars, bytes, row.id)
     }
+  },
+  // version 9 → 10: add last_generate_prompt to lore_nodes and plan_nodes
+  (db) => {
+    db.exec(`
+      ALTER TABLE lore_nodes ADD COLUMN last_generate_prompt TEXT NULL;
+      ALTER TABLE plan_nodes ADD COLUMN last_generate_prompt TEXT NULL;
+    `)
   },
 ]
 
