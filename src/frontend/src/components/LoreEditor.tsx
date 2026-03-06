@@ -8,6 +8,7 @@ import { useEditorSettings } from '../lib/editor-settings'
 import { useLocale } from '../lib/locale'
 import { dispatchLoreNodeSaved } from '../lib/lore-events'
 import { generateLoreStream } from '../lib/generate-lore-stream'
+import { preserveScrollOnExternalUpdate } from '../lib/codemirror-preserve-scroll'
 import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
 import type { AiSettings } from '../../../shared/ai-settings.js'
@@ -523,7 +524,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
           <CodeMirror
             value={content}
             height="100%"
-            extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
+            extensions={[markdown(), preserveScrollOnExternalUpdate, ...(wordWrap ? [EditorView.lineWrapping] : [])]}
             theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
             onChange={handleContentChange}
             className="h-full text-sm"
@@ -536,7 +537,7 @@ export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {
           <CodeMirror
             value={content}
             height="100%"
-            extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
+            extensions={[markdown(), preserveScrollOnExternalUpdate, ...(wordWrap ? [EditorView.lineWrapping] : [])]}
             theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
             onChange={isLocked ? undefined : handleContentChange}
             readOnly={isLocked}

@@ -8,6 +8,7 @@ import { useEditorSettings } from '../lib/editor-settings'
 import { useLocale } from '../lib/locale'
 import { dispatchPlanNodeSaved, dispatchPlanTreeRefresh } from '../lib/plan-events'
 import { generatePlanStream } from '../lib/generate-plan-stream'
+import { preserveScrollOnExternalUpdate } from '../lib/codemirror-preserve-scroll'
 import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
 import type { AiSettings } from '../../../shared/ai-settings.js'
@@ -518,7 +519,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
           <CodeMirror
             value={content}
             height="100%"
-            extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
+            extensions={[markdown(), preserveScrollOnExternalUpdate, ...(wordWrap ? [EditorView.lineWrapping] : [])]}
             theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
             onChange={handleContentChange}
             className="h-full text-sm"
@@ -531,7 +532,7 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
           <CodeMirror
             value={content}
             height="100%"
-            extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
+            extensions={[markdown(), preserveScrollOnExternalUpdate, ...(wordWrap ? [EditorView.lineWrapping] : [])]}
             theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
             onChange={isLocked ? undefined : handleContentChange}
             readOnly={isLocked}
