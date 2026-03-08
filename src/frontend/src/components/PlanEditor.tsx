@@ -14,11 +14,11 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
     primaryField: 'title',
     i18nPrefix: 'plan',
     generateEndpoint: '/api/ai/generate-plan',
-    showMinWords: true,
     onSaved: ({ nodeId: id, primaryValue, wordCount, charCount, byteCount }) => {
       dispatchPlanNodeSaved({ id, title: primaryValue, wordCount, charCount, byteCount })
     },
     onAfterGenerate: dispatchPlanGraphRefresh,
+    supportsAutoSummary: true,
   }), [])
 
   return <NodeEditor nodeId={nodeId} panelApi={panelApi} adapter={adapter} />

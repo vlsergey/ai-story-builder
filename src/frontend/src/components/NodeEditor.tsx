@@ -40,8 +40,8 @@ export interface NodeEditorAdapter {
   onAfterGenerate?: () => void
   /** Extra buttons rendered in the edit-mode footer (e.g. "split into children") */
   renderEditModeExtras?: (nodeId: number) => React.ReactNode
-  /** Show "min words" option in AI settings (plan only) */
-  showMinWords?: boolean
+  /** Whether this adapter supports auto‑generation of summary on editor close */
+  supportsAutoSummary?: boolean
 }
 
 interface NodeEditorProps {
@@ -208,9 +208,9 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   // ── Trigger summary generation on editor close ─────────────────────────────
   useEffect(() => {
     return () => {
-      // Only for plan nodes, when setting enabled, content changed, and not already triggered
+      // Only for adapters that support auto‑summary, when setting enabled, content changed, and not already triggered
       if (
-        adapter.i18nPrefix === 'plan' &&
+        adapter.supportsAutoSummary &&
         autoGenerateSummary &&
         !summaryTriggeredRef.current &&
         (content !== initialContent || primaryValue !== initialPrimary)
@@ -229,7 +229,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           .catch(() => {})
       }
     }
-  }, [nodeId, adapter.i18nPrefix, autoGenerateSummary, content, primaryValue, initialContent, initialPrimary])
+  }, [nodeId, adapter.supportsAutoSummary, autoGenerateSummary, content, primaryValue, initialContent, initialPrimary])
 
   // ── Clear timers on unmount ────────────────────────────────────────────────
   useEffect(() => () => {
@@ -366,10 +366,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         const patchBody: Record<string, unknown> = {
           content: finalContent,
           user_prompt: effectivePrompt.trim(),
-        }
-        if (adapter.i18nPrefix === 'plan') {
-          // plan nodes also have system_prompt, but we don't need to update it here
-          // optionally we could include system_prompt: systemPrompt
         }
         if (finalPrimary.trim()) patchBody[adapter.primaryField] = finalPrimary.trim()
         const r = await fetch(apiUrl, {
@@ -548,7 +544,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       availableModels={availableModels}
       settings={aiSettings}
       onSettingsChange={setAiSettings}
-      showMinWords={adapter.showMinWords}
       disabled={generating}
     />
   )

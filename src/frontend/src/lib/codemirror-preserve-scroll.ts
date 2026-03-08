@@ -1,5 +1,5 @@
 import { Transaction } from '@codemirror/state'
-import { ViewPlugin, ViewUpdate } from '@codemirror/view'
+import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view'
 
 /**
  * CodeMirror extension that preserves the scroll position when the document
@@ -12,6 +12,7 @@ import { ViewPlugin, ViewUpdate } from '@codemirror/view'
 export const preserveScrollOnExternalUpdate = ViewPlugin.fromClass(
   class {
     private scrollTop = 0
+    declare view: EditorView
 
     update(update: ViewUpdate) {
       if (
@@ -27,7 +28,7 @@ export const preserveScrollOnExternalUpdate = ViewPlugin.fromClass(
   {
     eventHandlers: {
       scroll(_e: Event, self) {
-        self.scrollTop = (self.view.scrollDOM).scrollTop
+        (self as any).scrollTop = (self as any).view.scrollDOM.scrollTop
       },
     },
   }

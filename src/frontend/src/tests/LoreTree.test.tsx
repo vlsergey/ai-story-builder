@@ -58,10 +58,13 @@ describe('LoreTree', () => {
     mockFetchTree([{
       id: 1, parent_id: null, name: 'Story Lore', status: 'ACTIVE',
       position: 0,
+      content: null,
       word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0,
+      ai_sync_info: null,
+      created_at: '2025-01-01T00:00:00Z',
       children: [
-        { id: 2, parent_id: 1, name: 'Abilities', status: 'ACTIVE', position: 0, word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, children: [] },
-        { id: 3, parent_id: 1, name: 'Spells',    status: 'ACTIVE', position: 1, word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, children: [] },
+        { id: 2, parent_id: 1, name: 'Abilities', status: 'ACTIVE', position: 0, content: null, word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null, created_at: '2025-01-01T00:00:00Z', children: [] },
+        { id: 3, parent_id: 1, name: 'Spells',    status: 'ACTIVE', position: 1, content: null, word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null, created_at: '2025-01-01T00:00:00Z', children: [] },
       ],
     }]);
 
@@ -121,7 +124,7 @@ describe('LoreTree', () => {
     // Simulates API returning nodes without the new stat columns (e.g. before migration)
     renderWithSettings(
       [{ id: 1, parent_id: null, name: 'Chapter', status: 'ACTIVE', content: null,
-         to_be_deleted: 0, content: null, ai_sync_info: null, children: [] } as Partial<LoreNode>],
+         to_be_deleted: 0, ai_sync_info: null, children: [] } as Partial<LoreNode>],
       { statMode: 'words' }
     );
     await screen.findByText('Chapter');
@@ -132,12 +135,16 @@ describe('LoreTree', () => {
     renderWithSettings(
       [{
         id: 1, parent_id: null, name: 'Root', status: 'ACTIVE', content: null,
+        position: 0,
         word_count: 10, char_count: 50, byte_count: 50,
-        to_be_deleted: 0, content: null, ai_sync_info: null,
+        to_be_deleted: 0, ai_sync_info: null,
+        created_at: '2025-01-01T00:00:00Z',
         children: [
           { id: 2, parent_id: 1, name: 'Child', status: 'ACTIVE', content: null,
+            position: 0,
             word_count: 32, char_count: 150, byte_count: 150,
-            to_be_deleted: 0, content: null, ai_sync_info: null, children: [] },
+            to_be_deleted: 0, ai_sync_info: null, children: [],
+            created_at: '2025-01-01T00:00:00Z' },
         ],
       }],
       { statMode: 'words' }
@@ -225,12 +232,16 @@ describe('LoreTree', () => {
     renderWithSettings(
       [{
         id: 1, parent_id: null, name: 'Root', status: 'ACTIVE', content: null,
+        position: 0,
         word_count: 0, char_count: 0, byte_count: 0,
-        to_be_deleted: 0, content: null, ai_sync_info: null,
+        to_be_deleted: 0, ai_sync_info: null,
+        created_at: '2025-01-01T00:00:00Z',
         children: [{
           id: 2, parent_id: 1, name: 'Child', status: 'ACTIVE', content: null,
+          position: 0,
           word_count: 0, char_count: 0, byte_count: 0,
-          to_be_deleted: 0, content: null, ai_sync_info: null, children: [],
+          to_be_deleted: 0, ai_sync_info: null, children: [],
+          created_at: '2025-01-01T00:00:00Z',
         }],
       }],
       { statMode: 'words' }
@@ -250,8 +261,11 @@ describe('LoreTree', () => {
   it('updates node name in tree when lore-node-saved event fires with name', async () => {
     mockFetchTree([{
       id: 1, parent_id: null, name: 'Old Name', status: 'ACTIVE', content: null,
+      position: 0,
       word_count: 0, char_count: 0, byte_count: 0,
-      to_be_deleted: 0, content: null, ai_sync_info: null, children: [],
+      to_be_deleted: 0, ai_sync_info: null,
+      created_at: '2025-01-01T00:00:00Z',
+      children: [],
     }]);
 
     render(
@@ -280,20 +294,28 @@ describe('LoreTree', () => {
     const { container } = renderWithSettings(
       [{
         id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+        content: null,
+        position: 0,
         word_count: 0, char_count: 0, byte_count: 0,
         to_be_deleted: 0, ai_sync_info: null,
+        created_at: '2025-01-01T00:00:00Z',
         children: [{
           id: 2, parent_id: 1, name: 'Characters', status: 'ACTIVE',
           content: null,
+          position: 0,
           // Group leader: no own text but file uploaded for the whole subtree
           word_count: 0, char_count: 0, byte_count: 0,
           to_be_deleted: 0,
           ai_sync_info: { grok: { file_id: 'grok-f1', last_synced_at: syncedAt, content_updated_at: syncedAt } },
+          created_at: '2025-01-01T00:00:00Z',
           children: [{
             id: 3, parent_id: 2, name: 'Hero', status: 'ACTIVE',
+            content: null,
+            position: 0,
             word_count: 5, char_count: 20, byte_count: 20,
             to_be_deleted: 0,
-            ai_sync_info: { grok: { merged_into_parent: true, last_synced_at: syncedAt, content_updated_at: syncedAt } },
+            ai_sync_info: { grok: { uploaded_as_parent: true, last_synced_at: syncedAt, content_updated_at: syncedAt } },
+            created_at: '2025-01-01T00:00:00Z',
             children: [],
           }],
         }],
@@ -311,10 +333,15 @@ describe('LoreTree', () => {
     const { container } = renderWithSettings(
       [{
         id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+        content: null,
+        position: 0,
         word_count: 0, char_count: 0, byte_count: 0,
         to_be_deleted: 0, ai_sync_info: null,
+        created_at: '2025-01-01T00:00:00Z',
         children: [{
           id: 2, parent_id: 1, name: 'Characters', status: 'ACTIVE',
+          content: null,
+          position: 0,
           word_count: 0, char_count: 0, byte_count: 0,
           to_be_deleted: 0,
           ai_sync_info: {
@@ -324,6 +351,7 @@ describe('LoreTree', () => {
               content_updated_at: '2025-06-01T00:00:00Z', // updated after sync
             },
           },
+          created_at: '2025-01-01T00:00:00Z',
           children: [],
         }],
       }],
@@ -340,13 +368,19 @@ describe('LoreTree', () => {
     const { container } = renderWithSettings(
       [{
         id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+        content: null,
+        position: 0,
         word_count: 0, char_count: 0, byte_count: 0,
         to_be_deleted: 0, ai_sync_info: null,
+        created_at: '2025-01-01T00:00:00Z',
         children: [{
           id: 2, parent_id: 1, name: 'World', status: 'ACTIVE',
+          content: null,
+          position: 0,
           word_count: 5, char_count: 20, byte_count: 20,
           to_be_deleted: 0,
           ai_sync_info: { grok: { file_id: 'grok-f1', last_synced_at: syncedAt, content_updated_at: syncedAt } },
+          created_at: '2025-01-01T00:00:00Z',
           children: [],
         }],
       }],
@@ -366,13 +400,23 @@ describe('LoreTree', () => {
   it('does not re-expand collapsed nodes when tree is refreshed', async () => {
     const treeData: Partial<LoreNode>[] = [{
       id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+      content: null,
+      position: 0,
       word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null,
+      created_at: '2025-01-01T00:00:00Z',
       children: [{
         id: 2, parent_id: 1, name: 'Category', status: 'ACTIVE',
+        content: null,
+        position: 0,
         word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null,
+        created_at: '2025-01-01T00:00:00Z',
         children: [{
           id: 3, parent_id: 2, name: 'Item', status: 'ACTIVE',
-          word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null, children: [],
+          content: null,
+          position: 0,
+          word_count: 0, char_count: 0, byte_count: 0, to_be_deleted: 0, ai_sync_info: null,
+          created_at: '2025-01-01T00:00:00Z',
+          children: [],
         }],
       }],
     }]
@@ -413,12 +457,19 @@ describe('LoreTree', () => {
     const onOpenLoreNode = vi.fn();
     mockFetchTree([{
       id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
+      content: null,
+      position: 0,
       word_count: 0, char_count: 0, byte_count: 0,
-      to_be_deleted: 0, content: null, ai_sync_info: null,
+      to_be_deleted: 0, ai_sync_info: null,
+      created_at: '2025-01-01T00:00:00Z',
       children: [{
         id: 2, parent_id: 1, name: 'Chapter', status: 'ACTIVE',
+        content: null,
+        position: 0,
         word_count: 0, char_count: 0, byte_count: 0,
-        to_be_deleted: 0, content: null, ai_sync_info: null, children: [],
+        to_be_deleted: 0, ai_sync_info: null,
+        created_at: '2025-01-01T00:00:00Z',
+        children: [],
       }],
     }]);
 

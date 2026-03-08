@@ -16,7 +16,7 @@ import {
   Plus, CopyPlus, Pencil, SquarePen, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
   CheckCircle2, Circle, Loader2, Wand2,
 } from 'lucide-react'
-import { LoreNode } from '../types/models'
+import { LoreNode, LoreStatMode } from '../types/models'
 import { useLoreSettings } from '../lib/lore-settings'
 import { LORE_NODE_SAVED_EVENT, LORE_TREE_REFRESH_EVENT, LoreNodeSavedDetail } from '../lib/lore-events'
 import { engineSupportsFileUpload } from '../lib/ai-engines'

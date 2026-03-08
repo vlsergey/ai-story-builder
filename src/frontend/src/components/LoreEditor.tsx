@@ -22,6 +22,7 @@ const loreAdapter: NodeEditorAdapter = {
       aiSyncInfo: aiSyncInfo ?? null,
     })
   },
+  supportsAutoSummary: false,
 }
 
 export default function LoreEditor({ nodeId, panelApi }: LoreEditorProps) {

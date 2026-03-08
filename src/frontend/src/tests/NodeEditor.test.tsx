@@ -228,6 +228,7 @@ describe('NodeEditor — auto‑summary generation', () => {
       i18nPrefix: 'plan',
       apiBase: '/api/plan/nodes',
       generateEndpoint: '/api/ai/generate-plan',
+      supportsAutoSummary: true,
     })
 
     const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
@@ -270,7 +271,7 @@ describe('NodeEditor — auto‑summary generation', () => {
       .mockResolvedValue({ ok: true, json: () => Promise.resolve({ word_count: 1, char_count: 10, byte_count: 10 })})
     vi.stubGlobal('fetch', fetchMock)
 
-    const planAdapter = makeAdapter({ i18nPrefix: 'plan', apiBase: '/api/plan/nodes' })
+    const planAdapter = makeAdapter({ i18nPrefix: 'plan', apiBase: '/api/plan/nodes', supportsAutoSummary: true })
     const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
     await screen.findByTestId('codemirror', {}, { timeout: 5000 })
 
