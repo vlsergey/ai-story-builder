@@ -10,11 +10,15 @@ import {
   getDataDir,
 } from '../db/state.js'
 import { setVerboseLogging } from '../lib/yandex-client.js'
+import { sanitizeProjectName } from '../lib/project-name.js'
 
-// openProjectDatabase is a CommonJS module; use require to load it at runtime
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { openProjectDatabase } = require('../db/index.js') as {
-  openProjectDatabase: (dbPath: string) => import('better-sqlite3').Database
+// Lazy loader — deferred so that test imports don't trigger the require
+function openProjectDatabase(dbPath: string): import('better-sqlite3').Database {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require('../db/index.js') as {
+    openProjectDatabase: (p: string) => import('better-sqlite3').Database
+  }
+  return mod.openProjectDatabase(dbPath)
 }
 
 // better-sqlite3 is optional
@@ -123,6 +127,16 @@ router.get('/recent', (_req: Request, res: Response) => {
   res.json(s.recent || [])
 })
 
+// DELETE /project/recent — remove one entry from the recent list
+router.delete('/recent', express.json(), (req: Request, res: Response) => {
+  const { path: p } = req.body as { path?: string }
+  if (!p) return res.status(400).json({ error: 'path required' })
+  const s = readAppSettings()
+  s.recent = (s.recent || []).filter((x) => x !== p)
+  writeAppSettings(s)
+  res.json({ ok: true })
+})
+
 // GET /project/files — list all supported project files in the projects directory
 router.get('/files', (_req: Request, res: Response) => {
   const projectsDir = path.join(getDataDir(), 'projects')
@@ -163,7 +177,7 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
   const body = req.body as { name?: string; text_language?: string } | undefined
   const name = body?.name ? body.name : `project-${Date.now()}`
   const text_language = body?.text_language ?? 'ru-RU'
-  const safeName = name.replace(/[^a-zA-Z0-9\-_.]/g, '_')
+  const safeName = sanitizeProjectName(name)
   const projectsDir = path.join(getDataDir(), 'projects')
   fs.mkdirSync(projectsDir, { recursive: true })
   const dbPath = path.join(projectsDir, `${safeName}.sqlite`)

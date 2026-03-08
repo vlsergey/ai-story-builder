@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import api from '../api'
 
-import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus } from 'lucide-react'
+import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -96,6 +96,16 @@ export default function StartScreen({
     api.post('/project/open-folder').catch(console.error)
   }
 
+  async function removeRecent(e: React.MouseEvent, p: string) {
+    e.stopPropagation()
+    await fetch('/api/project/recent', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: p }),
+    })
+    setRecent(prev => prev.filter(r => r !== p))
+  }
+
   async function openRecent(path: string) {
     setError(null)
     try {
@@ -162,14 +172,21 @@ export default function StartScreen({
           ) : (
             <ul className="space-y-0.5 px-2">
               {recent.map(r => (
-                <li key={r}>
+                <li key={r} className="group/item">
                   <button
                     onClick={() => openRecent(r)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors text-left group"
                   >
                     <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
                     <span className="truncate flex-1">{projectDisplayName(r)}</span>
-                    <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                    <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 group-hover/item:hidden" />
+                    <button
+                      onClick={e => removeRecent(e, r)}
+                      title="Remove from list"
+                      className="h-4 w-4 flex-shrink-0 hidden group-hover/item:flex items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </button>
                 </li>
               ))}

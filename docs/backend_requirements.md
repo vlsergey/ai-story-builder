@@ -86,6 +86,10 @@
 - Project creation (`POST /api/project/create`):
   - Accepts optional `text_language` field in request body (default `'ru-RU'`)
   - Stores `text_language` as a project setting alongside `project_title`
+  - The project name is sanitized for use as a filename: only characters forbidden by common filesystems (`\ / : * ? " < > |`) are replaced with `_`; all Unicode letters, digits, spaces, hyphens, underscores, and dots are preserved
+- Recent projects list management:
+  - `GET /api/project/recent` — returns the list of recently opened project paths (up to 10)
+  - `DELETE /api/project/recent` — removes one entry from the recent list; body: `{ path: string }`; returns `{ ok: true }` or 400 if path is missing
 
 ### Development Workflow
 - `npm run dev` starts three processes concurrently via `concurrently`:
