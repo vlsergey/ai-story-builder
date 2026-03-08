@@ -287,6 +287,7 @@ nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         nodesDraggable={!autoLayout}
+        zoomOnDoubleClick={false}
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls />
