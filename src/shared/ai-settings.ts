@@ -5,6 +5,4 @@ export interface AiSettings {
   maxTokens?: number
   /** undefined = not set (no extra limit) */
   maxCompletionTokens?: number
-  /** undefined = no minimum; only used by plan generation */
-  minWords?: number
 }

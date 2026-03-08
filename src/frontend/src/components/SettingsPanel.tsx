@@ -9,6 +9,8 @@ import {
 import { dispatchAiEngineChanged } from '../lib/lore-events'
 import { useLocale } from '../lib/locale'
 import { useTheme } from '../lib/theme/theme-provider'
+import AiGenerationSettings from './AiGenerationSettings'
+import type { AiSettings } from '@shared/ai-settings'
 
 interface ConfigData {
   current_engine: string | null
@@ -33,20 +35,25 @@ export default function SettingsPanel() {
   const [showField, setShowField] = useState<Record<string, boolean>>({})
   const [textLanguage, setTextLanguage] = useState('ru-RU')
   const [verboseAiLogging, setVerboseAiLogging] = useState(false)
+  const [autoGenerateSummary, setAutoGenerateSummary] = useState(false)
 
   // form values: engineId → fieldKey → value
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({})
+  // summary settings per engine
+  const [summarySettings, setSummarySettings] = useState<Record<string, AiSettings>>({})
 
   useEffect(() => {
     Promise.all([
       fetch('/api/ai/config').then(r => r.json()) as Promise<ConfigData>,
       fetch('/api/settings/text_language').then(r => r.json()) as Promise<{ value: string | null }>,
       fetch('/api/settings/verbose_ai_logging').then(r => r.json()) as Promise<{ value: string | null }>,
-    ]).then(([aiData, langData, verboseData]) => {
+      fetch('/api/settings/auto_generate_summary').then(r => r.json()) as Promise<{ value: string | null }>,
+    ]).then(([aiData, langData, verboseData, summaryData]) => {
         setConfig(aiData)
         setCurrentEngine(aiData.current_engine)
         if (langData.value) setTextLanguage(langData.value)
         setVerboseAiLogging(verboseData.value === 'true')
+        setAutoGenerateSummary(summaryData.value === 'true')
         // Use saved values, falling back to field defaultValue if nothing stored yet
         const initialValues: Record<string, Record<string, string>> = {}
         for (const engine of BUILTIN_ENGINES) {
@@ -58,6 +65,22 @@ export default function SettingsPanel() {
           }
         }
         setFormValues(initialValues)
+
+        // Initialize summary settings
+        const initialSummarySettings: Record<string, AiSettings> = {}
+        for (const engine of BUILTIN_ENGINES) {
+          const saved = (aiData as unknown as Record<string, Record<string, unknown>>)[engine.id] ?? {}
+          const savedSummary = saved.summary_settings as AiSettings | undefined
+          initialSummarySettings[engine.id] = savedSummary ?? {
+            model: '',
+            includeExistingLore: false,
+            webSearch: 'none',
+            maxTokens: 2048,
+            maxCompletionTokens: undefined,
+          }
+        }
+        setSummarySettings(initialSummarySettings)
+
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -66,6 +89,15 @@ export default function SettingsPanel() {
   async function handleVerboseAiLoggingChange(enabled: boolean) {
     setVerboseAiLogging(enabled)
     await fetch('/api/settings/verbose_ai_logging', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: String(enabled) }),
+    })
+  }
+
+  async function handleAutoGenerateSummaryChange(enabled: boolean) {
+    setAutoGenerateSummary(enabled)
+    await fetch('/api/settings/auto_generate_summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: String(enabled) }),
@@ -122,6 +154,15 @@ export default function SettingsPanel() {
     } finally {
       setRefreshingModels(prev => ({ ...prev, [engineId]: false }))
     }
+  }
+
+  async function handleSummarySettingsChange(engineId: string, settings: AiSettings) {
+    setSummarySettings(prev => ({ ...prev, [engineId]: settings }))
+    await fetch('/api/ai/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine: engineId, fields: { summary_settings: settings } }),
+    })
   }
 
   async function handleTest(engine: AiEngineDefinition) {
@@ -198,6 +239,25 @@ export default function SettingsPanel() {
               {t('settings.textLanguage.description')}
             </p>
           </div>
+        </section>
+
+        {/* ── Auto-summary generation ── */}
+        <section>
+          <h2 className="text-base font-semibold mb-3">{t('settings.autoSummary.title')}</h2>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoGenerateSummary}
+              onChange={e => handleAutoGenerateSummaryChange(e.target.checked)}
+              className="mt-0.5 shrink-0"
+            />
+            <div>
+              <p className="text-sm">{t('settings.autoSummary.title')}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t('settings.autoSummary.description')}
+              </p>
+            </div>
+          </label>
         </section>
 
         {/* ── Current AI Engine ── */}
@@ -342,6 +402,20 @@ export default function SettingsPanel() {
                 >
                   {isRefreshing ? t('settings.models.refreshing') : t('settings.models.refresh')}
                 </button>
+              </div>
+
+              {/* Summary generation settings */}
+              <div className="mb-4">
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                  {t('settings.summaryGeneration.title')}
+                </p>
+                <AiGenerationSettings
+                  engineId={engine.id}
+                  availableModels={engineModels}
+                  settings={summarySettings[engine.id] ?? {}}
+                  onSettingsChange={(s) => handleSummarySettingsChange(engine.id, s)}
+                  disabled={!isActive}
+                />
               </div>
 
               {/* Test button + result */}

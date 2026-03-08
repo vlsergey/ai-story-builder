@@ -8,9 +8,11 @@ import { useEditorSettings } from '../lib/editor-settings'
 import { useLocale } from '../lib/locale'
 import { generateNodeStream } from '../lib/generate-node-stream'
 import { dispatchAiCallCompleted } from '../lib/billing-events'
+import { dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import { preserveScrollOnExternalUpdate } from '../lib/codemirror-preserve-scroll'
 import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
+import ResizableTextarea from './ui/resizable-textarea'
 import type { AiSettings } from '../../../shared/ai-settings.js'
 import type { AiEngineSyncRecord } from '../types/models'
 
@@ -64,16 +66,22 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [loading, setLoading] = useState(true)
   const [primaryDirty, setPrimaryDirty] = useState(false)
   const [contentDirty, setContentDirty] = useState(false)
+  const [initialContent, setInitialContent] = useState('')
+  const [initialPrimary, setInitialPrimary] = useState('')
+  const [autoGenerateSummary, setAutoGenerateSummary] = useState(false)
 
   // Plan-only extra fields
   const [userPrompt, setUserPrompt] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false)
+  const [userPromptHeight, setUserPromptHeight] = useState<number>(80) // pixels
+  const [systemPromptHeight, setSystemPromptHeight] = useState<number>(60) // pixels
   const userPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const systemPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const primaryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const summaryTriggeredRef = useRef(false)
 
   // ── Editor mode ────────────────────────────────────────────────────────────
   const [editorMode, setEditorMode] = useState<EditorMode>('generate')
@@ -86,7 +94,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [aiSettings, setAiSettings] = useState<AiSettings>({ webSearch: 'none', includeExistingLore: true, maxTokens: 2048 })
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
-  const [generatePrompt, setGeneratePrompt] = useState('')
+  // generatePrompt removed, using userPrompt instead
 
   // ── Improve instruction (modes B, C, D) ────────────────────────────────────
   const [improveInstruction, setImproveInstruction] = useState('')
@@ -116,19 +124,14 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     fetch(apiUrl).then(r => r.json() as Promise<Record<string, unknown>>).then(node => {
       setPrimaryValue(node[adapter.primaryField] as string ?? '')
       setContent(node.content as string ?? '')
+      setInitialPrimary(node[adapter.primaryField] as string ?? '')
+      setInitialContent(node.content as string ?? '')
+      summaryTriggeredRef.current = false
       const userPrompt = node.user_prompt as string ?? ''
       const systemPrompt = node.system_prompt as string ?? ''
-      if (adapter.i18nPrefix === 'plan') {
-        setUserPrompt(userPrompt)
-        setSystemPrompt(systemPrompt)
-        setGeneratePrompt(userPrompt) // not used for plan, but keep for consistency
-      } else {
-        // lore nodes
-        setGeneratePrompt(userPrompt)
-        // keep userPrompt and systemPrompt state for consistency (not used in UI)
-        setUserPrompt(userPrompt)
-        setSystemPrompt(systemPrompt)
-      }
+      setUserPrompt(userPrompt)
+      setSystemPrompt(systemPrompt)
+      // generatePrompt removed
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content as string ?? '')
         setImproveInstruction(node.last_improve_instruction as string ?? '')
@@ -142,6 +145,13 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [nodeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Update panel title when primary value changes ─────────────────────────
+  useEffect(() => {
+    if (primaryValue && panelApi) {
+      panelApi.setTitle(primaryValue)
+    }
+  }, [primaryValue, panelApi])
 
   // ── Load AI config ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -165,12 +175,69 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       .catch(() => {})
   }, [])
 
+  // ── Load auto-generate summary setting ─────────────────────────────────────
+  useEffect(() => {
+    fetch('/api/settings/auto_generate_summary')
+      .then(r => r.json())
+      .then((data: { value: string | null }) => {
+        setAutoGenerateSummary(data.value === 'true')
+      })
+      .catch(() => {})
+  }, [])
+
+  // ── Load prompt heights from settings ──────────────────────────────────────
+  useEffect(() => {
+    const loadHeight = (key: string, defaultValue: number) => {
+      fetch(`/api/settings/${key}`)
+        .then(r => r.json())
+        .then((data: { value: string | null }) => {
+          if (data.value) {
+            const parsed = parseInt(data.value, 10)
+            if (!isNaN(parsed) && parsed > 0) {
+              if (key === 'prompt_user_height') setUserPromptHeight(parsed)
+              else if (key === 'prompt_system_height') setSystemPromptHeight(parsed)
+            }
+          }
+        })
+        .catch(() => {})
+    }
+    loadHeight('prompt_user_height', 80)
+    loadHeight('prompt_system_height', 60)
+  }, [])
+
+  // ── Trigger summary generation on editor close ─────────────────────────────
+  useEffect(() => {
+    return () => {
+      // Only for plan nodes, when setting enabled, content changed, and not already triggered
+      if (
+        adapter.i18nPrefix === 'plan' &&
+        autoGenerateSummary &&
+        !summaryTriggeredRef.current &&
+        (content !== initialContent || primaryValue !== initialPrimary)
+      ) {
+        summaryTriggeredRef.current = true
+        // Fire and forget, but dispatch a graph refresh after a short delay
+        fetch('/api/ai/generate-summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ node_id: nodeId, content: content || undefined }),
+        })
+          .then(() => {
+            // Give the backend a moment to update the node, then refresh the graph
+            setTimeout(() => dispatchPlanGraphRefresh(), 2000)
+          })
+          .catch(() => {})
+      }
+    }
+  }, [nodeId, adapter.i18nPrefix, autoGenerateSummary, content, primaryValue, initialContent, initialPrimary])
+
   // ── Clear timers on unmount ────────────────────────────────────────────────
   useEffect(() => () => {
     if (primaryTimerRef.current) clearTimeout(primaryTimerRef.current)
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
     if (userPromptTimerRef.current) clearTimeout(userPromptTimerRef.current)
     if (systemPromptTimerRef.current) clearTimeout(systemPromptTimerRef.current)
+    if (heightTimerRef.current) clearTimeout(heightTimerRef.current)
   }, [])
 
   // ── Primary field autosave ─────────────────────────────────────────────────
@@ -241,6 +308,19 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         body: JSON.stringify({ engine: currentEngine, fields: { settings: aiSettings } }),
       })
     }
+  }
+
+  // ── Save prompt height to settings ────────────────────────────────────────
+  const heightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function savePromptHeight(key: 'prompt_user_height' | 'prompt_system_height', height: number) {
+    if (heightTimerRef.current) clearTimeout(heightTimerRef.current)
+    heightTimerRef.current = setTimeout(() => {
+      void fetch(`/api/settings/${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: String(height) }),
+      })
+    }, 1000)
   }
 
   // ── Mode A: Generate from scratch ─────────────────────────────────────────
@@ -434,11 +514,10 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const hasContent = content.trim().length > 0
   const isReview = editorMode === 'review_locked' || editorMode === 'review_unlocked'
   const isLocked = editorMode === 'review_locked'
-  const effectivePrompt = adapter.i18nPrefix === 'plan' ? userPrompt : generatePrompt
+  const effectivePrompt = userPrompt
 
-  // ── Plan-only: user_prompt autosave ────────────────────────────────────────
-  function handleUserPromptChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const value = e.target.value
+  // ── user_prompt autosave ──────────────────────────────────────────────────
+  function handleUserPromptChange(value: string) {
     setUserPrompt(value)
     if (userPromptTimerRef.current) clearTimeout(userPromptTimerRef.current)
     userPromptTimerRef.current = setTimeout(() => {
@@ -450,9 +529,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     }, 1000)
   }
 
-  // ── Plan-only: system_prompt autosave ──────────────────────────────────────
-  function handleSystemPromptChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const value = e.target.value
+  // ── system_prompt autosave ────────────────────────────────────────────────
+  function handleSystemPromptChange(value: string) {
     setSystemPrompt(value)
     if (systemPromptTimerRef.current) clearTimeout(systemPromptTimerRef.current)
     systemPromptTimerRef.current = setTimeout(() => {
@@ -496,25 +574,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         className="shrink-0"
       >
         <div className="overflow-hidden min-h-0">
-          {adapter.i18nPrefix !== 'plan' && (
-            <textarea
-              value={generatePrompt}
-              onChange={e => setGeneratePrompt(e.target.value)}
-              placeholder={tp('generate_placeholder')}
-              disabled={generating}
-              className="h-[20vh] min-h-[80px] w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
-            />
-          )}
-          {aiControls}
-          <div className="flex items-center justify-end px-2 py-1 border-b border-border">
-            <button
-              onClick={handleGenerate}
-              disabled={generating || !effectivePrompt.trim()}
-              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {generating ? 'Generating…' : (hasContent ? tp('regenerate') : tp('generate'))}
-            </button>
-          </div>
+          {/* No separate generate prompt textarea; prompts are shown below for all adapters */}
         </div>
       </div>
 
@@ -574,32 +634,64 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         </div>
       )}
 
-      {/* ── PLAN-ONLY: USER PROMPT + SYSTEM PROMPT ────────────────────────────── */}
-      {adapter.i18nPrefix === 'plan' && (
-        <div className="border-b border-border shrink-0">
-          <textarea
-            value={userPrompt}
-            onChange={handleUserPromptChange}
-            placeholder={tp('userPrompt')}
-            rows={2}
-            className="w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          <div
-            className="flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground select-none"
-            onClick={() => setSystemPromptExpanded(prev => !prev)}
-          >
-            <span>{systemPromptExpanded ? '▾' : '▸'}</span>
-            <span>{tp('systemPrompt')}</span>
-          </div>
-          {systemPromptExpanded && (
-            <textarea
+      {/* ── SYSTEM PROMPT + USER PROMPT (for all adapters) ────────────────────── */}
+      <div className="border-b border-border shrink-0">
+        {/* System prompt with expandable toggle */}
+        <div
+          className="flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground select-none"
+          onClick={() => setSystemPromptExpanded(prev => !prev)}
+        >
+          <span>{systemPromptExpanded ? '▾' : '▸'}</span>
+          <span>{tp('systemPrompt')}</span>
+        </div>
+        {systemPromptExpanded && (
+          <div className="px-2 py-1">
+            <ResizableTextarea
               value={systemPrompt}
               onChange={handleSystemPromptChange}
+              onHeightChange={(height) => {
+                setSystemPromptHeight(height);
+                savePromptHeight('prompt_system_height', height);
+              }}
+              initialHeight={systemPromptHeight}
+              minHeight={40}
+              maxHeight={500}
               placeholder={tp('systemPrompt')}
-              rows={3}
-              className="w-full resize-none border-t border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full resize-none border border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             />
-          )}
+          </div>
+        )}
+        {/* User prompt */}
+        <div className="px-2 py-1 border-t border-border">
+          <ResizableTextarea
+            value={userPrompt}
+            onChange={handleUserPromptChange}
+            onHeightChange={(height) => {
+              setUserPromptHeight(height);
+              savePromptHeight('prompt_user_height', height);
+            }}
+            initialHeight={userPromptHeight}
+            minHeight={40}
+            maxHeight={500}
+            placeholder={tp('userPrompt')}
+            className="w-full resize-none border border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+      </div>
+
+      {/* ── AI CONTROLS & GENERATE BUTTON — after prompts, mode 'generate' only ───── */}
+      {editorMode === 'generate' && (
+        <div className="border-b border-border shrink-0">
+          {aiControls}
+          <div className="flex items-center justify-end px-2 py-1">
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !effectivePrompt.trim()}
+              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? 'Generating…' : (hasContent ? tp('regenerate') : tp('generate'))}
+            </button>
+          </div>
         </div>
       )}
 

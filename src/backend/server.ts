@@ -13,11 +13,12 @@ import aiSyncRouter from './routes/ai-sync.js'
 import generateLoreRouter from './routes/generate-lore.js'
 import generatePlanRouter from './routes/generate-plan.js'
 import generatePlaygroundRouter from './routes/generate-playground.js'
+import generateSummaryRouter from './routes/generate-summary.js'
 import aiBillingRouter from './routes/ai-billing.js'
 import { getDataDir, restoreLastOpenedProject } from './db/state.js'
 import { applyRuntimeSettings } from './routes/projects.js'
 
-const app = express()
+export const app = express()
 // Use port 3001 for development (Vite dev server takes 3000), 3000 for production
 const port = process.env['NODE_ENV'] === 'development' ? 3001 : (Number(process.env['PORT']) || 3000)
 
@@ -68,6 +69,7 @@ app.use('/api/ai', aiSyncRouter)
 app.use('/api/ai', generateLoreRouter)
 app.use('/api/ai', generatePlanRouter)
 app.use('/api/ai', generatePlaygroundRouter)
+app.use('/api/ai', generateSummaryRouter)
 app.use('/api/ai', aiBillingRouter)
 
 app.get('/api/hello', (_req, res) => {

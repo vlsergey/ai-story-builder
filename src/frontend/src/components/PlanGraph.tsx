@@ -17,11 +17,15 @@ import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { useLocale } from '../lib/locale'
 import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
+import { PLAN_NODE_SAVED_EVENT, type PlanNodeSavedDetail } from '../lib/plan-events'
 import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './plan-graph/GenerateAllDialog'
+
+type PlanGraphNodeData = PlanGraphNode & { onDelete: (id: string) => void }
+type PlanGraphEdgeData = { type: string; label?: string; onDelete: (id: string) => void }
 
 const nodeTypes = {
   planText: PlanTextNode,
@@ -67,8 +71,8 @@ function toReactFlowEdges(graphEdges: PlanGraphEdge[], onDeleteEdge: (id: string
 
 export default function PlanGraph() {
   const { t } = useLocale()
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<any>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<any>([])
   const [autoLayout, setAutoLayout] = useState<boolean>(() => {
     try { return localStorage.getItem('planGraph.autoLayout') !== 'false' }
     catch { return true }
@@ -118,6 +122,21 @@ export default function PlanGraph() {
     window.addEventListener(PLAN_GRAPH_REFRESH_EVENT, handler)
     return () => window.removeEventListener(PLAN_GRAPH_REFRESH_EVENT, handler)
   }, [loadGraph])
+
+  // Update node title when a plan node is saved
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { id, title } = (e as CustomEvent<PlanNodeSavedDetail>).detail
+      if (title === undefined) return
+      setNodes(prev => prev.map(node =>
+        node.id === String(id)
+          ? { ...node, data: { ...node.data, title } }
+          : node
+      ))
+    }
+    window.addEventListener(PLAN_NODE_SAVED_EVENT, handler)
+    return () => window.removeEventListener(PLAN_NODE_SAVED_EVENT, handler)
+  }, [])
 
   async function deleteNode(nodeId: string) {
     if (!window.confirm('Delete this node and all connected edges?')) return

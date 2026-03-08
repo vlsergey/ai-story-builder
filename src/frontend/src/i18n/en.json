@@ -62,6 +62,10 @@
   "settings.debug.verboseAiLogging": "Verbose AI request logging",
   "settings.debug.verboseAiLoggingDescription": "Prints full request headers (API key masked) and body to the server console for every AI API call. Use when diagnosing AI integration issues.",
 
+  "settings.autoSummary.title": "Auto-summary generation",
+  "settings.autoSummary.description": "Automatically generate a short summary (5–10 words) for plan nodes when content changes.",
+  "settings.summaryGeneration.title": "Summary generation settings",
+
   "plan.generate": "Generate",
   "plan.regenerate": "Regenerate",
   "plan.overwrite_warning": "Your manual changes will be overwritten. Regenerate?",
@@ -115,6 +119,8 @@
   "lore.expand_lines": "Show unchanged lines",
   "lore.repeat_improve": "Repeat improvement",
   "lore.accept_changes": "Accept changes",
+  "lore.userPrompt": "Generation instruction",
+  "lore.systemPrompt": "System prompt",
 
   "thinking.generating": "Generating…",
   "thinking.reasoning": "Reasoning…",

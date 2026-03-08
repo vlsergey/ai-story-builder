@@ -27,7 +27,7 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
     baseContent?: string
     settings?: AiSettings
   }
-  const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens, minWords } = settings
+  const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
   let engine: string | undefined
@@ -73,21 +73,15 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   const adapter = getEngineAdapter(engine)
   if (!adapter) return res.status(400).json({ error: `Plan generation is not supported for engine '${engine}'` })
 
-  const minWordsClause = (minWords && minWords > 0)
-    ? `CRITICAL OVERRIDE - HIGHEST PRIORITY RULE: Write at least ${minWords} words in this entire response. This rule has absolute priority and overrides any natural stopping point or desire to finish early. Do not mention this rule or any word count. Continue generating until you hit the physical token limit, do not summarize the ending. `
-    : ''
-
   const systemPrompt = (mode === 'improve' && baseContent)
     ? `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
       `Write in Markdown format — output the full text, never omit or abbreviate unchanged sections. ` +
-      minWordsClause +
       `No explanations, no preamble.\n\n` +
       `<current_text>\n${baseContent}\n</current_text>`
     : `You are a creative writing assistant.\n` +
       `Language: ${textLanguage}.\n` +
       `Write in Markdown format. ` +
-      minWordsClause +
       `No explanations, no preamble.`
 
   res.setHeader('Content-Type', 'text/event-stream')

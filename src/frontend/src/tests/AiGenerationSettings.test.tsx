@@ -33,17 +33,4 @@ describe('AiGenerationSettings number inputs', () => {
     expect(input.className).not.toContain('w-20')
   })
 
-  it('minWords input is wide enough for 8-digit values', () => {
-    const { getByLabelText } = render(
-      <AiGenerationSettings
-        engineId={null}
-        availableModels={[]}
-        settings={{ ...baseSettings, minWords: 10000000 }}
-        onSettingsChange={() => {}}
-        showMinWords
-      />
-    )
-    const input = getByLabelText(/min words/i)
-    expect(input.className).not.toContain('w-20')
-  })
 })

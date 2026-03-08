@@ -11,7 +11,6 @@ interface AiGenerationSettingsProps {
   availableModels: string[]
   settings: AiSettings
   onSettingsChange: (s: AiSettings) => void
-  showMinWords?: boolean
   disabled?: boolean
   className?: string
 }
@@ -21,7 +20,6 @@ export default function AiGenerationSettings({
   availableModels,
   settings,
   onSettingsChange,
-  showMinWords,
   disabled,
   className = 'flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap',
 }: AiGenerationSettingsProps) {
@@ -101,19 +99,6 @@ export default function AiGenerationSettings({
           className="w-28 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
         />
       </label>
-      {showMinWords && (
-        <label className="flex items-center gap-1.5 text-sm shrink-0">
-          <span className="text-muted-foreground">Min words</span>
-          <input
-            type="number"
-            min={0}
-            value={settings.minWords ?? 0}
-            onChange={e => { const v = parseInt(e.target.value, 10) || 0; set({ minWords: v > 0 ? v : undefined }) }}
-            disabled={disabled}
-            className="w-28 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-          />
-        </label>
-      )}
     </div>
   )
 }

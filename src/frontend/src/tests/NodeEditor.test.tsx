@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import NodeEditor, { type NodeEditorAdapter } from '../components/NodeEditor'
 import * as streamModule from '../lib/generate-node-stream'
+import { PLAN_GRAPH_REFRESH_EVENT } from '../lib/plan-graph-events'
+import * as planGraphEvents from '../lib/plan-graph-events'
 
 // ── Dependency mocks ────────────────────────────────────────────────────────
 
@@ -28,6 +30,7 @@ vi.mock('../lib/editor-settings', () => ({ useEditorSettings: () => ({ wordWrap:
 vi.mock('../lib/locale', () => ({ useLocale: () => ({ t: (key: string) => key }) }))
 vi.mock('../lib/generate-node-stream')
 vi.mock('../lib/codemirror-preserve-scroll', () => ({ preserveScrollOnExternalUpdate: [] }))
+vi.mock('../lib/plan-graph-events', () => ({ dispatchPlanGraphRefresh: vi.fn() }))
 vi.mock('../components/AiGenerationSettings', () => ({
   default: () => <div data-testid="ai-settings" />,
 }))
@@ -95,17 +98,12 @@ describe('NodeEditor — generate mode behavior', () => {
     render(<NodeEditor nodeId={1} adapter={makeAdapter()} />)
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
 
-    const promptTextarea = screen.getByPlaceholderText('lore.generate_placeholder')
+    const promptTextarea = screen.getByPlaceholderText('lore.userPrompt')
     fireEvent.change(promptTextarea, { target: { value: 'write something' } })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'lore.generate' }))
     })
-
-    // Generate form should still be expanded (staying in generate mode).
-    // The outer container uses CSS grid animation: gridTemplateRows='1fr' = visible.
-    const generateSection = promptTextarea.closest('div[style*="grid-template-rows"]') as HTMLElement
-    expect(generateSection?.style.gridTemplateRows).toBe('1fr')
 
     // The improve form (mode B) is always in the DOM but collapsed via maxHeight.
     // In generate mode its container must have maxHeight '0px' (not '50vh').
@@ -133,7 +131,7 @@ describe('NodeEditor — generate mode behavior', () => {
     // Since window.confirm would block, stub it to return true
     vi.stubGlobal('confirm', () => true)
 
-    const promptTextarea = screen.getByPlaceholderText('lore.generate_placeholder')
+    const promptTextarea = screen.getByPlaceholderText('lore.userPrompt')
     fireEvent.change(promptTextarea, { target: { value: 'regenerate this' } })
 
     // Start generation (don't await — stream is pending)
@@ -178,7 +176,7 @@ describe('NodeEditor — generate mode behavior', () => {
     render(<NodeEditor nodeId={1} adapter={makeAdapter()} />)
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
 
-    const promptTextarea = screen.getByPlaceholderText('lore.generate_placeholder')
+    const promptTextarea = screen.getByPlaceholderText('lore.userPrompt')
     fireEvent.change(promptTextarea, { target: { value: 'test prompt' } })
     fireEvent.click(screen.getByRole('button', { name: 'lore.generate' }))
 
@@ -197,5 +195,94 @@ describe('NodeEditor — generate mode behavior', () => {
     expect((screen.getByTestId('codemirror') as HTMLTextAreaElement).value).not.toBe('HeHello')
 
     await act(async () => { resolveStream() })
+  })
+})
+
+describe('NodeEditor — auto‑summary generation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('triggers summary generation when plan node content changes and editor closes', async () => {
+    // Mock fetch to return node data, AI config, and settings
+    const fetchMock = vi.fn()
+      // GET node
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({
+        name: 'Plan Node',
+        content: 'initial content',
+        changes_status: null,
+        review_base_content: null,
+        last_improve_instruction: null,
+        user_prompt: null,
+        system_prompt: null,
+      })})
+      // GET /api/ai/config
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current_engine: null })})
+      // GET /api/settings/auto_generate_summary
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: 'true' })})
+      // PATCH content (autosave) – we'll simulate a change
+      .mockResolvedValue({ ok: true, json: () => Promise.resolve({ word_count: 5, char_count: 20, byte_count: 20 })})
+    vi.stubGlobal('fetch', fetchMock)
+
+    const planAdapter = makeAdapter({
+      i18nPrefix: 'plan',
+      apiBase: '/api/plan/nodes',
+      generateEndpoint: '/api/ai/generate-plan',
+    })
+
+    const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
+    await screen.findByTestId('codemirror', {}, { timeout: 5000 })
+
+    // Change content (simulate typing)
+    const codemirror = screen.getByTestId('codemirror')
+    fireEvent.change(codemirror, { target: { value: 'updated content' } })
+
+    // Unmount component (simulate editor close) – this should trigger the cleanup effect
+    unmount()
+
+    // Expect a POST to /api/ai/generate-summary
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/ai/generate-summary',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ node_id: 42, content: 'updated content' }),
+      })
+    )
+
+    // Expect dispatchPlanGraphRefresh to have been called (after a setTimeout of 2000 ms)
+    await waitFor(() => expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).toHaveBeenCalled(), { timeout: 3000 })
+  })
+
+  it('does NOT trigger summary generation when setting is disabled', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({
+        name: 'Plan Node',
+        content: 'initial',
+        changes_status: null,
+        review_base_content: null,
+        last_improve_instruction: null,
+        user_prompt: null,
+        system_prompt: null,
+      })})
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current_engine: null })})
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: 'false' })})
+      .mockResolvedValue({ ok: true, json: () => Promise.resolve({ word_count: 1, char_count: 10, byte_count: 10 })})
+    vi.stubGlobal('fetch', fetchMock)
+
+    const planAdapter = makeAdapter({ i18nPrefix: 'plan', apiBase: '/api/plan/nodes' })
+    const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
+    await screen.findByTestId('codemirror', {}, { timeout: 5000 })
+
+    const codemirror = screen.getByTestId('codemirror')
+    fireEvent.change(codemirror, { target: { value: 'changed' } })
+
+    unmount()
+
+    // No call to /api/ai/generate-summary
+    const generateSummaryCalls = fetchMock.mock.calls.filter(call => call[0] === '/api/ai/generate-summary')
+    expect(generateSummaryCalls).toHaveLength(0)
+    // dispatchPlanGraphRefresh should not be called either
+    expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).not.toHaveBeenCalled()
   })
 })

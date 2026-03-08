@@ -62,6 +62,10 @@
   "settings.debug.verboseAiLogging": "Подробное логирование AI запросов",
   "settings.debug.verboseAiLoggingDescription": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции.",
 
+  "settings.autoSummary.title": "Авто-сводка",
+  "settings.autoSummary.description": "Автоматически генерировать краткую сводку (5–10 слов) для узлов плана при изменении контента.",
+  "settings.summaryGeneration.title": "Настройки генерации сводки",
+
   "plan.generate": "Сгенерировать",
   "plan.regenerate": "Перегенерировать",
   "plan.overwrite_warning": "Ваши правки будут заменены. Перегенерировать?",
@@ -115,6 +119,8 @@
   "lore.expand_lines": "Показать скрытые строки",
   "lore.repeat_improve": "Повторить улучшение",
   "lore.accept_changes": "Принять изменения",
+  "lore.userPrompt": "Инструкция для генерации",
+  "lore.systemPrompt": "Системный промпт",
 
   "thinking.generating": "Генерирую…",
   "thinking.reasoning": "Рассуждаю…",
