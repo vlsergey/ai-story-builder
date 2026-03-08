@@ -21,14 +21,45 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
 
-  const { prompt, mode, baseContent, settings = {} } = req.body as {
+  const { prompt, mode, baseContent, settings = {}, nodeId } = req.body as {
     prompt?: string
     mode?: 'generate' | 'improve'
     baseContent?: string
     settings?: AiSettings
+    nodeId?: number
   }
   const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
+
+  let finalPrompt = prompt.trim()
+  if (nodeId !== undefined) {
+    try {
+      const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
+      // Get incoming instruction edges
+      const edges = db.prepare(`
+        SELECT from_node_id
+        FROM plan_edges
+        WHERE to_node_id = ? AND type = 'instruction'
+        ORDER BY position
+        LIMIT 1
+      `).all(nodeId) as Array<{ from_node_id: number }>
+      if (edges.length > 0) {
+        const fromNodeId = edges[0].from_node_id
+        const fromNode = db.prepare(`
+          SELECT title, content FROM plan_nodes WHERE id = ?
+        `).get(fromNodeId) as { title: string, content: string } | undefined
+        if (fromNode) {
+          const placeholder = `{{${fromNode.title}}}`
+          const content = fromNode.content || ''
+          finalPrompt = finalPrompt.split(placeholder).join(content)
+        }
+      }
+      db.close()
+    } catch (e) {
+      // Log but ignore errors, keep original prompt
+      console.error('Failed to apply template substitution:', e)
+    }
+  }
 
   let engine: string | undefined
   let config: AiConfigStore = {}
@@ -103,7 +134,7 @@ router.post('/generate-plan', express.json(), async (req: Request, res: Response
   try {
     const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
       {
-        prompt: prompt.trim(),
+        prompt: finalPrompt,
         systemPrompt,
         model: requestedModel?.trim() ?? '',
         includeExistingLore: includeExistingLore ?? false,

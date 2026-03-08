@@ -44,7 +44,7 @@ export async function grokGenerate(
 
   for await (const event of stream) {
     if (isVerboseLogging()) {
-      const { type, ...rest } = event as { type: string; [k: string]: unknown }
+      const { type, ...rest } = event as any
       console.log(`[Grok] SSE ${type} ${JSON.stringify(rest)}`)
     }
 

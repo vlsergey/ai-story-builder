@@ -7,6 +7,8 @@ export interface GenerateNodeOptions {
   mode?: 'generate' | 'improve'
   /** The current content to improve; only used when mode='improve' */
   baseContent?: string
+  /** Node ID for template substitution (optional) */
+  nodeId?: number
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
   onDone?: (data: { response_id?: string; cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number; tokens_total?: number; cached_tokens?: number; reasoning_tokens?: number }) => void
@@ -25,6 +27,7 @@ export async function generateNodeStream(
       mode: options.mode,
       baseContent: options.baseContent,
       settings: options.settings,
+      nodeId: options.nodeId,
     }),
     signal: options.signal,
   })

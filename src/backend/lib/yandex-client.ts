@@ -14,6 +14,6 @@ export function createYandexClient(apiKey: string, folderId: string): OpenAI {
     baseURL: YANDEX_BASE,
     project: folderId,
     defaultHeaders: { 'x-folder-id': folderId },
-    fetch: makeLoggingFetch(),
+    fetch: makeLoggingFetch('Yandex', YANDEX_BASE),
   })
 }

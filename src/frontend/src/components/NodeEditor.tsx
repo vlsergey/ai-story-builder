@@ -343,6 +343,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       prompt: effectivePrompt,
       settings: aiSettings,
       mode: 'generate',
+      nodeId: nodeId,
       onThinking: (status, detail) => {
         if (status === 'done') setThinkingDone(true)
         else { setThinkingStatus(status); setThinkingDone(false) }
@@ -423,6 +424,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         settings: aiSettings,
         mode: 'improve',
         baseContent: baseForStream,
+        nodeId: nodeId,
         onThinking: (status, detail) => {
           if (status === 'done') setThinkingDone(true)
           else { setThinkingStatus(status); setThinkingDone(false) }
@@ -592,7 +594,15 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
             rows={2}
             className="w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
           />
-          <div className="flex items-center justify-end px-2 py-1 border-b border-border">
+          <div className="flex items-center justify-between flex-wrap px-2 py-1.5 border-b border-border">
+            <AiGenerationSettings
+              engineId={currentEngine}
+              availableModels={availableModels}
+              settings={aiSettings}
+              onSettingsChange={setAiSettings}
+              disabled={generating}
+              className="flex items-center gap-3 flex-wrap"
+            />
             <button
               onClick={handleImprove}
               disabled={isLocked || !improveInstruction.trim()}
@@ -601,33 +611,9 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
               {isLocked ? 'Generating…' : tp('repeat_improve')}
             </button>
           </div>
-          {aiControls}
         </div>
       </div>
 
-      {/* ── STATUS ROWS — always visible ────────────────────────────────────── */}
-      {thinkingStatus !== null && (
-        <div className="flex items-start gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
-          <div className="mt-0.5 shrink-0">
-            {thinkingDone
-              ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-              : <Loader2 className="h-4 w-4 animate-spin" />}
-          </div>
-          <div className="min-w-0">
-            <div>{t(`thinking.${thinkingDone ? 'done' : thinkingStatus}`)}</div>
-            {thinkingDetail && (
-              <div className="text-xs text-muted-foreground/70 truncate" title={thinkingDetail}>
-                {thinkingDetail}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {genError && (
-        <div className="px-2 py-1 text-xs text-destructive bg-destructive/10 border-b border-destructive/20 shrink-0">
-          {genError}
-        </div>
-      )}
 
       {/* ── SYSTEM PROMPT + USER PROMPT (for all adapters) ────────────────────── */}
       <div className="border-b border-border shrink-0">
@@ -677,8 +663,15 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       {/* ── AI CONTROLS & GENERATE BUTTON — after prompts, mode 'generate' only ───── */}
       {editorMode === 'generate' && (
         <div className="border-b border-border shrink-0">
-          {aiControls}
-          <div className="flex items-center justify-end px-2 py-1">
+          <div className="flex items-center justify-between flex-wrap px-2 py-1.5">
+            <AiGenerationSettings
+              engineId={currentEngine}
+              availableModels={availableModels}
+              settings={aiSettings}
+              onSettingsChange={setAiSettings}
+              disabled={generating}
+              className="flex items-center gap-3 flex-wrap"
+            />
             <button
               onClick={handleGenerate}
               disabled={generating || !effectivePrompt.trim()}
@@ -703,6 +696,30 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           {(primaryDirty || contentDirty) ? 'Saving…' : 'Saved'}
         </span>
       </div>
+
+      {/* ── STATUS ROWS — always visible ────────────────────────────────────── */}
+      {thinkingStatus !== null && (
+        <div className="flex items-start gap-2 px-2 py-1 text-sm text-muted-foreground border-b border-border shrink-0">
+          <div className="mt-0.5 shrink-0">
+            {thinkingDone
+              ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+              : <Loader2 className="h-4 w-4 animate-spin" />}
+          </div>
+          <div className="min-w-0">
+            <div>{t(`thinking.${thinkingDone ? 'done' : thinkingStatus}`)}</div>
+            {thinkingDetail && (
+              <div className="text-xs text-muted-foreground/70 truncate" title={thinkingDetail}>
+                {thinkingDetail}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {genError && (
+        <div className="px-2 py-1 text-xs text-destructive bg-destructive/10 border-b border-destructive/20 shrink-0">
+          {genError}
+        </div>
+      )}
 
       {/* ── [C/D] TAB BAR — visible in review modes ──────────────────────────── */}
       <div
@@ -822,9 +839,16 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
             className="h-[15vh] min-h-[80px] w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
           />
         )}
-        {aiControls}
-        <div className="flex items-center justify-between gap-2 px-2 py-1">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between flex-wrap px-2 py-1 border-t border-border">
+          <div className="flex items-center gap-2 flex-wrap">
+            <AiGenerationSettings
+              engineId={currentEngine}
+              availableModels={availableModels}
+              settings={aiSettings}
+              onSettingsChange={setAiSettings}
+              disabled={generating}
+              className="flex items-center gap-3 flex-wrap"
+            />
             {!generating && adapter.renderEditModeExtras?.(nodeId)}
           </div>
           <div className="flex items-center gap-2">

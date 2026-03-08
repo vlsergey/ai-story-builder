@@ -23,8 +23,11 @@ function maskAuth(value: string): string {
   return value.replace(/^(Bearer\s+)\S+$/i, '$1***')
 }
 
+type FetchParams = Parameters<typeof fetch>
+type RequestInitOrUndefined = FetchParams[1]
+type HeadersField = NonNullable<RequestInitOrUndefined>['headers']
 /** Normalises request headers (Headers | Record | [k,v][]) to a plain masked object for logging. */
-export function maskedHeaders(raw: Parameters<typeof fetch>[1]['headers']): Record<string, string> {
+export function maskedHeaders(raw: HeadersField | undefined): Record<string, string> {
   const out: Record<string, string> = {}
   if (!raw) return out
   if (raw instanceof Headers) {
@@ -75,7 +78,8 @@ export function makeLoggingFetch(
         console.log(`[${providerName}] REQ body: ${init.body}`)
       } else if (init?.body instanceof FormData) {
         const fields: Record<string, string> = {}
-        for (const [k, v] of (init.body as FormData).entries()) {
+        // @ts-ignore entries may be missing in some environments
+        for (const [k, v] of (init.body as any).entries()) {
           fields[k] = v instanceof Blob ? `<Blob size=${v.size} type=${v.type}>` : String(v)
         }
         console.log(`[${providerName}] REQ multipart: ${JSON.stringify(fields)}`)
