@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js'
-import { makeLoggingFetch, isVerboseLogging } from './yandex-client.js'
+import { makeLoggingFetch, isVerboseLogging } from './ai-logging.js'
 
 const GROK_BASE = 'https://api.x.ai/v1'
 

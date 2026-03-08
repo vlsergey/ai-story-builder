@@ -8,7 +8,7 @@ vi.mock('openai', () => ({
     return { responses: { create: mockCreate } }
   }),
 }))
-vi.mock('./yandex-client.js', () => ({
+vi.mock('./ai-logging.js', () => ({
   makeLoggingFetch: () => undefined,
   isVerboseLogging: () => false,
 }))

@@ -21,7 +21,7 @@ vi.mock('../db/state.js', () => ({
   getDataDir: () => '/tmp/test-data',
 }))
 
-vi.mock('../lib/yandex-client.js', () => ({ setVerboseLogging: vi.fn() }))
+vi.mock('../lib/ai-logging.js', () => ({ setVerboseLogging: vi.fn() }))
 
 const { default: router } = await import('./projects.js')
 

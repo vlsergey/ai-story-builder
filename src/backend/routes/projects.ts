@@ -9,7 +9,7 @@ import {
   writeAppSettings,
   getDataDir,
 } from '../db/state.js'
-import { setVerboseLogging } from '../lib/yandex-client.js'
+import { setVerboseLogging } from '../lib/ai-logging.js'
 import { sanitizeProjectName } from '../lib/project-name.js'
 
 // Lazy loader — deferred so that test imports don't trigger the require

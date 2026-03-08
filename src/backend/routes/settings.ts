@@ -1,6 +1,6 @@
 import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
-import { setVerboseLogging } from '../lib/yandex-client.js'
+import { setVerboseLogging } from '../lib/ai-logging.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
