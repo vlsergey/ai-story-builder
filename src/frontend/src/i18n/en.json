@@ -80,6 +80,9 @@
 
   "planGraph.addTextNode": "Add text node",
   "planGraph.addLoreNode": "Add lore node",
+  "planGraph.nodeTitle": "Node title",
+  "common.cancel": "Cancel",
+  "common.add": "Add",
   "planGraph.autoLayout": "Auto layout",
   "planGraph.applyLayout": "Apply layout",
   "planGraph.generateAll": "Generate all",

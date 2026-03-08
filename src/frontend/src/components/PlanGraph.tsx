@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -16,7 +16,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { useLocale } from '../lib/locale'
-import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
+import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh, dispatchOpenPlanNodeEditor } from '../lib/plan-graph-events'
 import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
@@ -76,6 +76,9 @@ export default function PlanGraph() {
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
   const [showGenerateAll, setShowGenerateAll] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' } | null>(null)
+  const [addTitle, setAddTitle] = useState('')
+  const addTitleInputRef = useRef<HTMLInputElement>(null)
 
   const loadGraph = useCallback(async () => {
     try {
@@ -129,26 +132,25 @@ export default function PlanGraph() {
     }
   }
 
-  async function addTextNode() {
-    const title = window.prompt('Node title:')
-    if (!title?.trim()) return
+  function openAddDialog(type: 'text' | 'lore') {
+    setAddTitle('')
+    setAddDialog({ type })
+    // focus the input on next paint
+    setTimeout(() => addTitleInputRef.current?.focus(), 0)
+  }
+
+  async function confirmAddNode() {
+    if (!addTitle.trim() || !addDialog) return
+    const title = addTitle.trim()
+    const type = addDialog.type
+    setAddDialog(null)
+    setAddTitle('')
     const centerX = 100 + Math.random() * 200
     const centerY = 100 + Math.random() * 200
     const resp = await fetch('/api/plan/graph/nodes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'text', title: title.trim(), x: centerX, y: centerY }),
-    })
-    if (resp.ok) dispatchPlanGraphRefresh()
-  }
-
-  async function addLoreNode() {
-    const title = window.prompt('Lore node title:')
-    if (!title?.trim()) return
-    const resp = await fetch('/api/plan/graph/nodes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'lore', title: title.trim(), x: 100, y: 100 }),
+      body: JSON.stringify({ type, title, x: centerX, y: centerY }),
     })
     if (resp.ok) dispatchPlanGraphRefresh()
   }
@@ -164,6 +166,12 @@ export default function PlanGraph() {
 
   const onConnect = useCallback((connection: Connection) => {
     setShowConnectDialog(connection)
+  }, [])
+
+  const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (node.type !== 'planText') return
+    const id = (node.data as { id?: number }).id
+    if (id != null) dispatchOpenPlanNodeEditor(id)
   }, [])
 
   async function confirmConnect(edgeType: string) {
@@ -234,13 +242,13 @@ export default function PlanGraph() {
       {/* Toolbar */}
       <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-background border border-border rounded shadow px-2 py-1.5 flex-wrap">
         <button
-          onClick={() => void addTextNode()}
+          onClick={() => openAddDialog('text')}
           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
         >
           {t('planGraph.addTextNode')}
         </button>
         <button
-          onClick={() => void addLoreNode()}
+          onClick={() => openAddDialog('lore')}
           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
         >
           {t('planGraph.addLoreNode')}
@@ -279,6 +287,7 @@ export default function PlanGraph() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
+        onNodeDoubleClick={onNodeDoubleClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -319,6 +328,44 @@ export default function PlanGraph() {
       {/* Generate All dialog */}
       {showGenerateAll && (
         <GenerateAllDialog onClose={() => setShowGenerateAll(false)} />
+      )}
+
+      {/* Add node dialog */}
+      {addDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-72">
+            <h3 className="text-sm font-semibold mb-3">
+              {addDialog.type === 'text' ? t('planGraph.addTextNode') : t('planGraph.addLoreNode')}
+            </h3>
+            <input
+              ref={addTitleInputRef}
+              type="text"
+              value={addTitle}
+              onChange={e => setAddTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void confirmAddNode()
+                if (e.key === 'Escape') { setAddDialog(null); setAddTitle('') }
+              }}
+              placeholder={t('planGraph.nodeTitle')}
+              className="w-full px-3 py-1.5 text-sm border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-ring mb-3"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setAddDialog(null); setAddTitle('') }}
+                className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={() => void confirmAddNode()}
+                disabled={!addTitle.trim()}
+                className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {t('common.add')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

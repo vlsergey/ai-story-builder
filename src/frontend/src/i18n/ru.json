@@ -80,6 +80,9 @@
 
   "planGraph.addTextNode": "Добавить текстовый узел",
   "planGraph.addLoreNode": "Добавить лор-узел",
+  "planGraph.nodeTitle": "Название узла",
+  "common.cancel": "Отмена",
+  "common.add": "Добавить",
   "planGraph.autoLayout": "Авторазмещение",
   "planGraph.applyLayout": "Применить раскладку",
   "planGraph.generateAll": "Генерировать всё",
