@@ -169,7 +169,8 @@ router.get('/:id', (req: Request, res: Response) => {
 router.patch('/:id', express.json(), (req: Request, res: Response) => {
   const {
     name, content, prompt,
-    start_review, accept_review, last_generate_prompt,
+    start_review, accept_review,
+    user_prompt, system_prompt,
   } = req.body as {
     name?: string
     content?: string
@@ -180,16 +181,19 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
     start_review?: boolean
     /** When true: clear changes_status, review_base_content, and last_improve_instruction. */
     accept_review?: boolean
-    /** Generate prompt (mode A); saved independently to last_generate_prompt */
-    last_generate_prompt?: string | null
+    /** User prompt for generation */
+    user_prompt?: string | null
+    /** System prompt for generation */
+    system_prompt?: string | null
   }
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   const hasName = typeof name === 'string' && name.trim().length > 0
   const hasContent = content !== undefined
-  const hasLastGeneratePrompt = last_generate_prompt !== undefined
-  if (!hasName && !hasContent && !accept_review && !hasLastGeneratePrompt && prompt === undefined)
+  const hasUserPrompt = user_prompt !== undefined
+  const hasSystemPrompt = system_prompt !== undefined
+  if (!hasName && !hasContent && !accept_review && !hasUserPrompt && !hasSystemPrompt && prompt === undefined)
     return res.status(400).json({ error: 'name or content required' })
   try {
     const db = new Database(dbPath)
@@ -223,9 +227,14 @@ router.patch('/:id', express.json(), (req: Request, res: Response) => {
       }
     }
 
-    // Save generate prompt independently (mode A)
-    if (hasLastGeneratePrompt) {
-      sets.push('last_generate_prompt = ?'); params.push(last_generate_prompt ?? null)
+    // Save user prompt
+    if (hasUserPrompt) {
+      sets.push('user_prompt = ?'); params.push(user_prompt ?? null)
+    }
+
+    // Save system prompt
+    if (hasSystemPrompt) {
+      sets.push('system_prompt = ?'); params.push(system_prompt ?? null)
     }
 
     // Save improve instruction whenever provided (first improve OR re-improve)

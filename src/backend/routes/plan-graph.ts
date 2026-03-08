@@ -39,7 +39,7 @@ router.get('/graph', (_req: Request, res: Response) => {
       `SELECT id, type, title, content, user_prompt, system_prompt, summary, auto_summary,
               ai_sync_info, x, y, word_count, char_count, byte_count,
               changes_status, review_base_content, last_improve_instruction,
-              last_generate_prompt, created_at
+              created_at
        FROM plan_nodes ORDER BY id`
     ).all() as PlanNodeRow[]
     const edges = db.prepare(
@@ -104,7 +104,7 @@ router.patch('/graph/nodes/:id', express.json(), (req: Request, res: Response) =
   const {
     title, content, x, y, type,
     user_prompt, system_prompt, summary, auto_summary,
-    prompt, start_review, accept_review, last_generate_prompt,
+    prompt, start_review, accept_review,
   } = req.body as {
     title?: string
     content?: string
@@ -118,7 +118,6 @@ router.patch('/graph/nodes/:id', express.json(), (req: Request, res: Response) =
     prompt?: string
     start_review?: boolean
     accept_review?: boolean
-    last_generate_prompt?: string | null
   }
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
@@ -132,11 +131,10 @@ router.patch('/graph/nodes/:id', express.json(), (req: Request, res: Response) =
   const hasSystemPrompt = system_prompt !== undefined
   const hasSummary = summary !== undefined
   const hasAutoSummary = auto_summary !== undefined
-  const hasLastGeneratePrompt = last_generate_prompt !== undefined
 
   if (!hasTitle && !hasContent && !hasPosition && !hasType && !hasUserPrompt &&
       !hasSystemPrompt && !hasSummary && !hasAutoSummary && !accept_review &&
-      !hasLastGeneratePrompt && prompt === undefined) {
+      prompt === undefined) {
     return res.status(400).json({ error: 'at least one field required' })
   }
 
@@ -165,9 +163,6 @@ router.patch('/graph/nodes/:id', express.json(), (req: Request, res: Response) =
       sets.push('byte_count = ?'); params.push(byteCount!)
     }
 
-    if (hasLastGeneratePrompt) {
-      sets.push('last_generate_prompt = ?'); params.push(last_generate_prompt ?? null)
-    }
 
     if (prompt !== undefined && !start_review) {
       sets.push('last_improve_instruction = ?'); params.push(prompt ?? null)

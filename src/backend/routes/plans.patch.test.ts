@@ -33,8 +33,7 @@ function setupDb(dbPath: string) {
       byte_count           INTEGER NOT NULL DEFAULT 0,
       changes_status       TEXT NULL,
       review_base_content  TEXT NULL,
-      last_improve_instruction TEXT NULL,
-      last_generate_prompt TEXT NULL
+      last_improve_instruction TEXT NULL
     );
     CREATE TABLE plan_edges (
       id           INTEGER PRIMARY KEY,

@@ -75,6 +75,8 @@ emerges from usage.
   - `changes_status` TEXT NULL — review workflow state: NULL (not in review) | `'review'` (AI improvement pending user acceptance)
   - `review_base_content` TEXT NULL — snapshot of `content` captured when the first AI improvement started; serves as the "old" side of diffs in review mode; set once per review session, never changed on repeat improvements, cleared on accept
   - `last_improve_instruction` TEXT NULL — last AI improve instruction used; stored when `start_review=true` so the review state (including prompt) can be restored when the editor is reopened; cleared on accept
+  - `user_prompt` TEXT NULL — generation instruction stored per-node (autosaved)
+  - `system_prompt` TEXT NULL — per-node system prompt override (autosaved)
   - Unique constraint on (`parent_id`, `name`)
 
 `AiEngineSyncRecord` (value in `ai_sync_info` JSON map):
@@ -106,7 +108,6 @@ The plan is a directed graph. Nodes carry content and edges carry semantic roles
   - `changes_status` TEXT NULL — review workflow state: NULL | `'review'`
   - `review_base_content` TEXT NULL — snapshot before AI improvement
   - `last_improve_instruction` TEXT NULL — last AI improve instruction
-  - `last_generate_prompt` TEXT NULL — last generate prompt (mode A)
 
 - `plan_edges`
   - `id` INTEGER PRIMARY KEY

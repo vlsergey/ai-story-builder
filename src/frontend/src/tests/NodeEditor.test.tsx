@@ -62,7 +62,8 @@ const emptyNode = {
   changes_status: null,
   review_base_content: null,
   last_improve_instruction: null,
-  last_generate_prompt: '',
+  user_prompt: null,
+  system_prompt: null,
 }
 
 const nodeWithContent = {
@@ -71,7 +72,8 @@ const nodeWithContent = {
   changes_status: null,
   review_base_content: null,
   last_improve_instruction: null,
-  last_generate_prompt: 'old prompt',
+  user_prompt: 'old prompt',
+  system_prompt: null,
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────

@@ -47,7 +47,8 @@ function setupDb(): string {
       changes_status          TEXT NULL,
       review_base_content     TEXT NULL,
       last_improve_instruction TEXT NULL,
-      last_generate_prompt    TEXT NULL,
+      user_prompt             TEXT NULL,
+      system_prompt           TEXT NULL,
       UNIQUE (parent_id, name)
     );
     INSERT INTO lore_nodes (id, parent_id, name, content) VALUES

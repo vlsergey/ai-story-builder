@@ -116,10 +116,18 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     fetch(apiUrl).then(r => r.json() as Promise<Record<string, unknown>>).then(node => {
       setPrimaryValue(node[adapter.primaryField] as string ?? '')
       setContent(node.content as string ?? '')
-      setGeneratePrompt(node.last_generate_prompt as string ?? '')
+      const userPrompt = node.user_prompt as string ?? ''
+      const systemPrompt = node.system_prompt as string ?? ''
       if (adapter.i18nPrefix === 'plan') {
-        setUserPrompt(node.user_prompt as string ?? '')
-        setSystemPrompt(node.system_prompt as string ?? '')
+        setUserPrompt(userPrompt)
+        setSystemPrompt(systemPrompt)
+        setGeneratePrompt(userPrompt) // not used for plan, but keep for consistency
+      } else {
+        // lore nodes
+        setGeneratePrompt(userPrompt)
+        // keep userPrompt and systemPrompt state for consistency (not used in UI)
+        setUserPrompt(userPrompt)
+        setSystemPrompt(systemPrompt)
       }
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content as string ?? '')
@@ -237,7 +245,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   // ── Mode A: Generate from scratch ─────────────────────────────────────────
   function handleGenerate() {
-    if (!generatePrompt.trim()) return
+    if (!effectivePrompt.trim()) return
     if (hasContent && !window.confirm(tp('overwrite_warning'))) return
     setThinkingStatus(null)
     setThinkingDetail(null)
@@ -252,7 +260,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     let lastCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number; tokens_total?: number; cached_tokens?: number; reasoning_tokens?: number } = {}
 
     generateNodeStream(adapter.generateEndpoint, {
-      prompt: generatePrompt,
+      prompt: effectivePrompt,
       settings: aiSettings,
       mode: 'generate',
       onThinking: (status, detail) => {
@@ -277,7 +285,11 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       if (finalPrimary.trim() || finalContent) {
         const patchBody: Record<string, unknown> = {
           content: finalContent,
-          last_generate_prompt: generatePrompt.trim(),
+          user_prompt: effectivePrompt.trim(),
+        }
+        if (adapter.i18nPrefix === 'plan') {
+          // plan nodes also have system_prompt, but we don't need to update it here
+          // optionally we could include system_prompt: systemPrompt
         }
         if (finalPrimary.trim()) patchBody[adapter.primaryField] = finalPrimary.trim()
         const r = await fetch(apiUrl, {
@@ -422,6 +434,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const hasContent = content.trim().length > 0
   const isReview = editorMode === 'review_locked' || editorMode === 'review_unlocked'
   const isLocked = editorMode === 'review_locked'
+  const effectivePrompt = adapter.i18nPrefix === 'plan' ? userPrompt : generatePrompt
 
   // ── Plan-only: user_prompt autosave ────────────────────────────────────────
   function handleUserPromptChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -483,18 +496,20 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         className="shrink-0"
       >
         <div className="overflow-hidden min-h-0">
-          <textarea
-            value={generatePrompt}
-            onChange={e => setGeneratePrompt(e.target.value)}
-            placeholder={tp('generate_placeholder')}
-            disabled={generating}
-            className="h-[20vh] min-h-[80px] w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
-          />
+          {adapter.i18nPrefix !== 'plan' && (
+            <textarea
+              value={generatePrompt}
+              onChange={e => setGeneratePrompt(e.target.value)}
+              placeholder={tp('generate_placeholder')}
+              disabled={generating}
+              className="h-[20vh] min-h-[80px] w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
+            />
+          )}
           {aiControls}
           <div className="flex items-center justify-end px-2 py-1 border-b border-border">
             <button
               onClick={handleGenerate}
-              disabled={generating || !generatePrompt.trim()}
+              disabled={generating || !effectivePrompt.trim()}
               className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {generating ? 'Generating…' : (hasContent ? tp('regenerate') : tp('generate'))}

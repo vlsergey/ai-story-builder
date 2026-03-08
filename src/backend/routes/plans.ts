@@ -114,7 +114,8 @@ router.post('/nodes', express.json(), (req: Request, res: Response) => {
 router.patch('/nodes/:id', express.json(), (req: Request, res: Response) => {
   const {
     title, content, prompt,
-    start_review, accept_review, last_generate_prompt,
+    start_review, accept_review,
+    user_prompt, system_prompt,
   } = req.body as {
     title?: string
     content?: string
@@ -122,16 +123,19 @@ router.patch('/nodes/:id', express.json(), (req: Request, res: Response) => {
     prompt?: string
     start_review?: boolean
     accept_review?: boolean
-    /** Generate prompt (mode A); saved independently to last_generate_prompt */
-    last_generate_prompt?: string | null
+    /** User prompt for generation (replaces last_generate_prompt for plan nodes) */
+    user_prompt?: string | null
+    /** System prompt for generation (plan nodes only) */
+    system_prompt?: string | null
   }
   const dbPath = getCurrentDbPath()
   if (!dbPath) return res.status(400).json({ error: 'no project open' })
   if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
   const hasTitle = typeof title === 'string' && title.trim().length > 0
   const hasContent = content !== undefined
-  const hasLastGeneratePrompt = last_generate_prompt !== undefined
-  if (!hasTitle && !hasContent && !accept_review && !hasLastGeneratePrompt && prompt === undefined) {
+  const hasUserPrompt = user_prompt !== undefined
+  const hasSystemPrompt = system_prompt !== undefined
+  if (!hasTitle && !hasContent && !accept_review && !hasUserPrompt && !hasSystemPrompt && prompt === undefined) {
     return res.status(400).json({ error: 'title, content, or accept_review required' })
   }
   try {
@@ -152,9 +156,14 @@ router.patch('/nodes/:id', express.json(), (req: Request, res: Response) => {
       sets.push('byte_count = ?'); params.push(byteCount!)
     }
 
-    // Save generate prompt independently (mode A)
-    if (hasLastGeneratePrompt) {
-      sets.push('last_generate_prompt = ?'); params.push(last_generate_prompt ?? null)
+    // Save user prompt
+    if (hasUserPrompt) {
+      sets.push('user_prompt = ?'); params.push(user_prompt ?? null)
+    }
+
+    // Save system prompt (plan nodes only)
+    if (hasSystemPrompt) {
+      sets.push('system_prompt = ?'); params.push(system_prompt ?? null)
     }
 
     // Save improve instruction whenever provided (first improve OR re-improve)

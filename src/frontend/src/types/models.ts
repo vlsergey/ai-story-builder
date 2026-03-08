@@ -73,7 +73,6 @@ export interface PlanGraphNode {
   changes_status: string | null
   review_base_content: string | null
   last_improve_instruction: string | null
-  last_generate_prompt: string | null
   created_at: string
 }
 

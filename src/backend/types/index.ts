@@ -19,8 +19,10 @@ export interface LoreNodeRow {
   review_base_content: string | null
   /** Last AI improve instruction used; stored for restoring review state on reopen */
   last_improve_instruction: string | null
-  /** Last generate prompt (mode A); stored to restore the textarea on reopen */
-  last_generate_prompt: string | null
+  /** User prompt for generation (mode A) */
+  user_prompt: string | null
+  /** System prompt for generation */
+  system_prompt: string | null
 }
 
 export interface PlanNodeRow {
@@ -47,8 +49,6 @@ export interface PlanNodeRow {
   review_base_content: string | null
   /** Last AI improve instruction used; stored for restoring review state on reopen */
   last_improve_instruction: string | null
-  /** Last generate prompt (mode A); stored to restore the textarea on reopen */
-  last_generate_prompt: string | null
 }
 
 export interface PlanEdgeRow {
