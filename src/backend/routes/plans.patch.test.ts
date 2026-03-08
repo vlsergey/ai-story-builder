@@ -14,19 +14,36 @@ function setupDb(dbPath: string) {
   const db = new Database(dbPath)
   db.exec(`
     CREATE TABLE plan_nodes (
-      id          INTEGER PRIMARY KEY,
-      parent_id   INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      title       TEXT NOT NULL,
-      content     TEXT,
-      position    INTEGER DEFAULT 0,
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-      word_count  INTEGER NOT NULL DEFAULT 0,
-      char_count  INTEGER NOT NULL DEFAULT 0,
-      byte_count  INTEGER NOT NULL DEFAULT 0,
-      changes_status TEXT NULL,
-      review_base_content TEXT NULL,
+      id                   INTEGER PRIMARY KEY,
+      parent_id            INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
+      title                TEXT NOT NULL,
+      content              TEXT,
+      position             INTEGER DEFAULT 0,
+      created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+      type                 TEXT NOT NULL DEFAULT 'text',
+      x                    REAL DEFAULT 0,
+      y                    REAL DEFAULT 0,
+      user_prompt          TEXT,
+      system_prompt        TEXT,
+      summary              TEXT,
+      auto_summary         INTEGER DEFAULT 0,
+      ai_sync_info         TEXT,
+      word_count           INTEGER NOT NULL DEFAULT 0,
+      char_count           INTEGER NOT NULL DEFAULT 0,
+      byte_count           INTEGER NOT NULL DEFAULT 0,
+      changes_status       TEXT NULL,
+      review_base_content  TEXT NULL,
       last_improve_instruction TEXT NULL,
       last_generate_prompt TEXT NULL
+    );
+    CREATE TABLE plan_edges (
+      id           INTEGER PRIMARY KEY,
+      from_node_id INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
+      to_node_id   INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
+      type         TEXT NOT NULL DEFAULT 'instruction',
+      position     INTEGER DEFAULT 0,
+      label        TEXT,
+      template     TEXT
     );
   `)
   // Root + child

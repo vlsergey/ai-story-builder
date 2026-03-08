@@ -30,6 +30,14 @@ export interface PlanNodeRow {
   content: string | null
   position: number
   created_at: string
+  type: string
+  x: number
+  y: number
+  user_prompt: string | null
+  system_prompt: string | null
+  summary: string | null
+  auto_summary: number
+  ai_sync_info: string | null
   word_count: number
   char_count: number
   byte_count: number
@@ -41,6 +49,16 @@ export interface PlanNodeRow {
   last_improve_instruction: string | null
   /** Last generate prompt (mode A); stored to restore the textarea on reopen */
   last_generate_prompt: string | null
+}
+
+export interface PlanEdgeRow {
+  id: number
+  from_node_id: number
+  to_node_id: number
+  type: string
+  position: number
+  label: string | null
+  template: string | null
 }
 
 export interface StoryPartRow {

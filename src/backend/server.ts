@@ -5,13 +5,13 @@ import fs from 'fs'
 import projectsRouter from './routes/projects.js'
 import loreRouter from './routes/lore.js'
 import plansRouter from './routes/plans.js'
+import planGraphRouter from './routes/plan-graph.js'
 import generationRouter from './routes/generation.js'
 import settingsRouter from './routes/settings.js'
 import aiConfigRouter from './routes/ai-config.js'
 import aiSyncRouter from './routes/ai-sync.js'
 import generateLoreRouter from './routes/generate-lore.js'
 import generatePlanRouter from './routes/generate-plan.js'
-import generatePlanChildrenRouter from './routes/generate-plan-children.js'
 import generatePlaygroundRouter from './routes/generate-playground.js'
 import aiBillingRouter from './routes/ai-billing.js'
 import { getDataDir, restoreLastOpenedProject } from './db/state.js'
@@ -60,13 +60,13 @@ app.use((req, res, next) => {
 app.use('/api/project', projectsRouter)
 app.use('/api/lore', loreRouter)
 app.use('/api/plan', plansRouter)
+app.use('/api/plan', planGraphRouter)
 app.use('/api', generationRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/ai', aiConfigRouter)
 app.use('/api/ai', aiSyncRouter)
 app.use('/api/ai', generateLoreRouter)
 app.use('/api/ai', generatePlanRouter)
-app.use('/api/ai', generatePlanChildrenRouter)
 app.use('/api/ai', generatePlaygroundRouter)
 app.use('/api/ai', aiBillingRouter)
 

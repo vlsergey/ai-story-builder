@@ -143,70 +143,63 @@ A singleton dockview panel (`id='settings'`) that opens in the editor group by d
 
 **AI Engine capability definitions** live in a shared frontend module (e.g., `src/frontend/src/lib/ai-engines.ts`) so they can be imported by both SettingsPanel and future panels.
 
-### PlanTree Panel
+### PlanGraph Panel
 
-A dockview panel (`id='plan-panel'`) in the left sidebar. Implemented with `react-complex-tree` `ControlledTreeEnvironment` (same architecture as LoreTree).
+A permanent dockview panel (`id='plan-graph'`) in the center area. Rendered by `PlanGraph.tsx` using **React Flow** (`@xyflow/react`) and **Dagre** (`@dagrejs/dagre`) for auto-layout.
 
-**Props:** `onOpenEditor?: (nodeId: number) => void`, `onOpenChildrenEditor?: (nodeId: number) => void`
+**Toolbar (floating, top-left):**
+- **Add text node** — prompts for title, `POST /api/plan/graph/nodes` with `type:'text'`
+- **Add lore node** — same with `type:'lore'`
+- **Auto layout** toggle (persisted in `localStorage`): when on, positions are recalculated with Dagre (LR direction) after any add; when off, nodes are freely draggable
+- **Apply layout** button (only visible when auto=off): runs Dagre once and persists positions
+- **Generate all** button — opens `GenerateAllDialog`
 
-**Toolbar actions:** Create child node, Rename (F2), Open editor (Enter / double-click), Split into sub-items, Delete (with confirm)
+**Canvas interactions:**
+- Double-click on text node → dispatches `OPEN_PLAN_NODE_EDITOR_EVENT` → `Layout.tsx` opens `plan-node-editor-{id}` panel
+- Drag node (auto=off) → `PATCH /api/plan/graph/nodes/:id` with new `{x, y}`
+- Connect two nodes → shows EdgeTypeDialog (instruction / attachment / system_prompt) → `POST /api/plan/graph/edges`
+- Hover over edge → shows Delete (×) button
+- Edge colors: instruction=blue, attachment=green, system_prompt=orange
 
-**Stats toggle**: cycle through none / words / chars / bytes (same as LoreTree)
+**Custom node types:**
+- `PlanTextNode` (`planText`): shows title, status badge (not generated / generated / review), word count, summary snippet
+- `PlanLoreNode` (`planLore`): shows lore icon + title
 
-**Events:**
-- Listens to `PLAN_NODE_SAVED_EVENT` → updates local stats without re-fetching the full tree
-- Listens to `PLAN_TREE_REFRESH_EVENT` → re-fetches full tree (used after PlanChildrenEditor applies changes)
+**Custom edge type:** `PlanEdge` — smoothstep path, colored by type, animated label, hover delete
 
-**Drag-and-drop:** full DnD support for reparenting and reordering (`PATCH /api/plan/nodes/:id/move`, `POST /api/plan/nodes/reorder-children`)
+**Auto-layout algorithm:** Dagre with `rankdir: 'LR'`, `nodesep: 60`, `ranksep: 120`, node size 200×80
 
-**Keyboard shortcuts:** F2 rename, Enter open editor, Delete key with confirm dialog
+**Data fetching:** `GET /api/plan/graph` on mount and on `PLAN_GRAPH_REFRESH_EVENT`
 
-### PlanEditor Panel
+### PlanEditor Panel (plan-node-editor)
 
-A dockview panel (`id='plan-editor-{nodeId}'`) with the same 4-mode flow as LoreEditor.
-
-**Props:** `nodeId: number`, `panelApi?: { setTitle: (t: string) => void }`, `onOpenChildrenEditor?: (nodeId: number) => void`
-
-**Differences from LoreEditor:**
-- Title field instead of name field (uses `plan_nodes.title`)
-- Calls `/api/plan/nodes/:id` for GET/PATCH
-- Uses `generatePlanStream` (calls `POST /api/ai/generate-plan`)
-- No "Include existing lore" toggle
-- In **edit mode** (mode B): "Split into sub-items…" button → `onOpenChildrenEditor(nodeId)`
-- Dispatches `PLAN_NODE_SAVED_EVENT` / `PLAN_TREE_REFRESH_EVENT`
-- Restores `review_unlocked` mode on open when `changes_status='review'`
-
-**Four modes** (identical state machine to LoreEditor):
-- A (generate): prompt textarea + AI controls + Generate button
-- B (edit + improve): CodeMirror + improve form + "Split into sub-items…" button
-- C (review_locked): streaming AI, UI locked
-- D (review_unlocked): DiffViewAndAccept tabs, Accept bar
-
-### PlanChildrenEditor Panel
-
-A dockview panel (`id='plan-children-editor-{nodeId}'`) for AI-assisted sub-node generation.
+A dockview panel (`id='plan-node-editor-{nodeId}'`) with the same 4-mode flow as LoreEditor. Opened from PlanGraph by double-clicking a text node.
 
 **Props:** `nodeId: number`, `panelApi?: { setTitle: (t: string) => void }`
 
-**Three modes:** `idle → streaming → review`
+**Differences from LoreEditor:**
+- Title field instead of name field (uses `plan_nodes.title`)
+- Calls `/api/plan/nodes/:id` for GET/PATCH (also `/api/plan/graph/nodes/:id` for new fields)
+- Uses `POST /api/ai/generate-plan` for AI generation
+- Dispatches `PLAN_NODE_SAVED_EVENT` / `PLAN_GRAPH_REFRESH_EVENT`
+- Shows **User Prompt** textarea (autosaved to `user_prompt`) and collapsible **System Prompt** textarea (autosaved to `system_prompt`) above the title field
 
-**Idle:** textarea for split instructions, AI controls (model + web search), "Generate sub-items" button
-
-**Streaming:** locked UI with thinking status indicator
-
-**Review:** editable list of proposed children (title + description per item); two action buttons:
-- **"Add to existing"** (`plan.add_to_existing`): `POST /api/plan/nodes` for each item (appended to existing children)
-- **"Replace all"** (`plan.replace_all`): inline confirmation dialog → on confirm: deletes all existing children, then creates new ones
-
-After acceptance: `dispatchPlanTreeRefresh()` so PlanTree reloads.
-
-**JSON schema** from AI: `{ description: string, items: [{ name: string, description: string }] }`
+**Four modes** (identical state machine to LoreEditor):
+- A (generate): prompt textarea + AI controls + Generate button
+- B (edit + improve): CodeMirror + improve form
+- C (review_locked): streaming AI, UI locked
+- D (review_unlocked): DiffViewAndAccept tabs, Accept bar
 
 ### Plan Events
 
-Shared event constants and dispatch helpers in `src/frontend/src/lib/plan-events.ts`:
+Shared event constants and dispatch helpers:
+
+`src/frontend/src/lib/plan-events.ts`:
 - `PLAN_NODE_SAVED_EVENT` / `dispatchPlanNodeSaved({ id, title?, wordCount?, charCount?, byteCount? })`
-- `PLAN_TREE_REFRESH_EVENT` / `dispatchPlanTreeRefresh()`
+
+`src/frontend/src/lib/plan-graph-events.ts`:
+- `PLAN_GRAPH_REFRESH_EVENT` / `dispatchPlanGraphRefresh()` — triggers full graph reload
+- `OPEN_PLAN_NODE_EDITOR_EVENT` / `dispatchOpenPlanNodeEditor(nodeId)` — triggers opening the node editor panel
 
 ### AI Billing Panel
 

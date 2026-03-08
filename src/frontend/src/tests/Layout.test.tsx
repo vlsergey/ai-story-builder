@@ -16,8 +16,8 @@ vi.mock('../components/LoreSection', () => ({
   }
 }));
 
-vi.mock('../components/PlanSection', () => ({
-  default: () => <div data-testid="plan-section">Plan Section</div>
+vi.mock('../components/PlanGraph', () => ({
+  default: () => <div data-testid="plan-graph">Plan Graph</div>
 }));
 
 vi.mock('../components/LoreEditor', () => ({
@@ -89,35 +89,17 @@ describe('Layout', () => {
     );
   });
 
-  it('default layout: lore, plan and cards panels render; center stays as watermark', async () => {
+  it('default layout: lore, plan-graph and cards panels render', async () => {
     render(<Layout {...mockProps} />);
 
     // dockview renders panel components into the DOM — verify content appears
     await waitFor(() => {
       expect(screen.getByTestId('folder-section')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('plan-section')).toBeInTheDocument();
-    // cards panel: check unique placeholder text (tab title also says "Cards", so getByText would be ambiguous)
+    // Plan graph panel is now in the center
+    expect(screen.getByTestId('plan-graph')).toBeInTheDocument();
+    // cards panel: check unique placeholder text
     expect(screen.getByText('Card definitions and values panel placeholder.')).toBeInTheDocument();
-
-    // Center group is empty — watermark text must be visible
-    expect(screen.getByText('AI Story Builder')).toBeInTheDocument();
-  });
-
-  it('watermark group is locked and its tab bar is hidden to prevent dragging', async () => {
-    const { container } = render(<Layout {...mockProps} />);
-
-    // Wait for dockview to fully apply the default layout
-    await screen.findByTestId('folder-section');
-
-    // group.locked = 'no-drop-target' adds dv-locked-groupview to the group container
-    expect(container.querySelector('.dv-locked-groupview')).toBeInTheDocument();
-
-    // group.header.hidden = true sets display:none on dv-tabs-and-actions-container,
-    // hiding the dv-void-container/dv-draggable handle that allows dragging the group
-    const tabBar = container.querySelector('.dv-locked-groupview .dv-tabs-and-actions-container') as HTMLElement | null;
-    expect(tabBar).toBeInTheDocument();
-    expect(tabBar?.style.display).toBe('none');
   });
 
   it('registers an IPC menu-action listener on mount', async () => {
@@ -126,53 +108,21 @@ describe('Layout', () => {
     expect(window.electronAPI!.onMenuAction).toHaveBeenCalled();
   });
 
-  it('tab bar becomes visible in center group when a lore editor is opened', async () => {
+  it('tab bar becomes visible when a lore editor is opened', async () => {
     const { container } = render(<Layout {...mockProps} />)
     await screen.findByTestId('folder-section')
-
-    const hiddenTabBars = () =>
-      Array.from(container.querySelectorAll<HTMLElement>('.dv-tabs-and-actions-container'))
-        .filter(el => el.style.display === 'none')
-
-    // Before: the empty center (watermark) group has its tab bar hidden
-    expect(hiddenTabBars().length).toBeGreaterThan(0)
 
     // Simulate opening a lore editor via the LoreSection callback
     const mockNode = {
       id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
-created_at: '', children: [],
+      created_at: '', children: [],
     }
     act(() => { capturedOnOpenLoreNode?.(mockNode) })
 
-    // After: the center group now has a panel — its tab bar must be visible
-    await waitFor(() => { expect(hiddenTabBars().length).toBe(0) })
-  })
-
-  it('watermark reappears after last lore editor is closed', async () => {
-    const { container } = render(<Layout {...mockProps} />)
-    await screen.findByTestId('folder-section')
-
-    // Open a lore editor — watermark in the center group should disappear
-    const mockNode = {
-      id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
-      position: 0, status: 'ACTIVE', to_be_deleted: 0,
-created_at: '', children: [],
-    }
-    act(() => { capturedOnOpenLoreNode?.(mockNode) })
-
-    // Wait until the editor tab is rendered (close button appears)
+    // After: a close button must appear for the new editor panel
     await waitFor(() => {
       expect(container.querySelector('.dv-default-tab-action')).toBeInTheDocument()
-    })
-
-    // Close the editor — the center group should stay and show the watermark
-    await act(async () => {
-      fireEvent.click(container.querySelector('.dv-default-tab-action')!)
-    })
-
-    await waitFor(() => {
-      expect(screen.getByText('AI Story Builder')).toBeInTheDocument()
     })
   })
 
@@ -183,15 +133,15 @@ created_at: '', children: [],
     const mockParent = {
       id: 1, name: 'Characters', parent_id: null, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
-created_at: '', children: [],
+      created_at: '', children: [],
     }
     const mockNode = {
       id: 42, name: 'Dragon Lore', parent_id: 1, content: null,
       position: 0, status: 'ACTIVE', to_be_deleted: 0,
-created_at: '', children: [],
+      created_at: '', children: [],
     }
 
-    // Open via wizard — creates node id=99, then opens lore-editor-99 filling the empty center group
+    // Open via wizard — creates node id=99, then opens lore-editor-99 in the center group
     await act(async () => { capturedOnOpenLoreWizard?.(mockParent) })
     await waitFor(() => {
       expect(screen.getByText('New lore item')).toBeInTheDocument()

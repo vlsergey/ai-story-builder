@@ -83,14 +83,39 @@ emerges from usage.
   - `uploaded_as_parent` boolean (optional) — true if the node's content was included in its parent's file rather than as a standalone file
   - `content_updated_at` TEXT (optional) — ISO-8601 UTC timestamp set by the PATCH endpoint each time content is saved; compared with `last_synced_at` to detect whether the node needs re-upload
 
-## Story Plan (hierarchical tree)
+## Story Plan (directed graph)
+
+The plan is a directed graph. Nodes carry content and edges carry semantic roles. Edge direction A→B means "B uses output of A as context for generation".
+
 - `plan_nodes`
   - `id` INTEGER PRIMARY KEY
-  - `parent_id` INTEGER NULL REFERENCES `plan_nodes`(`id`) ON DELETE CASCADE
+  - `parent_id` INTEGER NULL REFERENCES `plan_nodes`(`id`) ON DELETE CASCADE — deprecated (kept for compatibility, superseded by `plan_edges`)
   - `title` TEXT NOT NULL
-  - `content` TEXT — direct editable notes/description for the plan node (nullable)
-  - `position` INTEGER DEFAULT 0
+  - `content` TEXT — direct editable markdown text (nullable)
+  - `type` TEXT NOT NULL DEFAULT `'text'` — `'text'` | `'lore'`
+  - `x` REAL DEFAULT 0 — canvas X position
+  - `y` REAL DEFAULT 0 — canvas Y position
+  - `user_prompt` TEXT — generation instruction stored per-node (autosaved)
+  - `system_prompt` TEXT — per-node system prompt override (autosaved)
+  - `summary` TEXT — short auto-generated or manual summary
+  - `auto_summary` INTEGER DEFAULT 0 — 1 = summary is auto-generated
+  - `ai_sync_info` TEXT — reserved for future AI engine file sync (same format as `lore_nodes.ai_sync_info`)
+  - `position` INTEGER DEFAULT 0 — deprecated; kept for migration purposes
   - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+  - `word_count`, `char_count`, `byte_count` — updated automatically by PATCH
+  - `changes_status` TEXT NULL — review workflow state: NULL | `'review'`
+  - `review_base_content` TEXT NULL — snapshot before AI improvement
+  - `last_improve_instruction` TEXT NULL — last AI improve instruction
+  - `last_generate_prompt` TEXT NULL — last generate prompt (mode A)
+
+- `plan_edges`
+  - `id` INTEGER PRIMARY KEY
+  - `from_node_id` INTEGER NOT NULL REFERENCES `plan_nodes`(`id`) ON DELETE CASCADE
+  - `to_node_id` INTEGER NOT NULL REFERENCES `plan_nodes`(`id`) ON DELETE CASCADE
+  - `type` TEXT NOT NULL DEFAULT `'instruction'` — `'instruction'` | `'attachment'` | `'system_prompt'`
+  - `position` INTEGER DEFAULT 0 — display order among edges of the same target
+  - `label` TEXT — optional display label override
+  - `template` TEXT — optional template string (e.g. `{{title}}`) for rendering the source node as context
 
 ## Story Parts (generated chapters)
 - `story_parts`

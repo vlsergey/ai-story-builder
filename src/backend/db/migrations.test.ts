@@ -41,6 +41,7 @@ describe('migrateDatabase', () => {
     expect(tables).toContain('lore_nodes')
     expect(tables).not.toContain('lore_versions')
     expect(tables).toContain('plan_nodes')
+    expect(tables).toContain('plan_edges')
     expect(tables).not.toContain('plan_node_versions')
     expect(tables).toContain('story_parts')
     expect(tables).toContain('card_definitions')

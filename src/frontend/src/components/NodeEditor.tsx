@@ -65,6 +65,13 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [primaryDirty, setPrimaryDirty] = useState(false)
   const [contentDirty, setContentDirty] = useState(false)
 
+  // Plan-only extra fields
+  const [userPrompt, setUserPrompt] = useState('')
+  const [systemPrompt, setSystemPrompt] = useState('')
+  const [systemPromptExpanded, setSystemPromptExpanded] = useState(false)
+  const userPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const systemPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const primaryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -110,6 +117,10 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       setPrimaryValue(node[adapter.primaryField] as string ?? '')
       setContent(node.content as string ?? '')
       setGeneratePrompt(node.last_generate_prompt as string ?? '')
+      if (adapter.i18nPrefix === 'plan') {
+        setUserPrompt(node.user_prompt as string ?? '')
+        setSystemPrompt(node.system_prompt as string ?? '')
+      }
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content as string ?? '')
         setImproveInstruction(node.last_improve_instruction as string ?? '')
@@ -150,6 +161,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   useEffect(() => () => {
     if (primaryTimerRef.current) clearTimeout(primaryTimerRef.current)
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
+    if (userPromptTimerRef.current) clearTimeout(userPromptTimerRef.current)
+    if (systemPromptTimerRef.current) clearTimeout(systemPromptTimerRef.current)
   }, [])
 
   // ── Primary field autosave ─────────────────────────────────────────────────
@@ -410,6 +423,34 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const isReview = editorMode === 'review_locked' || editorMode === 'review_unlocked'
   const isLocked = editorMode === 'review_locked'
 
+  // ── Plan-only: user_prompt autosave ────────────────────────────────────────
+  function handleUserPromptChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value
+    setUserPrompt(value)
+    if (userPromptTimerRef.current) clearTimeout(userPromptTimerRef.current)
+    userPromptTimerRef.current = setTimeout(() => {
+      void fetch(apiUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_prompt: value }),
+      })
+    }, 1000)
+  }
+
+  // ── Plan-only: system_prompt autosave ──────────────────────────────────────
+  function handleSystemPromptChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value
+    setSystemPrompt(value)
+    if (systemPromptTimerRef.current) clearTimeout(systemPromptTimerRef.current)
+    systemPromptTimerRef.current = setTimeout(() => {
+      void fetch(apiUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system_prompt: value }),
+      })
+    }, 1000)
+  }
+
   const aiControls = (
     <AiGenerationSettings
       engineId={currentEngine}
@@ -515,6 +556,35 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       {genError && (
         <div className="px-2 py-1 text-xs text-destructive bg-destructive/10 border-b border-destructive/20 shrink-0">
           {genError}
+        </div>
+      )}
+
+      {/* ── PLAN-ONLY: USER PROMPT + SYSTEM PROMPT ────────────────────────────── */}
+      {adapter.i18nPrefix === 'plan' && (
+        <div className="border-b border-border shrink-0">
+          <textarea
+            value={userPrompt}
+            onChange={handleUserPromptChange}
+            placeholder={tp('userPrompt')}
+            rows={2}
+            className="w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <div
+            className="flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground select-none"
+            onClick={() => setSystemPromptExpanded(prev => !prev)}
+          >
+            <span>{systemPromptExpanded ? '▾' : '▸'}</span>
+            <span>{tp('systemPrompt')}</span>
+          </div>
+          {systemPromptExpanded && (
+            <textarea
+              value={systemPrompt}
+              onChange={handleSystemPromptChange}
+              placeholder={tp('systemPrompt')}
+              rows={3}
+              className="w-full resize-none border-t border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          )}
         </div>
       )}
 

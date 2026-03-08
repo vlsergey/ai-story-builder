@@ -66,13 +66,20 @@
   - JSON schema: `{ description: string, items: [{ name: string, description: string }] }`
   - Returns same SSE format as other generation endpoints
 - Plan nodes CRUD API (`/api/plan/*`):
-  - `GET /api/plan/nodes` — full tree (all columns including stats + review fields)
+  - `GET /api/plan/nodes` — full tree (all columns including stats + review fields) — kept for backward compatibility
   - `GET /api/plan/nodes/:id` — single node with all fields
-  - `POST /api/plan/nodes` — create node; body: `{ parent_id?, title, position?, content? }`
-  - `PATCH /api/plan/nodes/:id` — update title/content; supports `start_review`, `accept_review` flags (same semantics as lore PATCH)
-  - `DELETE /api/plan/nodes/:id` — hard delete (root node protected; children cascade via FK)
-  - `PATCH /api/plan/nodes/:id/move` — reparent node; body: `{ parent_id }`
-  - `POST /api/plan/nodes/reorder-children` — set positions; body: `{ child_ids: number[] }`
+  - `POST /api/plan/nodes` — create node (legacy, uses parent_id)
+  - `PATCH /api/plan/nodes/:id` — update title/content; supports `start_review`, `accept_review` flags (same semantics as lore PATCH); also supports new graph fields: `type`, `x`, `y`, `user_prompt`, `system_prompt`, `summary`, `auto_summary`
+  - `DELETE /api/plan/nodes/:id` — hard delete (cascade)
+- Plan graph CRUD API (`/api/plan/graph/*`):
+  - `GET /api/plan/graph` — full graph: `{ nodes: PlanNodeRow[], edges: PlanEdgeRow[] }`
+  - `POST /api/plan/graph/nodes` — create node; body: `{ type?, title, x?, y?, user_prompt?, system_prompt? }`
+  - `GET /api/plan/graph/nodes/:id` — single node
+  - `PATCH /api/plan/graph/nodes/:id` — update any writable fields; returns `{ ok, word_count?, char_count?, byte_count? }`
+  - `DELETE /api/plan/graph/nodes/:id` — hard delete (cascade-deletes connected edges via FK)
+  - `POST /api/plan/graph/edges` — create edge; body: `{ from_node_id, to_node_id, type?, position?, label?, template? }`
+  - `PATCH /api/plan/graph/edges/:id` — update type/position/label/template
+  - `DELETE /api/plan/graph/edges/:id`
 - Root plan node auto-creation:
   - When a project is opened (`POST /api/project/open`) and `plan_nodes` is empty, a root node is automatically inserted with `title = project_title` (fallback: `'Plan'`)
   - When a project is created (`POST /api/project/create`), a root plan node is inserted with `title = name`

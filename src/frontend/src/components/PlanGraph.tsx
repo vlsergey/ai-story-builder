@@ -1,0 +1,325 @@
+import React, { useCallback, useEffect, useState } from 'react'
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  type Node,
+  type Edge,
+  type Connection,
+  type OnConnectEnd,
+  BackgroundVariant,
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import dagre from '@dagrejs/dagre'
+import { useLocale } from '../lib/locale'
+import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
+import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
+import PlanTextNode from './plan-graph/PlanTextNode'
+import PlanLoreNode from './plan-graph/PlanLoreNode'
+import PlanEdgeComponent from './plan-graph/PlanEdge'
+import GenerateAllDialog from './plan-graph/GenerateAllDialog'
+
+const nodeTypes = {
+  planText: PlanTextNode,
+  planLore: PlanLoreNode,
+}
+
+const edgeTypes = {
+  planEdge: PlanEdgeComponent,
+}
+
+function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
+  const g = new dagre.graphlib.Graph()
+  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120 })
+  g.setDefaultEdgeLabel(() => ({}))
+  nodes.forEach(n => g.setNode(n.id, { width: 200, height: 80 }))
+  edges.forEach(e => g.setEdge(e.source, e.target))
+  dagre.layout(g)
+  return nodes.map(n => {
+    const pos = g.node(n.id)
+    if (!pos) return n
+    return { ...n, position: { x: pos.x - 100, y: pos.y - 40 } }
+  })
+}
+
+function toReactFlowNodes(graphNodes: PlanGraphNode[], onDelete: (id: string) => void): Node[] {
+  return graphNodes.map(n => ({
+    id: String(n.id),
+    type: n.type === 'lore' ? 'planLore' : 'planText',
+    position: { x: n.x ?? 0, y: n.y ?? 0 },
+    data: { ...n, onDelete },
+  }))
+}
+
+function toReactFlowEdges(graphEdges: PlanGraphEdge[], onDeleteEdge: (id: string) => void): Edge[] {
+  return graphEdges.map(e => ({
+    id: String(e.id),
+    source: String(e.from_node_id),
+    target: String(e.to_node_id),
+    type: 'planEdge',
+    data: { type: e.type, label: e.label, onDelete: onDeleteEdge },
+  }))
+}
+
+export default function PlanGraph() {
+  const { t } = useLocale()
+  const [nodes, setNodes, onNodesChange] = useNodesState([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [autoLayout, setAutoLayout] = useState<boolean>(() => {
+    try { return localStorage.getItem('planGraph.autoLayout') !== 'false' }
+    catch { return true }
+  })
+  const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
+  const [showGenerateAll, setShowGenerateAll] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const loadGraph = useCallback(async () => {
+    try {
+      const resp = await fetch('/api/plan/graph')
+      if (!resp.ok) return
+      const data = await resp.json() as { nodes: PlanGraphNode[]; edges: PlanGraphEdge[] }
+
+      const rfEdges = toReactFlowEdges(data.edges, deleteEdge)
+      let rfNodes = toReactFlowNodes(data.nodes, deleteNode)
+
+      if (autoLayout && rfNodes.length > 0) {
+        rfNodes = applyDagreLayout(rfNodes, rfEdges)
+        // Persist positions after auto-layout
+        for (const n of rfNodes) {
+          void fetch(`/api/plan/graph/nodes/${n.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ x: n.position.x, y: n.position.y }),
+          })
+        }
+      }
+
+      setNodes(rfNodes)
+      setEdges(rfEdges)
+      setLoading(false)
+    } catch {
+      setLoading(false)
+    }
+  }, [autoLayout]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    void loadGraph()
+  }, [loadGraph])
+
+  useEffect(() => {
+    const handler = () => void loadGraph()
+    window.addEventListener(PLAN_GRAPH_REFRESH_EVENT, handler)
+    return () => window.removeEventListener(PLAN_GRAPH_REFRESH_EVENT, handler)
+  }, [loadGraph])
+
+  async function deleteNode(nodeId: string) {
+    if (!window.confirm('Delete this node and all connected edges?')) return
+    const resp = await fetch(`/api/plan/graph/nodes/${nodeId}`, { method: 'DELETE' })
+    if (resp.ok) dispatchPlanGraphRefresh()
+  }
+
+  async function deleteEdge(edgeId: string) {
+    const resp = await fetch(`/api/plan/graph/edges/${edgeId}`, { method: 'DELETE' })
+    if (resp.ok) {
+      setEdges(prev => prev.filter(e => e.id !== edgeId))
+    }
+  }
+
+  async function addTextNode() {
+    const title = window.prompt('Node title:')
+    if (!title?.trim()) return
+    const centerX = 100 + Math.random() * 200
+    const centerY = 100 + Math.random() * 200
+    const resp = await fetch('/api/plan/graph/nodes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'text', title: title.trim(), x: centerX, y: centerY }),
+    })
+    if (resp.ok) dispatchPlanGraphRefresh()
+  }
+
+  async function addLoreNode() {
+    const title = window.prompt('Lore node title:')
+    if (!title?.trim()) return
+    const resp = await fetch('/api/plan/graph/nodes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'lore', title: title.trim(), x: 100, y: 100 }),
+    })
+    if (resp.ok) dispatchPlanGraphRefresh()
+  }
+
+  const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
+    if (autoLayout) return
+    void fetch(`/api/plan/graph/nodes/${node.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x: node.position.x, y: node.position.y }),
+    })
+  }, [autoLayout])
+
+  const onConnect = useCallback((connection: Connection) => {
+    setShowConnectDialog(connection)
+  }, [])
+
+  async function confirmConnect(edgeType: string) {
+    if (!showConnectDialog?.source || !showConnectDialog?.target) return
+    const resp = await fetch('/api/plan/graph/edges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from_node_id: Number(showConnectDialog.source),
+        to_node_id: Number(showConnectDialog.target),
+        type: edgeType,
+      }),
+    })
+    if (resp.ok) {
+      const { id } = await resp.json() as { id: number }
+      const newEdge: Edge = {
+        id: String(id),
+        source: showConnectDialog.source,
+        target: showConnectDialog.target,
+        type: 'planEdge',
+        data: { type: edgeType, onDelete: deleteEdge },
+      }
+      setEdges(prev => addEdge(newEdge, prev))
+    }
+    setShowConnectDialog(null)
+  }
+
+  function toggleAutoLayout() {
+    const next = !autoLayout
+    setAutoLayout(next)
+    try { localStorage.setItem('planGraph.autoLayout', String(next)) } catch { /* ignore */ }
+    if (next && nodes.length > 0) {
+      const laid = applyDagreLayout([...nodes], [...edges])
+      setNodes(laid)
+      for (const n of laid) {
+        void fetch(`/api/plan/graph/nodes/${n.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: n.position.x, y: n.position.y }),
+        })
+      }
+    }
+  }
+
+  function applyLayout() {
+    if (nodes.length === 0) return
+    const laid = applyDagreLayout([...nodes], [...edges])
+    setNodes(laid)
+    for (const n of laid) {
+      void fetch(`/api/plan/graph/nodes/${n.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: n.position.x, y: n.position.y }),
+      })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span className="text-muted-foreground text-sm">Loading…</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      {/* Toolbar */}
+      <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-background border border-border rounded shadow px-2 py-1.5 flex-wrap">
+        <button
+          onClick={() => void addTextNode()}
+          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+        >
+          {t('planGraph.addTextNode')}
+        </button>
+        <button
+          onClick={() => void addLoreNode()}
+          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+        >
+          {t('planGraph.addLoreNode')}
+        </button>
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <label className="flex items-center gap-1 text-xs cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoLayout}
+            onChange={toggleAutoLayout}
+            className="w-3 h-3"
+          />
+          {t('planGraph.autoLayout')}
+        </label>
+        {!autoLayout && (
+          <button
+            onClick={applyLayout}
+            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+          >
+            {t('planGraph.applyLayout')}
+          </button>
+        )}
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <button
+          onClick={() => setShowGenerateAll(true)}
+          className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          ▶ {t('planGraph.generateAll')}
+        </button>
+      </div>
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        nodesDraggable={!autoLayout}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        <Controls />
+        <MiniMap nodeStrokeWidth={2} zoomable pannable />
+      </ReactFlow>
+
+      {/* Edge type selection dialog */}
+      {showConnectDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-64">
+            <h3 className="text-sm font-semibold mb-3">Select edge type</h3>
+            <div className="flex flex-col gap-2">
+              {(['instruction', 'attachment', 'system_prompt'] as const).map(type => (
+                <button
+                  key={type}
+                  onClick={() => void confirmConnect(type)}
+                  className="px-3 py-1.5 text-sm rounded border border-border hover:bg-muted text-left"
+                >
+                  {t(`planGraph.edge.${type}` as Parameters<typeof t>[0])}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowConnectDialog(null)}
+              className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Generate All dialog */}
+      {showGenerateAll && (
+        <GenerateAllDialog onClose={() => setShowGenerateAll(false)} />
+      )}
+    </div>
+  )
+}

@@ -7,10 +7,9 @@ import 'dockview/dist/styles/dockview.css'
 
 // Local small wrappers to keep import cycles simple
 import LoreSection from './LoreSection'
-import PlanSection from './PlanSection'
 import LoreEditor from './LoreEditor'
 import PlanEditor from './PlanEditor'
-import PlanChildrenEditor from './PlanChildrenEditor'
+import PlanGraph from './PlanGraph'
 import SettingsPanel from './SettingsPanel'
 import AiPlayground from './AiPlayground'
 import AiBillingPanel from './AiBillingPanel'
@@ -18,6 +17,7 @@ import type { LoreNode } from '../types/models'
 import { EditorSettingsProvider } from '../lib/editor-settings'
 import { LoreSettingsProvider } from '../lib/lore-settings'
 import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
+import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from '../lib/plan-graph-events'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -34,28 +34,27 @@ const WelcomeWatermark = () => (
 
 /**
  * Layout component provides the main 4-pane dock-like layout:
- * - Left (30%): Lore and Plan tree
- * - Center (40%): Story editor / MD editor
+ * - Left (30%): Lore tree
+ * - Center (40%): Plan graph + editors
  * - Right (30%): Cards definitions / list
  * - Bottom: Logs / AI & Billing panel
  *
  * This implementation uses dockview for a fully dockable, resizable interface.
- * Each area is a placeholder component with descriptive comments to make extension straightforward.
  */
 export default function Layout({ onClose, initialLayout }: { onClose: () => void; initialLayout: unknown | null }) {
   const dockviewRef = useRef<any>(null)
   const { setPreference } = useTheme()
 
   /**
-   * Returns the group that should receive editor-type panels (lore-editor, plan-editor, settings).
-   * Prefers an existing editor group; falls back to the watermark (empty) group; then undefined.
+   * Returns the group that should receive editor-type panels (lore-editor, plan-node-editor, settings).
+   * Prefers an existing editor group; falls back to the plan-graph group; then an empty group.
    */
   function findEditorGroup(api: any): any {
     return (
       api.groups.find((g: any) =>
         g.panels.some((p: any) =>
-          p.id.startsWith('lore-editor-') || p.id.startsWith('plan-editor-') ||
-          p.id.startsWith('plan-children-editor-') || p.id === 'settings' || p.id === 'ai-playground'
+          p.id.startsWith('lore-editor-') || p.id.startsWith('plan-node-editor-') ||
+          p.id === 'settings' || p.id === 'ai-playground' || p.id === 'plan-graph'
         )
       ) ?? api.groups.find((g: any) => g.panels.length === 0)
     )
@@ -112,37 +111,19 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     })
   }
 
-  /** Opens (or activates) a plan-editor tab for the given node. */
-  function openPlanEditor(nodeId: number) {
+  /** Opens (or activates) a plan-node-editor tab for the given node. */
+  function openPlanNodeEditor(nodeId: number) {
     const api = dockviewRef.current
     if (!api) return
-    const panelId = `plan-editor-${nodeId}`
+    const panelId = `plan-node-editor-${nodeId}`
     const existing = api.getPanel(panelId)
     if (existing) { existing.api.setActive(); return }
     const editorGroup = findEditorGroup(api)
     api.addPanel({
       id: panelId,
-      component: 'plan-editor',
+      component: 'plan-node-editor',
       tabComponent: 'loreEditorTab',
       title: `Plan node #${nodeId}`,
-      params: { nodeId },
-      ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
-    })
-  }
-
-  /** Opens (or activates) a plan-children-editor tab for the given node. */
-  function openPlanChildrenEditor(nodeId: number) {
-    const api = dockviewRef.current
-    if (!api) return
-    const panelId = `plan-children-editor-${nodeId}`
-    const existing = api.getPanel(panelId)
-    if (existing) { existing.api.setActive(); return }
-    const editorGroup = findEditorGroup(api)
-    api.addPanel({
-      id: panelId,
-      component: 'plan-children-editor',
-      tabComponent: 'loreEditorTab',
-      title: `Split: #${nodeId}`,
       params: { nodeId },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
@@ -170,6 +151,16 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       .then((data: { value?: string }) => { if (data.value) setPreference(data.value) })
       .catch(() => {})
   }, [])
+
+  // Listen for open-plan-node-editor events from the PlanGraph canvas
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<OpenPlanNodeEditorDetail>).detail
+      openPlanNodeEditor(detail.nodeId)
+    }
+    window.addEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
+    return () => window.removeEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // helper to massage storage format into the version expected by dockview
   const normalizeLayout = (layout: any) => {
@@ -275,11 +266,10 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
 
     dockviewRef.current.clear()
 
-    // Create the center group with no arguments — passing any options object (even just {id})
-    // triggers the AbsolutePosition branch which requires a direction and throws without one.
-    // The empty group shows WelcomeWatermark; panels added with a direction create their own groups.
+    // Create a center group for the plan graph
     const centerGroup = dockviewRef.current.addGroup()
 
+    // Add lore tree to the left
     dockviewRef.current.addPanel({
       id: 'lore-panel',
       component: 'lore',
@@ -289,13 +279,13 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       minimumWidth: 200,
     })
 
+    // Add plan-graph panel to the center group
     dockviewRef.current.addPanel({
-      id: 'plan-panel',
-      component: 'plan',
-      tabComponent: 'nonClosableTab',
+      id: 'plan-graph',
+      component: 'plan-graph',
+      tabComponent: 'permanentTab',
       title: 'Plan',
-      position: { referencePanel: 'lore-panel', direction: 'below' },
-      minimumHeight: 150,
+      position: { referenceGroup: centerGroup },
     })
 
     dockviewRef.current.addPanel({
@@ -385,6 +375,15 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     );
   };
 
+  // Permanent tab — like NonClosableTab, no close button; used for plan-graph
+  const PermanentTab = (props: any) => {
+    return (
+      <div className="dv-default-tab">
+        <div className="dv-default-tab-content">{props.params?.title || props.api?.title}</div>
+      </div>
+    );
+  };
+
   // Tab for lore-editor panels. Wraps DockviewDefaultTab but overrides the close
   // action so that closing the last panel in a group keeps the group alive (shows
   // watermark) instead of collapsing the layout.
@@ -417,23 +416,9 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     'lore-editor': (props: any) => (
       <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
-    plan: () => (
-      <div className="p-2 h-full">
-        <PlanSection
-          onOpenEditor={openPlanEditor}
-          onOpenChildrenEditor={openPlanChildrenEditor}
-        />
-      </div>
-    ),
-    'plan-editor': (props: any) => (
+    'plan-graph': () => <PlanGraph />,
+    'plan-node-editor': (props: any) => (
       <PlanEditor
-        nodeId={props.params?.nodeId}
-        panelApi={props.api}
-        onOpenChildrenEditor={openPlanChildrenEditor}
-      />
-    ),
-    'plan-children-editor': (props: any) => (
-      <PlanChildrenEditor
         nodeId={props.params?.nodeId}
         panelApi={props.api}
       />
@@ -451,24 +436,23 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
 
   const tabComponents = {
     nonClosableTab: NonClosableTab,
+    permanentTab: PermanentTab,
     loreEditorTab: LoreEditorTab,
   };
 
-  // Prevent sidebar/utility panels (lore, plan, cards) from being dropped into the editor group.
-  // The editor group is identified by containing lore-editor or settings panels.
-  // The settings panel is allowed in the editor group (and can also move to any other group).
+  // Prevent sidebar/utility panels (lore, cards) from being dropped into the editor group.
   const handleWillDrop = (event: any) => {
     const targetGroup = event.group
     if (!targetGroup) return
     const isEditorGroup = targetGroup.panels.some(
-      (p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('plan-editor-') ||
-        p.id.startsWith('plan-children-editor-') || p.id === 'settings' || p.id === 'ai-playground'
+      (p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('plan-node-editor-') ||
+        p.id === 'plan-graph' || p.id === 'settings' || p.id === 'ai-playground'
     )
     if (!isEditorGroup) return
     const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
     const isEditorPanel = draggedPanelId?.startsWith('lore-editor-') ||
-      draggedPanelId?.startsWith('plan-editor-') ||
-      draggedPanelId?.startsWith('plan-children-editor-') ||
+      draggedPanelId?.startsWith('plan-node-editor-') ||
+      draggedPanelId === 'plan-graph' ||
       draggedPanelId === 'settings' || draggedPanelId === 'ai-playground'
     if (!isEditorPanel) {
       event.preventDefault()

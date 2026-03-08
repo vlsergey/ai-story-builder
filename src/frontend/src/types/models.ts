@@ -54,6 +54,40 @@ export interface PlanNodeTree {
   children: PlanNodeTree[]
 }
 
+/** Plan graph node (returned by GET /api/plan/graph) */
+export interface PlanGraphNode {
+  id: number
+  type: 'text' | 'lore'
+  title: string
+  content: string | null
+  user_prompt: string | null
+  system_prompt: string | null
+  summary: string | null
+  auto_summary: number
+  ai_sync_info: string | null
+  x: number
+  y: number
+  word_count: number
+  char_count: number
+  byte_count: number
+  changes_status: string | null
+  review_base_content: string | null
+  last_improve_instruction: string | null
+  last_generate_prompt: string | null
+  created_at: string
+}
+
+/** Plan graph edge */
+export interface PlanGraphEdge {
+  id: number
+  from_node_id: number
+  to_node_id: number
+  type: 'instruction' | 'attachment' | 'system_prompt'
+  position: number
+  label: string | null
+  template: string | null
+}
+
 export interface StoryPart {
   id: number
   plan_node_version_id: number

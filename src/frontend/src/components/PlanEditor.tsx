@@ -1,17 +1,14 @@
 import React, { useMemo } from 'react'
-import { useLocale } from '../lib/locale'
-import { dispatchPlanNodeSaved, dispatchPlanTreeRefresh } from '../lib/plan-events'
+import { dispatchPlanNodeSaved } from '../lib/plan-events'
+import { dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import NodeEditor, { type NodeEditorAdapter } from './NodeEditor'
 
 interface PlanEditorProps {
   nodeId: number
   panelApi?: { setTitle: (title: string) => void }
-  onOpenChildrenEditor?: (nodeId: number) => void
 }
 
-export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: PlanEditorProps) {
-  const { t } = useLocale()
-
+export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   const adapter = useMemo<NodeEditorAdapter>(() => ({
     apiBase: '/api/plan/nodes',
     primaryField: 'title',
@@ -21,18 +18,8 @@ export default function PlanEditor({ nodeId, panelApi, onOpenChildrenEditor }: P
     onSaved: ({ nodeId: id, primaryValue, wordCount, charCount, byteCount }) => {
       dispatchPlanNodeSaved({ id, title: primaryValue, wordCount, charCount, byteCount })
     },
-    onAfterGenerate: dispatchPlanTreeRefresh,
-    renderEditModeExtras: onOpenChildrenEditor
-      ? (nId) => (
-          <button
-            onClick={() => onOpenChildrenEditor(nId)}
-            className="px-3 py-1 text-sm rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {t('plan.split_into_children')}
-          </button>
-        )
-      : undefined,
-  }), [onOpenChildrenEditor, t])
+    onAfterGenerate: dispatchPlanGraphRefresh,
+  }), [])
 
   return <NodeEditor nodeId={nodeId} panelApi={panelApi} adapter={adapter} />
 }
