@@ -16,7 +16,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { useLocale } from '../lib/locale'
-import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh, dispatchOpenPlanNodeEditor } from '../lib/plan-graph-events'
+import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
@@ -168,11 +168,6 @@ export default function PlanGraph() {
     setShowConnectDialog(connection)
   }, [])
 
-  const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
-    if (node.type !== 'planText') return
-    const id = (node.data as { id?: number }).id
-    if (id != null) dispatchOpenPlanNodeEditor(id)
-  }, [])
 
   async function confirmConnect(edgeType: string) {
     if (!showConnectDialog?.source || !showConnectDialog?.target) return
@@ -287,8 +282,7 @@ export default function PlanGraph() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
-        onNodeDoubleClick={onNodeDoubleClick}
-        nodeTypes={nodeTypes}
+nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}

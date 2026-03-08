@@ -2,6 +2,7 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useLocale } from '../../lib/locale'
 import type { PlanGraphNode } from '../../types/models'
+import { dispatchOpenPlanNodeEditor } from '../../lib/plan-graph-events'
 
 export default function PlanTextNode({ data }: NodeProps) {
   const { t } = useLocale()
@@ -22,6 +23,7 @@ export default function PlanTextNode({ data }: NodeProps) {
   return (
     <div
       className="bg-background border border-border rounded shadow-sm w-[200px] cursor-pointer select-none hover:border-primary/60 transition-colors"
+      onDoubleClick={(e) => { e.stopPropagation(); dispatchOpenPlanNodeEditor(node.id) }}
     >
       <Handle type="target" position={Position.Left} />
       <div className="p-2">

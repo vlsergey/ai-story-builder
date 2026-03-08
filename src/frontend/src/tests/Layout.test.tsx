@@ -2,6 +2,7 @@ import React from 'react'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Layout from '../components/Layout';
+import { OPEN_PLAN_NODE_EDITOR_EVENT } from '../lib/plan-graph-events';
 
 // Captures the onOpenLoreNode / onOpenLoreWizard callbacks so tests can trigger panel opens
 let capturedOnOpenLoreNode: ((node: any) => void) | null = null
@@ -170,6 +171,21 @@ describe('Layout', () => {
     const wizardCreatedTab = screen.getByText('New lore item')
     const editorTab = screen.getByText('Dragon Lore')
     expect(wizardCreatedTab.closest('.dv-groupview')).toBe(editorTab.closest('.dv-groupview'))
+  })
+
+  it('opens plan-node-editor panel when open-plan-node-editor event is dispatched', async () => {
+    render(<Layout {...mockProps} />)
+    await screen.findByTestId('plan-graph')
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(OPEN_PLAN_NODE_EDITOR_EVENT, { detail: { nodeId: 42 } })
+      )
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Plan node #42')).toBeInTheDocument()
+    })
   })
 
   it('saves layout to database when reset-layouts IPC action fires', async () => {
