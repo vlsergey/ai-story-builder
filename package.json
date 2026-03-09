@@ -1,6 +1,8 @@
 {
   "name": "ai-story-builder",
   "version": "0.1.0",
+  "description": "AI-powered story building tool",
+  "author": "Sergey Vladimirov",
   "private": true,
   "main": "src/electron/main.js",
   "workspaces": [
@@ -14,10 +16,9 @@
     "build:backend": "npm run build --workspace=src/backend",
     "test": "npm run test --workspace=src/backend && npm run test --workspace=src/frontend",
     "typecheck": "npm run typecheck --workspace=src/backend && tsc -p src/frontend/tsconfig.json",
-    "package": "npm run build:backend && npm run build && electron-builder"
+    "package": "npm run build:backend && npm run build && electron-builder --publish never"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.6.0",
     "concurrently": "^8.2.0",
     "cross-env": "^7.0.3",
     "electron": "^33.0.0",
@@ -30,7 +31,11 @@
     "directories": {
       "output": "release"
     },
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/*.node"
+    ],
     "files": [
       "src/electron/**/*",
       "dist/**/*"
