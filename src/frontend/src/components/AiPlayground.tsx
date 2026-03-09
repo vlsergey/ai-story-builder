@@ -204,7 +204,7 @@ export default function AiPlayground() {
           {/* Response text */}
           <pre
             ref={responseRef}
-            className="flex-1 min-h-0 overflow-auto p-3 text-sm font-mono whitespace-pre-wrap break-words leading-relaxed"
+            className="flex-1 min-h-0 overflow-auto p-3 text-sm font-mono whitespace-pre-wrap wrap-break-word leading-relaxed"
           >
             {response || <span className="text-muted-foreground/50 select-none">Response will appear here…</span>}
           </pre>

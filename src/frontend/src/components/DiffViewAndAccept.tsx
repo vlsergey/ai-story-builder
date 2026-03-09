@@ -190,7 +190,7 @@ function Toolbar({
       >
         <ChevronLeft size={14} />
       </button>
-      <span className="text-muted-foreground min-w-[3.5rem] text-center tabular-nums">
+      <span className="text-muted-foreground min-w-14 text-center tabular-nums">
         {hunkCount === 0 ? '–' : `${currentIdx + 1} / ${hunkCount}`}
       </span>
       <button

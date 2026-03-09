@@ -47,7 +47,7 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
             className="h-8 text-sm"
             placeholder="Project name"
           />
-          <Button type="submit" disabled={busy} size="sm" className="flex-shrink-0">
+          <Button type="submit" disabled={busy} size="sm" className="shrink-0">
             {busy ? 'Creating…' : 'Create'}
           </Button>
         </div>
@@ -104,7 +104,7 @@ export default function StartScreen({
     <div className="min-h-screen flex bg-background text-foreground">
 
       {/* ── Left panel: branding + recent projects ── */}
-      <aside className="w-64 flex-shrink-0 flex flex-col border-r border-border bg-muted/20">
+      <aside className="w-64 shrink-0 flex flex-col border-r border-border bg-muted/20">
 
         {/* App identity */}
         <div className="px-5 pt-8 pb-5 border-b border-border">
@@ -145,13 +145,13 @@ export default function StartScreen({
                     onClick={() => openRecent(r)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors text-left group"
                   >
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
                     <span className="truncate flex-1">{projectDisplayName(r)}</span>
-                    <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 group-hover/item:hidden" />
+                    <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 group-hover/item:hidden" />
                     <button
                       onClick={e => removeRecent(e, r)}
                       title="Remove from list"
-                      className="h-4 w-4 flex-shrink-0 hidden group-hover/item:flex items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
+                      className="h-4 w-4 shrink-0 hidden group-hover/item:flex items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -181,7 +181,7 @@ export default function StartScreen({
           {/* ── Create new project ── */}
           <section>
             <div className="flex items-center gap-2 mb-3">
-              <Plus className="h-4 w-4 text-primary flex-shrink-0" />
+              <Plus className="h-4 w-4 text-primary shrink-0" />
               <h3 className="text-sm font-semibold">
                 {t('start.create')}
               </h3>
@@ -194,7 +194,7 @@ export default function StartScreen({
           {/* ── Projects folder ── */}
           <section>
             <div className="flex items-center gap-2 mb-1">
-              <FolderOpen className="h-4 w-4 text-primary flex-shrink-0" />
+              <FolderOpen className="h-4 w-4 text-primary shrink-0" />
               <h3 className="text-sm font-semibold">
                 {t('start.projects_folder')}
               </h3>
@@ -226,9 +226,9 @@ export default function StartScreen({
                       onClick={() => openRecent(f)}
                       className="w-full flex items-center gap-2.5 pl-6 pr-2 py-1.5 rounded-md text-sm hover:bg-accent transition-colors text-left group"
                     >
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
                       <span className="truncate flex-1">{projectDisplayName(f)}</span>
-                      <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </button>
                   </li>
                 ))}

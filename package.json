@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "dev": "concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/server.js tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "dev": "electron-rebuild -f -w better-sqlite3 && concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/server.js tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "build": "npm run build --workspace=src/frontend",
     "build:backend": "npm run build --workspace=src/backend",
     "test": "npm run test --workspace=src/backend && npm run test --workspace=src/frontend",

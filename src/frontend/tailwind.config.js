@@ -1,6 +1,6 @@
 module.exports = {
   // enable class-based dark mode; Tailwind will add `.dark:` variants
-  darkMode: 'class',
+  dark: 'class',
   content: [
     './src/**/*.{js,jsx,ts,tsx}',
     '../../dist/index.html'
