@@ -7,7 +7,7 @@ export default defineConfig({
   outDir: '../../dist/backend',
   // Native and optional modules must remain as runtime require() calls;
   // electron-builder rebuilds better-sqlite3 for the correct Electron ABI.
-  external: ['better-sqlite3', 'multer', 'electron'],
+  external: ['better-sqlite3', 'electron'],
   bundle: true,
   sourcemap: false,
   clean: true,
