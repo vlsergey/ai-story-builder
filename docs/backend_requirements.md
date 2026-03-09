@@ -1,20 +1,20 @@
 ## Backend Tech Stack and Functional Requirements
 
 ### Tech Stack
-- Runtime: Node.js 22 LTS (Active LTS)
+- Runtime: Node.js 22 LTS (Active LTS, embedded in Electron)
 - Language: TypeScript (strict mode)
-- Framework: Express.js
+- Communication: Electron IPC (`ipcMain.handle` / `ipcRenderer.invoke`)
 - Database: SQLite 3 with better-sqlite3 driver
 - Schema migrations: PRAGMA user_version with embedded migration runner
-- HTTP Client: Axios
-- Configuration: dotenv + Zod schema validation
-- Logging: Pino
 - Desktop packaging: Electron with electron-builder
 
 ### Functional Requirements (Architecture Level)
 - The application is distributed as a native desktop app (Electron) that runs on the target machine without requiring Node.js or any other runtime to be installed.
 - Must support three target platforms: Windows (x64), Linux (x64), and macOS (x64 + arm64).
-- The Electron main process starts the Express HTTP server, then opens a BrowserWindow pointing to it.
+- The Electron main process loads backend code directly (no HTTP server), registers IPC handlers via `registerIpcHandlers(win)`, then opens a BrowserWindow pointing to the Vite dev server (dev) or `file://dist/index.html` (prod).
+- All frontend-to-backend communication uses Electron IPC: synchronous request-response via `ipcMain.handle` / `ipcRenderer.invoke`; streaming AI generation uses `webContents.send` (`stream:event` channel) for push events.
+- The frontend calls the backend exclusively through `window.electronAPI.invoke(channel, ...args)` (exposed by `preload.js` via `contextBridge`). The typed wrapper lives in `src/frontend/src/ipcClient.ts`.
+- IPC errors are returned as `{ __ipcError: true, message: string, status: number }` objects; `ipcClient.ts` converts them to thrown `Error` instances with a `status` property.
 
 ### Code Organization
 - All API endpoints should be separated by domain/entity.  For example, routes pertaining to folders, lore, plans, versions, AI calls, etc. should live in their own directory under `src/backend` (e.g. `routes/folders.js`, `routes/lore.js`, etc.).
@@ -26,7 +26,8 @@
 - All user data (project databases, backups, application settings) is stored in the OS-standard user data directory via Electron's `app.getPath('userData')`. In development (plain Node.js), falls back to `<cwd>/data`.
 - Automatic database backup is created before opening any project and before schema migrations (keep last 7 backups).
 - Full support for multiple AI backends: Grok API, Yandex Cloud AI, Local LLM (via OpenAI-compatible HTTP endpoint), and Mock mode.
-- AI configuration API (`/api/ai/*`) for managing engine credentials and selecting the active engine:
+- All operations below are exposed as IPC channels (e.g. `lore:tree`, `ai:config:get`). HTTP paths shown in parentheses are legacy references only; the actual transport is IPC. The typed client lives in `src/frontend/src/ipcClient.ts`.
+- AI configuration IPC channels (`ai:*`) for managing engine credentials and selecting the active engine:
   - `GET /api/ai/config` — returns current engine list with credentials (API keys returned as-is since stored in per-user project DB)
   - `POST /api/ai/config` — saves per-engine credential fields (merged into existing JSON)
   - `POST /api/ai/current-engine` — sets the active engine; validates required fields before accepting; body: `{ engine: string | null }`
@@ -93,10 +94,10 @@
 
 ### Development Workflow
 - `npm run dev` starts three processes concurrently via `concurrently`:
-  1. Express backend with nodemon on port 3001 (system Node.js)
-  2. Vite frontend dev server on port 3000 (proxies `/api` to port 3001)
-  3. Electron, loading `http://localhost:3000` with DevTools open
-- Before starting, `npm run dev` automatically rebuilds `better-sqlite3` for the system Node.js ABI (`predev` hook). This is necessary because `npm run package` (via electron-builder) compiles it for Electron's Node.js, which has a different ABI.
+  1. `tsup --watch` — rebuilds backend TypeScript to `dist/backend/server.js` on every change
+  2. Vite frontend dev server on port 3000 (no `/api` proxy — all backend calls use IPC)
+  3. Electron (waits for `dist/backend/server.js` and port 3000 to be ready), loads `http://localhost:3000`
+- No `predev` hook; no port 3001; no `better-sqlite3` rebuild step in dev (Electron uses its own ABI automatically via electron-builder rebuild at package time).
 - `npm run package` rebuilds native modules for Electron automatically via electron-builder.
 
 ### Build Output

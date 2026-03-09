@@ -2,8 +2,7 @@
 
 To keep the project maintainable and scalable, follow these rules:
 
-* **Backend structure** – Organize server code by entity. Each major domain (projects, folders, lore, plan, generated parts, etc.) should live in its own subdirectory under `src/backend`.  
-  Within each directory, put individual route handlers in separate files (e.g. `create.js`, `list.js`, `move.js`).  Import and assemble them in a central router.  Avoid a monolithic `projectRoutes.js` file.
+* **Backend structure** – Organize backend code by entity. Each major domain (projects, lore, plan, AI, settings, etc.) should live in its own file under `src/backend/routes/` as pure functions (no Express, no `req`/`res`). Functions throw errors with `.status` instead of sending HTTP responses. IPC wiring lives in `src/backend/ipc/index.ts` (`registerIpcHandlers`), which maps IPC channel names to the pure functions. Keep route files focused; avoid a monolithic file.
 * **Frontend structure** – Use a component-per-file approach and prefer functional components with hooks. Keep styling using Tailwind util classes or shadcn/ui patterns.
 * **Theming & I18n** – All user-facing text strings must be internationalised using the `useLocale()` hook (`t(key)`) and stored in UTF-8 JSON locale files under `src/frontend/src/i18n/`.  Do not inline user-visible strings directly in JSX.  Every new i18n key must be added to **both** `en.json` and `ru.json` at the same time — the project supports English and Russian, and both translations must be provided upfront.
 * **URL routing** – UI must reflect application state in the URL (React Router is used).  Reloading the page should not reset to the start screen.
@@ -11,13 +10,13 @@ To keep the project maintainable and scalable, follow these rules:
 * **Interactive docking** – Panels should be implemented with a docking/window library or custom drag/resize handlers. Users must be able to reposition and dock panels via drag‑drop.
 * **Dependency management** – Frontend and backend must have separate `package.json` files to maintain clear separation of concerns. Dependencies should be installed only in the relevant workspace.
 
-* **HTTP error codes** – Use the correct status code for each failure:
-  * `400 Bad Request` – missing or invalid parameters supplied by the client.
-  * `404 Not Found` – requested resource does not exist.
-  * `409 Conflict` – the operation conflicts with the current state (e.g. duplicate name).
-  * `500 Internal Server Error` – an unexpected server-side failure only (unhandled exception, I/O error, etc.).
-  Returning `500` because of wrong UI state or invalid user input is a **bug** and must be fixed, not accepted.
-* **Error logging** – The backend logs a stack trace for every 4xx/5xx response automatically. Never swallow exceptions silently; always surface them as the appropriate HTTP error code with a descriptive `{ error: "..." }` JSON body.
+* **IPC error convention** – Backend pure functions throw `Error` objects with an optional `status: number` property (`400`, `404`, `409`, `500`). The IPC wrapper in `src/backend/ipc/index.ts` catches these and returns `{ __ipcError: true, message, status }` to the renderer. `ipcClient.ts` in the frontend converts them back to thrown `Error` instances with the same `status` property. Use the correct status code:
+  * `400` – missing or invalid parameters supplied by the caller.
+  * `404` – requested resource does not exist.
+  * `409` – the operation conflicts with the current state (e.g. duplicate name).
+  * `500` – an unexpected server-side failure only (unhandled exception, I/O error, etc.).
+  Returning `500` because of wrong caller state or invalid input is a **bug** and must be fixed, not accepted.
+* **Error logging** – Never swallow exceptions silently. Always throw with a descriptive message and the appropriate `status` code so errors surface meaningfully to the user.
 
 * **Keyboard shortcuts scoped to their panel** – A global `window` keydown listener for panel-local shortcuts (e.g. Delete / Enter in the Lore Tree) must guard against events originating outside the panel. Use a container `ref` and check `containerRef.current.contains(e.target)` before processing the event. This prevents the panel's shortcuts from firing when focus is in another panel (e.g. a CodeMirror editor, a form, etc.). Keep the `INPUT` / `TEXTAREA` tag guard as well, for editable fields that live inside the same panel.
 
@@ -28,7 +27,7 @@ To keep the project maintainable and scalable, follow these rules:
   * Should backfill existing rows where the new column has a meaningful value that can be derived from existing data.
   * Test fixtures (e.g. `setupDb()` in `*.test.ts` files) must include any new columns so the tests reflect the real schema.
 
-* **Engine-agnostic API endpoints** – API routes must not be tied to a specific AI engine (e.g. no `/api/ai/yandex/…` paths). All engine-specific operations should be exposed through engine-agnostic endpoints (e.g. `POST /api/ai/sync-lore`) that read the `current_backend` value from the project settings and dispatch to the appropriate adapter. This keeps the frontend and route structure independent of which engine is active. Engine-specific logic lives in adapter functions/modules, not in the route path.
+* **Engine-agnostic IPC channels** – IPC channel names must not be tied to a specific AI engine (e.g. no `ai:yandex:*` channels). All engine-specific operations should be exposed through engine-agnostic channels (e.g. `ai:sync-lore`) that read the `current_backend` value from the project settings and dispatch to the appropriate adapter. This keeps the frontend and IPC structure independent of which engine is active. Engine-specific logic lives in adapter functions/modules, not in the channel name.
 
 * **Engine-specific adapter isolation** – All code specific to a particular AI provider (API call format, request construction, response parsing, streaming, error mapping) must live in dedicated adapter files per engine (e.g. `src/backend/lib/grok-adapter.ts`, `src/backend/lib/yandex-adapter.ts`). Each adapter implements a common interface (e.g. `LoreGenerateAdapter` in `lore-generate-adapter.ts`); a factory function (`getLoreAdapter`) maps an engine ID to its adapter. Routes call only the common interface and never contain `if (engine === 'grok')` branches. New engine support means adding one new adapter file and one line in the factory — nothing else.
 
@@ -39,7 +38,7 @@ To keep the project maintainable and scalable, follow these rules:
 
 * **TypeScript build architecture** – The backend uses a two-tool setup:
   * `tsc --noEmit` (`tsconfig.json`) — type-checks all `.ts` files including tests. Targets `ESNext/Bundler` to support top-level `await` in test files. Never emits output files.
-  * `tsup` (`tsup.config.ts`) — production build. Bundles `server.ts` and all its imports (including `src/shared/`) into a single `dist/backend/server.js` CJS file. Native/optional modules (`better-sqlite3`, `multer`, `electron`) are kept external and resolved at runtime by Electron.
+  * `tsup` (`tsup.config.ts`) — production build. Bundles `server.ts` (which re-exports `registerIpcHandlers` from `ipc/index.ts`) and all its imports into a single `dist/backend/server.js` CJS file. Native modules (`better-sqlite3`, `electron`) are kept external and resolved at runtime by Electron.
 
 * **Build output** – `build:backend` writes only to `dist/backend/`. Source directories (`src/backend/`, `src/shared/`) never contain compiled output. `dist/` is gitignored.
 
