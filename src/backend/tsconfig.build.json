@@ -2,8 +2,11 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "outDir": "..",
     "rootDir": ".."
   },
-  "include": ["**/*.ts", "../shared/**/*.ts"]
+  "include": ["**/*.ts", "../shared/**/*.ts"],
+  "exclude": ["**/*.test.ts", "node_modules"]
 }

@@ -89,7 +89,7 @@ router.post('/playground', express.json(), async (req: Request, res: Response) =
     const { response_id } = await adapter.generateResponse(
       {
         prompt: prompt.trim(),
-        systemPrompt: systemPrompt?.trim() || undefined,
+        systemPrompt: systemPrompt?.trim() ?? '',
         model: requestedModel?.trim() ?? '',
         includeExistingLore: includeExistingLore ?? false,
         webSearch: webSearch ?? 'none',

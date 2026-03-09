@@ -119,7 +119,7 @@ router.post('/config', express.json(), (req: Request, res: Response) => {
       config.yandex = { ...config.yandex, ...fields } as YandexConfig
     } else {
       if (!config.custom) config.custom = {}
-      config.custom[engine] = { ...(config.custom[engine] ?? {}), ...fields }
+      config.custom[engine] = { ...(config.custom[engine] ?? {}), ...fields } as Record<string, string>
     }
     writeAiConfig(dbPath, config)
     res.json({ ok: true })

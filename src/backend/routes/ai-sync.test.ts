@@ -31,7 +31,7 @@ const { mockFilesCreate, mockFilesDel, mockFilesRetrieve, mockVsCreate, mockVsDe
 vi.mock('openai', () => ({
   default: class {
     files = { create: mockFilesCreate, delete: mockFilesDel, retrieve: mockFilesRetrieve }
-    vectorStores = { create: mockVsCreate, del: mockVsDel, retrieve: mockVsRetrieve }
+    vectorStores = { create: mockVsCreate, delete: mockVsDel, retrieve: mockVsRetrieve }
   },
   toFile: mockToFile,
 }))
@@ -263,7 +263,7 @@ describe('POST /ai/sync-lore', () => {
 
     // Verify toFile was called with .md filename and correct content
     expect(mockToFile).toHaveBeenCalledOnce()
-    const [toFileBuffer, toFileName, toFileOpts] = mockToFile.mock.calls[0] as [Buffer, string, { type: string }]
+    const [toFileBuffer, toFileName, toFileOpts] = mockToFile.mock.calls[0] as unknown as [Buffer, string, { type: string }]
     expect(toFileName).toBe('lore-42.md')
     expect(toFileOpts.type).toBe('text/plain')
     // Verify YAML frontmatter in file content
@@ -811,7 +811,7 @@ describe('POST /ai/sync-lore', () => {
 
   it('Grok: returns 400 when too many top-level categories', async () => {
     // 11 level-2 nodes (> maxFilesPerRequest=10)
-    const nodes = [
+    const nodes: Array<{ id: number; parent_id: number | null; name: string; content: string | null; word_count: number }> = [
       { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
     ]
     for (let i = 2; i <= 12; i++) {
@@ -842,7 +842,7 @@ describe('POST /ai/sync-lore', () => {
     expect(res.status).toBe(200)
 
     expect(mockToFile).toHaveBeenCalledOnce()
-    const [buf, filename] = mockToFile.mock.calls[0] as [Buffer, string, unknown]
+    const [buf, filename] = mockToFile.mock.calls[0] as unknown as [Buffer, string, unknown]
     expect(filename).toBe('lore-group-2.md')
     const content = buf.toString('utf-8')
     expect(content).toContain('# World')
