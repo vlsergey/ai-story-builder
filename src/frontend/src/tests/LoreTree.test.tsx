@@ -1,18 +1,33 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import LoreTree from '../components/LoreTree';
 import { LoreSettingsContext } from '../lib/lore-settings';
 import type { LoreNode } from '../types/models';
 
-// Mock the fetch API
-global.fetch = vi.fn() as unknown as typeof fetch;
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const mockFetchTree = (nodes: Partial<LoreNode>[]) => {
-  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-    json: () => Promise.resolve(nodes)
-  });
-};
+let currentLoreTreeData: Partial<LoreNode>[] = []
+
+function setupElectronAPIWithTree(nodes: Partial<LoreNode>[]) {
+  currentLoreTreeData = nodes
+  window.electronAPI = {
+    onMenuAction: vi.fn().mockReturnValue(vi.fn()),
+    sendMenuState: vi.fn(),
+    showErrorDialog: vi.fn(),
+    invoke: vi.fn().mockImplementation((channel: string) => {
+      if (channel === 'lore:tree') return Promise.resolve(currentLoreTreeData)
+      return Promise.resolve({})
+    }),
+    startStream: vi.fn().mockResolvedValue({ ok: true }),
+    abortStream: vi.fn().mockResolvedValue({ ok: true }),
+    onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
+  }
+}
+
+function setLoreTreeData(nodes: Partial<LoreNode>[]) {
+  currentLoreTreeData = nodes
+}
 
 const mockProps = { onSelectLoreNode: vi.fn() };
 
@@ -21,7 +36,7 @@ function renderWithSettings(
   nodes: Partial<LoreNode>[],
   settings: { statMode?: 'none' | 'words' | 'chars' | 'bytes'; currentAiEngine?: string | null }
 ) {
-  mockFetchTree(nodes);
+  setupElectronAPIWithTree(nodes);
   const { statMode = 'words', currentAiEngine = null } = settings;
   return render(
     <LoreSettingsContext.Provider value={{ statMode, currentAiEngine }}>
@@ -33,29 +48,52 @@ function renderWithSettings(
 describe('LoreTree', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    currentLoreTreeData = [];
+  });
+
+  afterEach(() => {
+    delete (window as any).electronAPI;
   });
 
   it('renders without crashing when tree data is an array', () => {
-    mockFetchTree([{ id: 1, name: 'Story Lore', parent_id: null, status: 'ACTIVE', children: [] }]);
+    setupElectronAPIWithTree([{ id: 1, name: 'Story Lore', parent_id: null, status: 'ACTIVE', children: [] }]);
     expect(() => render(<LoreTree {...mockProps} />)).not.toThrow();
   });
 
   it('handles non-array tree data gracefully', () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      json: () => Promise.resolve({ error: 'Invalid response' })
-    });
+    window.electronAPI = {
+      onMenuAction: vi.fn().mockReturnValue(vi.fn()),
+      sendMenuState: vi.fn(),
+      showErrorDialog: vi.fn(),
+      invoke: vi.fn().mockImplementation((channel: string) => {
+        if (channel === 'lore:tree') return Promise.resolve({ error: 'Invalid response' })
+        return Promise.resolve({})
+      }),
+      startStream: vi.fn().mockResolvedValue({ ok: true }),
+      abortStream: vi.fn().mockResolvedValue({ ok: true }),
+      onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
+    }
     expect(() => render(<LoreTree {...mockProps} />)).not.toThrow();
   });
 
   it('handles null tree data gracefully', () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      json: () => Promise.resolve(null)
-    });
+    window.electronAPI = {
+      onMenuAction: vi.fn().mockReturnValue(vi.fn()),
+      sendMenuState: vi.fn(),
+      showErrorDialog: vi.fn(),
+      invoke: vi.fn().mockImplementation((channel: string) => {
+        if (channel === 'lore:tree') return Promise.resolve(null)
+        return Promise.resolve({})
+      }),
+      startStream: vi.fn().mockResolvedValue({ ok: true }),
+      abortStream: vi.fn().mockResolvedValue({ ok: true }),
+      onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
+    }
     expect(() => render(<LoreTree {...mockProps} />)).not.toThrow();
   });
 
   it('renders tree nodes after fetch resolves', async () => {
-    mockFetchTree([{
+    setupElectronAPIWithTree([{
       id: 1, parent_id: null, name: 'Story Lore', status: 'ACTIVE',
       position: 0,
       content: null,
@@ -259,7 +297,7 @@ describe('LoreTree', () => {
   });
 
   it('updates node name in tree when lore-node-saved event fires with name', async () => {
-    mockFetchTree([{
+    setupElectronAPIWithTree([{
       id: 1, parent_id: null, name: 'Old Name', status: 'ACTIVE', content: null,
       position: 0,
       word_count: 0, char_count: 0, byte_count: 0,
@@ -421,8 +459,7 @@ describe('LoreTree', () => {
       }],
     }]
 
-    // First fetch: initial load
-    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ json: () => Promise.resolve(treeData) })
+    setupElectronAPIWithTree(treeData)
     render(
       <LoreSettingsContext.Provider value={{ statMode: 'none', currentAiEngine: null }}>
         <LoreTree onSelectLoreNode={vi.fn()} />
@@ -440,12 +477,17 @@ describe('LoreTree', () => {
     // 'Item' must disappear from DOM after collapse
     await waitFor(() => expect(screen.queryByText('Item')).toBeNull())
 
+    const invokeMock = window.electronAPI!.invoke as ReturnType<typeof vi.fn>
+    const loreTreeCallsBefore = invokeMock.mock.calls.filter((call: unknown[]) => call[0] === 'lore:tree').length
+
     // Simulate a tree refresh (e.g. after creating a child node)
-    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ json: () => Promise.resolve(treeData) })
     window.dispatchEvent(new Event('lore-tree-refresh'))
 
-    // Wait for the second fetch to complete
-    await waitFor(() => expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2))
+    // Wait for the second lore:tree call to complete
+    await waitFor(() => {
+      const loreTreeCalls = invokeMock.mock.calls.filter((call: unknown[]) => call[0] === 'lore:tree').length
+      expect(loreTreeCalls).toBe(loreTreeCallsBefore + 1)
+    })
 
     // 'Item' must remain hidden — refresh must NOT re-expand collapsed nodes
     expect(screen.queryByText('Item')).toBeNull()
@@ -455,7 +497,7 @@ describe('LoreTree', () => {
 
   it('does not intercept Enter key when focus is outside the lore tree', async () => {
     const onOpenLoreNode = vi.fn();
-    mockFetchTree([{
+    setupElectronAPIWithTree([{
       id: 1, parent_id: null, name: 'Root', status: 'ACTIVE',
       content: null,
       position: 0,

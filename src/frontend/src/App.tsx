@@ -6,6 +6,7 @@ import './styles.css'
 import { ThemeProvider } from './lib/theme/theme-provider'
 import { LocaleProvider } from './lib/locale'
 import { ProjectData } from './types/models'
+import { ipcClient } from './ipcClient'
 
 /**
  * Root application component
@@ -23,8 +24,7 @@ export default function App() {
   useEffect(() => {
     const checkProjectStatus = async () => {
       try {
-        const res = await fetch('/api/project/status')
-        const data = await res.json() as { isOpen: boolean }
+        const data = await ipcClient.project.status()
         setProjectOpen(data.isOpen)
         if (data.isOpen) {
           navigate('/project', { replace: true })
@@ -46,13 +46,9 @@ export default function App() {
 
   async function handleCloseProject() {
     try {
-      const res = await fetch('/api/project/close', { method: 'POST' })
-      if (res.ok) {
-        setProjectOpen(false)
-        navigate('/', { replace: true })
-      } else {
-        console.error('Failed to close project: API error')
-      }
+      await ipcClient.project.close()
+      setProjectOpen(false)
+      navigate('/', { replace: true })
     } catch (e) {
       console.error('Failed to close project:', e)
       // Still close UI even if API fails

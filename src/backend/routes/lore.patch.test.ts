@@ -1,12 +1,10 @@
 /**
- * Integration tests for PATCH /lore/:id
+ * Integration tests for patchLoreNode()
  */
 
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import express from 'express'
-import request from 'supertest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 let testDbPath = ''
@@ -16,11 +14,7 @@ vi.mock('../db/state.js', () => ({
   getDataDir: () => os.tmpdir(),
 }))
 
-const { default: router } = await import('./lore.js')
-
-const app = express()
-app.use(express.json())
-app.use('/lore', router)
+const { patchLoreNode } = await import('./lore.js')
 
 function setupDb(): string {
   const file = path.join(
@@ -62,39 +56,31 @@ function setupDb(): string {
 beforeEach(() => { testDbPath = setupDb() })
 afterEach(() => { try { fs.unlinkSync(testDbPath) } catch { /* ignore */ } })
 
-describe('PATCH /lore/:id', () => {
-  it('returns updated word/char/byte counts when content is saved', async () => {
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ content: 'Hello world from lore' })
+describe('patchLoreNode', () => {
+  it('returns updated word/char/byte counts when content is saved', () => {
+    const res = patchLoreNode(2, { content: 'Hello world from lore' })
 
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
-    expect(res.body.word_count).toBe(4)
-    expect(res.body.char_count).toBe(21)
-    expect(res.body.byte_count).toBe(21)
+    expect(res.ok).toBe(true)
+    expect(res.word_count).toBe(4)
+    expect(res.char_count).toBe(21)
+    expect(res.byte_count).toBe(21)
   })
 
-  it('does not include stats in response when only name is updated', async () => {
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ name: 'New Name' })
+  it('does not include stats in response when only name is updated', () => {
+    const res = patchLoreNode(2, { name: 'New Name' })
 
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
-    expect(res.body.word_count).toBeUndefined()
+    expect(res.ok).toBe(true)
+    expect(res.word_count).toBeUndefined()
   })
 
-  it('returns null ai_sync_info when node has no prior sync records', async () => {
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ content: 'Some new content' })
+  it('returns null ai_sync_info when node has no prior sync records', () => {
+    const res = patchLoreNode(2, { content: 'Some new content' })
 
-    expect(res.status).toBe(200)
-    expect(res.body.ai_sync_info).toBeNull()
+    expect(res.ok).toBe(true)
+    expect(res.ai_sync_info).toBeNull()
   })
 
-  it('returns updated ai_sync_info with content_updated_at when node has existing sync records', async () => {
+  it('returns updated ai_sync_info with content_updated_at when node has existing sync records', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
@@ -104,29 +90,25 @@ describe('PATCH /lore/:id', () => {
     db.close()
 
     const before = new Date().toISOString()
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ content: 'Updated content' })
+    const res = patchLoreNode(2, { content: 'Updated content' })
 
-    expect(res.status).toBe(200)
-    expect(res.body.ai_sync_info).toBeDefined()
-    expect(res.body.ai_sync_info.yandex).toBeDefined()
-    expect(res.body.ai_sync_info.yandex.file_id).toBe('f1')
-    expect(res.body.ai_sync_info.yandex.content_updated_at).toBeDefined()
-    expect(new Date(res.body.ai_sync_info.yandex.content_updated_at).getTime())
+    expect(res.ok).toBe(true)
+    expect(res.ai_sync_info).toBeDefined()
+    expect(res.ai_sync_info!.yandex).toBeDefined()
+    expect(res.ai_sync_info!.yandex.file_id).toBe('f1')
+    expect(res.ai_sync_info!.yandex.content_updated_at).toBeDefined()
+    expect(new Date(res.ai_sync_info!.yandex.content_updated_at as string).getTime())
       .toBeGreaterThanOrEqual(new Date(before).getTime() - 1000)
   })
 
-  it('does not return ai_sync_info when only name is updated', async () => {
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ name: 'New Name' })
+  it('does not return ai_sync_info when only name is updated', () => {
+    const res = patchLoreNode(2, { name: 'New Name' })
 
-    expect(res.status).toBe(200)
-    expect(res.body.ai_sync_info).toBeUndefined()
+    expect(res.ok).toBe(true)
+    expect(res.ai_sync_info).toBeUndefined()
   })
 
-  it('persists updated content_updated_at inside ai_sync_info in DB when content is saved', async () => {
+  it('persists updated content_updated_at inside ai_sync_info in DB when content is saved', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
@@ -135,7 +117,7 @@ describe('PATCH /lore/:id', () => {
     )
     db.close()
 
-    await request(app).patch('/lore/2').send({ content: 'Some content' })
+    patchLoreNode(2, { content: 'Some content' })
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database2 = require('better-sqlite3')
@@ -147,20 +129,16 @@ describe('PATCH /lore/:id', () => {
     expect(syncInfo.yandex.content_updated_at).toBeDefined()
   })
 
-  it('start_review captures current content as review_base_content and sets changes_status=review', async () => {
+  it('start_review captures current content as review_base_content and sets changes_status=review', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
-    // Pre-set existing content in the DB
     const db = new Database(testDbPath)
     db.prepare("UPDATE lore_nodes SET content = ? WHERE id = 2").run('Original content')
     db.close()
 
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ content: 'AI improved content', prompt: 'Make it better', start_review: true })
+    const res = patchLoreNode(2, { content: 'AI improved content', prompt: 'Make it better', start_review: true })
 
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+    expect(res.ok).toBe(true)
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database2 = require('better-sqlite3')
@@ -175,12 +153,8 @@ describe('PATCH /lore/:id', () => {
     expect(row.review_base_content).toBe('Original content')
   })
 
-  it('start_review saves prompt as last_improve_instruction', async () => {
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ content: 'New content', prompt: 'Make it epic', start_review: true })
-
-    expect(res.status).toBe(200)
+  it('start_review saves prompt as last_improve_instruction', () => {
+    patchLoreNode(2, { content: 'New content', prompt: 'Make it epic', start_review: true })
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
@@ -191,7 +165,7 @@ describe('PATCH /lore/:id', () => {
     expect(row.last_improve_instruction).toBe('Make it epic')
   })
 
-  it('start_review does not overwrite review_base_content when already in review', async () => {
+  it('start_review does not overwrite review_base_content when already in review', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
@@ -199,12 +173,7 @@ describe('PATCH /lore/:id', () => {
       .run('First AI result', 'Original content')
     db.close()
 
-    // Second improvement (repeat): send start_review again with new AI content
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ content: 'Second AI result', start_review: true })
-
-    expect(res.status).toBe(200)
+    patchLoreNode(2, { content: 'Second AI result', start_review: true })
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database2 = require('better-sqlite3')
@@ -214,23 +183,19 @@ describe('PATCH /lore/:id', () => {
     }
     db2.close()
 
-    // review_base_content must remain the original (not overwritten with 'First AI result')
     expect(row.review_base_content).toBe('Original content')
   })
 
-  it('accept_review clears changes_status, review_base_content, and last_improve_instruction', async () => {
+  it('accept_review clears changes_status, review_base_content, and last_improve_instruction', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
     db.prepare("UPDATE lore_nodes SET changes_status = 'review', review_base_content = 'Old', last_improve_instruction = 'some instruction' WHERE id = 2").run()
     db.close()
 
-    const res = await request(app)
-      .patch('/lore/2')
-      .send({ accept_review: true })
+    const res = patchLoreNode(2, { accept_review: true })
 
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+    expect(res.ok).toBe(true)
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database2 = require('better-sqlite3')

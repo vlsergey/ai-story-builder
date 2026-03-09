@@ -1,12 +1,10 @@
 /**
- * Integration tests for POST /api/ai/generate-lore
+ * Integration tests for generateLore()
  */
 
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import express from 'express'
-import request from 'supertest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 let testDbPath = ''
@@ -32,13 +30,9 @@ vi.mock('../lib/grok-client.js', () => ({
   grokGenerate: mockGrokGenerate,
 }))
 
-// ─── App setup ────────────────────────────────────────────────────────────────
+// ─── Import pure function ────────────────────────────────────────────────────
 
-const { default: router } = await import('./generate-lore.js')
-
-const app = express()
-app.use(express.json())
-app.use('/ai', router)
+const { generateLore } = await import('./generate-lore.js')
 
 // ─── DB helper ────────────────────────────────────────────────────────────────
 
@@ -138,24 +132,6 @@ function setupDb(opts?: {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function parseSseEvents(body: string): Array<{ event: string; data: Record<string, unknown> }> {
-  const events: Array<{ event: string; data: Record<string, unknown> }> = []
-  let event = ''
-  for (const line of body.split('\n')) {
-    if (line.startsWith('event: ')) event = line.slice(7).trim()
-    else if (line.startsWith('data: ')) {
-      events.push({ event, data: JSON.parse(line.slice(6)) as Record<string, unknown> })
-      event = ''
-    }
-  }
-  return events
-}
-
-function ssePartialJson(events: ReturnType<typeof parseSseEvents>): Record<string, unknown> {
-  const partials = events.filter(e => e.event === 'partial_json')
-  return (partials[partials.length - 1]?.data ?? {}) as Record<string, unknown>
-}
-
 function mockYandexResponse(content = JSON.stringify({ name: 'Lore item', content: 'Generated lore text' })) {
   mockChatCreate.mockResolvedValueOnce({
     choices: [{ message: { content } }],
@@ -171,6 +147,15 @@ function mockGrokResponse(content = JSON.stringify({ name: 'Lore item', content:
   )
 }
 
+async function callGenerateLore(params: Record<string, unknown>) {
+  const partials: Record<string, unknown>[] = []
+  const thinkings: { status: string; detail?: string }[] = []
+  const onThinking = (status: string, detail?: string) => thinkings.push({ status, detail })
+  const onPartialJson = (data: Record<string, unknown>) => partials.push(data)
+  const result = await generateLore(params as any, onThinking, onPartialJson)
+  return { result, partials, thinkings }
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -183,62 +168,49 @@ afterEach(() => {
   }
 })
 
-describe('POST /ai/generate-lore', () => {
+describe('generateLore', () => {
 
   // ─── 1. Basic validation ───────────────────────────────────────────────────
 
-  it('returns 400 when no project open', async () => {
+  it('throws 400 when no project open', async () => {
     testDbPath = ''
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'test' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('no project open')
+    await expect(callGenerateLore({ prompt: 'test' })).rejects.toThrow(/no project open/)
+    try { await callGenerateLore({ prompt: 'test' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when prompt is missing', async () => {
+  it('throws 400 when prompt is missing', async () => {
     testDbPath = setupDb({ grokApiKey: 'key' })
-    const res = await request(app).post('/ai/generate-lore').send({})
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('prompt is required')
+    await expect(callGenerateLore({})).rejects.toThrow(/prompt is required/)
+    try { await callGenerateLore({}) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when no AI engine is configured', async () => {
+  it('throws 400 when no AI engine is configured', async () => {
     testDbPath = setupDb() // no engine
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'hello' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('no AI engine configured')
+    await expect(callGenerateLore({ prompt: 'hello' })).rejects.toThrow(/no AI engine configured/)
+    try { await callGenerateLore({ prompt: 'hello' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 for an unknown engine id', async () => {
+  it('throws 400 for an unknown engine id', async () => {
     testDbPath = setupDb({ currentEngine: 'unknown-engine' })
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'hello' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain("not supported for engine 'unknown-engine'")
+    await expect(callGenerateLore({ prompt: 'hello' })).rejects.toThrow(/not supported for engine 'unknown-engine'/)
+    try { await callGenerateLore({ prompt: 'hello' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   // ─── 2. Grok — basic generation ───────────────────────────────────────────
 
-  it('returns generated content for Grok engine', async () => {
+  it('returns generated content for Grok engine via onPartialJson', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse(JSON.stringify({ name: 'Arin', content: 'A brave hero named Arin.' }))
 
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
-    expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
-    const events = parseSseEvents(res.text)
-    const last = ssePartialJson(events)
+    const { partials } = await callGenerateLore({ prompt: 'Describe a hero' })
+    const last = partials[partials.length - 1]
     expect(last.name).toBe('Arin')
     expect(last.content).toBe('A brave hero named Arin.')
-    expect(events.some(e => e.event === 'thinking' && e.data.status === 'done')).toBe(true)
   })
 
-  it('returns SSE error when Grok api_key is missing', async () => {
+  it('throws when Grok api_key is missing', async () => {
     testDbPath = setupDb({ currentEngine: 'grok' }) // no grokApiKey in config
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'test' })
-    expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
-    const events = parseSseEvents(res.text)
-    const errorEvent = events.find(e => e.event === 'error')
-    expect(errorEvent?.data.message).toContain('Grok api_key is required')
+    await expect(callGenerateLore({ prompt: 'test' })).rejects.toThrow(/Grok api_key is required/)
   })
 
   // ─── 3. Grok file attachment format ───────────────────────────────────────
@@ -254,17 +226,13 @@ describe('POST /ai/generate-lore', () => {
         {
           id: 2, parent_id: 1, name: 'Characters',
           word_count: 0,
-          // Group-leader node: word_count=0 but carries a file_id
           ai_sync_info: JSON.stringify({ grok: { file_id: 'file-abc123', last_synced_at: '2025-01-01T00:00:00Z' } }),
         },
       ],
     })
     mockGrokResponse('Hero content')
 
-    await request(app).post('/ai/generate-lore').send({
-      prompt: 'Describe a hero',
-      settings: { includeExistingLore: true },
-    })
+    await callGenerateLore({ prompt: 'Describe a hero', settings: { includeExistingLore: true } })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
     const params = mockGrokGenerate.mock.calls[0][1] as {
@@ -279,7 +247,6 @@ describe('POST /ai/generate-lore', () => {
   })
 
   // ─── 4. Grok group-leader nodes (word_count=0) included in file list ───────
-  // Bug fix: SQL previously filtered AND word_count > 0, excluding Grok group-leader nodes
 
   it('includes file IDs from group-leader nodes with word_count=0', async () => {
     testDbPath = setupDb({
@@ -288,22 +255,17 @@ describe('POST /ai/generate-lore', () => {
         { id: 1, parent_id: null, name: 'Root', word_count: 0, ai_sync_info: null },
         {
           id: 2, parent_id: 1, name: 'Characters', word_count: 0,
-          // Group-leader: no own text but file uploaded for the whole subtree
           ai_sync_info: JSON.stringify({ grok: { file_id: 'file-leader', last_synced_at: '2025-01-01T00:00:00Z' } }),
         },
         {
           id: 3, parent_id: 2, name: 'Hero', word_count: 5,
-          // Merged-into-parent: no file_id (merged into group leader)
           ai_sync_info: JSON.stringify({ grok: { merged_into_parent: true, last_synced_at: '2025-01-01T00:00:00Z' } }),
         },
       ],
     })
     mockGrokResponse('Hero lore')
 
-    await request(app).post('/ai/generate-lore').send({
-      prompt: 'Tell me about the hero',
-      settings: { includeExistingLore: true },
-    })
+    await callGenerateLore({ prompt: 'Tell me about the hero', settings: { includeExistingLore: true } })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
     const params = mockGrokGenerate.mock.calls[0][1] as {
@@ -312,9 +274,7 @@ describe('POST /ai/generate-lore', () => {
     const userMessage = params.input.find((m) => m.role === 'user')
     const fileAttachments = userMessage!.content.filter(c => c.type === 'input_file')
 
-    // The group-leader node (word_count=0) must be included
     expect(fileAttachments.some(f => f.file_id === 'file-leader')).toBe(true)
-    // The merged-into-parent node has no file_id — should not appear
     expect(fileAttachments).toHaveLength(1)
   })
 
@@ -335,10 +295,7 @@ describe('POST /ai/generate-lore', () => {
     })
     mockGrokResponse('Some lore')
 
-    await request(app).post('/ai/generate-lore').send({
-      prompt: 'test',
-      settings: { includeExistingLore: true },
-    })
+    await callGenerateLore({ prompt: 'test', settings: { includeExistingLore: true } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as {
       input: Array<{ role: string; content: Array<Record<string, unknown>> }>
@@ -362,10 +319,7 @@ describe('POST /ai/generate-lore', () => {
     })
     mockGrokResponse('Some lore')
 
-    await request(app).post('/ai/generate-lore').send({
-      prompt: 'test',
-      settings: { includeExistingLore: false },
-    })
+    await callGenerateLore({ prompt: 'test', settings: { includeExistingLore: false } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as {
       input: Array<{ role: string; content: Array<Record<string, unknown>> }>
@@ -381,24 +335,15 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
     mockYandexResponse(JSON.stringify({ name: 'World', content: 'Yandex lore result' }))
 
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Create a world' })
-    expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
-    const events = parseSseEvents(res.text)
-    const last = ssePartialJson(events)
+    const { partials } = await callGenerateLore({ prompt: 'Create a world' })
+    const last = partials[partials.length - 1]
     expect(last.name).toBe('World')
     expect(last.content).toBe('Yandex lore result')
-    expect(events.some(e => e.event === 'thinking' && e.data.status === 'done')).toBe(true)
   })
 
-  it('returns SSE error when Yandex api_key or folder_id is missing', async () => {
+  it('throws when Yandex api_key or folder_id is missing', async () => {
     testDbPath = setupDb({ currentEngine: 'yandex' }) // no credentials
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'test' })
-    expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/text\/event-stream/)
-    const events = parseSseEvents(res.text)
-    const errorEvent = events.find(e => e.event === 'error')
-    expect(errorEvent?.data.message).toContain('Yandex api_key and folder_id are required')
+    await expect(callGenerateLore({ prompt: 'test' })).rejects.toThrow(/Yandex api_key and folder_id are required/)
   })
 
   // ─── 6. text_language setting ─────────────────────────────────────────────
@@ -407,17 +352,16 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key', textLanguage: 'en-US' })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a wizard' })
+    await callGenerateLore({ prompt: 'Describe a wizard' })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
     expect(params.instructions).toContain('en-US')
   })
 
-  it('returns 400 when text_language is not configured', async () => {
+  it('throws 400 when text_language is not configured', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key', textLanguage: null })
-    const res = await request(app).post('/ai/generate-lore').send({ prompt: 'Describe a hero' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('text_language is not configured')
+    await expect(callGenerateLore({ prompt: 'Describe a hero' })).rejects.toThrow(/text_language is not configured/)
+    try { await callGenerateLore({ prompt: 'Describe a hero' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   // ─── 7. Grok web search ────────────────────────────────────────────────────
@@ -426,7 +370,7 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse('Lore with web info')
 
-    await request(app).post('/ai/generate-lore').send({ prompt: 'News', settings: { webSearch: 'on' } })
+    await callGenerateLore({ prompt: 'News', settings: { webSearch: 'on' } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
     expect(params.tools).toEqual([{ type: 'web_search' }])
@@ -436,7 +380,7 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse('Normal lore')
 
-    await request(app).post('/ai/generate-lore').send({ prompt: 'Something', settings: { webSearch: 'none' } })
+    await callGenerateLore({ prompt: 'Something', settings: { webSearch: 'none' } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
     expect(params.tools).toBeUndefined()
@@ -444,30 +388,17 @@ describe('POST /ai/generate-lore', () => {
 
   // ─── 8. Structured JSON output ─────────────────────────────────────────────
 
-  it('emits partial_json events (not delta) for Grok', async () => {
+  it('emits partial_json callbacks (not delta) for Grok', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     const jsonResponse = JSON.stringify({ name: 'Arin the Brave', content: '## Hero\nA brave warrior.' })
     mockGrokResponse(jsonResponse)
 
-    const res = await request(app).post('/ai/generate-lore').send({
-      prompt: 'Describe a hero',
-    })
+    const { partials } = await callGenerateLore({ prompt: 'Describe a hero' })
 
-    expect(res.status).toBe(200)
-    const events = parseSseEvents(res.text)
-
-    // No delta events when schema is used
-    expect(events.some(e => e.event === 'delta')).toBe(false)
-
-    // partial_json events present
-    expect(events.some(e => e.event === 'partial_json')).toBe(true)
-
-    // Last partial_json has correct fields
-    const last = ssePartialJson(events)
+    const last = partials[partials.length - 1]
     expect(last.name).toBe('Arin the Brave')
     expect(last.content).toBe('## Hero\nA brave warrior.')
 
-    // Grok was called with json_schema format
     const params = mockGrokGenerate.mock.calls[0][1] as { text?: { format?: { type?: string } } }
     expect(params.text?.format?.type).toBe('json_schema')
   })
@@ -478,7 +409,7 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-lore').send({
+    await callGenerateLore({
       prompt: 'Make it longer',
       mode: 'improve',
       baseContent: 'A short hero description.',
@@ -488,10 +419,8 @@ describe('POST /ai/generate-lore', () => {
       instructions: string
       input: Array<{ role: string; content: Array<{ type: string; text?: string }> }>
     }
-    // System prompt should reference "improve" and include the base content
     expect(params.instructions).toContain('Improve the following lore item')
     expect(params.instructions).toContain('A short hero description.')
-    // The user's improvement instruction goes in the user message input
     const userText = params.input.find(m => m.role === 'user')?.content.find(c => c.type === 'input_text')?.text
     expect(userText).toContain('Make it longer')
   })
@@ -500,39 +429,24 @@ describe('POST /ai/generate-lore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-lore').send({
-      prompt: 'Create a wizard',
-    })
+    await callGenerateLore({ prompt: 'Create a wizard' })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
     expect(params.instructions).toContain('Generate a lore item')
     expect(params.instructions).not.toContain('Improve')
   })
 
-  it('emits partial_json events (not delta) for Yandex', async () => {
+  it('emits partial_json callbacks for Yandex', async () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
     const jsonResponse = JSON.stringify({ name: 'Mystic Forest', content: '## Forest\nA place of wonder.' })
     mockYandexResponse(jsonResponse)
 
-    const res = await request(app).post('/ai/generate-lore').send({
-      prompt: 'Describe a location',
-    })
+    const { partials } = await callGenerateLore({ prompt: 'Describe a location' })
 
-    expect(res.status).toBe(200)
-    const events = parseSseEvents(res.text)
-
-    // No delta events when schema is used
-    expect(events.some(e => e.event === 'delta')).toBe(false)
-
-    // partial_json events present
-    expect(events.some(e => e.event === 'partial_json')).toBe(true)
-
-    // Last partial_json has correct fields
-    const last = ssePartialJson(events)
+    const last = partials[partials.length - 1]
     expect(last.name).toBe('Mystic Forest')
     expect(last.content).toBe('## Forest\nA place of wonder.')
 
-    // Yandex was called with json_schema response_format
     const params = mockChatCreate.mock.calls[0][0] as { response_format?: { type?: string } }
     expect(params.response_format?.type).toBe('json_schema')
   })

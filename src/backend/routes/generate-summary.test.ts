@@ -1,13 +1,11 @@
 /**
- * Integration tests for POST /api/ai/generate-summary
+ * Integration tests for generateSummary()
  */
 
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import request from 'supertest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { app } from '../server.js'
 
 let testDbPath = ''
 
@@ -27,7 +25,14 @@ vi.mock('../lib/ai-engine-adapter.js', () => ({
   getEngineAdapter: () => ({
     generateResponse: mockGenerateResponse,
   }),
+  BUILTIN_ENGINES: [],
 }))
+
+vi.mock('../../shared/ai-engines.js', () => ({
+  BUILTIN_ENGINES: [{ id: 'grok', capabilities: {} }, { id: 'yandex', capabilities: {} }],
+}))
+
+const { generateSummary } = await import('./generate-summary.js')
 
 // ─── DB helper ───────────────────────────────────────────────────────────────
 
@@ -82,7 +87,6 @@ function setupDb(opts?: {
   if (opts?.grokApiKey) {
     aiConfig['grok'] = { api_key: opts.grokApiKey }
   }
-  // Add summary settings if provided
   if (opts?.summarySettings && engine) {
     if (!aiConfig[engine]) {
       aiConfig[engine] = {}
@@ -120,26 +124,6 @@ function setupDb(opts?: {
   return file
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function parseSseEvents(body: string): Array<{ event: string; data: Record<string, unknown> }> {
-  const events: Array<{ event: string; data: Record<string, unknown> }> = []
-  let event = ''
-  for (const line of body.split('\n')) {
-    if (line.startsWith('event: ')) event = line.slice(7).trim()
-    else if (line.startsWith('data: ')) {
-      events.push({ event, data: JSON.parse(line.slice(6)) as Record<string, unknown> })
-      event = ''
-    }
-  }
-  return events
-}
-
-function ssePartialJson(events: ReturnType<typeof parseSseEvents>): Record<string, unknown> {
-  const partials = events.filter(e => e.event === 'partial_json')
-  return (partials[partials.length - 1]?.data ?? {}) as Record<string, unknown>
-}
-
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -153,36 +137,32 @@ afterEach(() => {
   }
 })
 
-describe('POST /api/ai/generate-summary', () => {
-  it('returns 400 when no project open', async () => {
+describe('generateSummary', () => {
+  it('throws 400 when no project open', async () => {
     testDbPath = ''
-    const res = await request(app).post('/api/ai/generate-summary').send({ node_id: 1 })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('no project open')
+    await expect(generateSummary({ node_id: 1 })).rejects.toThrow(/no project open/)
+    try { await generateSummary({ node_id: 1 }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when node_id is missing', async () => {
+  it('throws 400 when node_id is missing', async () => {
     testDbPath = setupDb({ grokApiKey: 'key' })
-    const res = await request(app).post('/api/ai/generate-summary').send({})
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('node_id is required')
+    await expect(generateSummary({})).rejects.toThrow(/node_id is required/)
+    try { await generateSummary({}) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when no AI engine configured', async () => {
+  it('throws 400 when no AI engine configured', async () => {
     testDbPath = setupDb() // no engine
-    const res = await request(app).post('/api/ai/generate-summary').send({ node_id: 1 })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('no AI engine configured')
+    await expect(generateSummary({ node_id: 1 })).rejects.toThrow(/no AI engine configured/)
+    try { await generateSummary({ node_id: 1 }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when plan node content is empty', async () => {
+  it('throws 400 when plan node content is empty', async () => {
     testDbPath = setupDb({
       grokApiKey: 'key',
       planNode: { id: 1, content: '' },
     })
-    const res = await request(app).post('/api/ai/generate-summary').send({ node_id: 1 })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('plan node content is empty')
+    await expect(generateSummary({ node_id: 1 })).rejects.toThrow(/plan node content is empty/)
+    try { await generateSummary({ node_id: 1 }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   it('returns JSON response and updates node summary', async () => {
@@ -191,7 +171,7 @@ describe('POST /api/ai/generate-summary', () => {
       planNode: { id: 1, content: 'A long story about a hero.' },
     })
 
-    mockGenerateResponse.mockImplementationOnce(async (params, onThinking, onDelta) => {
+    mockGenerateResponse.mockImplementationOnce(async (params: any, onThinking: any, onDelta: any) => {
       onThinking?.('thinking', 'thinking detail')
       onDelta?.('Summary text')
       return {
@@ -205,21 +185,18 @@ describe('POST /api/ai/generate-summary', () => {
       }
     })
 
-    const res = await request(app).post('/api/ai/generate-summary').send({ node_id: 1 })
-    expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/application\/json/)
-
-    const body = res.body
-    expect(body.summary).toBe('Summary text')
-    expect(body.response_id).toBe('resp-123')
-    expect(body.tokens_input).toBe(10)
-    expect(body.tokens_output).toBe(5)
-    expect(body.tokens_total).toBe(15)
-    expect(body.cached_tokens).toBe(0)
-    expect(body.reasoning_tokens).toBe(0)
-    expect(body.cost_usd_ticks).toBe(100)
+    const result = await generateSummary({ node_id: 1 })
+    expect(result.summary).toBe('Summary text')
+    expect(result.response_id).toBe('resp-123')
+    expect(result.tokens_input).toBe(10)
+    expect(result.tokens_output).toBe(5)
+    expect(result.tokens_total).toBe(15)
+    expect(result.cached_tokens).toBe(0)
+    expect(result.reasoning_tokens).toBe(0)
+    expect(result.cost_usd_ticks).toBe(100)
 
     // Verify that the node was updated
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
     const row = db.prepare('SELECT summary, auto_summary FROM plan_nodes WHERE id = 1').get() as {
@@ -232,62 +209,39 @@ describe('POST /api/ai/generate-summary', () => {
     expect(row?.summary).toBe('Summary text')
   })
 
-  it('uses content from request body if provided', async () => {
+  it('uses content from params if provided', async () => {
     testDbPath = setupDb({
       grokApiKey: 'key',
       planNode: { id: 1, content: 'Old content' },
     })
 
-    mockGenerateResponse.mockImplementationOnce(async (params, onThinking, onDelta) => {
-      onThinking?.('thinking', 'thinking detail')
+    mockGenerateResponse.mockImplementationOnce(async (params: any, onThinking: any, onDelta: any) => {
       onDelta?.('Summary text')
-      return {
-        response_id: 'resp-456',
-        tokensInput: 0,
-        tokensOutput: 0,
-        tokensTotal: 0,
-        cachedTokens: 0,
-        reasoningTokens: 0,
-        costUsdTicks: 0,
-      }
+      return { response_id: 'resp-456', tokensInput: 0, tokensOutput: 0, tokensTotal: 0, cachedTokens: 0, reasoningTokens: 0, costUsdTicks: 0 }
     })
 
-    await request(app).post('/api/ai/generate-summary').send({
-      node_id: 1,
-      content: 'New content for summary',
-    })
+    await generateSummary({ node_id: 1, content: 'New content for summary' })
 
-    // The mock should have been called with the new content
     expect(mockGenerateResponse).toHaveBeenCalledOnce()
     const call = mockGenerateResponse.mock.calls[0]
-    const params = call[0] // first argument is the request object
+    const params = call[0]
     expect(params.prompt).toContain('New content for summary')
   })
 
-  it('respects auto_generate_summary setting (false)', async () => {
+  it('respects auto_generate_summary setting (false) — still generates when called directly', async () => {
     testDbPath = setupDb({
       grokApiKey: 'key',
       autoGenerateSummary: false,
       planNode: { id: 1, content: 'Some content' },
     })
 
-    mockGenerateResponse.mockImplementationOnce(async (params, onThinking, onDelta) => {
-      onThinking?.('thinking', 'thinking detail')
+    mockGenerateResponse.mockImplementationOnce(async (params: any, onThinking: any, onDelta: any) => {
       onDelta?.('Summary text')
-      return {
-        response_id: 'resp-789',
-        tokensInput: 0,
-        tokensOutput: 0,
-        tokensTotal: 0,
-        cachedTokens: 0,
-        reasoningTokens: 0,
-        costUsdTicks: 0,
-      }
+      return { response_id: 'resp-789', tokensInput: 0, tokensOutput: 0, tokensTotal: 0, cachedTokens: 0, reasoningTokens: 0, costUsdTicks: 0 }
     })
 
-    const res = await request(app).post('/api/ai/generate-summary').send({ node_id: 1 })
-    // Should still generate (the endpoint does not block when setting is false)
-    expect(res.status).toBe(200)
+    const result = await generateSummary({ node_id: 1 })
+    expect(result.summary).toBe('Summary text')
     expect(mockGenerateResponse).toHaveBeenCalledOnce()
   })
 
@@ -297,28 +251,16 @@ describe('POST /api/ai/generate-summary', () => {
       planNode: { id: 1, content: 'Some content' },
     })
 
-    mockGenerateResponse.mockImplementationOnce(async (params, onThinking, onDelta) => {
-      onThinking?.('thinking', 'thinking detail')
+    mockGenerateResponse.mockImplementationOnce(async (params: any, onThinking: any, onDelta: any) => {
       onDelta?.('A plain text summary')
-      return {
-        response_id: 'resp-xyz',
-        tokensInput: 0,
-        tokensOutput: 0,
-        tokensTotal: 0,
-        cachedTokens: 0,
-        reasoningTokens: 0,
-        costUsdTicks: 0,
-      }
+      return { response_id: 'resp-xyz', tokensInput: 0, tokensOutput: 0, tokensTotal: 0, cachedTokens: 0, reasoningTokens: 0, costUsdTicks: 0 }
     })
 
-    const res = await request(app).post('/api/ai/generate-summary').send({ node_id: 1 })
-    expect(res.status).toBe(200)
-    expect(res.headers['content-type']).toMatch(/application\/json/)
+    const result = await generateSummary({ node_id: 1 })
+    expect(result.summary).toBe('A plain text summary')
+    expect(result.response_id).toBe('resp-xyz')
 
-    const body = res.body
-    expect(body.summary).toBe('A plain text summary')
-    expect(body.response_id).toBe('resp-xyz')
-
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
     const row = db.prepare('SELECT summary, auto_summary FROM plan_nodes WHERE id = 1').get() as {
@@ -329,7 +271,6 @@ describe('POST /api/ai/generate-summary', () => {
     expect(row).toBeDefined()
     expect(row?.auto_summary).toBe(1)
     expect(row?.summary).toBe('A plain text summary')
-    // Ensure it's not JSON
     expect(() => JSON.parse(row!.summary)).toThrow()
   })
 })

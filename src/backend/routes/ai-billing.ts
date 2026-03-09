@@ -1,4 +1,3 @@
-import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 
@@ -21,8 +20,8 @@ function readGrokManagementConfig(dbPath: string): { managementKey: string; team
     db.close()
     if (!row) return null
     const config = JSON.parse(row.value) as AiConfigStore
-    const managementKey = config.grok?.management_key?.trim()
-    const teamId = config.grok?.team_id?.trim()
+    const managementKey = (config.grok as any)?.management_key?.trim()
+    const teamId = (config.grok as any)?.team_id?.trim()
     if (!managementKey || !teamId) return null
     return { managementKey, teamId }
   } catch {
@@ -77,19 +76,19 @@ async function fetchUsage(
   return JSON.parse(responseText) as Record<string, unknown>
 }
 
-const router = express.Router()
-
-// ─── GET /billing ─────────────────────────────────────────────────────────────
-
-router.get('/billing', async (_req: Request, res: Response) => {
+export async function getAiBilling(): Promise<{
+  configured: boolean
+  error?: string
+  totals?: Record<string, unknown>
+}> {
   const dbPath = getCurrentDbPath()
   if (!dbPath) {
-    return res.json({ configured: false, error: 'no project open' })
+    return { configured: false, error: 'no project open' }
   }
 
   const creds = readGrokManagementConfig(dbPath)
   if (!creds) {
-    return res.json({ configured: false })
+    return { configured: false }
   }
 
   const now = new Date()
@@ -115,10 +114,8 @@ router.get('/billing', async (_req: Request, res: Response) => {
       totals[key] = data
     }
 
-    return res.json({ configured: true, totals })
+    return { configured: true, totals }
   } catch (e) {
-    return res.json({ configured: true, error: String(e), totals: {} })
+    return { configured: true, error: String(e), totals: {} }
   }
-})
-
-export default router
+}

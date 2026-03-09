@@ -1,4 +1,3 @@
-import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiSettings } from '../../shared/ai-settings.js'
@@ -13,22 +12,27 @@ try {
   Database = null
 }
 
-const router: Router = express.Router()
+// ── Error helper ──────────────────────────────────────────────────────────────
 
-// POST /playground
-router.post('/playground', express.json(), async (req: Request, res: Response) => {
+function makeError(message: string, status: number): Error {
+  const e = new Error(message)
+  ;(e as any).status = status
+  return e
+}
+
+export async function generatePlayground(
+  params: { systemPrompt?: string; prompt?: string; settings?: AiSettings },
+  onThinking: (status: string, detail?: string) => void,
+  onPartialJson: (data: Record<string, unknown>) => void,
+): Promise<{ response_id?: string }> {
   const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
 
-  const { systemPrompt, prompt, settings = {} } = req.body as {
-    systemPrompt?: string
-    prompt?: string
-    settings?: AiSettings
-  }
+  const { systemPrompt, prompt, settings = {} } = params
   const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
 
-  if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
+  if (!prompt?.trim()) throw makeError('prompt is required', 400)
 
   let engine: string | undefined
   let config: AiConfigStore = {}
@@ -40,7 +44,7 @@ router.post('/playground', express.json(), async (req: Request, res: Response) =
     const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
 
     engine = engineRow?.value
-    if (!engine) { db.close(); return res.status(400).json({ error: 'no AI engine configured' }) }
+    if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
     }
@@ -59,22 +63,16 @@ router.post('/playground', express.json(), async (req: Request, res: Response) =
     }
 
     db.close()
-  } catch (e) {
-    return res.status(500).json({ error: 'failed to read project settings: ' + String(e) })
+  } catch (e: any) {
+    if (e.status) throw e
+    throw makeError('failed to read project settings: ' + String(e), 500)
   }
 
   const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
-  if (!engineDef) return res.status(400).json({ error: `Playground is not supported for engine '${engine}'` })
+  if (!engineDef) throw makeError(`Playground is not supported for engine '${engine}'`, 400)
 
-  const adapter = getEngineAdapter(engine)
-  if (!adapter) return res.status(400).json({ error: `Playground is not supported for engine '${engine}'` })
-
-  res.setHeader('Content-Type', 'text/event-stream')
-  res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('X-Accel-Buffering', 'no')
-
-  const sse = (event: string, data: unknown) =>
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+  const adapter = getEngineAdapter(engine!)
+  if (!adapter) throw makeError(`Playground is not supported for engine '${engine}'`, 400)
 
   let accumulated = ''
   let lastEmitted = ''
@@ -82,31 +80,25 @@ router.post('/playground', express.json(), async (req: Request, res: Response) =
     accumulated += chunk
     if (accumulated === lastEmitted) return
     lastEmitted = accumulated
-    sse('partial_json', { content: accumulated })
+    onPartialJson({ content: accumulated })
   }
 
-  try {
-    const { response_id } = await adapter.generateResponse(
-      {
-        prompt: prompt.trim(),
-        systemPrompt: systemPrompt?.trim() ?? '',
-        model: requestedModel?.trim() ?? '',
-        includeExistingLore: includeExistingLore ?? false,
-        webSearch: webSearch ?? 'none',
-        engineFileIds,
-        engineDef,
-        config,
-        maxTokens: maxTokens ?? undefined,
-        maxCompletionTokens: maxCompletionTokens ?? undefined,
-      },
-      (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
-      onDelta,
-    )
-    sse('done', response_id ? { response_id } : {})
-  } catch (e) {
-    sse('error', { message: String(e) })
-  }
-  res.end()
-})
+  const { response_id } = await adapter.generateResponse(
+    {
+      prompt: prompt!.trim(),
+      systemPrompt: systemPrompt?.trim() ?? '',
+      model: requestedModel?.trim() ?? '',
+      includeExistingLore: includeExistingLore ?? false,
+      webSearch: webSearch ?? 'none',
+      engineFileIds,
+      engineDef,
+      config,
+      maxTokens: maxTokens ?? undefined,
+      maxCompletionTokens: maxCompletionTokens ?? undefined,
+    },
+    (status, detail) => onThinking(status, detail),
+    onDelta,
+  )
 
-export default router
+  return response_id ? { response_id } : {}
+}

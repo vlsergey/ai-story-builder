@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import api from '../api'
+import { ipcClient } from '../ipcClient'
 
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -27,18 +27,9 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
     setBusy(true)
     setCreateError(null)
     try {
-      const res = await fetch('/api/project/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, text_language: textLanguage }),
-      })
-      const j = (await res.json()) as ProjectData & { error?: string }
-      if (res.ok) {
-        onCreated(j.path, j)
-        navigate('/project')
-      } else {
-        setCreateError('Error creating project: ' + (j.error || JSON.stringify(j)))
-      }
+      const j = await ipcClient.project.create({ name, text_language: textLanguage }) as ProjectData
+      onCreated(j.path, j)
+      navigate('/project')
     } catch (err) {
       setCreateError('Create failed: ' + (err as Error).message)
     } finally {
@@ -85,48 +76,25 @@ export default function StartScreen({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    api.get<string[]>('/project/recent').then(r => setRecent(r)).catch(() => setRecent([]))
-    api
-      .get<{ dir: string; files: string[] }>('/project/files')
-      .then(r => setProjectsData(r))
-      .catch(() => setProjectsData(null))
+    ipcClient.project.recent().then(r => setRecent(r)).catch(() => setRecent([]))
+    ipcClient.project.files().then(r => setProjectsData(r)).catch(() => setProjectsData(null))
   }, [])
 
   function openFolder() {
-    api.post('/project/open-folder').catch(console.error)
+    ipcClient.project.openFolder().catch(console.error)
   }
 
   async function removeRecent(e: React.MouseEvent, p: string) {
     e.stopPropagation()
-    await fetch('/api/project/recent', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: p }),
-    })
+    await ipcClient.project.deleteRecent(p)
     setRecent(prev => prev.filter(r => r !== p))
   }
 
   async function openRecent(path: string) {
     setError(null)
     try {
-      const res = await fetch('/api/project/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path }),
-      })
-      const text = await res.text()
-      let data: ProjectData & { error?: string }
-      try {
-        data = JSON.parse(text)
-      } catch {
-        setError('Error opening project: Invalid response from server')
-        return
-      }
-      if (res.ok) {
-        onOpenProject(data.path, data)
-      } else {
-        setError('Failed to open project: ' + (data.error || 'Unknown error'))
-      }
+      const data = await ipcClient.project.open(path) as ProjectData
+      onOpenProject(data.path, data)
     } catch (err) {
       setError('Error opening project: ' + (err as Error).message)
     }

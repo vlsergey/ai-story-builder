@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react'
 import { DockviewReact, DockviewDefaultTab } from 'dockview'
 import { useTheme } from '../lib/theme/theme-provider'
+import { ipcClient } from '../ipcClient'
 
 // Import the dockview styles
 import 'dockview/dist/styles/dockview.css'
@@ -132,13 +133,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   /** Creates a new blank child node under the given parent, then opens it in LoreEditor. */
   async function openLoreWizard(node: LoreNode) {
     try {
-      const r = await fetch('/api/lore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parent_id: node.id, name: 'New lore item' }),
-      })
-      if (!r.ok) return
-      const { id } = await r.json() as { id: number }
+      const { id } = await ipcClient.lore.create({ parent_id: node.id, name: 'New lore item' })
       window.dispatchEvent(new Event(LORE_TREE_REFRESH_EVENT))
       openLoreEditor({ id, name: 'New lore item', parent_id: node.id } as LoreNode)
     } catch { /* ignore */ }
@@ -146,9 +141,8 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
 
   // Load saved theme preference from the project settings
   useEffect(() => {
-    fetch('/api/settings/ui_theme')
-      .then(res => res.json())
-      .then((data: { value?: string }) => { if (data.value) setPreference(data.value) })
+    ipcClient.settings.get('ui_theme')
+      .then((data) => { if (data.value) setPreference(data.value) })
       .catch(() => {})
   }, [])
 
@@ -218,11 +212,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   // Load layout from database
   const loadLayoutFromDatabase = async () => {
     try {
-      const layout = await fetch(
-        '/api/settings/layout',
-        { cache: 'no-store' }
-      ).then(res => res.json())
-      return layout
+      return await ipcClient.settings.getLayout()
     } catch (e) {
       console.error('Failed to load layout from database:', e)
       return null
@@ -236,11 +226,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     if (panelsCount === 0) return
 
     try {
-      await fetch('/api/settings/layout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ layout })
-      })
+      await ipcClient.settings.saveLayout(layout)
     } catch (e) {
       console.error('Failed to save layout to database:', e)
     }

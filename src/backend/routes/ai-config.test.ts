@@ -1,12 +1,10 @@
 /**
- * Integration tests for /api/ai/* endpoints
+ * Integration tests for ai-config pure functions
  */
 
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import express from 'express'
-import request from 'supertest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 let testDbPath = ''
@@ -16,11 +14,7 @@ vi.mock('../db/state.js', () => ({
   getDataDir: () => os.tmpdir(),
 }))
 
-const { default: router } = await import('./ai-config.js')
-
-const app = express()
-app.use(express.json())
-app.use('/ai', router)
+const { getAiConfig, saveAiConfig, setCurrentEngine, getEngineModels, refreshEngineModels, testEngineConnection } = await import('./ai-config.js')
 
 function setupDb(): string {
   const file = path.join(
@@ -43,199 +37,147 @@ function setupDb(): string {
 beforeEach(() => { testDbPath = setupDb() })
 afterEach(() => { try { fs.unlinkSync(testDbPath) } catch { /* ignore */ } })
 
-// ── GET /api/ai/config ────────────────────────────────────────────────────────
+// ── getAiConfig ────────────────────────────────────────────────────────────────
 
-describe('GET /ai/config', () => {
-  it('returns defaults when nothing is saved', async () => {
-    const res = await request(app).get('/ai/config')
+describe('getAiConfig', () => {
+  it('returns defaults when nothing is saved', () => {
+    const res = getAiConfig()
 
-    expect(res.status).toBe(200)
-    expect(res.body.current_engine).toBeNull()
-    expect(res.body.grok.api_key).toBe('')
-    expect(res.body.yandex.api_key).toBe('')
-    expect(res.body.yandex.folder_id).toBe('')
+    expect(res.current_engine).toBeNull()
+    expect((res.grok as any).api_key).toBe('')
+    expect((res.yandex as any).api_key).toBe('')
+    expect((res.yandex as any).folder_id).toBe('')
   })
 
-  it('returns saved grok api_key', async () => {
-    await request(app).post('/ai/config').send({ engine: 'grok', fields: { api_key: 'xai-test-key' } })
-    const res = await request(app).get('/ai/config')
+  it('returns saved grok api_key', () => {
+    saveAiConfig({ engine: 'grok', fields: { api_key: 'xai-test-key' } })
+    const res = getAiConfig()
 
-    expect(res.status).toBe(200)
-    expect(res.body.grok.api_key).toBe('xai-test-key')
+    expect((res.grok as any).api_key).toBe('xai-test-key')
   })
 
-  it('returns saved yandex credentials', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'yandex',
-      fields: { api_key: 'AQVN-test', folder_id: 'b1g12345' },
-    })
-    const res = await request(app).get('/ai/config')
+  it('returns saved yandex credentials', () => {
+    saveAiConfig({ engine: 'yandex', fields: { api_key: 'AQVN-test', folder_id: 'b1g12345' } })
+    const res = getAiConfig()
 
-    expect(res.status).toBe(200)
-    expect(res.body.yandex.api_key).toBe('AQVN-test')
-    expect(res.body.yandex.folder_id).toBe('b1g12345')
+    expect((res.yandex as any).api_key).toBe('AQVN-test')
+    expect((res.yandex as any).folder_id).toBe('b1g12345')
   })
 
-  it('returns null last_model when not set', async () => {
-    const res = await request(app).get('/ai/config')
-    expect(res.status).toBe(200)
-    expect(res.body.grok.last_model).toBeNull()
-    expect(res.body.yandex.last_model).toBeNull()
+  it('returns null last_model when not set', () => {
+    const res = getAiConfig()
+    expect((res.grok as any).last_model).toBeNull()
+    expect((res.yandex as any).last_model).toBeNull()
   })
 
-  it('returns stored last_model for grok and yandex', async () => {
-    await request(app).post('/ai/config').send({ engine: 'grok', fields: { last_model: 'grok-3' } })
-    await request(app).post('/ai/config').send({ engine: 'yandex', fields: { last_model: 'gpt://b1g999/yandexgpt/latest' } })
+  it('returns stored last_model for grok and yandex', () => {
+    saveAiConfig({ engine: 'grok', fields: { last_model: 'grok-3' } })
+    saveAiConfig({ engine: 'yandex', fields: { last_model: 'gpt://b1g999/yandexgpt/latest' } })
 
-    const res = await request(app).get('/ai/config')
-    expect(res.status).toBe(200)
-    expect(res.body.grok.last_model).toBe('grok-3')
-    expect(res.body.yandex.last_model).toBe('gpt://b1g999/yandexgpt/latest')
+    const res = getAiConfig()
+    expect((res.grok as any).last_model).toBe('grok-3')
+    expect((res.yandex as any).last_model).toBe('gpt://b1g999/yandexgpt/latest')
   })
 
-  it('returns extra fields saved via POST (e.g. settings object)', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'grok',
-      fields: { settings: { model: 'grok-3', maxTokens: 4096, webSearch: 'none' } },
-    })
-    const res = await request(app).get('/ai/config')
-    expect(res.status).toBe(200)
-    expect(res.body.grok.settings).toEqual({ model: 'grok-3', maxTokens: 4096, webSearch: 'none' })
+  it('returns extra fields saved via saveAiConfig (e.g. settings object)', () => {
+    saveAiConfig({ engine: 'grok', fields: { settings: { model: 'grok-3', maxTokens: 4096, webSearch: 'none' } } })
+    const res = getAiConfig()
+    expect((res.grok as any).settings).toEqual({ model: 'grok-3', maxTokens: 4096, webSearch: 'none' })
   })
 
-  it('returns saved current_engine', async () => {
+  it('returns saved current_engine', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
     db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', 'grok')").run()
     db.close()
 
-    const res = await request(app).get('/ai/config')
-    expect(res.body.current_engine).toBe('grok')
+    const res = getAiConfig()
+    expect(res.current_engine).toBe('grok')
   })
 })
 
-// ── POST /ai/config ───────────────────────────────────────────────────────────
+// ── saveAiConfig ───────────────────────────────────────────────────────────────
 
-describe('POST /ai/config', () => {
-  it('saves grok api_key', async () => {
-    const res = await request(app).post('/ai/config').send({
-      engine: 'grok',
-      fields: { api_key: 'xai-abc123' },
-    })
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+describe('saveAiConfig', () => {
+  it('saves grok api_key', () => {
+    const res = saveAiConfig({ engine: 'grok', fields: { api_key: 'xai-abc123' } })
+    expect(res.ok).toBe(true)
   })
 
-  it('saves yandex api_key and folder_id', async () => {
-    const res = await request(app).post('/ai/config').send({
-      engine: 'yandex',
-      fields: { api_key: 'AQVN-abc', folder_id: 'b1g999' },
-    })
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+  it('saves yandex api_key and folder_id', () => {
+    const res = saveAiConfig({ engine: 'yandex', fields: { api_key: 'AQVN-abc', folder_id: 'b1g999' } })
+    expect(res.ok).toBe(true)
 
-    // Verify persisted
-    const cfg = await request(app).get('/ai/config')
-    expect(cfg.body.yandex.api_key).toBe('AQVN-abc')
-    expect(cfg.body.yandex.folder_id).toBe('b1g999')
+    const cfg = getAiConfig()
+    expect((cfg.yandex as any).api_key).toBe('AQVN-abc')
+    expect((cfg.yandex as any).folder_id).toBe('b1g999')
   })
 
-  it('merges fields without clobbering other fields', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'yandex',
-      fields: { api_key: 'AQVN-abc', folder_id: 'b1g999' },
-    })
-    // Now update only api_key
-    await request(app).post('/ai/config').send({
-      engine: 'yandex',
-      fields: { api_key: 'AQVN-new' },
-    })
-    const cfg = await request(app).get('/ai/config')
-    expect(cfg.body.yandex.api_key).toBe('AQVN-new')
-    expect(cfg.body.yandex.folder_id).toBe('b1g999')  // preserved
+  it('merges fields without clobbering other fields', () => {
+    saveAiConfig({ engine: 'yandex', fields: { api_key: 'AQVN-abc', folder_id: 'b1g999' } })
+    saveAiConfig({ engine: 'yandex', fields: { api_key: 'AQVN-new' } })
+    const cfg = getAiConfig()
+    expect((cfg.yandex as any).api_key).toBe('AQVN-new')
+    expect((cfg.yandex as any).folder_id).toBe('b1g999')  // preserved
   })
 
-  it('returns 400 when engine is missing', async () => {
-    const res = await request(app).post('/ai/config').send({ fields: { api_key: 'x' } })
-    expect(res.status).toBe(400)
+  it('throws 400 when engine is missing', () => {
+    expect(() => saveAiConfig({ engine: '', fields: { api_key: 'x' } })).toThrow()
+    try { saveAiConfig({ engine: '', fields: { api_key: 'x' } }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 })
 
-// ── POST /ai/current-engine ───────────────────────────────────────────────────
+// ── setCurrentEngine ───────────────────────────────────────────────────────────
 
-describe('POST /ai/current-engine', () => {
-  it('returns 400 with missing field list when grok api_key not saved', async () => {
-    const res = await request(app).post('/ai/current-engine').send({ engine: 'grok' })
-
-    expect(res.status).toBe(400)
-    expect(res.body.missing).toContain('api_key')
+describe('setCurrentEngine', () => {
+  it('throws 400 with missing field list when grok api_key not saved', () => {
+    expect(() => setCurrentEngine({ engine: 'grok' })).toThrow(/api_key/)
+    try { setCurrentEngine({ engine: 'grok' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 for yandex when api_key or folder_id missing', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'yandex',
-      fields: { api_key: 'AQVN-abc' },
-      // folder_id NOT saved
-    })
-    const res = await request(app).post('/ai/current-engine').send({ engine: 'yandex' })
-
-    expect(res.status).toBe(400)
-    expect(res.body.missing).toContain('folder_id')
+  it('throws 400 for yandex when api_key or folder_id missing', () => {
+    saveAiConfig({ engine: 'yandex', fields: { api_key: 'AQVN-abc' } })
+    expect(() => setCurrentEngine({ engine: 'yandex' })).toThrow(/folder_id/)
+    try { setCurrentEngine({ engine: 'yandex' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('accepts valid grok engine selection', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'grok',
-      fields: { api_key: 'xai-abc' },
-    })
-    const res = await request(app).post('/ai/current-engine').send({ engine: 'grok' })
-
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+  it('accepts valid grok engine selection', () => {
+    saveAiConfig({ engine: 'grok', fields: { api_key: 'xai-abc' } })
+    const res = setCurrentEngine({ engine: 'grok' })
+    expect(res.ok).toBe(true)
   })
 
-  it('accepts valid yandex engine selection', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'yandex',
-      fields: { api_key: 'AQVN-abc', folder_id: 'b1g999' },
-    })
-    const res = await request(app).post('/ai/current-engine').send({ engine: 'yandex' })
-
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+  it('accepts valid yandex engine selection', () => {
+    saveAiConfig({ engine: 'yandex', fields: { api_key: 'AQVN-abc', folder_id: 'b1g999' } })
+    const res = setCurrentEngine({ engine: 'yandex' })
+    expect(res.ok).toBe(true)
   })
 
-  it('clears engine when null is passed', async () => {
-    // Set engine first
+  it('clears engine when null is passed', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
     db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', 'grok')").run()
     db.close()
 
-    const res = await request(app).post('/ai/current-engine').send({ engine: null })
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+    const res = setCurrentEngine({ engine: null })
+    expect(res.ok).toBe(true)
 
-    const cfg = await request(app).get('/ai/config')
-    expect(cfg.body.current_engine).toBeNull()
+    const cfg = getAiConfig()
+    expect(cfg.current_engine).toBeNull()
   })
 })
 
-// ── POST /ai/:engine/test ─────────────────────────────────────────────────────
+// ── testEngineConnection ───────────────────────────────────────────────────────
 
-describe('POST /ai/:engine/test', () => {
-  it('returns 400 when grok api_key is missing', async () => {
-    const res = await request(app).post('/ai/grok/test').send({})
-    expect(res.status).toBe(400)
-    expect(res.body.ok).toBe(false)
+describe('testEngineConnection', () => {
+  it('throws 400 when grok api_key is missing', async () => {
+    await expect(testEngineConnection('grok', {})).rejects.toThrow(/api_key/)
   })
 
-  it('returns 400 when yandex folder_id is missing', async () => {
-    const res = await request(app).post('/ai/yandex/test').send({ api_key: 'AQVN-abc' })
-    expect(res.status).toBe(400)
-    expect(res.body.ok).toBe(false)
+  it('throws 400 when yandex folder_id is missing', async () => {
+    await expect(testEngineConnection('yandex', { api_key: 'AQVN-abc' })).rejects.toThrow(/folder_id/)
   })
 
   it('returns ok:false on grok HTTP error (mocked fetch)', async () => {
@@ -246,9 +188,9 @@ describe('POST /ai/:engine/test', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/grok/test').send({ api_key: 'bad-key' })
-    expect(res.body.ok).toBe(false)
-    expect(res.body.error).toContain('401')
+    const res = await testEngineConnection('grok', { api_key: 'bad-key' })
+    expect(res.ok).toBe(false)
+    expect(res.error).toContain('401')
 
     vi.unstubAllGlobals()
   })
@@ -260,9 +202,9 @@ describe('POST /ai/:engine/test', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/grok/test').send({ api_key: 'xai-valid' })
-    expect(res.body.ok).toBe(true)
-    expect(res.body.detail).toContain('2 model')
+    const res = await testEngineConnection('grok', { api_key: 'xai-valid' })
+    expect(res.ok).toBe(true)
+    expect(res.detail).toContain('2 model')
 
     vi.unstubAllGlobals()
   })
@@ -275,11 +217,9 @@ describe('POST /ai/:engine/test', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app)
-      .post('/ai/yandex/test')
-      .send({ api_key: 'bad-key', folder_id: 'b1g999' })
-    expect(res.body.ok).toBe(false)
-    expect(res.body.error).toContain('403')
+    const res = await testEngineConnection('yandex', { api_key: 'bad-key', folder_id: 'b1g999' })
+    expect(res.ok).toBe(false)
+    expect(res.error).toContain('403')
 
     vi.unstubAllGlobals()
   })
@@ -291,31 +231,28 @@ describe('POST /ai/:engine/test', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app)
-      .post('/ai/yandex/test')
-      .send({ api_key: 'AQVN-valid', folder_id: 'b1g999' })
-    expect(res.body.ok).toBe(true)
-    expect(res.body.detail).toContain('2 model')
+    const res = await testEngineConnection('yandex', { api_key: 'AQVN-valid', folder_id: 'b1g999' })
+    expect(res.ok).toBe(true)
+    expect(res.detail).toContain('2 model')
 
     vi.unstubAllGlobals()
   })
 
-  it('returns 400 for unknown engine', async () => {
-    const res = await request(app).post('/ai/unknown/test').send({ api_key: 'x' })
-    expect(res.status).toBe(400)
+  it('returns ok:false for unknown engine', async () => {
+    const res = await testEngineConnection('unknown', { api_key: 'x' })
+    expect(res.ok).toBe(false)
   })
 })
 
-// ── GET /ai/:engine/models ────────────────────────────────────────────────────
+// ── getEngineModels ────────────────────────────────────────────────────────────
 
-describe('GET /ai/:engine/models', () => {
-  it('returns empty array when no models cached', async () => {
-    const res = await request(app).get('/ai/yandex/models')
-    expect(res.status).toBe(200)
-    expect(res.body.models).toEqual([])
+describe('getEngineModels', () => {
+  it('returns empty array when no models cached', () => {
+    const res = getEngineModels('yandex')
+    expect(res.models).toEqual([])
   })
 
-  it('returns cached models after they are saved', async () => {
+  it('returns cached models after they are saved', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
     const db = new Database(testDbPath)
@@ -325,25 +262,20 @@ describe('GET /ai/:engine/models', () => {
     )
     db.close()
 
-    const res = await request(app).get('/ai/yandex/models')
-    expect(res.status).toBe(200)
-    expect(res.body.models).toEqual(models)
+    const res = getEngineModels('yandex')
+    expect(res.models).toEqual(models)
   })
 })
 
-// ── POST /ai/:engine/models/refresh ──────────────────────────────────────────
+// ── refreshEngineModels ────────────────────────────────────────────────────────
 
-describe('POST /ai/:engine/models/refresh', () => {
-  it('returns 400 when credentials are missing', async () => {
-    const res = await request(app).post('/ai/yandex/models/refresh')
-    expect(res.status).toBe(400)
+describe('refreshEngineModels', () => {
+  it('throws 400 when credentials are missing', async () => {
+    await expect(refreshEngineModels('yandex')).rejects.toThrow()
   })
 
   it('fetches and saves yandex models (mocked fetch)', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'yandex',
-      fields: { api_key: 'AQVN-valid', folder_id: 'b1g999' },
-    })
+    saveAiConfig({ engine: 'yandex', fields: { api_key: 'AQVN-valid', folder_id: 'b1g999' } })
 
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
@@ -357,16 +289,14 @@ describe('POST /ai/:engine/models/refresh', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/yandex/models/refresh')
-    expect(res.status).toBe(200)
-    expect(res.body.models).toEqual([
+    const res = await refreshEngineModels('yandex')
+    expect(res.models).toEqual([
       'gpt://b1g999/yandexgpt/latest',
       'gpt://b1g999/yandexgpt-lite/latest',
     ])
 
-    // Verify persisted in config
-    const cfg = await request(app).get('/ai/config')
-    expect(cfg.body.yandex.available_models).toEqual([
+    const cfg = getAiConfig()
+    expect((cfg.yandex as any).available_models).toEqual([
       'gpt://b1g999/yandexgpt/latest',
       'gpt://b1g999/yandexgpt-lite/latest',
     ])
@@ -375,10 +305,7 @@ describe('POST /ai/:engine/models/refresh', () => {
   })
 
   it('fetches and saves grok models (mocked fetch)', async () => {
-    await request(app).post('/ai/config').send({
-      engine: 'grok',
-      fields: { api_key: 'xai-valid' },
-    })
+    saveAiConfig({ engine: 'grok', fields: { api_key: 'xai-valid' } })
 
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
@@ -386,15 +313,14 @@ describe('POST /ai/:engine/models/refresh', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const res = await request(app).post('/ai/grok/models/refresh')
-    expect(res.status).toBe(200)
-    expect(res.body.models).toEqual(['grok-2', 'grok-3-mini'])
+    const res = await refreshEngineModels('grok')
+    expect(res.models).toEqual(['grok-2', 'grok-3-mini'])
 
     vi.unstubAllGlobals()
   })
 
-  it('returns 400 for unsupported engine', async () => {
-    const res = await request(app).post('/ai/unknown/models/refresh')
-    expect(res.status).toBe(400)
+  it('throws 400 for unsupported engine', async () => {
+    await expect(refreshEngineModels('unknown')).rejects.toThrow()
+    try { await refreshEngineModels('unknown') } catch (e: any) { expect(e.status).toBe(400) }
   })
 })

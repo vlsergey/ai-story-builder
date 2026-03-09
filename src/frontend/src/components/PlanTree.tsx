@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { PlanNodeTree } from '../types/models'
 import { PLAN_NODE_SAVED_EVENT, PLAN_TREE_REFRESH_EVENT, PlanNodeSavedDetail } from '../lib/plan-events'
+import { ipcClient } from '../ipcClient'
 
 // ── Stats helpers ─────────────────────────────────────────────────────────────
 
@@ -181,8 +182,7 @@ export default function PlanTree({
   }, [pendingRenameId, items])
 
   function fetchTree() {
-    fetch('/api/plan/nodes')
-      .then(r => r.json())
+    ipcClient.plan.nodes()
       .then((data: PlanNodeTree[]) => {
         if (!Array.isArray(data)) return
         setTree(data)
@@ -234,11 +234,7 @@ export default function PlanTree({
       const newParentId = target.targetItem as number
       for (const item of droppedItems) {
         if (!item.data?.id) continue
-        await fetch(`/api/plan/nodes/${item.data.id}/move`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ parent_id: newParentId }),
-        })
+        await ipcClient.plan.moveNode(item.data.id, { parent_id: newParentId })
       }
     } else if (target.targetType === 'between-items') {
       const parentKey = target.parentItem
@@ -257,18 +253,10 @@ export default function PlanTree({
       for (const item of droppedItems) {
         if (!item.data?.id) continue
         if (item.data.parent_id !== newParentId) {
-          await fetch(`/api/plan/nodes/${item.data.id}/move`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parent_id: newParentId }),
-          })
+          await ipcClient.plan.moveNode(item.data.id, { parent_id: newParentId })
         }
       }
-      await fetch('/api/plan/nodes/reorder-children', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ child_ids: remaining }),
-      })
+      await ipcClient.plan.reorderChildren(remaining)
     }
     fetchTree()
   }
@@ -280,12 +268,7 @@ export default function PlanTree({
     const [parentId] = selectedNodeIds
     const siblings = findNode(parentId, tree)?.children ?? []
     const title = uniqueTitle('New item', siblings.map(s => s.title))
-    const res = await fetch('/api/plan/nodes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parent_id: parentId, title }),
-    })
-    const { id: newId } = await res.json() as { id: number }
+    const { id: newId } = await ipcClient.plan.createNode({ parent_id: parentId, title })
     fetchTree()
     setPendingRenameId(newId)
   }
@@ -298,11 +281,7 @@ export default function PlanTree({
 
   async function handleInlineRename(item: TreeItem<ItemData>, newTitle: string) {
     if (!item.data?.id || !newTitle.trim() || newTitle.trim() === item.data.title) return
-    await fetch(`/api/plan/nodes/${item.data.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTitle.trim() }),
-    })
+    await ipcClient.plan.patchNode(item.data.id, { title: newTitle.trim() })
     fetchTree()
   }
 
@@ -325,7 +304,7 @@ export default function PlanTree({
     })
     if (toDelete.length === 0) return
     if (!window.confirm(`Delete ${toDelete.length} node${toDelete.length > 1 ? 's' : ''}? All descendants will also be deleted.`)) return
-    await Promise.all(toDelete.map(id => fetch(`/api/plan/nodes/${id}`, { method: 'DELETE' })))
+    await Promise.all(toDelete.map(id => ipcClient.plan.deleteNode(id)))
     setViewState(prev => ({ ...prev, 'plan-tree': { ...prev['plan-tree'], selectedItems: [] } }))
     fetchTree()
   }

@@ -1,4 +1,3 @@
-import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 
 let Database: typeof import('better-sqlite3') | null = null
@@ -9,54 +8,43 @@ try {
   Database = null
 }
 
-const router: Router = express.Router()
+// ── Error helper ──────────────────────────────────────────────────────────────
 
-// POST /generate
-router.post('/generate', express.json(), (req: Request, res: Response) => {
-  const { plan_node_version_id, prompt } = req.body as {
-    plan_node_version_id?: number
-    prompt?: string
-  }
+function makeError(message: string, status: number): Error {
+  const e = new Error(message)
+  ;(e as any).status = status
+  return e
+}
+
+export function generate(data: { plan_node_version_id?: number; prompt?: string }): { story_part_id: number | bigint } {
+  const { plan_node_version_id, prompt } = data
   const dbPath = getCurrentDbPath()
   if (!dbPath || !plan_node_version_id) {
-    return res
-      .status(400)
-      .json({ error: 'plan_node_version_id required, db must be open' })
+    throw makeError('plan_node_version_id required, db must be open', 400)
   }
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath)
-    const generatedContent = `Generated content for plan_node_version ${plan_node_version_id}\nPrompt:\n${prompt ?? ''}`
-    const g = db
-      .prepare(
-        'INSERT INTO story_parts (plan_node_version_id, version, content) VALUES (?, ?, ?)',
-      )
-      .run(plan_node_version_id, 1, generatedContent)
-    const gid = g.lastInsertRowid
-    db.close()
-    res.json({ story_part_id: gid })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
-
-// PUT /generated_parts/:id
-router.put('/generated_parts/:id', express.json(), (req: Request, res: Response) => {
-  const { content } = req.body as { content?: string }
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath)
-    db.prepare('UPDATE story_parts SET content = ? WHERE id = ?').run(
-      content ?? null,
-      req.params.id,
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath)
+  const generatedContent = `Generated content for plan_node_version ${plan_node_version_id}\nPrompt:\n${prompt ?? ''}`
+  const g = db
+    .prepare(
+      'INSERT INTO story_parts (plan_node_version_id, version, content) VALUES (?, ?, ?)',
     )
-    db.close()
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
+    .run(plan_node_version_id, 1, generatedContent)
+  const gid = g.lastInsertRowid
+  db.close()
+  return { story_part_id: gid }
+}
 
-export default router
+export function updateGeneratedPart(id: number, data: { content?: string }): { ok: boolean } {
+  const { content } = data
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath)
+  db.prepare('UPDATE story_parts SET content = ? WHERE id = ?').run(
+    content ?? null,
+    id,
+  )
+  db.close()
+  return { ok: true }
+}

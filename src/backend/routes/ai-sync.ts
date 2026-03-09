@@ -1,5 +1,4 @@
 import path from 'path'
-import express, { Request, Response, Router } from 'express'
 import OpenAI, { toFile } from 'openai'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
@@ -15,12 +14,18 @@ try {
   Database = null
 }
 
-const router: Router = express.Router()
-
 // Exported so tests can override without fake timers
 export const POLL_CONFIG = {
   intervalMs: 5000,
   timeoutMs: 5 * 60 * 1000,
+}
+
+// ── Error helper ──────────────────────────────────────────────────────────────
+
+function makeError(message: string, status: number): Error {
+  const e = new Error(message)
+  ;(e as any).status = status
+  return e
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,16 +112,10 @@ function buildFileContent(
     '',
   ].join('\n')
 
-  // Build markdown heading. Path segments (after stripping leading '/'):
-  //   depth 0 = root → '# Name'
-  //   depth 1 = level-2 → '# Name'
-  //   depth 2 = level-3 → '## Level2 / Name'
-  //   depth 3 = level-4 → '### Level2 / Level3 / Name'
   const segments = nodePath.split('/').filter(Boolean)
-  const depth = segments.length - 1 // 0 for root, 1 for l2, etc.
+  const depth = segments.length - 1
   const headingLevel = Math.max(1, depth)
   const hashes = '#'.repeat(headingLevel)
-  // From depth 2+: include ancestor path starting from level-2 (exclude root)
   const headingText = depth >= 2 ? segments.slice(1).join(' / ') : row.name
 
   return frontmatter + `${hashes} ${headingText}\n\n` + (row.content ?? '')
@@ -126,7 +125,6 @@ function formatApiError(e: unknown): string {
   if (e != null && typeof e === 'object' && 'status' in e && 'message' in e) {
     const apiErr = e as { status: number; message: string; error?: unknown; headers?: unknown }
 
-    // Extract synthetic request-context headers injected by makeLoggingFetch.
     let requestMethod: string | undefined
     let requestUrl: string | undefined
     const allHeaderEntries: [string, string][] = []
@@ -182,15 +180,6 @@ function parseAiSyncInfoMap(aiSyncInfoJson: string | null): Record<string, AiEng
   }
 }
 
-/**
- * Returns true if a Grok collapsed group needs to be re-uploaded.
- *
- * Triggers:
- * - No existing file_id on the level-2 node (never uploaded).
- * - A node with content has no grok sync entry (newly added to the group).
- * - A node previously merged has been deleted since the last sync.
- * - A node's content was updated after the last sync.
- */
 function grokGroupNeedsReupload(
   l2GrokSync: AiEngineSyncRecord | undefined,
   groupRows: LoreNodeRow[],
@@ -204,15 +193,12 @@ function grokGroupNeedsReupload(
     const rowGrokSync = syncMap['grok']
 
     if (row.to_be_deleted === 1) {
-      // Was this node previously included in the group?
       if (rowGrokSync?.merged_into_parent || rowGrokSync?.file_id) return true
       continue
     }
 
     if (row.word_count > 0) {
-      // New node — never included in any grok sync
       if (!rowGrokSync) return true
-      // Content updated since last sync
       if (rowGrokSync.content_updated_at && rowGrokSync.content_updated_at > lastSynced) return true
     }
   }
@@ -220,12 +206,6 @@ function grokGroupNeedsReupload(
   return false
 }
 
-/**
- * Deletes a remote file, ignoring 404 (already gone).
- * On 405 (Method Not Allowed), verifies via retrieve: if the file returns 404,
- * it is already absent and the deletion is treated as a success; otherwise the
- * original 405 error is re-thrown.
- */
 async function deleteFileIfExists(client: OpenAI, fileId: string, context: string): Promise<void> {
   try {
     await client.files.delete(fileId)
@@ -233,15 +213,12 @@ async function deleteFileIfExists(client: OpenAI, fileId: string, context: strin
     const status = (e as { status?: number })?.status
     if (status === 404) return
     if (status === 405) {
-      // Some providers return 405 for certain file states; verify the file is gone.
       try {
         const fileInfo = await client.files.retrieve(fileId)
-        // File still exists — log its details and re-throw original error.
         console.warn(`[AI Sync] DELETE ${fileId} returned 405 but file still exists: ${JSON.stringify(fileInfo)}`)
         throw new Error(`Delete file ${fileId} failed (HTTP 405, file still present):\n${context}\n${formatApiError(e)}`)
       } catch (retrieveErr: unknown) {
         if ((retrieveErr as { status?: number })?.status === 404) return
-        // If retrieve itself returned a new meaningful error, throw that; otherwise re-throw original.
         throw new Error(`Delete file ${fileId} failed (HTTP 405, retrieve check also failed):\n${context}\n${formatApiError(e)}`)
       }
     }
@@ -265,356 +242,341 @@ async function waitForVectorStore(
   throw new Error(`VectorStore creation timed out after ${POLL_CONFIG.timeoutMs / 1000}s (id=${storeId})`)
 }
 
-// ─── POST /sync-lore ─────────────────────────────────────────────────────────
+// Keep makeLoggingFetch import used by yandex-client
+void makeLoggingFetch
 
-router.post('/sync-lore', async (_req: Request, res: Response) => {
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+export async function syncLore(): Promise<{
+  ok: boolean
+  uploaded: number
+  deleted: number
+  unchanged: number
+  search_index_id: string | null
+}> {
   const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
 
-  try {
-    // Step 1 — load settings and nodes
-    const db = getDb(dbPath, true)
-    const engineRow = db
-      .prepare("SELECT value FROM settings WHERE key = 'current_backend'")
-      .get() as { value: string } | undefined
-    const configRow = db
-      .prepare("SELECT value FROM settings WHERE key = 'ai_config'")
-      .get() as { value: string } | undefined
+  // Step 1 — load settings and nodes
+  const db = getDb(dbPath, true)
+  const engineRow = db
+    .prepare("SELECT value FROM settings WHERE key = 'current_backend'")
+    .get() as { value: string } | undefined
+  const configRow = db
+    .prepare("SELECT value FROM settings WHERE key = 'ai_config'")
+    .get() as { value: string } | undefined
 
-    const rows = db
-      .prepare('SELECT id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info FROM lore_nodes')
-      .all() as LoreNodeRow[]
-    db.close()
+  const rows = db
+    .prepare('SELECT id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info FROM lore_nodes')
+    .all() as LoreNodeRow[]
+  db.close()
 
-    const currentEngine = engineRow?.value
-    if (!currentEngine) {
-      return res.status(400).json({ error: 'no AI engine configured' })
+  const currentEngine = engineRow?.value
+  if (!currentEngine) {
+    throw makeError('no AI engine configured', 400)
+  }
+
+  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
+  if (!engineDef) {
+    throw makeError(`Lore sync is not supported for engine '${currentEngine}'`, 400)
+  }
+
+  let config: AiConfigStore = {}
+  if (configRow) {
+    try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
+  }
+
+  // ── Grok sync (collapsed tree, file attachment, no vector store) ──────────
+
+  if (currentEngine === 'grok') {
+    const apiKey = config.grok?.api_key?.trim()
+    if (!apiKey) {
+      throw makeError('Grok api_key is required', 400)
     }
 
-    const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
-    if (!engineDef) {
-      return res.status(400).json({ error: `Lore sync is not supported for engine '${currentEngine}'` })
+    const maxFiles = engineDef.maxFilesPerRequest ?? 10
+    const collapseResult = collapseLoreTree(rows, maxFiles)
+
+    if ('error' in collapseResult) {
+      throw makeError(collapseResult.error, 400)
     }
 
-    let config: AiConfigStore = {}
-    if (configRow) {
-      try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
-    }
+    const groups = collapseResult
+    const client = createGrokClient(apiKey)
+    const now = new Date().toISOString()
 
-    // ── Grok sync (collapsed tree, file attachment, no vector store) ──────────
-
-    if (currentEngine === 'grok') {
-      const apiKey = config.grok?.api_key?.trim()
-      if (!apiKey) {
-        return res.status(400).json({ error: 'Grok api_key is required' })
-      }
-
-      const maxFiles = engineDef.maxFilesPerRequest ?? 10
-      const collapseResult = collapseLoreTree(rows, maxFiles)
-
-      if ('error' in collapseResult) {
-        return res.status(400).json({ error: collapseResult.error })
-      }
-
-      const groups = collapseResult
-      const client = createGrokClient(apiKey)
-      const now = new Date().toISOString()
-
-      const idToRow = new Map(rows.map(r => [r.id, r]))
-
-      // Categorise groups
-      interface GrokGroupResult {
-        group: typeof groups[number]
-        action: 'upload' | 'delete' | 'unchanged'
-        newFileId?: string
-      }
-
-      const results: GrokGroupResult[] = []
-
-      for (const group of groups) {
-        const l2Row = idToRow.get(group.level2NodeId)!
-        const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
-        const l2GrokSync = l2SyncMap['grok']
-        const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
-
-        if (!group.hasContent) {
-          results.push({ group, action: 'delete' })
-          continue
-        }
-
-        if (grokGroupNeedsReupload(l2GrokSync, groupRows)) {
-          results.push({ group, action: 'upload' })
-        } else {
-          results.push({ group, action: 'unchanged' })
-        }
-      }
-
-      // Upload / delete
-      for (const result of results) {
-        const { group } = result
-        const l2Row = idToRow.get(group.level2NodeId)!
-        const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
-        const oldFileId = l2SyncMap['grok']?.file_id
-
-        if (result.action === 'delete') {
-          if (oldFileId && engineDef.capabilities.fileDeletion) {
-            await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}"`)
-          }
-        } else if (result.action === 'upload') {
-          // Delete old file first to avoid orphans (only if provider supports deletion)
-          if (oldFileId && engineDef.capabilities.fileDeletion) {
-            await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}" (pre-upload cleanup)`)
-          }
-          try {
-            const uploaded = await client.files.create({
-              file: await toFile(
-                Buffer.from(group.content, 'utf-8'),
-                `lore-group-${group.level2NodeId}.md`,
-                { type: 'text/plain' },
-              ),
-              purpose: 'assistants',
-            })
-            result.newFileId = uploaded.id
-          } catch (e) {
-            throw new Error(`Upload failed for Grok group "${group.level2NodeName}" (id=${group.level2NodeId}):\n${formatApiError(e)}`)
-          }
-        }
-      }
-
-      // Commit to DB
-      const db2 = getDb(dbPath)
-      db2.transaction(() => {
-        const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
-
-        for (const result of results) {
-          const { group, action, newFileId } = result
-          const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
-
-          if (action === 'delete') {
-            for (const row of groupRows) {
-              const existing = parseAiSyncInfoMap(row.ai_sync_info)
-              delete existing['grok']
-              updateStmt.run(JSON.stringify(existing), row.id)
-            }
-          } else if (action === 'upload' && newFileId) {
-            // Level-2 node gets file_id
-            const l2Row = idToRow.get(group.level2NodeId)!
-            const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
-            existing['grok'] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
-            updateStmt.run(JSON.stringify(existing), group.level2NodeId)
-
-            // Descendants get merged_into_parent marker
-            for (const row of groupRows) {
-              if (row.id === group.level2NodeId) continue
-              const existing = parseAiSyncInfoMap(row.ai_sync_info)
-              existing['grok'] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
-              updateStmt.run(JSON.stringify(existing), row.id)
-            }
-          }
-        }
-
-        // Physically remove all nodes marked for deletion — both those that had a
-        // remote file (already deleted above) and those that never had one.
-        db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
-      })()
-      db2.close()
-
-      const uploaded = results.filter(r => r.action === 'upload').length
-      const deleted = results.filter(r => r.action === 'delete').length
-      const unchanged = results.filter(r => r.action === 'unchanged').length
-
-      return res.json({ ok: true, uploaded, deleted, unchanged, search_index_id: null })
-    }
-
-    // ── Yandex sync (individual file upload + VectorStore) ────────────────────
-
-    if (currentEngine !== 'yandex') {
-      return res.status(400).json({ error: `Lore sync is not supported for engine '${currentEngine}'` })
-    }
-
-    const apiKey = config.yandex?.api_key?.trim()
-    const folderId = config.yandex?.folder_id?.trim()
-    if (!apiKey || !folderId) {
-      return res.status(400).json({ error: 'Yandex api_key and folder_id are required' })
-    }
-
-    const projectName = path.basename(dbPath).replace(/\.[^.]+$/, '')
-    const client = createYandexClient(apiKey, folderId)
-
-    // Build path and parent helpers
     const idToRow = new Map(rows.map(r => [r.id, r]))
-    const pathMap = buildPathMap(rows)
 
-    // Step 3 — categorise
-    interface NodeInfo {
-      id: number
-      name: string
-      content: string
-      word_count: number
-      to_be_deleted: number
-      yandexSync: AiEngineSyncRecord | undefined
+    interface GrokGroupResult {
+      group: typeof groups[number]
+      action: 'upload' | 'delete' | 'unchanged'
+      newFileId?: string
     }
 
-    const toUpload: NodeInfo[] = []
-    const toDelete: NodeInfo[] = []
-    const unchanged: NodeInfo[] = []
+    const results: GrokGroupResult[] = []
 
-    for (const row of rows) {
-      const yandexSync = parseYandexSync(row.ai_sync_info)
-      const info: NodeInfo = {
-        id: row.id,
-        name: row.name,
-        content: row.content ?? '',
-        word_count: row.word_count,
-        to_be_deleted: row.to_be_deleted,
-        yandexSync,
-      }
+    for (const group of groups) {
+      const l2Row = idToRow.get(group.level2NodeId)!
+      const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
+      const l2GrokSync = l2SyncMap['grok']
+      const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
 
-      const needsDelete = !!(yandexSync?.file_id && (row.to_be_deleted === 1 || row.word_count === 0))
-      const needsUpload = row.to_be_deleted === 0 && row.word_count > 0 && (
-        !yandexSync ||
-        !!(yandexSync.content_updated_at && yandexSync.content_updated_at > yandexSync.last_synced_at)
-      )
-
-      if (needsDelete) {
-        toDelete.push(info)
-      } else if (needsUpload) {
-        toUpload.push(info)
-      } else if (row.to_be_deleted === 0 && row.word_count > 0) {
-        unchanged.push(info)
-      }
-    }
-
-    // Step 4 — for each node to upload: delete old remote file first, then upload new one
-    const newFileIds = new Map<number, string>()
-    for (const node of toUpload) {
-      const row = idToRow.get(node.id)!
-
-      // Delete old remote file before uploading new version (avoids orphaned files on partial failure)
-      if (node.yandexSync?.file_id) {
-        await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id}, pre-upload cleanup)`)
-      }
-
-      try {
-        const fileContent = buildFileContent(row, projectName, pathMap, idToRow)
-        const uploaded = await client.files.create({
-          // Use ASCII-safe filename (node name is in the YAML frontmatter content)
-          file: await toFile(Buffer.from(fileContent, 'utf-8'), `lore-${node.id}.md`, { type: 'text/plain' }),
-          purpose: 'assistants',
-        })
-        newFileIds.set(node.id, uploaded.id)
-      } catch (e) {
-        throw new Error(`Upload failed for node "${node.name}" (id=${node.id}):\n${formatApiError(e)}`)
-      }
-    }
-
-    // Step 5 — delete remote files
-    for (const node of toDelete) {
-      if (node.yandexSync?.file_id) {
-        await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id})`)
-      }
-    }
-
-    // Step 6 — collect all valid file IDs for new vector store
-    const deleteNodeIds = new Set(toDelete.map(n => n.id))
-    const allFileIds: string[] = []
-
-    for (const row of rows) {
-      if (deleteNodeIds.has(row.id)) continue
-
-      const newFileId = newFileIds.get(row.id)
-      if (newFileId) {
-        allFileIds.push(newFileId)
+      if (!group.hasContent) {
+        results.push({ group, action: 'delete' })
         continue
       }
 
-      const yandexSync = parseYandexSync(row.ai_sync_info)
-      if (yandexSync?.file_id) {
-        allFileIds.push(yandexSync.file_id)
+      if (grokGroupNeedsReupload(l2GrokSync, groupRows)) {
+        results.push({ group, action: 'upload' })
+      } else {
+        results.push({ group, action: 'unchanged' })
       }
     }
 
-    // Step 7 — rebuild VectorStore (delete old, create new)
-    const oldSearchIndexId = config.yandex?.search_index_id
-    if (oldSearchIndexId) {
-      try {
-        await client.vectorStores.delete(oldSearchIndexId)
-      } catch (e: unknown) {
-        if ((e as { status?: number })?.status !== 404) {
-          throw new Error(`Delete VectorStore ${oldSearchIndexId} failed:\n${formatApiError(e)}`)
+    // Upload / delete
+    for (const result of results) {
+      const { group } = result
+      const l2Row = idToRow.get(group.level2NodeId)!
+      const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
+      const oldFileId = l2SyncMap['grok']?.file_id
+
+      if (result.action === 'delete') {
+        if (oldFileId && engineDef.capabilities.fileDeletion) {
+          await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}"`)
+        }
+      } else if (result.action === 'upload') {
+        if (oldFileId && engineDef.capabilities.fileDeletion) {
+          await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}" (pre-upload cleanup)`)
+        }
+        try {
+          const uploaded = await client.files.create({
+            file: await toFile(
+              Buffer.from(group.content, 'utf-8'),
+              `lore-group-${group.level2NodeId}.md`,
+              { type: 'text/plain' },
+            ),
+            purpose: 'assistants',
+          })
+          result.newFileId = uploaded.id
+        } catch (e) {
+          throw new Error(`Upload failed for Grok group "${group.level2NodeName}" (id=${group.level2NodeId}):\n${formatApiError(e)}`)
         }
       }
     }
 
-    let newSearchIndexId: string | undefined
-    if (allFileIds.length > 0) {
-      const store = await client.vectorStores.create({
-        name: `story-lore-${Date.now()}`,
-        file_ids: allFileIds,
-      })
-      const completed = store.status === 'completed'
-        ? store
-        : await waitForVectorStore(client, store.id)
-      newSearchIndexId = completed.id
-    }
-
-    // Step 8 — commit to DB (single transaction)
-    const now = new Date().toISOString()
+    // Commit to DB
     const db2 = getDb(dbPath)
-
     db2.transaction(() => {
       const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
 
-      for (const [nodeId, fileId] of newFileIds.entries()) {
-        const nodeRow = rows.find(r => r.id === nodeId)
-        const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
-        existing['yandex'] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
-        updateStmt.run(JSON.stringify(existing), nodeId)
-      }
+      for (const result of results) {
+        const { group, action, newFileId } = result
+        const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
 
-      for (const node of toDelete) {
-        const nodeRow = rows.find(r => r.id === node.id)
-        const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
-        if (node.to_be_deleted === 1) {
-          delete existing['yandex']
-        } else {
-          existing['yandex'] = { last_synced_at: now }
+        if (action === 'delete') {
+          for (const row of groupRows) {
+            const existing = parseAiSyncInfoMap(row.ai_sync_info)
+            delete existing['grok']
+            updateStmt.run(JSON.stringify(existing), row.id)
+          }
+        } else if (action === 'upload' && newFileId) {
+          const l2Row = idToRow.get(group.level2NodeId)!
+          const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
+          existing['grok'] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
+          updateStmt.run(JSON.stringify(existing), group.level2NodeId)
+
+          for (const row of groupRows) {
+            if (row.id === group.level2NodeId) continue
+            const existing = parseAiSyncInfoMap(row.ai_sync_info)
+            existing['grok'] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
+            updateStmt.run(JSON.stringify(existing), row.id)
+          }
         }
-        updateStmt.run(JSON.stringify(existing), node.id)
       }
 
-      const updatedConfig = { ...config }
-      if (!updatedConfig.yandex) updatedConfig.yandex = {}
-      if (newSearchIndexId) {
-        updatedConfig.yandex = { ...updatedConfig.yandex, search_index_id: newSearchIndexId }
-      } else {
-        const { search_index_id: _removed, ...rest } = updatedConfig.yandex
-        void _removed
-        updatedConfig.yandex = rest
-      }
-
-      db2.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_config', ?)")
-        .run(JSON.stringify(updatedConfig))
-
-      // Physically remove all nodes marked for deletion — both those that had a
-      // remote file (already deleted above) and those that never had one.
       db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
     })()
-
     db2.close()
 
-    // Step 9 — return
-    res.json({
-      ok: true,
-      uploaded: toUpload.length,
-      deleted: toDelete.length,
-      unchanged: unchanged.length,
-      search_index_id: newSearchIndexId ?? null,
-    })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
+    const uploaded = results.filter(r => r.action === 'upload').length
+    const deleted = results.filter(r => r.action === 'delete').length
+    const unchanged = results.filter(r => r.action === 'unchanged').length
 
-export default router
+    return { ok: true, uploaded, deleted, unchanged, search_index_id: null }
+  }
+
+  // ── Yandex sync (individual file upload + VectorStore) ────────────────────
+
+  if (currentEngine !== 'yandex') {
+    throw makeError(`Lore sync is not supported for engine '${currentEngine}'`, 400)
+  }
+
+  const apiKey = config.yandex?.api_key?.trim()
+  const folderId = config.yandex?.folder_id?.trim()
+  if (!apiKey || !folderId) {
+    throw makeError('Yandex api_key and folder_id are required', 400)
+  }
+
+  const projectName = path.basename(dbPath).replace(/\.[^.]+$/, '')
+  const client = createYandexClient(apiKey, folderId)
+
+  const idToRow = new Map(rows.map(r => [r.id, r]))
+  const pathMap = buildPathMap(rows)
+
+  interface NodeInfo {
+    id: number
+    name: string
+    content: string
+    word_count: number
+    to_be_deleted: number
+    yandexSync: AiEngineSyncRecord | undefined
+  }
+
+  const toUpload: NodeInfo[] = []
+  const toDelete: NodeInfo[] = []
+  const unchanged: NodeInfo[] = []
+
+  for (const row of rows) {
+    const yandexSync = parseYandexSync(row.ai_sync_info)
+    const info: NodeInfo = {
+      id: row.id,
+      name: row.name,
+      content: row.content ?? '',
+      word_count: row.word_count,
+      to_be_deleted: row.to_be_deleted,
+      yandexSync,
+    }
+
+    const needsDelete = !!(yandexSync?.file_id && (row.to_be_deleted === 1 || row.word_count === 0))
+    const needsUpload = row.to_be_deleted === 0 && row.word_count > 0 && (
+      !yandexSync ||
+      !!(yandexSync.content_updated_at && yandexSync.content_updated_at > yandexSync.last_synced_at)
+    )
+
+    if (needsDelete) {
+      toDelete.push(info)
+    } else if (needsUpload) {
+      toUpload.push(info)
+    } else if (row.to_be_deleted === 0 && row.word_count > 0) {
+      unchanged.push(info)
+    }
+  }
+
+  const newFileIds = new Map<number, string>()
+  for (const node of toUpload) {
+    const row = idToRow.get(node.id)!
+
+    if (node.yandexSync?.file_id) {
+      await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id}, pre-upload cleanup)`)
+    }
+
+    try {
+      const fileContent = buildFileContent(row, projectName, pathMap, idToRow)
+      const uploaded = await client.files.create({
+        file: await toFile(Buffer.from(fileContent, 'utf-8'), `lore-${node.id}.md`, { type: 'text/plain' }),
+        purpose: 'assistants',
+      })
+      newFileIds.set(node.id, uploaded.id)
+    } catch (e) {
+      throw new Error(`Upload failed for node "${node.name}" (id=${node.id}):\n${formatApiError(e)}`)
+    }
+  }
+
+  for (const node of toDelete) {
+    if (node.yandexSync?.file_id) {
+      await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id})`)
+    }
+  }
+
+  const deleteNodeIds = new Set(toDelete.map(n => n.id))
+  const allFileIds: string[] = []
+
+  for (const row of rows) {
+    if (deleteNodeIds.has(row.id)) continue
+
+    const newFileId = newFileIds.get(row.id)
+    if (newFileId) {
+      allFileIds.push(newFileId)
+      continue
+    }
+
+    const yandexSync = parseYandexSync(row.ai_sync_info)
+    if (yandexSync?.file_id) {
+      allFileIds.push(yandexSync.file_id)
+    }
+  }
+
+  const oldSearchIndexId = config.yandex?.search_index_id
+  if (oldSearchIndexId) {
+    try {
+      await client.vectorStores.delete(oldSearchIndexId)
+    } catch (e: unknown) {
+      if ((e as { status?: number })?.status !== 404) {
+        throw new Error(`Delete VectorStore ${oldSearchIndexId} failed:\n${formatApiError(e)}`)
+      }
+    }
+  }
+
+  let newSearchIndexId: string | undefined
+  if (allFileIds.length > 0) {
+    const store = await client.vectorStores.create({
+      name: `story-lore-${Date.now()}`,
+      file_ids: allFileIds,
+    })
+    const completed = store.status === 'completed'
+      ? store
+      : await waitForVectorStore(client, store.id)
+    newSearchIndexId = completed.id
+  }
+
+  const now = new Date().toISOString()
+  const db2 = getDb(dbPath)
+
+  db2.transaction(() => {
+    const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
+
+    for (const [nodeId, fileId] of newFileIds.entries()) {
+      const nodeRow = rows.find(r => r.id === nodeId)
+      const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
+      existing['yandex'] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
+      updateStmt.run(JSON.stringify(existing), nodeId)
+    }
+
+    for (const node of toDelete) {
+      const nodeRow = rows.find(r => r.id === node.id)
+      const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
+      if (node.to_be_deleted === 1) {
+        delete existing['yandex']
+      } else {
+        existing['yandex'] = { last_synced_at: now }
+      }
+      updateStmt.run(JSON.stringify(existing), node.id)
+    }
+
+    const updatedConfig = { ...config }
+    if (!updatedConfig.yandex) updatedConfig.yandex = {}
+    if (newSearchIndexId) {
+      updatedConfig.yandex = { ...updatedConfig.yandex, search_index_id: newSearchIndexId }
+    } else {
+      const { search_index_id: _removed, ...rest } = updatedConfig.yandex
+      void _removed
+      updatedConfig.yandex = rest
+    }
+
+    db2.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_config', ?)")
+      .run(JSON.stringify(updatedConfig))
+
+    db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
+  })()
+
+  db2.close()
+
+  return {
+    ok: true,
+    uploaded: toUpload.length,
+    deleted: toDelete.length,
+    unchanged: unchanged.length,
+    search_index_id: newSearchIndexId ?? null,
+  }
+}

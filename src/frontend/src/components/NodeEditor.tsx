@@ -15,6 +15,7 @@ import DiffViewAndAccept from './DiffViewAndAccept'
 import ResizableTextarea from './ui/resizable-textarea'
 import type { AiSettings } from '../../../shared/ai-settings.js'
 import type { AiEngineSyncRecord } from '../types/models'
+import { ipcClient } from '../ipcClient'
 
 export interface NodeSavedPayload {
   nodeId: number
@@ -26,8 +27,10 @@ export interface NodeSavedPayload {
 }
 
 export interface NodeEditorAdapter {
-  /** API base, e.g. '/api/lore' or '/api/plan/nodes'. Node ID is appended. */
-  apiBase: string
+  /** Fetch a single node by id. */
+  getNode: (id: number) => Promise<Record<string, unknown>>
+  /** Patch a node and return updated stats. */
+  patchNode: (id: number, data: Record<string, unknown>) => Promise<{ ok: boolean; word_count?: number | null; char_count?: number | null; byte_count?: number | null; ai_sync_info?: Record<string, unknown> | null }>
   /** Primary text field name in the API and partial-JSON stream */
   primaryField: 'name' | 'title'
   /** i18n key prefix: 'lore' or 'plan' */
@@ -106,8 +109,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [thinkingDetail, setThinkingDetail] = useState<string | null>(null)
   const [thinkingDone, setThinkingDone] = useState(false)
 
-  const apiUrl = `${adapter.apiBase}/${nodeId}`
-
   // ── Load node ──────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
@@ -121,7 +122,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     setThinkingStatus(null)
     setThinkingDone(false)
 
-    fetch(apiUrl).then(r => r.json() as Promise<Record<string, unknown>>).then(node => {
+    adapter.getNode(nodeId).then(node => {
       setPrimaryValue(node[adapter.primaryField] as string ?? '')
       setContent(node.content as string ?? '')
       setInitialPrimary(node[adapter.primaryField] as string ?? '')
@@ -155,8 +156,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   // ── Load AI config ─────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch('/api/ai/config')
-      .then(r => r.json())
+    ipcClient.ai.getConfig()
       .then((data: { current_engine?: string | null; [key: string]: unknown }) => {
         const engine = data.current_engine ?? null
         setCurrentEngine(engine)
@@ -177,20 +177,16 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   // ── Load auto-generate summary setting ─────────────────────────────────────
   useEffect(() => {
-    fetch('/api/settings/auto_generate_summary')
-      .then(r => r.json())
-      .then((data: { value: string | null }) => {
-        setAutoGenerateSummary(data.value === 'true')
-      })
+    ipcClient.settings.get('auto_generate_summary')
+      .then((data) => { setAutoGenerateSummary(data.value === 'true') })
       .catch(() => {})
   }, [])
 
   // ── Load prompt heights from settings ──────────────────────────────────────
   useEffect(() => {
-    const loadHeight = (key: string, defaultValue: number) => {
-      fetch(`/api/settings/${key}`)
-        .then(r => r.json())
-        .then((data: { value: string | null }) => {
+    const loadHeight = (key: string) => {
+      ipcClient.settings.get(key)
+        .then((data) => {
           if (data.value) {
             const parsed = parseInt(data.value, 10)
             if (!isNaN(parsed) && parsed > 0) {
@@ -201,8 +197,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         })
         .catch(() => {})
     }
-    loadHeight('prompt_user_height', 80)
-    loadHeight('prompt_system_height', 60)
+    loadHeight('prompt_user_height')
+    loadHeight('prompt_system_height')
   }, [])
 
   // ── Trigger summary generation on editor close ─────────────────────────────
@@ -217,11 +213,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       ) {
         summaryTriggeredRef.current = true
         // Fire and forget, but dispatch a graph refresh after a short delay
-        fetch('/api/ai/generate-summary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ node_id: nodeId, content: content || undefined }),
-        })
+        ipcClient.ai.generateSummary({ node_id: nodeId, content: content || undefined })
           .then(() => {
             // Give the backend a moment to update the node, then refresh the graph
             setTimeout(() => dispatchPlanGraphRefresh(), 2000)
@@ -249,11 +241,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     primaryTimerRef.current = setTimeout(() => {
       if (!value.trim()) { setPrimaryDirty(false); return }
       const trimmed = value.trim()
-      fetch(apiUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [adapter.primaryField]: trimmed }),
-      }).then(() => {
+      adapter.patchNode(nodeId, { [adapter.primaryField]: trimmed }).then(() => {
         panelApi?.setTitle(trimmed)
         setPrimaryDirty(false)
         adapter.onSaved({ nodeId, primaryValue: trimmed })
@@ -267,18 +255,14 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     setContentDirty(true)
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
     contentTimerRef.current = setTimeout(() => {
-      fetch(apiUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: value }),
-      }).then(r => r.json())
-        .then((data: { ok: boolean; word_count: number; char_count: number; byte_count: number; ai_sync_info?: Record<string, unknown> | null }) => {
+      adapter.patchNode(nodeId, { content: value })
+        .then((data) => {
           setContentDirty(false)
           adapter.onSaved({
             nodeId,
-            wordCount: data.word_count,
-            charCount: data.char_count,
-            byteCount: data.byte_count,
+            wordCount: data.word_count ?? undefined,
+            charCount: data.char_count ?? undefined,
+            byteCount: data.byte_count ?? undefined,
             aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
           })
         }).catch(() => setContentDirty(false))
@@ -292,21 +276,13 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       contentTimerRef.current = null
     }
     setContentDirty(false)
-    await fetch(apiUrl, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: currentContent }),
-    })
+    await adapter.patchNode(nodeId, { content: currentContent })
   }
 
   // ── Save last-used model and settings ─────────────────────────────────────
   function saveAiSettings() {
     if (currentEngine) {
-      void fetch('/api/ai/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: currentEngine, fields: { settings: aiSettings } }),
-      })
+      void ipcClient.ai.saveConfig({ engine: currentEngine, fields: { settings: aiSettings } })
     }
   }
 
@@ -315,11 +291,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   function savePromptHeight(key: 'prompt_user_height' | 'prompt_system_height', height: number) {
     if (heightTimerRef.current) clearTimeout(heightTimerRef.current)
     heightTimerRef.current = setTimeout(() => {
-      void fetch(`/api/settings/${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: String(height) }),
-      })
+      void ipcClient.settings.set(key, String(height))
     }, 1000)
   }
 
@@ -369,20 +341,15 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           user_prompt: effectivePrompt.trim(),
         }
         if (finalPrimary.trim()) patchBody[adapter.primaryField] = finalPrimary.trim()
-        const r = await fetch(apiUrl, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patchBody),
-        })
-        const data = await r.json() as { ok: boolean; word_count?: number; char_count?: number; byte_count?: number; ai_sync_info?: Record<string, unknown> | null }
+        const data = await adapter.patchNode(nodeId, patchBody)
         if (data.ok) {
           if (finalPrimary.trim()) panelApi?.setTitle(finalPrimary.trim())
           adapter.onSaved({
             nodeId,
             primaryValue: finalPrimary.trim() || undefined,
-            wordCount: data.word_count,
-            charCount: data.char_count,
-            byteCount: data.byte_count,
+            wordCount: data.word_count ?? undefined,
+            charCount: data.char_count ?? undefined,
+            byteCount: data.byte_count ?? undefined,
             aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
           })
           adapter.onAfterGenerate?.()
@@ -449,20 +416,15 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         patchBody['start_review'] = true
       }
 
-      const r = await fetch(apiUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patchBody),
-      })
-      const data = await r.json() as { ok: boolean; word_count?: number; char_count?: number; byte_count?: number; ai_sync_info?: Record<string, unknown> | null }
+      const data = await adapter.patchNode(nodeId, patchBody)
       if (data.ok) {
         if (finalPrimary.trim()) panelApi?.setTitle(finalPrimary.trim())
         adapter.onSaved({
           nodeId,
           primaryValue: finalPrimary.trim() || undefined,
-          wordCount: data.word_count,
-          charCount: data.char_count,
-          byteCount: data.byte_count,
+          wordCount: data.word_count ?? undefined,
+          charCount: data.char_count ?? undefined,
+          byteCount: data.byte_count ?? undefined,
           aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
         })
       }
@@ -480,18 +442,13 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   // ── Mode D→B: Accept changes ───────────────────────────────────────────────
   async function acceptChanges(contentToAccept: string) {
-    const r = await fetch(apiUrl, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accept_review: true, content: contentToAccept }),
-    })
-    const data = await r.json() as { ok: boolean; word_count?: number; char_count?: number; byte_count?: number; ai_sync_info?: Record<string, unknown> | null }
+    const data = await adapter.patchNode(nodeId, { accept_review: true, content: contentToAccept })
     if (data.ok) {
       adapter.onSaved({
         nodeId,
-        wordCount: data.word_count,
-        charCount: data.char_count,
-        byteCount: data.byte_count,
+        wordCount: data.word_count ?? undefined,
+        charCount: data.char_count ?? undefined,
+        byteCount: data.byte_count ?? undefined,
         aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
       })
     }
@@ -519,11 +476,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     setUserPrompt(value)
     if (userPromptTimerRef.current) clearTimeout(userPromptTimerRef.current)
     userPromptTimerRef.current = setTimeout(() => {
-      void fetch(apiUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_prompt: value }),
-      })
+      void adapter.patchNode(nodeId, { user_prompt: value })
     }, 1000)
   }
 
@@ -532,11 +485,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     setSystemPrompt(value)
     if (systemPromptTimerRef.current) clearTimeout(systemPromptTimerRef.current)
     systemPromptTimerRef.current = setTimeout(() => {
-      void fetch(apiUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system_prompt: value }),
-      })
+      void adapter.patchNode(nodeId, { system_prompt: value })
     }, 1000)
   }
 

@@ -23,4 +23,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showErrorDialog: (title, message) => {
     return ipcRenderer.invoke('show-error-dialog', { title, message })
   },
+
+  /** Generic typed IPC invocation */
+  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+
+  /** Start a streaming generation job */
+  startStream: (streamId, endpoint, params) =>
+    ipcRenderer.invoke('stream:start', { streamId, endpoint, params }),
+
+  /** Abort an in-progress stream */
+  abortStream: (streamId) =>
+    ipcRenderer.invoke('stream:abort', { streamId }),
+
+  /** Subscribe to stream events. Returns an unsubscribe function. */
+  onStreamEvent: (callback) => {
+    const handler = (_, data) => callback(data)
+    ipcRenderer.on('stream:event', handler)
+    return () => ipcRenderer.removeListener('stream:event', handler)
+  },
 })

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { AI_CALL_COMPLETED_EVENT, type AiCallCompletedDetail } from '../lib/billing-events'
 import { useLocale } from '../lib/locale'
+import { ipcClient } from '../ipcClient'
 
 // 1 tick = 1e-10 USD
 const USD_PER_TICK = 1e-10
@@ -86,8 +87,7 @@ export default function AiBillingPanel() {
   async function fetchBilling() {
     setLoading(true)
     try {
-      const res = await fetch('/api/ai/billing')
-      const data = await res.json() as BillingData
+      const data = await ipcClient.ai.billing() as BillingData
       setBilling(data)
     } catch {
       /* ignore */

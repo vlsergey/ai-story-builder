@@ -1,11 +1,9 @@
 /**
- * Integration tests for POST /api/ai/generate-plan-children
+ * Integration tests for generatePlanChildren()
  */
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import express from 'express'
-import request from 'supertest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 let testDbPath = ''
@@ -22,11 +20,7 @@ vi.mock('../lib/grok-client.js', () => ({
   grokGenerate: mockGrokGenerate,
 }))
 
-const { default: router } = await import('./generate-plan-children.js')
-
-const app = express()
-app.use(express.json())
-app.use('/ai', router)
+const { generatePlanChildren } = await import('./generate-plan-children.js')
 
 // ─── DB helper ────────────────────────────────────────────────────────────────
 
@@ -108,6 +102,14 @@ function mockGrokResponse(content = JSON.stringify({ overview: 'Overview', items
   )
 }
 
+async function callGeneratePlanChildren(params: Record<string, unknown>) {
+  const partials: Record<string, unknown>[] = []
+  const onThinking = vi.fn()
+  const onPartialJson = (data: Record<string, unknown>) => partials.push(data)
+  const result = await generatePlanChildren(params as any, onThinking, onPartialJson)
+  return { result, partials, onThinking }
+}
+
 function getGrokCallUserContent(): Array<Record<string, unknown>> {
   const params = mockGrokGenerate.mock.calls[0][1] as {
     input: Array<{ role: string; content: Array<Record<string, unknown>> }>
@@ -127,22 +129,20 @@ afterEach(() => {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('POST /ai/generate-plan-children', () => {
+describe('generatePlanChildren', () => {
 
   // ─── 1. Basic validation ───────────────────────────────────────────────────
 
-  it('returns 400 when no project open', async () => {
+  it('throws 400 when no project open', async () => {
     testDbPath = ''
-    const res = await request(app).post('/ai/generate-plan-children').send({ prompt: 'test', parentTitle: 'Act 1' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('no project open')
+    await expect(callGeneratePlanChildren({ prompt: 'test', parentTitle: 'Act 1' })).rejects.toThrow(/no project open/)
+    try { await callGeneratePlanChildren({ prompt: 'test', parentTitle: 'Act 1' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when prompt is missing', async () => {
+  it('throws 400 when prompt is missing', async () => {
     testDbPath = setupDb({ grokApiKey: 'key' })
-    const res = await request(app).post('/ai/generate-plan-children').send({ parentTitle: 'Act 1' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('prompt is required')
+    await expect(callGeneratePlanChildren({ parentTitle: 'Act 1' })).rejects.toThrow(/prompt is required/)
+    try { await callGeneratePlanChildren({ parentTitle: 'Act 1' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   // ─── 2. includeExistingLore: file ID propagation ───────────────────────────
@@ -159,11 +159,7 @@ describe('POST /ai/generate-plan-children', () => {
     })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-plan-children').send({
-      prompt: 'Split into chapters',
-      parentTitle: 'Act 1',
-      settings: { includeExistingLore: true },
-    })
+    await callGeneratePlanChildren({ prompt: 'Split into chapters', parentTitle: 'Act 1', settings: { includeExistingLore: true } })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
     const content = getGrokCallUserContent()
@@ -183,11 +179,7 @@ describe('POST /ai/generate-plan-children', () => {
     })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-plan-children').send({
-      prompt: 'Split into chapters',
-      parentTitle: 'Act 1',
-      settings: { includeExistingLore: false },
-    })
+    await callGeneratePlanChildren({ prompt: 'Split into chapters', parentTitle: 'Act 1', settings: { includeExistingLore: false } })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
     const content = getGrokCallUserContent()
@@ -211,11 +203,7 @@ describe('POST /ai/generate-plan-children', () => {
     })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-plan-children').send({
-      prompt: 'Split into chapters',
-      parentTitle: 'Act 1',
-      settings: { includeExistingLore: true },
-    })
+    await callGeneratePlanChildren({ prompt: 'Split into chapters', parentTitle: 'Act 1', settings: { includeExistingLore: true } })
 
     const content = getGrokCallUserContent()
     const fileAttachments = content.filter(c => c['type'] === 'input_file')
@@ -229,11 +217,7 @@ describe('POST /ai/generate-plan-children', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-plan-children').send({
-      prompt: 'Create outline',
-      parentTitle: 'My Novel',
-      isRoot: true,
-    })
+    await callGeneratePlanChildren({ prompt: 'Create outline', parentTitle: 'My Novel', isRoot: true })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
     expect(params.instructions).not.toContain('detailed breakdown')
@@ -243,11 +227,7 @@ describe('POST /ai/generate-plan-children', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse()
 
-    await request(app).post('/ai/generate-plan-children').send({
-      prompt: 'Split this section',
-      parentTitle: 'Act 1',
-      isRoot: false,
-    })
+    await callGeneratePlanChildren({ prompt: 'Split this section', parentTitle: 'Act 1', isRoot: false })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
     expect(params.instructions).toContain('detailed breakdown')

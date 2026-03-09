@@ -1,4 +1,3 @@
-import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiSettings } from '../../shared/ai-settings.js'
@@ -13,44 +12,53 @@ try {
   Database = null
 }
 
-const router: Router = express.Router()
+// ── Error helper ──────────────────────────────────────────────────────────────
 
-// POST /api/ai/generate-summary
-router.post('/generate-summary', express.json(), async (req: Request, res: Response) => {
+function makeError(message: string, status: number): Error {
+  const e = new Error(message)
+  ;(e as any).status = status
+  return e
+}
+
+// Unused but kept for type compat
+void (undefined as unknown as JsonSchemaSpec)
+
+export async function generateSummary(params: { node_id?: number; content?: string }): Promise<{
+  summary: string
+  response_id?: string
+  tokens_input?: number
+  tokens_output?: number
+  tokens_total?: number
+  cached_tokens?: number
+  reasoning_tokens?: number
+  cost_usd_ticks?: number
+}> {
   const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
 
-  const { node_id, content } = req.body as {
-    node_id?: number
-    content?: string
-  }
-  if (!node_id) return res.status(400).json({ error: 'node_id is required' })
+  const { node_id, content } = params
+  if (!node_id) throw makeError('node_id is required', 400)
 
   let engine: string | undefined
   let config: AiConfigStore = {}
   let textLanguage: string | undefined
   let nodeContent: string = ''
-  const engineFileIds: string[] = [] // we will not include lore files (includeExistingLore = false)
+  const engineFileIds: string[] = []
 
   try {
     const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
     const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
     const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
     const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
-    const autoSummarySetting = db.prepare("SELECT value FROM settings WHERE key = 'auto_generate_summary'").get() as { value: string } | undefined
 
     engine = engineRow?.value
-    if (!engine) { db.close(); return res.status(400).json({ error: 'no AI engine configured' }) }
+    if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
     }
     textLanguage = langRow?.value
-    const autoGenerate = autoSummarySetting?.value === 'true'
-    // If auto-generation is disabled, we still allow manual trigger.
-    // Proceed with generation regardless.
 
-    // Fetch node content if not provided
     nodeContent = content ?? ''
     if (nodeContent === '') {
       const node = db.prepare('SELECT content FROM plan_nodes WHERE id = ?').get(node_id) as { content: string | null } | undefined
@@ -58,19 +66,19 @@ router.post('/generate-summary', express.json(), async (req: Request, res: Respo
     }
     db.close()
     if (!nodeContent || nodeContent.trim().length === 0) {
-      return res.status(400).json({ error: 'plan node content is empty' })
+      throw makeError('plan node content is empty', 400)
     }
-  } catch (e) {
-    return res.status(500).json({ error: 'failed to read project settings: ' + String(e) })
+  } catch (e: any) {
+    if (e.status) throw e
+    throw makeError('failed to read project settings: ' + String(e), 500)
   }
 
   const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
-  if (!engineDef) return res.status(400).json({ error: `Summary generation is not supported for engine '${engine}'` })
+  if (!engineDef) throw makeError(`Summary generation is not supported for engine '${engine}'`, 400)
 
-  const adapter = getEngineAdapter(engine)
-  if (!adapter) return res.status(400).json({ error: `Summary generation is not supported for engine '${engine}'` })
+  const adapter = getEngineAdapter(engine!)
+  if (!adapter) throw makeError(`Summary generation is not supported for engine '${engine}'`, 400)
 
-  // Extract summary-specific settings from engine config
   const engineConfig = config[engine as keyof AiConfigStore] as Record<string, unknown> | undefined
   const summarySettings = engineConfig?.summary_settings as AiSettings | undefined
 
@@ -80,7 +88,6 @@ router.post('/generate-summary', express.json(), async (req: Request, res: Respo
   const maxTokens = summarySettings?.maxTokens
   const maxCompletionTokens = summarySettings?.maxCompletionTokens
 
-  // Construct system prompt for summary generation
   const systemPrompt = `You are a concise summarization assistant.
 Language: ${textLanguage}.
 Generate a short summary of the provided text, 5–10 words, in the same language as the text.
@@ -94,51 +101,44 @@ Output only the summary text.`
     accumulated += chunk
   }
 
-  try {
-    const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
-      {
-        prompt: prompt.trim(),
-        systemPrompt,
-        model: model || '', // use summary-specific model or default
-        includeExistingLore: includeExistingLore,
-        webSearch: webSearch,
-        engineFileIds,
-        engineDef,
-        config,
-        maxTokens: maxTokens,
-        maxCompletionTokens: maxCompletionTokens,
-      },
-      () => {}, // ignore thinking events
-      onDelta,
-    )
+  const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
+    {
+      prompt: prompt.trim(),
+      systemPrompt,
+      model: model || '',
+      includeExistingLore: includeExistingLore,
+      webSearch: webSearch,
+      engineFileIds,
+      engineDef,
+      config,
+      maxTokens: maxTokens,
+      maxCompletionTokens: maxCompletionTokens,
+    },
+    () => {}, // ignore thinking events
+    onDelta,
+  )
 
-    // Update the plan node with the generated summary
-    if (accumulated.trim().length > 0) {
-      try {
-        const db = new (Database as typeof import('better-sqlite3'))(dbPath)
-        db.prepare(
-          'UPDATE plan_nodes SET summary = ?, auto_summary = 1 WHERE id = ?'
-        ).run(accumulated.trim(), node_id)
-        db.close()
-      } catch (updateError) {
-        console.error('[generate-summary] Failed to update node summary:', updateError)
-        // Do not fail the request, just log
-      }
+  // Update the plan node with the generated summary
+  if (accumulated.trim().length > 0) {
+    try {
+      const db = new (Database as typeof import('better-sqlite3'))(dbPath)
+      db.prepare(
+        'UPDATE plan_nodes SET summary = ?, auto_summary = 1 WHERE id = ?'
+      ).run(accumulated.trim(), node_id)
+      db.close()
+    } catch (updateError) {
+      console.error('[generate-summary] Failed to update node summary:', updateError)
     }
-
-    return res.json({
-      summary: accumulated.trim(),
-      response_id,
-      tokens_input: tokensInput,
-      tokens_output: tokensOutput,
-      tokens_total: tokensTotal,
-      cached_tokens: cachedTokens,
-      reasoning_tokens: reasoningTokens,
-      cost_usd_ticks: costUsdTicks,
-    })
-  } catch (e) {
-    return res.status(500).json({ error: String(e) })
   }
-})
 
-export default router
+  return {
+    summary: accumulated.trim(),
+    response_id,
+    tokens_input: tokensInput,
+    tokens_output: tokensOutput,
+    tokens_total: tokensTotal,
+    cached_tokens: cachedTokens,
+    reasoning_tokens: reasoningTokens,
+    cost_usd_ticks: costUsdTicks,
+  }
+}

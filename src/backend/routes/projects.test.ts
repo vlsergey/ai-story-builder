@@ -1,10 +1,8 @@
 /**
- * Integration tests for /api/project/* endpoints
+ * Integration tests for project route pure functions
  * (routes that do not require an open database)
  */
 
-import express from 'express'
-import request from 'supertest'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // Mutable app settings store shared across the module mock
@@ -23,46 +21,36 @@ vi.mock('../db/state.js', () => ({
 
 vi.mock('../lib/ai-logging.js', () => ({ setVerboseLogging: vi.fn() }))
 
-const { default: router } = await import('./projects.js')
-
-const app = express()
-app.use(express.json())
-app.use('/project', router)
+const { deleteRecentProject } = await import('./projects.js')
 
 beforeEach(() => {
   mockSettings.recent = []
   delete mockSettings.lastOpenedPath
 })
 
-// ── DELETE /project/recent ────────────────────────────────────────────────────
+// ── deleteRecentProject ────────────────────────────────────────────────────────
 
-describe('DELETE /project/recent', () => {
-  it('removes the specified path from the recent list', async () => {
+describe('deleteRecentProject', () => {
+  it('removes the specified path from the recent list', () => {
     mockSettings.recent = ['/data/a.sqlite', '/data/b.sqlite', '/data/c.sqlite']
 
-    const res = await request(app)
-      .delete('/project/recent')
-      .send({ path: '/data/b.sqlite' })
+    const res = deleteRecentProject('/data/b.sqlite')
 
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+    expect(res.ok).toBe(true)
     expect(mockSettings.recent).toEqual(['/data/a.sqlite', '/data/c.sqlite'])
   })
 
-  it('is a no-op when path is not in the recent list', async () => {
+  it('is a no-op when path is not in the recent list', () => {
     mockSettings.recent = ['/data/a.sqlite']
 
-    const res = await request(app)
-      .delete('/project/recent')
-      .send({ path: '/data/nonexistent.sqlite' })
+    const res = deleteRecentProject('/data/nonexistent.sqlite')
 
-    expect(res.status).toBe(200)
+    expect(res.ok).toBe(true)
     expect(mockSettings.recent).toEqual(['/data/a.sqlite'])
   })
 
-  it('returns 400 when path is missing', async () => {
-    const res = await request(app).delete('/project/recent').send({})
-
-    expect(res.status).toBe(400)
+  it('throws 400 when path is empty', () => {
+    expect(() => deleteRecentProject('')).toThrow()
+    try { deleteRecentProject('') } catch (e: any) { expect(e.status).toBe(400) }
   })
 })

@@ -6,6 +6,7 @@ import {
   AGE_RATING_ORDER,
   type AiEngineDefinition,
 } from '../lib/ai-engines'
+import { ipcClient } from '../ipcClient'
 import { dispatchAiEngineChanged } from '../lib/lore-events'
 import { useLocale } from '../lib/locale'
 import { useTheme } from '../lib/theme/theme-provider'
@@ -44,10 +45,10 @@ export default function SettingsPanel() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/ai/config').then(r => r.json()) as Promise<ConfigData>,
-      fetch('/api/settings/text_language').then(r => r.json()) as Promise<{ value: string | null }>,
-      fetch('/api/settings/verbose_ai_logging').then(r => r.json()) as Promise<{ value: string | null }>,
-      fetch('/api/settings/auto_generate_summary').then(r => r.json()) as Promise<{ value: string | null }>,
+      ipcClient.ai.getConfig() as unknown as Promise<ConfigData>,
+      ipcClient.settings.get('text_language'),
+      ipcClient.settings.get('verbose_ai_logging'),
+      ipcClient.settings.get('auto_generate_summary'),
     ]).then(([aiData, langData, verboseData, summaryData]) => {
         setConfig(aiData)
         setCurrentEngine(aiData.current_engine)
@@ -88,61 +89,39 @@ export default function SettingsPanel() {
 
   async function handleVerboseAiLoggingChange(enabled: boolean) {
     setVerboseAiLogging(enabled)
-    await fetch('/api/settings/verbose_ai_logging', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: String(enabled) }),
-    })
+    await ipcClient.settings.setVerboseAiLogging(String(enabled))
   }
 
   async function handleAutoGenerateSummaryChange(enabled: boolean) {
     setAutoGenerateSummary(enabled)
-    await fetch('/api/settings/auto_generate_summary', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: String(enabled) }),
-    })
+    await ipcClient.settings.set('auto_generate_summary', String(enabled))
   }
 
   async function handleTextLanguageChange(lang: string) {
     setTextLanguage(lang)
-    await fetch('/api/settings/text_language', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: lang }),
-    })
+    await ipcClient.settings.set('text_language', lang)
   }
 
   async function handleEngineSelect(engine: string | null) {
     setEngineError(null)
-    const res = await fetch('/api/ai/current-engine', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ engine }),
-    })
-    const data = await res.json() as { ok?: boolean; error?: string }
-    if (!res.ok) {
-      setEngineError(data.error ?? 'Failed to save')
-      return
+    try {
+      await ipcClient.ai.setCurrentEngine({ engine })
+      setCurrentEngine(engine)
+      dispatchAiEngineChanged()
+    } catch (e) {
+      setEngineError((e as Error).message ?? 'Failed to save')
     }
-    setCurrentEngine(engine)
-    dispatchAiEngineChanged()
   }
 
   async function saveField(engineId: string, fieldKey: string, value: string) {
-    await fetch('/api/ai/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ engine: engineId, fields: { [fieldKey]: value } }),
-    })
+    await ipcClient.ai.saveConfig({ engine: engineId, fields: { [fieldKey]: value } })
   }
 
   async function handleRefreshModels(engineId: string) {
     setRefreshingModels(prev => ({ ...prev, [engineId]: true }))
     try {
-      const res = await fetch(`/api/ai/${engineId}/models/refresh`, { method: 'POST' })
-      const data = await res.json() as { models?: string[]; error?: string }
-      if (res.ok && data.models) {
+      const data = await ipcClient.ai.refreshModels(engineId)
+      if (data.models) {
         setConfig(prev => {
           if (!prev) return prev
           return {
@@ -158,23 +137,14 @@ export default function SettingsPanel() {
 
   async function handleSummarySettingsChange(engineId: string, settings: AiSettings) {
     setSummarySettings(prev => ({ ...prev, [engineId]: settings }))
-    await fetch('/api/ai/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ engine: engineId, fields: { summary_settings: settings } }),
-    })
+    await ipcClient.ai.saveConfig({ engine: engineId, fields: { summary_settings: settings as unknown as Record<string, unknown> } })
   }
 
   async function handleTest(engine: AiEngineDefinition) {
     setTestStates(prev => ({ ...prev, [engine.id]: { loading: true } }))
     const fields = formValues[engine.id] ?? {}
     try {
-      const res = await fetch(`/api/ai/${engine.id}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fields),
-      })
-      const result = await res.json() as { ok: boolean; detail?: string; error?: string }
+      const result = await ipcClient.ai.test(engine.id, fields)
       setTestStates(prev => ({ ...prev, [engine.id]: { loading: false, result } }))
     } catch (e) {
       setTestStates(prev => ({

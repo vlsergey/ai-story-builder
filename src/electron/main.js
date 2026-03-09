@@ -232,7 +232,6 @@ function createWindow() {
 // If it was compiled for a different Node.js ABI, show a clear error
 // instead of crashing with a cryptic native-module message.
 function checkNativeDeps() {
-  if (isDev) return // dev: backend runs in system Node.js via nodemon, not here
   try {
     require('better-sqlite3')
   } catch (e) {
@@ -292,16 +291,17 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
   }
 })
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   checkNativeDeps()
   buildApplicationMenu()
 
+  const { registerIpcHandlers } = require('../../dist/backend/server')
+  registerIpcHandlers()
+
   if (isDev) {
-    // In dev, Vite and Express are started externally by the dev script.
     serverUrl = 'http://localhost:3000'
   } else {
-    const { startServer } = require('../../dist/backend/server')
-    serverUrl = await startServer()
+    serverUrl = `file://${path.join(app.getAppPath(), 'dist', 'index.html')}`
   }
   createWindow()
 })

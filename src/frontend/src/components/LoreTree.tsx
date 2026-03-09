@@ -9,6 +9,7 @@ import {
   TreeViewState,
   InteractionMode,
 } from 'react-complex-tree'
+import { ipcClient } from '../ipcClient'
 import 'react-complex-tree/lib/style-modern.css'
 import {
   ChevronRight, ChevronDown,
@@ -289,8 +290,7 @@ export default function LoreTree({
   }, [pendingRenameId, items])
 
   function fetchTree() {
-    fetch('/api/lore/tree')
-      .then(r => r.json())
+    ipcClient.lore.tree()
       .then((data: LoreNode[]) => {
         if (!Array.isArray(data)) return
         setTree(data)
@@ -347,11 +347,7 @@ export default function LoreTree({
       const newParentId = target.targetItem as number
       for (const item of droppedItems) {
         if (!item.data?.id) continue
-        await fetch(`/api/lore/${item.data.id}/move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ parent_id: newParentId }),
-        })
+        await ipcClient.lore.move(item.data.id, { parent_id: newParentId })
       }
     } else if (target.targetType === 'between-items') {
       const parentKey = target.parentItem
@@ -375,20 +371,12 @@ export default function LoreTree({
       for (const item of droppedItems) {
         if (!item.data?.id) continue
         if (item.data.parent_id !== newParentId) {
-          await fetch(`/api/lore/${item.data.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parent_id: newParentId }),
-          })
+          await ipcClient.lore.move(item.data.id, { parent_id: newParentId })
         }
       }
 
       // Reorder siblings
-      await fetch('/api/lore/reorder-children', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ child_ids: remaining }),
-      })
+      await ipcClient.lore.reorderChildren(remaining)
     }
 
     fetchTree()
@@ -401,12 +389,7 @@ export default function LoreTree({
     const [parentId] = selectedNodeIds
     const siblings = findNode(parentId, tree)?.children ?? []
     const name = uniqueName('New node', siblings.map(s => s.name))
-    const res = await fetch('/api/lore', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parent_id: parentId, name }),
-    })
-    const { id: newId } = await res.json() as { id: number }
+    const { id: newId } = await ipcClient.lore.create({ parent_id: parentId, name })
     setPendingRenameId(newId)
     fetchTree()
   }
@@ -419,18 +402,14 @@ export default function LoreTree({
 
   async function handleInlineRename(item: TreeItem<ItemData>, newName: string) {
     if (!item.data?.id || !newName.trim() || newName.trim() === item.data.name) return
-    await fetch(`/api/lore/${item.data.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim() }),
-    })
+    await ipcClient.lore.patch(item.data.id, { name: newName.trim() })
     fetchTree()
   }
 
   async function handleDuplicate() {
     if (selectedNodeIds.size !== 1) return
     const [nodeId] = selectedNodeIds
-    await fetch(`/api/lore/${nodeId}/duplicate`, { method: 'POST' })
+    await ipcClient.lore.duplicate(nodeId)
     fetchTree()
   }
 
@@ -441,10 +420,14 @@ export default function LoreTree({
     e.target.value = ''
     if (!f || selectedNodeIds.size !== 1) return
     const [parentId] = selectedNodeIds
-    const fd = new FormData()
-    fd.append('file', f)
-    fd.append('parent_id', String(parentId))
-    await fetch('/api/lore/import', { method: 'POST', body: fd })
+    // Read file content as text
+    const content = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (ev) => resolve(ev.target!.result as string)
+      reader.onerror = reject
+      reader.readAsText(f)
+    })
+    await ipcClient.lore.import({ name: f.name, content, parentId: Number(parentId) })
     fetchTree()
   }
 
@@ -464,7 +447,7 @@ export default function LoreTree({
     await Promise.all(
       [...selectedNodeIds]
         .filter(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
-        .map(id => fetch(`/api/lore/${id}/sort-children`, { method: 'POST' }))
+        .map(id => ipcClient.lore.sortChildren(id))
     )
     fetchTree()
   }
@@ -476,14 +459,14 @@ export default function LoreTree({
     })
     if (toDelete.length === 0) return
     if (!window.confirm(`Mark ${toDelete.length} node${toDelete.length > 1 ? 's' : ''} for deletion? All descendants will also be marked.`)) return
-    await Promise.all(toDelete.map(id => fetch(`/api/lore/${id}`, { method: 'DELETE' })))
+    await Promise.all(toDelete.map(id => ipcClient.lore.delete(id)))
     setViewState(prev => ({ ...prev, 'lore-tree': { ...prev['lore-tree'], selectedItems: [] } }))
     fetchTree()
   }
 
   async function handleRestore() {
     const toRestore = [...selectedNodeIds].filter(id => findNode(id, tree)?.to_be_deleted)
-    await Promise.all(toRestore.map(id => fetch(`/api/lore/${id}/restore`, { method: 'POST' })))
+    await Promise.all(toRestore.map(id => ipcClient.lore.restore(id)))
     fetchTree()
   }
 
@@ -514,10 +497,9 @@ export default function LoreTree({
     const toSync = collectSyncableIds(tree, currentAiEngine)
     setSyncingIds(toSync.size > 0 ? toSync : new Set(collectAllIds(tree).map(id => id)))
     try {
-      const res = await fetch('/api/ai/sync-lore', { method: 'POST' })
-      const data = await res.json() as { ok?: boolean; error?: string }
-      if (!res.ok || !data.ok) {
-        showError(`Sync failed: ${data.error ?? 'unknown error'}`)
+      const data = await ipcClient.ai.syncLore()
+      if (!data.ok) {
+        showError(`Sync failed: unknown error`)
       }
     } catch (e) {
       showError(`Sync error: ${String(e)}`)

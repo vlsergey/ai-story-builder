@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { StoryPart } from '../types/models'
+import { ipcClient } from '../ipcClient'
 
 export default function GeneratedPartEditor({ part }: { part: StoryPart }) {
   const [content, setContent] = useState<string>(part.content || '')
@@ -12,9 +13,7 @@ export default function GeneratedPartEditor({ part }: { part: StoryPart }) {
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch('/api/generated_parts/' + part.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
-      const j = await res.json() as { error?: string }
-      if (!res.ok) setError('Save error: ' + (j.error || JSON.stringify(j)))
+      await ipcClient.generation.updatePart(part.id, { content })
     } catch (e) { setError('Save failed: ' + (e as Error).message) }
     setSaving(false)
   }

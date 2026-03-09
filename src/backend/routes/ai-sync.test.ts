@@ -1,12 +1,10 @@
 /**
- * Integration tests for POST /api/ai/sync-lore
+ * Integration tests for syncLore()
  */
 
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import express from 'express'
-import request from 'supertest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 let testDbPath = ''
@@ -36,13 +34,9 @@ vi.mock('openai', () => ({
   toFile: mockToFile,
 }))
 
-// ─── App setup ────────────────────────────────────────────────────────────────
+// ─── Import pure function ─────────────────────────────────────────────────────
 
-const { default: router, POLL_CONFIG } = await import('./ai-sync.js')
-
-const app = express()
-app.use(express.json())
-app.use('/ai', router)
+const { syncLore, POLL_CONFIG } = await import('./ai-sync.js')
 
 // ─── DB helper ────────────────────────────────────────────────────────────────
 
@@ -148,43 +142,38 @@ afterEach(() => {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('POST /ai/sync-lore', () => {
+describe('syncLore', () => {
 
   // ─── 1. Basic validation ───────────────────────────────────────────────────
 
-  it('returns 400 when no project open', async () => {
+  it('throws 400 when no project open', async () => {
     testDbPath = ''
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('no project open')
+    await expect(syncLore()).rejects.toThrow(/no project open/)
+    try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when no AI engine is configured', async () => {
+  it('throws 400 when no AI engine is configured', async () => {
     testDbPath = setupDb()
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('no AI engine configured')
+    await expect(syncLore()).rejects.toThrow(/no AI engine configured/)
+    try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when current engine is unknown / not supported', async () => {
+  it('throws 400 when current engine is unknown / not supported', async () => {
     testDbPath = setupDb({ currentEngine: 'unknown-engine' })
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain("not supported for engine 'unknown-engine'")
+    await expect(syncLore()).rejects.toThrow(/not supported for engine 'unknown-engine'/)
+    try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when api_key is missing', async () => {
+  it('throws 400 when api_key is missing', async () => {
     testDbPath = setupDb({ folderId: 'b1g123' })
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('api_key')
+    await expect(syncLore()).rejects.toThrow(/api_key/)
+    try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('returns 400 when folder_id is missing', async () => {
+  it('throws 400 when folder_id is missing', async () => {
     testDbPath = setupDb({ apiKey: 'AQVN-test' })
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('folder_id')
+    await expect(syncLore()).rejects.toThrow(/folder_id/)
+    try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   // ─── 3. All nodes already synced and up-to-date ───────────────────────────
@@ -215,12 +204,11 @@ describe('POST /ai/sync-lore', () => {
     // Two unchanged nodes with file_ids → vector store will be created
     mockVsCreate.mockResolvedValueOnce({ id: 'vs-new', status: 'completed' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
-    expect(res.body.uploaded).toBe(0)
-    expect(res.body.deleted).toBe(0)
-    expect(res.body.unchanged).toBe(2)
+    const result = await syncLore()
+    expect(result.ok).toBe(true)
+    expect(result.uploaded).toBe(0)
+    expect(result.deleted).toBe(0)
+    expect(result.unchanged).toBe(2)
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
@@ -245,12 +233,11 @@ describe('POST /ai/sync-lore', () => {
     mockFilesCreate.mockResolvedValueOnce({ id: 'remote-file-1' })
     mockVsCreate.mockResolvedValueOnce({ id: 'idx-1', status: 'completed' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
-    expect(res.body.uploaded).toBe(1)
-    expect(res.body.deleted).toBe(0)
-    expect(res.body.search_index_id).toBe('idx-1')
+    const result = await syncLore()
+    expect(result.ok).toBe(true)
+    expect(result.uploaded).toBe(1)
+    expect(result.deleted).toBe(0)
+    expect(result.search_index_id).toBe('idx-1')
 
     // Verify DB was updated
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -297,10 +284,9 @@ describe('POST /ai/sync-lore', () => {
 
     mockVsCreate.mockResolvedValueOnce({ id: 'idx-new', status: 'completed' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.uploaded).toBe(0)
-    expect(res.body.unchanged).toBe(1)
+    const result = await syncLore()
+    expect(result.uploaded).toBe(0)
+    expect(result.unchanged).toBe(1)
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
@@ -327,9 +313,8 @@ describe('POST /ai/sync-lore', () => {
     mockFilesCreate.mockResolvedValueOnce({ id: 'new-file-id' })
     mockVsCreate.mockResolvedValueOnce({ id: 'idx-1', status: 'completed' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.uploaded).toBe(1)
+    const result = await syncLore()
+    expect(result.uploaded).toBe(1)
 
     // Verify new file_id stored
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -361,11 +346,10 @@ describe('POST /ai/sync-lore', () => {
 
     mockFilesDel.mockResolvedValueOnce({ deleted: true })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.deleted).toBe(1)
-    expect(res.body.uploaded).toBe(0)
-    expect(res.body.search_index_id).toBeNull()
+    const result = await syncLore()
+    expect(result.deleted).toBe(1)
+    expect(result.uploaded).toBe(0)
+    expect(result.search_index_id).toBeNull()
 
     // Verify delete was called with the right file ID
     expect(mockFilesDel).toHaveBeenCalledWith('del-file')
@@ -395,8 +379,7 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
+    const result = await syncLore()
     // No remote file to delete
     expect(mockFilesDel).not.toHaveBeenCalled()
 
@@ -407,6 +390,7 @@ describe('POST /ai/sync-lore', () => {
     const row = db.prepare('SELECT id FROM lore_nodes WHERE id = 31').get()
     db.close()
     expect(row).toBeUndefined()
+    void result
   })
 
   // ─── 8. Deletes remote file for emptied node (word_count=0) ──────────────
@@ -429,9 +413,8 @@ describe('POST /ai/sync-lore', () => {
 
     mockFilesDel.mockResolvedValueOnce({ deleted: true })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.deleted).toBe(1)
+    const result = await syncLore()
+    expect(result.deleted).toBe(1)
 
     // Verify ai_sync_info.yandex has no file_id (but record still exists)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -468,10 +451,9 @@ describe('POST /ai/sync-lore', () => {
     mockVsCreate.mockResolvedValueOnce({ id: 'new-idx-456', status: 'in_progress' })
     mockVsRetrieve.mockResolvedValueOnce({ id: 'new-idx-456', status: 'completed' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
-    expect(res.body.search_index_id).toBe('new-idx-456')
+    const result = await syncLore()
+    expect(result.ok).toBe(true)
+    expect(result.search_index_id).toBe('new-idx-456')
 
     // Verify delete was called on old index
     expect(mockVsDel).toHaveBeenCalledWith('old-idx')
@@ -510,10 +492,9 @@ describe('POST /ai/sync-lore', () => {
     mockFilesDel.mockResolvedValueOnce({ deleted: true })
     mockVsDel.mockResolvedValueOnce({ deleted: true })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
-    expect(res.body.search_index_id).toBeNull()
+    const result = await syncLore()
+    expect(result.ok).toBe(true)
+    expect(result.search_index_id).toBeNull()
 
     // VectorStore create should NOT have been called
     expect(mockVsCreate).not.toHaveBeenCalled()
@@ -552,10 +533,9 @@ describe('POST /ai/sync-lore', () => {
       return { id: 'vs-result', status: 'completed' }
     })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.uploaded).toBe(2)
-    expect(res.body.search_index_id).toBe('vs-result')
+    const result = await syncLore()
+    expect(result.uploaded).toBe(2)
+    expect(result.search_index_id).toBe('vs-result')
 
     // Both file uploads must precede the vector store creation
     expect(callOrder).toEqual(['files.create:1', 'files.create:2', 'vectorStores.create'])
@@ -568,16 +548,15 @@ describe('POST /ai/sync-lore', () => {
 
   // ─── 12. Grok: returns 400 when api_key is missing ────────────────────────
 
-  it('returns 400 for Grok when api_key is missing', async () => {
+  it('throws 400 for Grok when api_key is missing', async () => {
     testDbPath = setupDb({ currentEngine: 'grok' })
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('api_key')
+    await expect(syncLore()).rejects.toThrow(/api_key/)
+    try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  // ─── 13. 500 if file upload fails ─────────────────────────────────────────
+  // ─── 13. throws when file upload fails ────────────────────────────────────
 
-  it('returns 500 when file upload fails', async () => {
+  it('throws when file upload fails', async () => {
     testDbPath = setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
@@ -595,14 +574,12 @@ describe('POST /ai/sync-lore', () => {
 
     mockFilesCreate.mockRejectedValueOnce(Object.assign(new Error('HTTP 500 Internal Server Error'), { status: 500 }))
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(500)
-    expect(res.body.error).toContain('Upload failed')
+    await expect(syncLore()).rejects.toThrow(/Upload failed/)
   })
 
-  // ─── 14. 500 if VectorStore polling times out ─────────────────────────────
+  // ─── 14. throws when VectorStore polling times out ────────────────────────
 
-  it('returns 500 when VectorStore polling exceeds timeout', async () => {
+  it('throws when VectorStore polling exceeds timeout', async () => {
     testDbPath = setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
@@ -628,13 +605,12 @@ describe('POST /ai/sync-lore', () => {
     // Always return in_progress → triggers timeout
     mockVsRetrieve.mockResolvedValue({ id: 'vs-timeout', status: 'in_progress' })
 
-    const res = await request(app).post('/ai/sync-lore')
-
-    POLL_CONFIG.intervalMs = origIntervalMs
-    POLL_CONFIG.timeoutMs = origTimeoutMs
-
-    expect(res.status).toBe(500)
-    expect(res.body.error).toContain('timed out')
+    try {
+      await expect(syncLore()).rejects.toThrow(/timed out/)
+    } finally {
+      POLL_CONFIG.intervalMs = origIntervalMs
+      POLL_CONFIG.timeoutMs = origTimeoutMs
+    }
   })
 
   // ─── Grok sync (collapsed tree) ──────────────────────────────────────────
@@ -657,8 +633,7 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
+    await syncLore()
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
@@ -681,13 +656,12 @@ describe('POST /ai/sync-lore', () => {
 
     mockFilesCreate.mockResolvedValueOnce({ id: 'grok-file-1' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
-    expect(res.body.uploaded).toBe(1)
-    expect(res.body.deleted).toBe(0)
-    expect(res.body.unchanged).toBe(0)
-    expect(res.body.search_index_id).toBeNull()
+    const result = await syncLore()
+    expect(result.ok).toBe(true)
+    expect(result.uploaded).toBe(1)
+    expect(result.deleted).toBe(0)
+    expect(result.unchanged).toBe(0)
+    expect(result.search_index_id).toBeNull()
 
     // Level-2 node gets file_id; level-3 node gets merged_into_parent
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -720,10 +694,9 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.uploaded).toBe(0)
-    expect(res.body.unchanged).toBe(1)
+    const result = await syncLore()
+    expect(result.uploaded).toBe(0)
+    expect(result.unchanged).toBe(1)
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
@@ -747,9 +720,8 @@ describe('POST /ai/sync-lore', () => {
 
     mockFilesCreate.mockResolvedValueOnce({ id: 'new-grok-file' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.uploaded).toBe(1)
+    const result = await syncLore()
+    expect(result.uploaded).toBe(1)
 
     // Grok does not support file deletion — old file is left as-is
     expect(mockFilesDel).not.toHaveBeenCalled()
@@ -781,9 +753,8 @@ describe('POST /ai/sync-lore', () => {
 
     mockFilesCreate.mockResolvedValueOnce({ id: 'updated-grok-file' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.uploaded).toBe(1)
+    const result = await syncLore()
+    expect(result.uploaded).toBe(1)
     expect(mockFilesCreate).toHaveBeenCalledOnce()
     expect(mockFilesDel).not.toHaveBeenCalled()
   })
@@ -801,15 +772,14 @@ describe('POST /ai/sync-lore', () => {
       ],
     })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
-    expect(res.body.deleted).toBe(1)
-    expect(res.body.uploaded).toBe(0)
+    const result = await syncLore()
+    expect(result.deleted).toBe(1)
+    expect(result.uploaded).toBe(0)
     expect(mockFilesDel).not.toHaveBeenCalled()
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
-  it('Grok: returns 400 when too many top-level categories', async () => {
+  it('Grok: throws 400 when too many top-level categories', async () => {
     // 11 level-2 nodes (> maxFilesPerRequest=10)
     const nodes: Array<{ id: number; parent_id: number | null; name: string; content: string | null; word_count: number }> = [
       { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
@@ -819,9 +789,8 @@ describe('POST /ai/sync-lore', () => {
     }
     testDbPath = setupDb({ grokApiKey: 'xai-key', nodes })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('Too many top-level lore categories')
+    await expect(syncLore()).rejects.toThrow(/Too many top-level lore categories/)
+    try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
@@ -838,8 +807,7 @@ describe('POST /ai/sync-lore', () => {
 
     mockFilesCreate.mockResolvedValueOnce({ id: 'grok-deep' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
+    await syncLore()
 
     expect(mockToFile).toHaveBeenCalledOnce()
     const [buf, filename] = mockToFile.mock.calls[0] as unknown as [Buffer, string, unknown]
@@ -871,8 +839,7 @@ describe('POST /ai/sync-lore', () => {
     mockFilesRetrieve.mockRejectedValueOnce(Object.assign(new Error('HTTP 404'), { status: 404 }))
     mockVsCreate.mockResolvedValueOnce({ id: 'vs-1', status: 'completed' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(200)
+    await syncLore()
     expect(mockFilesRetrieve).toHaveBeenCalledWith('old-405-file')
   })
 
@@ -891,8 +858,6 @@ describe('POST /ai/sync-lore', () => {
     // retrieve succeeds → file still present
     mockFilesRetrieve.mockResolvedValueOnce({ id: 'still-there' })
 
-    const res = await request(app).post('/ai/sync-lore')
-    expect(res.status).toBe(500)
-    expect(res.body.error).toContain('405')
+    await expect(syncLore()).rejects.toThrow(/405/)
   })
 })

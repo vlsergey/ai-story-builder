@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import express from 'express'
-import request from 'supertest'
 import Database from 'better-sqlite3'
 import os from 'os'
 import path from 'path'
 import fs from 'fs'
 import { setCurrentDbPath } from '../db/state.js'
-import plansRouter from './plans.js'
+import { patchPlanNode, getPlanNode, deletePlanNode } from './plans.js'
 
 // ── In-memory DB setup ────────────────────────────────────────────────────────
 
@@ -51,18 +49,9 @@ function setupDb(dbPath: string) {
   db.close()
 }
 
-// ── App factory ───────────────────────────────────────────────────────────────
-
-function makeApp() {
-  const app = express()
-  app.use(express.json())
-  app.use('/plan', plansRouter)
-  return app
-}
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('PATCH /plan/nodes/:id', () => {
+describe('patchPlanNode', () => {
   let dbPath: string
 
   beforeEach(() => {
@@ -76,77 +65,59 @@ describe('PATCH /plan/nodes/:id', () => {
     try { fs.unlinkSync(dbPath) } catch (_) {}
   })
 
-  it('updates title', async () => {
-    const app = makeApp()
-    const res = await request(app)
-      .patch('/plan/nodes/2')
-      .send({ title: 'Updated Title' })
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+  it('updates title', () => {
+    const res = patchPlanNode(2, { title: 'Updated Title' })
+    expect(res.ok).toBe(true)
 
-    const check = await request(app).get('/plan/nodes/2')
-    expect(check.body.title).toBe('Updated Title')
+    const node = getPlanNode(2)
+    expect(node.title).toBe('Updated Title')
   })
 
-  it('updates content and returns counts', async () => {
-    const app = makeApp()
-    const res = await request(app)
-      .patch('/plan/nodes/2')
-      .send({ content: 'Hello world' })
-    expect(res.status).toBe(200)
-    expect(res.body.word_count).toBe(2)
-    expect(res.body.char_count).toBe(11)
+  it('updates content and returns counts', () => {
+    const res = patchPlanNode(2, { content: 'Hello world' })
+    expect(res.ok).toBe(true)
+    expect(res.word_count).toBe(2)
+    expect(res.char_count).toBe(11)
   })
 
-  it('start_review sets changes_status and captures review_base_content', async () => {
-    const app = makeApp()
-    // First set some content
-    await request(app).patch('/plan/nodes/2').send({ content: 'Original content' })
-    // Now start review
-    const res = await request(app).patch('/plan/nodes/2').send({
-      content: 'Improved content',
-      start_review: true,
-      prompt: 'Make it better',
-    })
-    expect(res.status).toBe(200)
+  it('start_review sets changes_status and captures review_base_content', () => {
+    patchPlanNode(2, { content: 'Original content' })
+    patchPlanNode(2, { content: 'Improved content', start_review: true, prompt: 'Make it better' })
 
-    const check = await request(app).get('/plan/nodes/2')
-    expect(check.body.changes_status).toBe('review')
-    expect(check.body.review_base_content).toBe('Original content')
-    expect(check.body.last_improve_instruction).toBe('Make it better')
+    const node = getPlanNode(2)
+    expect(node.changes_status).toBe('review')
+    expect(node.review_base_content).toBe('Original content')
+    expect(node.last_improve_instruction).toBe('Make it better')
   })
 
-  it('start_review on repeat does not overwrite review_base_content', async () => {
-    const app = makeApp()
-    await request(app).patch('/plan/nodes/2').send({ content: 'Base' })
-    await request(app).patch('/plan/nodes/2').send({ content: 'First improve', start_review: true, prompt: 'first' })
-    await request(app).patch('/plan/nodes/2').send({ content: 'Second improve', start_review: true, prompt: 'second' })
+  it('start_review on repeat does not overwrite review_base_content', () => {
+    patchPlanNode(2, { content: 'Base' })
+    patchPlanNode(2, { content: 'First improve', start_review: true, prompt: 'first' })
+    patchPlanNode(2, { content: 'Second improve', start_review: true, prompt: 'second' })
 
-    const check = await request(app).get('/plan/nodes/2')
-    expect(check.body.review_base_content).toBe('Base')
-    expect(check.body.last_improve_instruction).toBe('second')
+    const node = getPlanNode(2)
+    expect(node.review_base_content).toBe('Base')
+    expect(node.last_improve_instruction).toBe('second')
   })
 
-  it('accept_review clears review state', async () => {
-    const app = makeApp()
-    await request(app).patch('/plan/nodes/2').send({ content: 'Base' })
-    await request(app).patch('/plan/nodes/2').send({ content: 'Improved', start_review: true, prompt: 'fix it' })
-    await request(app).patch('/plan/nodes/2').send({ content: 'Improved', accept_review: true })
+  it('accept_review clears review state', () => {
+    patchPlanNode(2, { content: 'Base' })
+    patchPlanNode(2, { content: 'Improved', start_review: true, prompt: 'fix it' })
+    patchPlanNode(2, { content: 'Improved', accept_review: true })
 
-    const check = await request(app).get('/plan/nodes/2')
-    expect(check.body.changes_status).toBeNull()
-    expect(check.body.review_base_content).toBeNull()
-    expect(check.body.last_improve_instruction).toBeNull()
+    const node = getPlanNode(2)
+    expect(node.changes_status).toBeNull()
+    expect(node.review_base_content).toBeNull()
+    expect(node.last_improve_instruction).toBeNull()
   })
 
-  it('returns 400 when no fields provided', async () => {
-    const app = makeApp()
-    const res = await request(app).patch('/plan/nodes/2').send({})
-    expect(res.status).toBe(400)
+  it('throws 400 when no fields provided', () => {
+    expect(() => patchPlanNode(2, {})).toThrow()
+    try { patchPlanNode(2, {}) } catch (e: any) { expect(e.status).toBe(400) }
   })
 })
 
-describe('DELETE /plan/nodes/:id', () => {
+describe('deletePlanNode', () => {
   let dbPath: string
 
   beforeEach(() => {
@@ -160,19 +131,16 @@ describe('DELETE /plan/nodes/:id', () => {
     try { fs.unlinkSync(dbPath) } catch (_) {}
   })
 
-  it('deletes a child node', async () => {
-    const app = makeApp()
-    const res = await request(app).delete('/plan/nodes/2')
-    expect(res.status).toBe(200)
-    expect(res.body.ok).toBe(true)
+  it('deletes a child node', () => {
+    const res = deletePlanNode(2)
+    expect(res.ok).toBe(true)
 
-    const check = await request(app).get('/plan/nodes/2')
-    expect(check.status).toBe(404)
+    expect(() => getPlanNode(2)).toThrow()
+    try { getPlanNode(2) } catch (e: any) { expect(e.status).toBe(404) }
   })
 
-  it('refuses to delete root node', async () => {
-    const app = makeApp()
-    const res = await request(app).delete('/plan/nodes/1')
-    expect(res.status).toBe(403)
+  it('refuses to delete root node', () => {
+    expect(() => deletePlanNode(1)).toThrow()
+    try { deletePlanNode(1) } catch (e: any) { expect(e.status).toBe(403) }
   })
 })

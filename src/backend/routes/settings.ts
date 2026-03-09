@@ -1,4 +1,3 @@
-import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 import { setVerboseLogging } from '../lib/ai-logging.js'
 
@@ -10,117 +9,79 @@ try {
   Database = null
 }
 
-const router: Router = express.Router()
+// ── Error helper ──────────────────────────────────────────────────────────────
 
-// GET /settings/layout  — must be declared BEFORE /:key to avoid Express treating
-// 'layout' as the key parameter value.
-router.get('/layout', (_req: Request, res: Response) => {
+function makeError(message: string, status: number): Error {
+  const e = new Error(message)
+  ;(e as any).status = status
+  return e
+}
+
+// ── Exports ───────────────────────────────────────────────────────────────────
+
+export function getLayout(): unknown {
   const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    res.set('Cache-Control', 'no-store')
-    res.removeHeader('ETag')
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath, { readonly: true })
+  const row = db
+    .prepare("SELECT value FROM settings WHERE key = 'layout'")
+    .get() as { value: string } | undefined
+  db.close()
 
-    const db = new Database(dbPath, { readonly: true })
-    const row = db
-      .prepare("SELECT value FROM settings WHERE key = 'layout'")
-      .get() as { value: string } | undefined
-    db.close()
-
-    let layout: unknown = null
-    if (row) {
-      try {
-        layout = JSON.parse(row.value)
-      } catch (_) {
-        console.error('[Layout GET] failed to parse layout JSON')
-        layout = null
-      }
+  let layout: unknown = null
+  if (row) {
+    try {
+      layout = JSON.parse(row.value)
+    } catch (_) {
+      console.error('[Layout GET] failed to parse layout JSON')
+      layout = null
     }
-    res.json(layout)
-  } catch (e) {
-    console.error('[Layout GET] error:', (e as Error).message)
-    res.status(500).json({ error: String(e) })
   }
-})
+  return layout
+}
 
-// POST /settings/layout  — must be declared BEFORE /:key for the same reason.
-router.post('/layout', express.json(), (req: Request, res: Response) => {
-  const { layout } = req.body as { layout?: unknown }
+export function saveLayout(layout: unknown): { ok: boolean } {
   const dbPath = getCurrentDbPath()
-  if (!dbPath || !layout) {
-    return res.status(400).json({ error: 'layout required, db must be open' })
-  }
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const serialised = JSON.stringify(layout)
-    const db = new Database(dbPath)
-    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('layout', ?)").run(serialised)
-    db.close()
-    res.json({ ok: true })
-  } catch (e) {
-    console.error('[Layout POST] error:', (e as Error).message)
-    res.status(500).json({ error: String(e) })
-  }
-})
+  if (!dbPath || !layout) throw makeError('layout required, db must be open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const serialised = JSON.stringify(layout)
+  const db = new Database(dbPath)
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('layout', ?)").run(serialised)
+  db.close()
+  return { ok: true }
+}
 
-// POST /settings/verbose_ai_logging — save to DB and apply to the running process immediately.
-// Must be declared before /:key to avoid Express treating the literal string as the key param.
-router.post('/verbose_ai_logging', express.json(), (req: Request, res: Response) => {
-  const { value } = req.body as { value?: unknown }
+export function setVerboseAiLogging(value: unknown): { ok: boolean } {
   const dbPath = getCurrentDbPath()
-  if (!dbPath || value === undefined) {
-    return res.status(400).json({ error: 'value required, db must be open' })
-  }
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const strValue = String(value)
-    const db = new Database(dbPath)
-    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('verbose_ai_logging', ?)").run(strValue)
-    db.close()
-    setVerboseLogging(strValue === 'true')
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
+  if (!dbPath || value === undefined) throw makeError('value required, db must be open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const strValue = String(value)
+  const db = new Database(dbPath)
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('verbose_ai_logging', ?)").run(strValue)
+  db.close()
+  setVerboseLogging(strValue === 'true')
+  return { ok: true }
+}
 
-// GET /settings/:key
-router.get('/:key', (req: Request, res: Response) => {
+export function getSetting(key: string): { value: string | null } {
   const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath, { readonly: true })
-    const row = db
-      .prepare('SELECT value FROM settings WHERE key = ?')
-      .get(req.params.key) as { value: string } | undefined
-    db.close()
-    res.json({ value: row ? row.value : null })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath, { readonly: true })
+  const row = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get(key) as { value: string } | undefined
+  db.close()
+  return { value: row ? row.value : null }
+}
 
-// POST /settings/:key
-router.post('/:key', express.json(), (req: Request, res: Response) => {
-  const { value } = req.body as { value?: unknown }
+export function setSetting(key: string, value: unknown): { ok: boolean } {
   const dbPath = getCurrentDbPath()
-  if (!dbPath || value === undefined) {
-    return res.status(400).json({ error: 'value required, db must be open' })
-  }
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
-  try {
-    const db = new Database(dbPath)
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
-      req.params.key,
-      String(value),
-    )
-    db.close()
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ error: String(e) })
-  }
-})
-
-export default router
+  if (!dbPath || value === undefined) throw makeError('value required, db must be open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath)
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, String(value))
+  db.close()
+  return { ok: true }
+}

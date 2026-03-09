@@ -56,19 +56,17 @@ describe('Layout', () => {
       onMenuAction: vi.fn((cb) => { menuActionHandler = cb; return vi.fn() }),
       sendMenuState: vi.fn(),
       showErrorDialog: vi.fn(),
+      invoke: vi.fn().mockImplementation((channel: string) => {
+        if (channel === 'settings:layout:get') return Promise.resolve(null)
+        if (channel === 'settings:layout:save') return Promise.resolve({ ok: true })
+        if (channel === 'settings:get') return Promise.resolve({ value: null })
+        if (channel === 'lore:create') return Promise.resolve({ id: 99 })
+        return Promise.resolve({})
+      }),
+      startStream: vi.fn().mockResolvedValue({ ok: true }),
+      abortStream: vi.fn().mockResolvedValue({ ok: true }),
+      onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
     }
-
-    vi.stubGlobal('fetch', (url: unknown, opts?: unknown) => {
-      if (opts && (opts as RequestInit).method === 'POST') {
-        // POST /api/lore returns a new node id for the wizard flow
-        if (typeof url === 'string' && url.includes('/api/lore')) {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99 }) } as Response)
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
-      }
-      // null → restoreLayout falls through to setupDefaultLayout
-      return Promise.resolve({ json: () => Promise.resolve(null) } as Response);
-    });
   });
 
   afterEach(() => {
@@ -80,14 +78,9 @@ describe('Layout', () => {
     expect(() => render(<Layout {...mockProps} />)).not.toThrow();
   });
 
-  it('includes cache-control on layout fetch', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ json: () => Promise.resolve(null) } as unknown as Response);
+  it('loads layout via IPC on mount', async () => {
     render(<Layout {...mockProps} />);
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('/api/settings/layout'),
-      expect.objectContaining({ cache: 'no-store' })
-    );
+    await waitFor(() => expect(window.electronAPI!.invoke).toHaveBeenCalledWith('settings:layout:get'));
   });
 
   it('default layout: lore, plan-graph and cards panels render', async () => {
@@ -188,8 +181,7 @@ describe('Layout', () => {
     })
   })
 
-  it('saves layout to database when reset-layouts IPC action fires', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch');
+  it('saves layout via IPC when reset-layouts IPC action fires', async () => {
     render(<Layout {...mockProps} />);
 
     // Wait for panels to render and handler to be registered
@@ -200,9 +192,9 @@ describe('Layout', () => {
     act(() => { menuActionHandler!('reset-layouts') });
 
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/settings/layout',
-        expect.objectContaining({ method: 'POST' })
+      expect(window.electronAPI!.invoke).toHaveBeenCalledWith(
+        'settings:layout:save',
+        expect.anything()
       );
     });
   });

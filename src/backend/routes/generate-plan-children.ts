@@ -1,4 +1,3 @@
-import express, { Request, Response, Router } from 'express'
 import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiSettings } from '../../shared/ai-settings.js'
@@ -11,6 +10,14 @@ try {
   Database = require('better-sqlite3')
 } catch (_) {
   Database = null
+}
+
+// ── Error helper ──────────────────────────────────────────────────────────────
+
+function makeError(message: string, status: number): Error {
+  const e = new Error(message)
+  ;(e as any).status = status
+  return e
 }
 
 /**
@@ -28,23 +35,26 @@ function parseMarkdownOutline(text: string): { overview: string; items: Array<{ 
   return { overview, items }
 }
 
-const router: Router = express.Router()
-
-// POST /generate-plan-children
-router.post('/generate-plan-children', express.json(), async (req: Request, res: Response) => {
+export async function generatePlanChildren(
+  params: { prompt?: string; parentTitle?: string; parentContent?: string; isRoot?: boolean; settings?: AiSettings },
+  onThinking: (status: string, detail?: string) => void,
+  onPartialJson: (data: Record<string, unknown>) => void,
+): Promise<{
+  response_id?: string
+  cost_usd_ticks?: number
+  tokens_input?: number
+  tokens_output?: number
+  tokens_total?: number
+  cached_tokens?: number
+  reasoning_tokens?: number
+}> {
   const dbPath = getCurrentDbPath()
-  if (!dbPath) return res.status(400).json({ error: 'no project open' })
-  if (!Database) return res.status(500).json({ error: 'SQLite lib missing' })
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
 
-  const { prompt, parentTitle, parentContent, isRoot, settings = {} } = req.body as {
-    prompt?: string
-    parentTitle?: string
-    parentContent?: string
-    isRoot?: boolean
-    settings?: AiSettings
-  }
+  const { prompt, parentTitle, parentContent, isRoot, settings = {} } = params
   const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
-  if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
+  if (!prompt?.trim()) throw makeError('prompt is required', 400)
 
   let engine: string | undefined
   let config: AiConfigStore = {}
@@ -58,7 +68,7 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
     const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
 
     engine = engineRow?.value
-    if (!engine) { db.close(); return res.status(400).json({ error: 'no AI engine configured' }) }
+    if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
     if (configRow) {
       try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
     }
@@ -77,17 +87,18 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
       }
     }
 
-    if (!textLanguage) { db.close(); return res.status(400).json({ error: 'text_language is not configured' }) }
+    if (!textLanguage) { db.close(); throw makeError('text_language is not configured', 400) }
     db.close()
-  } catch (e) {
-    return res.status(500).json({ error: 'failed to read project settings: ' + String(e) })
+  } catch (e: any) {
+    if (e.status) throw e
+    throw makeError('failed to read project settings: ' + String(e), 500)
   }
 
   const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
-  if (!engineDef) return res.status(400).json({ error: `Plan generation is not supported for engine '${engine}'` })
+  if (!engineDef) throw makeError(`Plan generation is not supported for engine '${engine}'`, 400)
 
-  const adapter = getEngineAdapter(engine)
-  if (!adapter) return res.status(400).json({ error: `Plan generation is not supported for engine '${engine}'` })
+  const adapter = getEngineAdapter(engine!)
+  if (!adapter) throw makeError(`Plan generation is not supported for engine '${engine}'`, 400)
 
   const sectionTitle = parentTitle?.trim() || 'Untitled'
   const parentContext = parentContent?.trim()
@@ -108,13 +119,6 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
       `No explanations, no preamble — respond in Markdown only.` +
       parentContext
 
-  res.setHeader('Content-Type', 'text/event-stream')
-  res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('X-Accel-Buffering', 'no')
-
-  const sse = (event: string, data: unknown) =>
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-
   let accumulated = ''
   let lastEmittedJson = ''
   const onDelta = (chunk: string) => {
@@ -123,42 +127,42 @@ router.post('/generate-plan-children', express.json(), async (req: Request, res:
     const json = JSON.stringify(parsed)
     if (json === lastEmittedJson) return
     lastEmittedJson = json
-    sse('partial_json', parsed)
+    onPartialJson(parsed as unknown as Record<string, unknown>)
   }
 
-  try {
-    const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
-      {
-        prompt: prompt.trim(),
-        systemPrompt,
-        model: requestedModel?.trim() ?? '',
-        includeExistingLore: includeExistingLore ?? false,
-        webSearch: webSearch ?? 'none',
-        engineFileIds,
-        engineDef,
-        config,
-        maxTokens: maxTokens ?? undefined,
-        maxCompletionTokens: maxCompletionTokens ?? undefined,
-      },
-      (status, detail) => sse('thinking', detail ? { status, detail } : { status }),
-      onDelta,
-    )
-    const donePayload: Record<string, unknown> = {}
-    if (response_id) donePayload.response_id = response_id
-    if (costUsdTicks != null) donePayload.cost_usd_ticks = costUsdTicks
-    if (tokensInput != null) donePayload.tokens_input = tokensInput
-    if (tokensOutput != null) donePayload.tokens_output = tokensOutput
-    if (tokensTotal != null) donePayload.tokens_total = tokensTotal
-    if (cachedTokens != null) donePayload.cached_tokens = cachedTokens
-    if (reasoningTokens != null) donePayload.reasoning_tokens = reasoningTokens
-    sse('done', donePayload)
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    const stack = e instanceof Error ? e.stack : undefined
-    console.error('[generate-plan-children] error:', stack ?? message)
-    sse('error', { message, stack })
-  }
-  res.end()
-})
+  const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
+    {
+      prompt: prompt!.trim(),
+      systemPrompt,
+      model: requestedModel?.trim() ?? '',
+      includeExistingLore: includeExistingLore ?? false,
+      webSearch: webSearch ?? 'none',
+      engineFileIds,
+      engineDef,
+      config,
+      maxTokens: maxTokens ?? undefined,
+      maxCompletionTokens: maxCompletionTokens ?? undefined,
+    },
+    (status, detail) => onThinking(status, detail),
+    onDelta,
+  )
 
-export default router
+  const donePayload: Record<string, unknown> = {}
+  if (response_id) donePayload.response_id = response_id
+  if (costUsdTicks != null) donePayload.cost_usd_ticks = costUsdTicks
+  if (tokensInput != null) donePayload.tokens_input = tokensInput
+  if (tokensOutput != null) donePayload.tokens_output = tokensOutput
+  if (tokensTotal != null) donePayload.tokens_total = tokensTotal
+  if (cachedTokens != null) donePayload.cached_tokens = cachedTokens
+  if (reasoningTokens != null) donePayload.reasoning_tokens = reasoningTokens
+
+  return donePayload as {
+    response_id?: string
+    cost_usd_ticks?: number
+    tokens_input?: number
+    tokens_output?: number
+    tokens_total?: number
+    cached_tokens?: number
+    reasoning_tokens?: number
+  }
+}

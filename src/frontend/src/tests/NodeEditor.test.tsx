@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import NodeEditor, { type NodeEditorAdapter } from '../components/NodeEditor'
 import * as streamModule from '../lib/generate-node-stream'
 import { PLAN_GRAPH_REFRESH_EVENT } from '../lib/plan-graph-events'
@@ -40,25 +40,6 @@ vi.mock('../components/DiffViewAndAccept', () => ({
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeAdapter(overrides: Partial<NodeEditorAdapter> = {}): NodeEditorAdapter {
-  return {
-    apiBase: '/api/lore',
-    primaryField: 'name',
-    i18nPrefix: 'lore',
-    generateEndpoint: '/api/ai/generate-lore',
-    onSaved: vi.fn(),
-    ...overrides,
-  }
-}
-
-/** Returns a fetch mock: first call is GET node, subsequent calls are PATCH responses. */
-function makeFetchMock(nodeData: Record<string, unknown>, patchResponse = { ok: true, word_count: 3, char_count: 10, byte_count: 10 }) {
-  return vi.fn()
-    .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(nodeData) }) // GET /api/ai/config
-    .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current_engine: null }) }) // GET /api/ai/config
-    .mockResolvedValue({ ok: true, json: () => Promise.resolve(patchResponse) }) // PATCH calls
-}
-
 const emptyNode = {
   name: 'Test Node',
   content: '',
@@ -79,16 +60,47 @@ const nodeWithContent = {
   system_prompt: null,
 }
 
+function makeAdapter(nodeData: Record<string, unknown> = emptyNode, overrides: Partial<NodeEditorAdapter> = {}): NodeEditorAdapter {
+  return {
+    getNode: vi.fn().mockResolvedValue(nodeData),
+    patchNode: vi.fn().mockResolvedValue({ ok: true, word_count: 3, char_count: 10, byte_count: 10 }),
+    primaryField: 'name',
+    i18nPrefix: 'lore',
+    generateEndpoint: '/api/ai/generate-lore',
+    onSaved: vi.fn(),
+    ...overrides,
+  }
+}
+
+function setupElectronAPI(invokeImpl?: (channel: string, ...args: unknown[]) => unknown) {
+  window.electronAPI = {
+    onMenuAction: vi.fn().mockReturnValue(vi.fn()),
+    sendMenuState: vi.fn(),
+    showErrorDialog: vi.fn(),
+    invoke: vi.fn().mockImplementation(invokeImpl ?? ((channel: string) => {
+      if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
+      if (channel === 'settings:get') return Promise.resolve({ value: null })
+      return Promise.resolve({})
+    })),
+    startStream: vi.fn().mockResolvedValue({ ok: true }),
+    abortStream: vi.fn().mockResolvedValue({ ok: true }),
+    onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
+  }
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('NodeEditor — generate mode behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setupElectronAPI()
+  })
+
+  afterEach(() => {
+    delete (window as any).electronAPI
   })
 
   it('stays in generate mode after generation completes (does not switch to edit)', async () => {
-    vi.stubGlobal('fetch', makeFetchMock(emptyNode))
-
     const generateNodeStream = vi.mocked(streamModule.generateNodeStream)
     generateNodeStream.mockImplementation(async (_endpoint, options) => {
       options.onPartialJson?.({ name: 'Generated Name', content: 'Generated content' })
@@ -113,8 +125,6 @@ describe('NodeEditor — generate mode behavior', () => {
   })
 
   it('preserves existing content until first streaming token arrives', async () => {
-    vi.stubGlobal('fetch', makeFetchMock(nodeWithContent))
-
     let triggerPartial: (data: Record<string, unknown>) => void = () => {}
     let resolveStream: () => void = () => {}
 
@@ -124,7 +134,7 @@ describe('NodeEditor — generate mode behavior', () => {
       return new Promise<void>(resolve => { resolveStream = resolve })
     })
 
-    render(<NodeEditor nodeId={1} adapter={makeAdapter()} />)
+    render(<NodeEditor nodeId={1} adapter={makeAdapter(nodeWithContent)} />)
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
 
     // Node has content; confirm dialog not needed — simulate already loaded with content
@@ -162,8 +172,6 @@ describe('NodeEditor — generate mode behavior', () => {
   })
 
   it('replaces content progressively as tokens arrive (not appending)', async () => {
-    vi.stubGlobal('fetch', makeFetchMock(emptyNode))
-
     const partialCalls: Array<(data: Record<string, unknown>) => void> = []
     let resolveStream: () => void = () => {}
 
@@ -203,30 +211,31 @@ describe('NodeEditor — auto‑summary generation', () => {
     vi.clearAllMocks()
   })
 
-  it('triggers summary generation when plan node content changes and editor closes', async () => {
-    // Mock fetch to return node data, AI config, and settings
-    const fetchMock = vi.fn()
-      // GET node
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({
-        name: 'Plan Node',
-        content: 'initial content',
-        changes_status: null,
-        review_base_content: null,
-        last_improve_instruction: null,
-        user_prompt: null,
-        system_prompt: null,
-      })})
-      // GET /api/ai/config
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current_engine: null })})
-      // GET /api/settings/auto_generate_summary
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: 'true' })})
-      // PATCH content (autosave) – we'll simulate a change
-      .mockResolvedValue({ ok: true, json: () => Promise.resolve({ word_count: 5, char_count: 20, byte_count: 20 })})
-    vi.stubGlobal('fetch', fetchMock)
+  afterEach(() => {
+    delete (window as any).electronAPI
+  })
 
-    const planAdapter = makeAdapter({
+  it('triggers summary generation when plan node content changes and editor closes', async () => {
+    setupElectronAPI((channel: string, ...args: unknown[]) => {
+      if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
+      if (channel === 'settings:get' && args[0] === 'auto_generate_summary') return Promise.resolve({ value: 'true' })
+      if (channel === 'settings:get') return Promise.resolve({ value: null })
+      if (channel === 'ai:generate-summary') return Promise.resolve({ summary: 'generated summary' })
+      return Promise.resolve({})
+    })
+
+    const planNodeData = {
+      name: 'Plan Node',
+      content: 'initial content',
+      changes_status: null,
+      review_base_content: null,
+      last_improve_instruction: null,
+      user_prompt: null,
+      system_prompt: null,
+    }
+
+    const planAdapter = makeAdapter(planNodeData, {
       i18nPrefix: 'plan',
-      apiBase: '/api/plan/nodes',
       generateEndpoint: '/api/ai/generate-plan',
       supportsAutoSummary: true,
     })
@@ -241,14 +250,10 @@ describe('NodeEditor — auto‑summary generation', () => {
     // Unmount component (simulate editor close) – this should trigger the cleanup effect
     unmount()
 
-    // Expect a POST to /api/ai/generate-summary
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/ai/generate-summary',
-      expect.objectContaining({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ node_id: 42, content: 'updated content' }),
-      })
+    // Expect invoke to have been called with 'ai:generate-summary'
+    expect(window.electronAPI!.invoke).toHaveBeenCalledWith(
+      'ai:generate-summary',
+      { node_id: 42, content: 'updated content' }
     )
 
     // Expect dispatchPlanGraphRefresh to have been called (after a setTimeout of 2000 ms)
@@ -256,22 +261,24 @@ describe('NodeEditor — auto‑summary generation', () => {
   })
 
   it('does NOT trigger summary generation when setting is disabled', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({
-        name: 'Plan Node',
-        content: 'initial',
-        changes_status: null,
-        review_base_content: null,
-        last_improve_instruction: null,
-        user_prompt: null,
-        system_prompt: null,
-      })})
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current_engine: null })})
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: 'false' })})
-      .mockResolvedValue({ ok: true, json: () => Promise.resolve({ word_count: 1, char_count: 10, byte_count: 10 })})
-    vi.stubGlobal('fetch', fetchMock)
+    setupElectronAPI((channel: string, ...args: unknown[]) => {
+      if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
+      if (channel === 'settings:get' && args[0] === 'auto_generate_summary') return Promise.resolve({ value: 'false' })
+      if (channel === 'settings:get') return Promise.resolve({ value: null })
+      return Promise.resolve({})
+    })
 
-    const planAdapter = makeAdapter({ i18nPrefix: 'plan', apiBase: '/api/plan/nodes', supportsAutoSummary: true })
+    const planNodeData = {
+      name: 'Plan Node',
+      content: 'initial',
+      changes_status: null,
+      review_base_content: null,
+      last_improve_instruction: null,
+      user_prompt: null,
+      system_prompt: null,
+    }
+
+    const planAdapter = makeAdapter(planNodeData, { i18nPrefix: 'plan', supportsAutoSummary: true })
     const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
     await screen.findByTestId('codemirror', {}, { timeout: 5000 })
 
@@ -280,9 +287,8 @@ describe('NodeEditor — auto‑summary generation', () => {
 
     unmount()
 
-    // No call to /api/ai/generate-summary
-    const generateSummaryCalls = fetchMock.mock.calls.filter(call => call[0] === '/api/ai/generate-summary')
-    expect(generateSummaryCalls).toHaveLength(0)
+    // No call to 'ai:generate-summary'
+    expect(window.electronAPI!.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
     // dispatchPlanGraphRefresh should not be called either
     expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).not.toHaveBeenCalled()
   })

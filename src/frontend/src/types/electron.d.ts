@@ -7,13 +7,26 @@ export {}
 declare global {
   interface Window {
     electronAPI?: {
-      /** Register a handler for native-menu actions (e.g. 'reset-layouts', 'close-project', 'set-theme:obsidian').
-       *  Returns an unsubscribe function — call it on component unmount to remove only this listener. */
+      /** Register a handler for native-menu actions */
       onMenuAction: (callback: (action: string) => void) => () => void
-      /** Sync a UI setting back to the main process (e.g. 'word-wrap', true). */
+      /** Sync a UI setting back to the main process */
       sendMenuState: (key: string, value: boolean | string) => void
       /** Show a native error dialog with a "Copy to Clipboard" button. */
       showErrorDialog: (title: string, message: string) => Promise<void>
+      /** Generic IPC invocation */
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+      /** Start a streaming generation job */
+      startStream: (streamId: string, endpoint: string, params: unknown) => Promise<{ ok: boolean }>
+      /** Abort an in-progress stream */
+      abortStream: (streamId: string) => Promise<{ ok: boolean }>
+      /** Subscribe to stream events. Returns an unsubscribe function. */
+      onStreamEvent: (callback: (data: StreamEvent) => void) => () => void
     }
+  }
+
+  interface StreamEvent {
+    streamId: string
+    type: 'thinking' | 'partial_json' | 'done' | 'error'
+    data: Record<string, unknown>
   }
 }

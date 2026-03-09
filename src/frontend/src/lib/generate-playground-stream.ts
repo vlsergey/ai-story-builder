@@ -11,43 +11,37 @@ export interface GeneratePlaygroundOptions {
 }
 
 export async function generatePlaygroundStream(options: GeneratePlaygroundOptions): Promise<void> {
-  const response = await fetch('/api/ai/playground', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const streamId = crypto.randomUUID()
+
+  await new Promise<void>((resolve, reject) => {
+    const unsub = window.electronAPI!.onStreamEvent((event) => {
+      if (event.streamId !== streamId) return
+      if (event.type === 'thinking') {
+        options.onThinking?.(event.data.status as string, event.data.detail as string | undefined)
+      } else if (event.type === 'partial_json') {
+        options.onPartialJson?.(event.data as Record<string, unknown>)
+      } else if (event.type === 'done') {
+        unsub()
+        options.onDone?.(event.data as { response_id?: string })
+        resolve()
+      } else if (event.type === 'error') {
+        unsub()
+        reject(new Error(event.data.message as string))
+      }
+    })
+
+    if (options.signal) {
+      options.signal.addEventListener('abort', () => {
+        unsub()
+        window.electronAPI!.abortStream(streamId)
+        reject(new DOMException('Aborted', 'AbortError'))
+      }, { once: true })
+    }
+
+    window.electronAPI!.startStream(streamId, 'generate-playground', {
       systemPrompt: options.systemPrompt,
       prompt: options.prompt,
       settings: options.settings,
-    }),
-    signal: options.signal,
+    }).catch(reject)
   })
-
-  if (!response.ok) {
-    const err = await response.json() as { error?: string }
-    throw new Error(err.error ?? `HTTP ${response.status}`)
-  }
-
-  const reader = response.body!.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let currentEvent = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      if (line.startsWith('event: ')) { currentEvent = line.slice(7).trim() }
-      else if (line.startsWith('data: ')) {
-        const data = JSON.parse(line.slice(6)) as Record<string, unknown>
-        if (currentEvent === 'thinking') options.onThinking?.(data.status as string, data.detail as string | undefined)
-        else if (currentEvent === 'partial_json') options.onPartialJson?.(data)
-        else if (currentEvent === 'done') options.onDone?.(data as { response_id?: string })
-        else if (currentEvent === 'error') throw new Error(data.message as string)
-        currentEvent = ''
-      }
-    }
-  }
 }

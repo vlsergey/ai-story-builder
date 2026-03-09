@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { ThemePreference, ResolvedTheme } from '../../types/models'
+import { ipcClient } from '../../ipcClient'
 
 interface ThemeContextValue {
   preference: ThemePreference
@@ -71,11 +72,7 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemePro
     if (!VALID_PREFERENCES.includes(pref as ThemePreference)) return
     localStorage.setItem(STORAGE_KEY, pref)
     setPreferenceState(pref as ThemePreference)
-    fetch('/api/settings/ui_theme', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: pref }),
-    }).catch(() => {})
+    ipcClient.settings.set('ui_theme', pref).catch(() => {})
   }
 
   return (

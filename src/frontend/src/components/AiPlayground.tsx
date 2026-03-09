@@ -3,6 +3,7 @@ import { Loader2, CheckCircle2, Clipboard, Trash2 } from 'lucide-react'
 import AiGenerationSettings from './AiGenerationSettings'
 import { generatePlaygroundStream } from '../lib/generate-playground-stream'
 import type { AiSettings } from '../../../shared/ai-settings.js'
+import { ipcClient } from '../ipcClient'
 
 export default function AiPlayground() {
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
@@ -23,8 +24,7 @@ export default function AiPlayground() {
 
   // Load AI config
   useEffect(() => {
-    fetch('/api/ai/config')
-      .then(r => r.json())
+    ipcClient.ai.getConfig()
       .then((data: { current_engine?: string | null; [key: string]: unknown }) => {
         const engine = data.current_engine ?? null
         setCurrentEngine(engine)
@@ -77,11 +77,7 @@ export default function AiPlayground() {
         onDone: () => {},
       })
       if (currentEngine) {
-        void fetch('/api/ai/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { settings: aiSettings } }),
-        })
+        void ipcClient.ai.saveConfig({ engine: currentEngine, fields: { settings: aiSettings } })
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {

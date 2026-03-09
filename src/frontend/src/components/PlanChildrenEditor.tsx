@@ -5,6 +5,7 @@ import { generatePlanChildrenStream } from '../lib/generate-plan-children-stream
 import { dispatchPlanTreeRefresh } from '../lib/plan-events'
 import AiGenerationSettings from './AiGenerationSettings'
 import type { AiSettings } from '../../../shared/ai-settings.js'
+import { ipcClient } from '../ipcClient'
 
 interface PlanChildrenEditorProps {
   nodeId: number
@@ -52,9 +53,8 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
 
   // Load node on mount
   useEffect(() => {
-    fetch(`/api/plan/nodes/${nodeId}`)
-      .then(r => r.json() as Promise<{ title: string; content: string | null; parent_id: number | null }>)
-      .then(node => {
+    ipcClient.plan.getNode(nodeId)
+      .then((node: { title: string; content: string | null; parent_id: number | null }) => {
         setParentTitle(node.title)
         setParentContent(node.content ?? '')
         setIsRoot(node.parent_id === null)
@@ -66,8 +66,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
 
   // Load AI config
   useEffect(() => {
-    fetch('/api/ai/config')
-      .then(r => r.json())
+    ipcClient.ai.getConfig()
       .then((data: { current_engine?: string | null; [key: string]: unknown }) => {
         const engine = data.current_engine ?? null
         setCurrentEngine(engine)
@@ -132,11 +131,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
 
       // Save last-used model and max tokens
       if (currentEngine) {
-        void fetch('/api/ai/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: currentEngine, fields: { settings: aiSettings } }),
-        })
+        void ipcClient.ai.saveConfig({ engine: currentEngine, fields: { settings: aiSettings } })
       }
 
       setMode('review')
@@ -154,8 +149,7 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
     try {
       if (replaceExisting) {
         // Delete all existing children
-        const tree = await fetch(`/api/plan/nodes`)
-          .then(r => r.json() as Promise<Array<{ id: number; parent_id: number | null; children?: unknown[] }>>)
+        const tree = await ipcClient.plan.nodes() as Array<{ id: number; parent_id: number | null; children?: unknown[] }>
         // Find children of this node
         function findNode(nodes: Array<{ id: number; parent_id: number | null; children?: unknown[] }>, id: number): { id: number; children?: unknown[] } | null {
           for (const n of nodes) {
@@ -169,23 +163,17 @@ export default function PlanChildrenEditor({ nodeId, panelApi }: PlanChildrenEdi
         }
         const parentNode = findNode(tree, nodeId)
         const existingChildren = (parentNode?.children ?? []) as Array<{ id: number }>
-        await Promise.all(existingChildren.map(c =>
-          fetch(`/api/plan/nodes/${c.id}`, { method: 'DELETE' })
-        ))
+        await Promise.all(existingChildren.map(c => ipcClient.plan.deleteNode(c.id)))
       }
 
       // Create new children
       for (let i = 0; i < proposedChildren.length; i++) {
         const child = proposedChildren[i]
-        await fetch('/api/plan/nodes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            parent_id: nodeId,
-            title: child.title,
-            content: child.content,
-            position: i,
-          }),
+        await ipcClient.plan.createNode({
+          parent_id: nodeId,
+          title: child.title,
+          content: child.content,
+          position: i,
         })
       }
 

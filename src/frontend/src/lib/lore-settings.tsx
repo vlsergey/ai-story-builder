@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { LoreStatMode } from '../types/models'
 import { AI_ENGINE_CHANGED_EVENT } from './lore-events'
+import { ipcClient } from '../ipcClient'
 
 const LORE_STAT_KEY = 'ai-story-builder-lore-stat'
 
@@ -25,9 +26,8 @@ export function LoreSettingsProvider({ children }: { children: React.ReactNode }
   const [currentAiEngine, setCurrentAiEngine] = useState<string | null>(null)
 
   function fetchCurrentEngine() {
-    fetch('/api/settings/current_backend')
-      .then(r => r.json())
-      .then((data: { value?: string | null }) => setCurrentAiEngine(data.value ?? null))
+    ipcClient.settings.get('current_backend')
+      .then(data => setCurrentAiEngine(data.value ?? null))
       .catch(() => setCurrentAiEngine(null))
   }
 

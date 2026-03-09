@@ -1,4 +1,3 @@
-import express, { Request, Response, Router } from 'express'
 import fs from 'fs'
 import path from 'path'
 import type { ProjectInitialData } from '../types/index.js'
@@ -11,6 +10,14 @@ import {
 } from '../db/state.js'
 import { setVerboseLogging } from '../lib/ai-logging.js'
 import { sanitizeProjectName } from '../lib/project-name.js'
+
+// ── Error helper ──────────────────────────────────────────────────────────────
+
+function makeError(message: string, status: number): Error {
+  const e = new Error(message)
+  ;(e as any).status = status
+  return e
+}
 
 // Lazy loader — deferred so that test imports don't trigger the require
 function openProjectDatabase(dbPath: string): import('better-sqlite3').Database {
@@ -76,27 +83,21 @@ function updateRecent(dbPath: string): void {
   writeAppSettings(s)
 }
 
-const router: Router = express.Router()
-
-// GET /project/status
-router.get('/status', (_req: Request, res: Response) => {
+export function getProjectStatus(): { isOpen: boolean; path: string | null } {
   const dbPath = getCurrentDbPath()
-  res.json({ isOpen: !!dbPath, path: dbPath })
-})
+  return { isOpen: !!dbPath, path: dbPath }
+}
 
-// POST /project/close
-router.post('/close', (_req: Request, res: Response) => {
+export function closeProject(): { ok: boolean } {
   setCurrentDbPath(null)
-  res.json({ ok: true })
-})
+  return { ok: true }
+}
 
-// POST /project/open
-router.post('/open', express.json(), (req: Request, res: Response) => {
-  const { path: dbPath } = req.body as { path?: string }
-  if (!dbPath) return res.status(400).json({ error: 'path required' })
+export function openProject(dbPath: string): { path: string; layout: unknown; projectTitle: string | null } {
+  if (!dbPath) throw makeError('path required', 400)
 
   if (!fs.existsSync(dbPath)) {
-    return res.status(404).json({ error: 'database file not found' })
+    throw makeError('database file not found', 404)
   }
 
   try {
@@ -112,44 +113,39 @@ router.post('/open', express.json(), (req: Request, res: Response) => {
     }
     db.close()
   } catch (e) {
-    return res.status(500).json({ error: 'failed to open database: ' + String(e) })
+    throw makeError('failed to open database: ' + String(e), 500)
   }
 
   setCurrentDbPath(dbPath)
   applyRuntimeSettings(dbPath)
   updateRecent(dbPath)
-  res.json({ path: dbPath, ...getProjectInitialData(dbPath) })
-})
+  return { path: dbPath, ...getProjectInitialData(dbPath) }
+}
 
-// GET /project/recent
-router.get('/recent', (_req: Request, res: Response) => {
+export function getRecentProjects(): string[] {
   const s = readAppSettings()
-  res.json(s.recent || [])
-})
+  return s.recent || []
+}
 
-// DELETE /project/recent — remove one entry from the recent list
-router.delete('/recent', express.json(), (req: Request, res: Response) => {
-  const { path: p } = req.body as { path?: string }
-  if (!p) return res.status(400).json({ error: 'path required' })
+export function deleteRecentProject(p: string): { ok: boolean } {
+  if (!p) throw makeError('path required', 400)
   const s = readAppSettings()
   s.recent = (s.recent || []).filter((x) => x !== p)
   writeAppSettings(s)
-  res.json({ ok: true })
-})
+  return { ok: true }
+}
 
-// GET /project/files — list all supported project files in the projects directory
-router.get('/files', (_req: Request, res: Response) => {
+export function listProjectFiles(): { dir: string; files: string[] } {
   const projectsDir = path.join(getDataDir(), 'projects')
-  if (!fs.existsSync(projectsDir)) return res.json({ dir: projectsDir, files: [] })
+  if (!fs.existsSync(projectsDir)) return { dir: projectsDir, files: [] }
   const files = fs
     .readdirSync(projectsDir)
     .filter((f) => f.endsWith('.sqlite') || f.endsWith('.db'))
     .map((f) => path.join(projectsDir, f))
-  res.json({ dir: projectsDir, files })
-})
+  return { dir: projectsDir, files }
+}
 
-// POST /project/open-folder — open the projects directory in the OS file manager
-router.post('/open-folder', (_req: Request, res: Response) => {
+export function openProjectFolder(): { ok: boolean } {
   const projectsDir = path.join(getDataDir(), 'projects')
   fs.mkdirSync(projectsDir, { recursive: true })
   try {
@@ -169,14 +165,17 @@ router.post('/open-folder', (_req: Request, res: Response) => {
           : `xdg-open "${projectsDir}"`
     exec(cmd)
   }
-  res.json({ ok: true })
-})
+  return { ok: true }
+}
 
-// POST /project/create
-router.post('/create', express.json(), (req: Request, res: Response) => {
-  const body = req.body as { name?: string; text_language?: string } | undefined
-  const name = body?.name ? body.name : `project-${Date.now()}`
-  const text_language = body?.text_language ?? 'ru-RU'
+export function createProject(data: { name?: string; text_language?: string }): {
+  path: string
+  layout: unknown
+  projectTitle: string | null
+  reused?: boolean
+} {
+  const name = data?.name ? data.name : `project-${Date.now()}`
+  const text_language = data?.text_language ?? 'ru-RU'
   const safeName = sanitizeProjectName(name)
   const projectsDir = path.join(getDataDir(), 'projects')
   fs.mkdirSync(projectsDir, { recursive: true })
@@ -189,7 +188,6 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
   if (fs.existsSync(dbPath)) {
     try {
       const db = openProjectDatabase(dbPath) // runs migrations on any existing DB
-      // Insert default nodes if none exist yet (e.g. DB was empty from a failed migration)
       const hasRoot = db.prepare('SELECT id FROM lore_nodes WHERE parent_id IS NULL LIMIT 1').get()
       if (!hasRoot) {
         const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
@@ -199,29 +197,26 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
       }
       db.close()
     } catch (e) {
-      return res.status(500).json({ error: String(e) })
+      throw makeError(String(e), 500)
     }
     setCurrentDbPath(dbPath)
     updateRecent(dbPath)
-    return res.json({ path: dbPath, reused: true, ...getProjectInitialData(dbPath) })
+    return { path: dbPath, reused: true, ...getProjectInitialData(dbPath) }
   }
 
   try {
     const db: import('better-sqlite3').Database = openProjectDatabase(dbPath)
 
-    // Insert root node and default children into lore_nodes table
     const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
     const root = insertNode.run(null, defaultNodes.root)
     const rootId = root.lastInsertRowid
     for (const f of defaultNodes.children) insertNode.run(rootId, f)
 
-    // Store basic settings
     const setSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
     setSetting.run('project_title', name)
     setSetting.run('locale', 'en')
     setSetting.run('text_language', text_language)
 
-    // Create root plan node
     db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(name)
 
     db.close()
@@ -229,10 +224,8 @@ router.post('/create', express.json(), (req: Request, res: Response) => {
     setCurrentDbPath(dbPath)
     updateRecent(dbPath)
 
-    return res.json({ path: dbPath, layout: null, projectTitle: name })
+    return { path: dbPath, layout: null, projectTitle: name }
   } catch (e) {
-    return res.status(500).json({ error: String(e) })
+    throw makeError(String(e), 500)
   }
-})
-
-export default router
+}

@@ -23,6 +23,7 @@ import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './plan-graph/GenerateAllDialog'
+import { ipcClient } from '../ipcClient'
 
 type PlanGraphNodeData = PlanGraphNode & { onDelete: (id: string) => void }
 type PlanGraphEdgeData = { type: string; label?: string; onDelete: (id: string) => void }
@@ -86,9 +87,7 @@ export default function PlanGraph() {
 
   const loadGraph = useCallback(async () => {
     try {
-      const resp = await fetch('/api/plan/graph')
-      if (!resp.ok) return
-      const data = await resp.json() as { nodes: PlanGraphNode[]; edges: PlanGraphEdge[] }
+      const data = await ipcClient.graph.get()
 
       const rfEdges = toReactFlowEdges(data.edges, deleteEdge)
       let rfNodes = toReactFlowNodes(data.nodes, deleteNode)
@@ -97,11 +96,7 @@ export default function PlanGraph() {
         rfNodes = applyDagreLayout(rfNodes, rfEdges)
         // Persist positions after auto-layout
         for (const n of rfNodes) {
-          void fetch(`/api/plan/graph/nodes/${n.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ x: n.position.x, y: n.position.y }),
-          })
+          void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
         }
       }
 
@@ -140,13 +135,13 @@ export default function PlanGraph() {
 
   async function deleteNode(nodeId: string) {
     if (!window.confirm('Delete this node and all connected edges?')) return
-    const resp = await fetch(`/api/plan/graph/nodes/${nodeId}`, { method: 'DELETE' })
-    if (resp.ok) dispatchPlanGraphRefresh()
+    const result = await ipcClient.graph.deleteNode(Number(nodeId))
+    if (result.ok) dispatchPlanGraphRefresh()
   }
 
   async function deleteEdge(edgeId: string) {
-    const resp = await fetch(`/api/plan/graph/edges/${edgeId}`, { method: 'DELETE' })
-    if (resp.ok) {
+    const result = await ipcClient.graph.deleteEdge(Number(edgeId))
+    if (result.ok) {
       setEdges(prev => prev.filter(e => e.id !== edgeId))
     }
   }
@@ -166,21 +161,13 @@ export default function PlanGraph() {
     setAddTitle('')
     const centerX = 100 + Math.random() * 200
     const centerY = 100 + Math.random() * 200
-    const resp = await fetch('/api/plan/graph/nodes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, title, x: centerX, y: centerY }),
-    })
-    if (resp.ok) dispatchPlanGraphRefresh()
+    await ipcClient.graph.createNode({ type, title, x: centerX, y: centerY })
+    dispatchPlanGraphRefresh()
   }
 
   const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
     if (autoLayout) return
-    void fetch(`/api/plan/graph/nodes/${node.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ x: node.position.x, y: node.position.y }),
-    })
+    void ipcClient.graph.patchNode(Number(node.id), { x: node.position.x, y: node.position.y })
   }, [autoLayout])
 
   const onConnect = useCallback((connection: Connection) => {
@@ -190,26 +177,19 @@ export default function PlanGraph() {
 
   async function confirmConnect(edgeType: string) {
     if (!showConnectDialog?.source || !showConnectDialog?.target) return
-    const resp = await fetch('/api/plan/graph/edges', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from_node_id: Number(showConnectDialog.source),
-        to_node_id: Number(showConnectDialog.target),
-        type: edgeType,
-      }),
+    const result = await ipcClient.graph.createEdge({
+      from_node_id: Number(showConnectDialog.source),
+      to_node_id: Number(showConnectDialog.target),
+      type: edgeType,
     })
-    if (resp.ok) {
-      const { id } = await resp.json() as { id: number }
-      const newEdge: Edge = {
-        id: String(id),
-        source: showConnectDialog.source,
-        target: showConnectDialog.target,
-        type: 'planEdge',
-        data: { type: edgeType, onDelete: deleteEdge },
-      }
-      setEdges(prev => addEdge(newEdge, prev))
+    const newEdge: Edge = {
+      id: String(result.id),
+      source: showConnectDialog.source,
+      target: showConnectDialog.target,
+      type: 'planEdge',
+      data: { type: edgeType, onDelete: deleteEdge },
     }
+    setEdges(prev => addEdge(newEdge, prev))
     setShowConnectDialog(null)
   }
 
@@ -221,11 +201,7 @@ export default function PlanGraph() {
       const laid = applyDagreLayout([...nodes], [...edges])
       setNodes(laid)
       for (const n of laid) {
-        void fetch(`/api/plan/graph/nodes/${n.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ x: n.position.x, y: n.position.y }),
-        })
+        void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
       }
     }
   }
@@ -235,11 +211,7 @@ export default function PlanGraph() {
     const laid = applyDagreLayout([...nodes], [...edges])
     setNodes(laid)
     for (const n of laid) {
-      void fetch(`/api/plan/graph/nodes/${n.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: n.position.x, y: n.position.y }),
-      })
+      void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
     }
   }
 
