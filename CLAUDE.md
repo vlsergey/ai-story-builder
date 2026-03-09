@@ -1,34 +1,26 @@
 # Project Rules
 
-## Documentation
+## Read the docs first — always
 
-- All documentation must be written and maintained in **English**.
-- The `/docs/` folder contains the authoritative project documentation:
-  - `backend_requirements.md`
-  - `frontend_requirements.md`
-  - `use_cases.md`
-  - `data_model.md`
-  - `coding_guidelines.md`
+**Before doing anything**, read the relevant files in `/docs/`. They are the authoritative source for architecture, data model, requirements, and coding conventions. Update them as part of every feature or fix.
 
-## Workflow
+Key files:
+- `coding_guidelines.md` — code style, TypeScript build architecture, test conventions, CI pipeline
+- `backend_requirements.md` — backend tech stack, API structure, AI engine architecture
+- `frontend_requirements.md` — frontend tech stack, UI conventions
+- `data_model.md` — database schema and entity relationships
+- `use_cases.md` — product requirements and user scenarios
 
-- **Always read `/docs/` first** when starting any task. The docs folder is the authoritative description of the project architecture, data model, and requirements. Read and update the relevant doc files as part of every feature or fix.
-- Before adding new functionality (not bug fixes), update the relevant requirements documents in `/docs/`, including the feature/capabilities list.
-- When fixing a bug, follow this order:
-  1. Write a failing test that reproduces the bug.
-  2. Fix the bug.
-  3. Confirm the test now passes.
+## Non-negotiable rules
 
-## Database Schema
+**Bug fixes:**
+1. Write a failing test first.
+2. Fix the bug.
+3. Confirm the test passes.
 
-- **All schema changes must go through migrations.** Never edit the initial `CREATE TABLE` statements. Add a new migration step to `src/backend/db/migrations.ts` for every column/table addition or change.
-- Each migration must backfill existing rows where possible (derive values from existing data).
-- Test DB fixtures (`setupDb()` functions in `*.test.ts`) must be kept in sync with the real schema — add any new columns to the fixture `CREATE TABLE` statements.
+**Database schema:** All changes go through migrations in `src/backend/db/migrations.ts`. Never edit initial `CREATE TABLE` statements. Keep `setupDb()` fixtures in test files in sync with the real schema.
 
-## Git Commits
-
-- Never add AI name (e.g. "Co-Authored-By: Claude") to commit messages or descriptions.
-- Before every commit, run the full test suite for both workspaces and ensure all tests pass:
-  - `npm run test --workspace=src/backend`
-  - `npm run test --workspace=src/frontend`
-- After any significant change (new feature, bug fix, refactor, doc update), create a git commit before moving on.
+**Git commits:**
+- Run `npm test` (both workspaces) before every commit — all tests must pass.
+- Never add AI co-author lines to commit messages.
+- Commit after every significant change before moving on.
