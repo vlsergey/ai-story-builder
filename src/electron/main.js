@@ -300,7 +300,7 @@ app.whenReady().then(async () => {
     // In dev, Vite and Express are started externally by the dev script.
     serverUrl = 'http://localhost:3000'
   } else {
-    const { startServer } = require('../backend/server')
+    const { startServer } = require('../../dist/backend/server')
     serverUrl = await startServer()
   }
   createWindow()

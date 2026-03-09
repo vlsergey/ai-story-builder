@@ -37,16 +37,14 @@ To keep the project maintainable and scalable, follow these rules:
   * If no automated cleanup path exists, document the limitation explicitly in the code with a `// TODO:` comment and consider exposing a manual cleanup action in the UI so the user can remove orphaned resources.
   * Do **not** treat "deletion not supported" as "ignore silently" — orphaned billable resources (files, embeddings, indices) have real cost implications for the user.
 
-* **TypeScript build architecture** – The backend uses two separate tsconfig files with different purposes:
-  * `tsconfig.json` – used by `tsc --noEmit` (typecheck). Targets `ESNext/Bundler` to support top-level `await` in test files. Does **not** emit files.
-  * `tsconfig.build.json` – used by `tsc -p tsconfig.build.json` (production build). Targets `CommonJS/Node`, excludes `*.test.ts` files, and emits `.js`/`.d.ts` files alongside the TypeScript sources in `src/backend/` (gitignored via `.gitignore`).
+* **TypeScript build architecture** – The backend uses a two-tool setup:
+  * `tsc --noEmit` (`tsconfig.json`) — type-checks all `.ts` files including tests. Targets `ESNext/Bundler` to support top-level `await` in test files. Never emits output files.
+  * `tsup` (`tsup.config.ts`) — production build. Bundles `server.ts` and all its imports (including `src/shared/`) into a single `dist/backend/server.js` CJS file. Native/optional modules (`better-sqlite3`, `multer`, `electron`) are kept external and resolved at runtime by Electron.
 
-* **Build output location** – `build:backend` emits compiled `.js` files into `src/backend/**/*.js` (next to `.ts` sources). These are gitignored and must never be committed. Electron Builder picks them up from the filesystem during packaging.
+* **Build output** – `build:backend` writes only to `dist/backend/`. Source directories (`src/backend/`, `src/shared/`) never contain compiled output. `dist/` is gitignored.
 
-* **Local dev workflow with tests** – Do **not** run `npm test` immediately after `npm run build:backend` without knowing that compiled `.js` files are now present. Vitest is configured (via `resolve.alias` in `vitest.config.ts`) to prefer `.ts` sources over `.js` files for relative imports, so tests should work correctly in both states. If tests behave unexpectedly after a build, verify the alias is in effect.
+* **Test file conventions** – Backend test files use top-level `await import('./foo.js')` to load modules after `vi.mock()` declarations. This requires `module: ESNext` (in `tsconfig.json`). The `.js` extension is intentional — vitest's `resolve.alias` in `vitest.config.ts` transparently redirects it to the `.ts` source.
 
-* **Test file conventions** – Backend test files use top-level `await import('./foo.js')` to load modules after `vi.mock()` declarations. This pattern requires `module: ESNext` (set in `tsconfig.json`). The `.js` extension in the import is intentional — vitest's resolve alias transparently redirects it to the `.ts` source.
-
-* **CI pipeline order** – The CI runs three sequential stages per OS: `typecheck` → `test` → `package`. TypeScript errors in both source and test files are caught at the `typecheck` stage, before tests run and before the expensive package step.
+* **CI pipeline order** – The CI runs three sequential stages per OS: `typecheck` → `test` → `package`. TypeScript errors are caught early, before the expensive Electron packaging step.
 
 These guidelines are part of the project's acceptance criteria and should be reviewed when adding new features.

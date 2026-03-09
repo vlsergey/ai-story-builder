@@ -33,12 +33,7 @@
     "asar": false,
     "files": [
       "src/electron/**/*",
-      "src/backend/**/*",
-      "src/shared/**/*",
-      "dist/**/*",
-      "!src/backend/scripts/**/*",
-      "!src/backend/dist-sea/**/*",
-      "!src/frontend/**/*"
+      "dist/**/*"
     ],
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }]
