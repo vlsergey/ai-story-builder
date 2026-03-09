@@ -19,10 +19,11 @@
     "package": "npm run build:backend && npm run build && electron-builder --publish never"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0",
+    "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
+    "electron-rebuild": "^3.2.9",
     "wait-on": "^9.0.4"
   },
   "build": {
