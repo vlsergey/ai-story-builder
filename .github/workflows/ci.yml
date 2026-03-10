@@ -68,16 +68,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Package
-        # Add architecture flag for macOS
-        run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npm run package -- --mac --${{ matrix.arch }}
-          else
-            npm run package
-          fi
+      - name: Package (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npm run package -- --mac --${{ matrix.arch }}
         env:
           # Skip macOS code signing in CI (no certificate available)
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Package (other OS)
+        if: matrix.os != 'macos-latest'
+        run: npm run package
+        env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload release artifacts
