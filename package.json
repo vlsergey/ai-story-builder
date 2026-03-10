@@ -42,6 +42,7 @@
       "dist/**/*"
     ],
     "win": {
+      "icon": "src/electron/icons/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -52,6 +53,7 @@
       ]
     },
     "linux": {
+      "icon": "src/electron/icons/256x256.png",
       "target": [
         {
           "target": "AppImage",
@@ -62,6 +64,7 @@
       ]
     },
     "mac": {
+      "icon": "src/electron/icons/icon.icns",
       "target": [
         {
           "target": "dmg",
