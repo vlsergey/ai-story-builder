@@ -307,6 +307,13 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     }, 1000)
   }
 
+  function computeTextMetrics(text: string): { bytes: number; chars: number; words: number } {
+    const bytes = new TextEncoder().encode(text).length;
+    const chars = text.length;
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    return { bytes, chars, words };
+  }
+
   // ── Mode A: Generate from scratch ─────────────────────────────────────────
   function handleGenerate() {
     if (!effectivePrompt.trim()) return
@@ -368,7 +375,18 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         }
       }
       saveAiSettings()
-      dispatchAiCallCompleted({ costUsdTicks: lastCallData.cost_usd_ticks, tokensInput: lastCallData.tokens_input, tokensOutput: lastCallData.tokens_output, tokensTotal: lastCallData.tokens_total, cachedTokens: lastCallData.cached_tokens, reasoningTokens: lastCallData.reasoning_tokens })
+      const { bytes, chars, words } = computeTextMetrics(finalContent);
+      dispatchAiCallCompleted({
+        costUsdTicks: lastCallData.cost_usd_ticks,
+        tokensInput: lastCallData.tokens_input,
+        tokensOutput: lastCallData.tokens_output,
+        tokensTotal: lastCallData.tokens_total,
+        cachedTokens: lastCallData.cached_tokens,
+        reasoningTokens: lastCallData.reasoning_tokens,
+        responseBytes: bytes,
+        responseChars: chars,
+        responseWords: words
+      })
     }).catch(e => setGenError(String(e)))
       .finally(() => setGenerating(false))
   }
@@ -442,7 +460,18 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       }
 
       saveAiSettings()
-      dispatchAiCallCompleted({ costUsdTicks: improveCallData.cost_usd_ticks, tokensInput: improveCallData.tokens_input, tokensOutput: improveCallData.tokens_output, tokensTotal: improveCallData.tokens_total, cachedTokens: improveCallData.cached_tokens, reasoningTokens: improveCallData.reasoning_tokens })
+      const { bytes, chars, words } = computeTextMetrics(finalContent);
+      dispatchAiCallCompleted({
+        costUsdTicks: improveCallData.cost_usd_ticks,
+        tokensInput: improveCallData.tokens_input,
+        tokensOutput: improveCallData.tokens_output,
+        tokensTotal: improveCallData.tokens_total,
+        cachedTokens: improveCallData.cached_tokens,
+        reasoningTokens: improveCallData.reasoning_tokens,
+        responseBytes: bytes,
+        responseChars: chars,
+        responseWords: words
+      })
       setEditorMode('review_unlocked')
     } catch (e) {
       setGenError(String(e))

@@ -36,6 +36,9 @@ interface LastRequest {
   tokensTotal?: number
   cachedTokens?: number
   reasoningTokens?: number
+  responseBytes?: number
+  responseChars?: number
+  responseWords?: number
   timestamp: string
 }
 
@@ -79,6 +82,11 @@ const POLL_INTERVAL_MS = 60_000
 
 export default function AiBillingPanel() {
   const { t } = useLocale()
+  // Format tokens with unit (e.g., "1,234 tokens")
+  function formatTokensWithUnit(n: number | null | undefined): string {
+    if (n == null) return '—';
+    return `${n.toLocaleString()} ${t('billing.tokens_unit')}`;
+  }
   const [lastRequest, setLastRequest] = useState<LastRequest | null>(null)
   const [billing, setBilling] = useState<BillingData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -120,6 +128,9 @@ export default function AiBillingPanel() {
         tokensTotal: detail.tokensTotal,
         cachedTokens: detail.cachedTokens,
         reasoningTokens: detail.reasoningTokens,
+        responseBytes: detail.responseBytes,
+        responseChars: detail.responseChars,
+        responseWords: detail.responseWords,
         timestamp: new Date().toISOString(),
       })
       void fetchBilling().then(schedulePoll)
@@ -153,16 +164,38 @@ export default function AiBillingPanel() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('billing.total_tokens')}</span>
-              <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensTotal)}</span>
+              <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.tokensTotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground pl-3">{t('billing.input_tokens')}{lastRequest.cachedTokens ? ` (${t('billing.cached')}: ${formatTokens(lastRequest.cachedTokens)})` : ''}</span>
-              <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensInput)}</span>
+              <span className="text-muted-foreground pl-3">{t('billing.input_tokens')}</span>
+              <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.tokensInput)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground pl-3">{t('billing.output_tokens')}{lastRequest.reasoningTokens ? ` (${t('billing.reasoning')}: ${formatTokens(lastRequest.reasoningTokens)})` : ''}</span>
-              <span className="font-mono text-foreground">{formatTokens(lastRequest.tokensOutput)}</span>
+              <span className="text-muted-foreground pl-6">{t('billing.cached')}</span>
+              <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.cachedTokens)}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground pl-3">{t('billing.output_tokens')}</span>
+              <span className="font-mono text-foreground">{lastRequest.responseBytes != null ? `${lastRequest.responseBytes.toLocaleString()} ${t('billing.bytes')}` : '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground pl-3"></span>
+              <span className="font-mono text-foreground">{lastRequest.responseChars != null ? `${lastRequest.responseChars.toLocaleString()} ${t('billing.chars')}` : '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground pl-3"></span>
+              <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.tokensOutput)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground pl-3"></span>
+              <span className="font-mono text-foreground">{lastRequest.responseWords != null ? `${lastRequest.responseWords.toLocaleString()} ${t('billing.words')}` : '—'}</span>
+            </div>
+            {lastRequest.reasoningTokens ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground pl-6">{t('billing.reasoning')}</span>
+                <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.reasoningTokens)}</span>
+              </div>
+            ) : <span />}
             <div className="text-xs text-muted-foreground text-right">{timeAgo(lastRequest.timestamp)}</div>
           </div>
         ) : (

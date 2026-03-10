@@ -7,6 +7,9 @@ export interface AiCallCompletedDetail {
   tokensTotal?: number
   cachedTokens?: number
   reasoningTokens?: number
+  responseBytes?: number
+  responseChars?: number
+  responseWords?: number
 }
 
 /** Dispatched after any successful AI generation (generate or improve). */
