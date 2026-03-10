@@ -49,7 +49,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-latest
+            arch: x64
+          - os: macos-latest
+            arch: arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +69,13 @@ jobs:
         run: npm ci
 
       - name: Package
-        run: npm run package
+        # Add architecture flag for macOS
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            npm run package -- --mac --${{ matrix.arch }}
+          else
+            npm run package
+          fi
         env:
           # Skip macOS code signing in CI (no certificate available)
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -71,5 +83,6 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
+          # Add arch to artifact name to avoid overwriting
+          name: release-${{ matrix.os }}-${{ matrix.arch || 'default' }}
           path: release/

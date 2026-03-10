@@ -16,7 +16,7 @@
     "build:backend": "npm run build --workspace=src/backend",
     "test": "npm rebuild better-sqlite3 && npm run test --workspace=src/backend && npm run test --workspace=src/frontend",
     "typecheck": "npm run typecheck --workspace=src/backend && tsc -p src/frontend/tsconfig.json",
-    "package": "npm run build:backend && npm run build && electron-builder --publish never"
+    "package": "npm run build:backend && npm run build && node scripts/package.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
