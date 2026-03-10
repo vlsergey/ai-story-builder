@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PlanTree from '../components/PlanTree';
 
@@ -11,33 +11,33 @@ describe('PlanTree', () => {
     vi.clearAllMocks();
   });
 
-  it('renders without crashing when tree data is an array', () => {
+  it('renders without crashing when tree data is an array', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       json: () => Promise.resolve([{ id: 1, title: 'Node 1', children: [] }])
     });
 
-    expect(() => {
+    await act(async () => {
       render(<PlanTree />);
-    }).not.toThrow();
+    });
   });
 
-  it('handles non-array tree data gracefully', () => {
+  it('handles non-array tree data gracefully', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       json: () => Promise.resolve({ error: 'Invalid response' })
     });
 
-    expect(() => {
+    await act(async () => {
       render(<PlanTree />);
-    }).not.toThrow();
+    });
   });
 
-  it('handles null tree data gracefully', () => {
+  it('handles null tree data gracefully', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       json: () => Promise.resolve(null)
     });
 
-    expect(() => {
+    await act(async () => {
       render(<PlanTree />);
-    }).not.toThrow();
+    });
   });
 });

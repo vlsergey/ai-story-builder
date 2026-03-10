@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, waitFor } from '@testing-library/react'
+import { render, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@xyflow/react', () => ({
@@ -41,12 +41,18 @@ describe('PlanGraph', () => {
 
   it('renders without crashing', async () => {
     const PlanGraph = (await import('../components/PlanGraph')).default
-    expect(() => render(<PlanGraph />)).not.toThrow()
+    await act(async () => {
+      render(<PlanGraph />);
+    });
   })
 
   it('renders the ReactFlow component', async () => {
     const PlanGraph = (await import('../components/PlanGraph')).default
-    const { getByTestId } = render(<PlanGraph />)
+    let getByTestId: any;
+    await act(async () => {
+      const result = render(<PlanGraph />);
+      getByTestId = result.getByTestId;
+    });
     await waitFor(() => {
       expect(getByTestId('react-flow')).toBeInTheDocument()
     })

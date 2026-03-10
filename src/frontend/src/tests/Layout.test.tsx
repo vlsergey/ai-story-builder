@@ -74,8 +74,10 @@ describe('Layout', () => {
     delete (window as any).electronAPI
   });
 
-  it('renders without crashing', () => {
-    expect(() => render(<Layout {...mockProps} />)).not.toThrow();
+  it('renders without crashing', async () => {
+    await act(async () => {
+      render(<Layout {...mockProps} />);
+    });
   });
 
   it('loads layout via IPC on mount', async () => {

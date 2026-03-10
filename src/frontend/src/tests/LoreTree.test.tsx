@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import LoreTree from '../components/LoreTree';
 import { LoreSettingsContext } from '../lib/lore-settings';
@@ -55,12 +55,14 @@ describe('LoreTree', () => {
     delete (window as any).electronAPI;
   });
 
-  it('renders without crashing when tree data is an array', () => {
+  it('renders without crashing when tree data is an array', async () => {
     setupElectronAPIWithTree([{ id: 1, name: 'Story Lore', parent_id: null, status: 'ACTIVE', children: [] }]);
-    expect(() => render(<LoreTree {...mockProps} />)).not.toThrow();
+    await act(async () => {
+      render(<LoreTree {...mockProps} />);
+    });
   });
 
-  it('handles non-array tree data gracefully', () => {
+  it('handles non-array tree data gracefully', async () => {
     window.electronAPI = {
       onMenuAction: vi.fn().mockReturnValue(vi.fn()),
       sendMenuState: vi.fn(),
@@ -73,10 +75,12 @@ describe('LoreTree', () => {
       abortStream: vi.fn().mockResolvedValue({ ok: true }),
       onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
     }
-    expect(() => render(<LoreTree {...mockProps} />)).not.toThrow();
+    await act(async () => {
+      render(<LoreTree {...mockProps} />);
+    });
   });
 
-  it('handles null tree data gracefully', () => {
+  it('handles null tree data gracefully', async () => {
     window.electronAPI = {
       onMenuAction: vi.fn().mockReturnValue(vi.fn()),
       sendMenuState: vi.fn(),
@@ -89,7 +93,9 @@ describe('LoreTree', () => {
       abortStream: vi.fn().mockResolvedValue({ ok: true }),
       onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
     }
-    expect(() => render(<LoreTree {...mockProps} />)).not.toThrow();
+    await act(async () => {
+      render(<LoreTree {...mockProps} />);
+    });
   });
 
   it('renders tree nodes after fetch resolves', async () => {
@@ -259,9 +265,11 @@ describe('LoreTree', () => {
     await screen.findByText('Chapter');
     expect(screen.queryByText(/\d+w/)).toBeNull();
 
-    window.dispatchEvent(new CustomEvent('lore-node-saved', {
-      detail: { id: 1, wordCount: 7, charCount: 35, byteCount: 35 },
-    }));
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lore-node-saved', {
+        detail: { id: 1, wordCount: 7, charCount: 35, byteCount: 35 },
+      }));
+    });
 
     await screen.findByText('7w');
   });
@@ -287,9 +295,11 @@ describe('LoreTree', () => {
     await screen.findByText('Child');
     expect(screen.queryByText(/\d+w/)).toBeNull();
 
-    window.dispatchEvent(new CustomEvent('lore-node-saved', {
-      detail: { id: 2, wordCount: 10, charCount: 50, byteCount: 50 },
-    }));
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lore-node-saved', {
+        detail: { id: 2, wordCount: 10, charCount: 50, byteCount: 50 },
+      }));
+    });
 
     // Both child and root (aggregate) show '10w'
     const badges = await screen.findAllByText('10w');
@@ -314,9 +324,11 @@ describe('LoreTree', () => {
 
     await screen.findByText('Old Name');
 
-    window.dispatchEvent(new CustomEvent('lore-node-saved', {
-      detail: { id: 1, name: 'New Name' },
-    }));
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lore-node-saved', {
+        detail: { id: 1, name: 'New Name' },
+      }));
+    });
 
     await screen.findByText('New Name');
     expect(screen.queryByText('Old Name')).toBeNull();
@@ -481,7 +493,9 @@ describe('LoreTree', () => {
     const loreTreeCallsBefore = invokeMock.mock.calls.filter((call: unknown[]) => call[0] === 'lore:tree').length
 
     // Simulate a tree refresh (e.g. after creating a child node)
-    window.dispatchEvent(new Event('lore-tree-refresh'))
+    act(() => {
+      window.dispatchEvent(new Event('lore-tree-refresh'))
+    })
 
     // Wait for the second lore:tree call to complete
     await waitFor(() => {
