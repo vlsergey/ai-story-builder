@@ -292,4 +292,88 @@ describe('NodeEditor — auto‑summary generation', () => {
     // dispatchPlanGraphRefresh should not be called either
     expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).not.toHaveBeenCalled()
   })
+  it('does NOT trigger summary generation during AI streaming (only on unmount)', async () => {
+    // Mock settings: auto_generate_summary = true
+    setupElectronAPI((channel: string, ...args: unknown[]) => {
+      if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
+      if (channel === 'settings:get' && args[0] === 'auto_generate_summary') return Promise.resolve({ value: 'true' })
+      if (channel === 'settings:get') return Promise.resolve({ value: null })
+      if (channel === 'ai:generate-summary') return Promise.resolve({ summary: 'generated summary' })
+      return Promise.resolve({})
+    })
+
+    const planNodeData = {
+      name: 'Plan Node',
+      content: 'initial content',
+      changes_status: null,
+      review_base_content: null,
+      last_improve_instruction: null,
+      user_prompt: null,
+      system_prompt: null,
+    }
+
+    const planAdapter = makeAdapter(planNodeData, {
+      i18nPrefix: 'plan',
+      generateEndpoint: '/api/ai/generate-plan',
+      supportsAutoSummary: true,
+    })
+
+    let triggerPartial: (data: Record<string, unknown>) => void = () => {}
+    let resolveStream: () => void = () => {}
+
+    const generateNodeStream = vi.mocked(streamModule.generateNodeStream)
+    generateNodeStream.mockImplementation((_endpoint, options) => {
+      triggerPartial = (data) => options.onPartialJson?.(data)
+      return new Promise<void>(resolve => { resolveStream = resolve })
+    })
+
+    const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
+    await screen.findByTestId('codemirror', {}, { timeout: 5000 })
+    // Stub confirm dialog to allow regeneration
+    vi.stubGlobal('confirm', () => true)
+
+    // Start AI generation (simulate user clicking generate)
+    const promptTextarea = screen.getByPlaceholderText('plan.userPrompt')
+    fireEvent.change(promptTextarea, { target: { value: 'generate something' } })
+    fireEvent.click(screen.getByRole('button', { name: 'plan.regenerate' }))
+
+    // Wait for stream to be set up
+    await waitFor(() => expect(generateNodeStream).toHaveBeenCalled())
+
+    // Send a streaming token that changes content
+    await act(async () => {
+      triggerPartial({ content: 'partial content' })
+    })
+
+    // At this point, content has changed due to streaming.
+    // With the bug, the summary generation would have been triggered.
+    // With the fix, it should NOT be triggered.
+    expect(window.electronAPI!.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+
+    // Send another token
+    await act(async () => {
+      triggerPartial({ content: 'more partial content' })
+    })
+
+    // Still no summary call
+    expect(window.electronAPI!.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+
+    // Finish streaming
+    await act(async () => {
+      resolveStream()
+    })
+
+    // Unmount component (simulate editor close)
+    unmount()
+
+    // Now summary generation should be triggered because content changed (final content)
+    expect(window.electronAPI!.invoke).toHaveBeenCalledWith(
+      'ai:generate-summary',
+      { node_id: 42, content: 'more partial content' }
+    )
+
+    // dispatchPlanGraphRefresh should also be called after a delay
+    await waitFor(() => expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).toHaveBeenCalled(), { timeout: 3000 })
+    vi.unstubAllGlobals()
+  })
 })

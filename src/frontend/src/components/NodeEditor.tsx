@@ -86,6 +86,12 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const summaryTriggeredRef = useRef(false)
 
+  // Refs for summary generation (to avoid stale closures)
+  const contentRef = useRef('')
+  const dirtyRef = useRef(false)
+  const autoGenerateSummaryRef = useRef(false)
+  const adapterRef = useRef(adapter)
+
   // ── Editor mode ────────────────────────────────────────────────────────────
   const [editorMode, setEditorMode] = useState<EditorMode>('generate')
   const [reviewBaseContent, setReviewBaseContent] = useState('')
@@ -108,6 +114,12 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
   const [thinkingDetail, setThinkingDetail] = useState<string | null>(null)
   const [thinkingDone, setThinkingDone] = useState(false)
+
+  // Keep refs up to date with current state (for summary generation)
+  contentRef.current = content
+  autoGenerateSummaryRef.current = autoGenerateSummary
+  adapterRef.current = adapter
+  dirtyRef.current = content !== initialContent || primaryValue !== initialPrimary
 
   // ── Load node ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -206,14 +218,14 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     return () => {
       // Only for adapters that support auto‑summary, when setting enabled, content changed, and not already triggered
       if (
-        adapter.supportsAutoSummary &&
-        autoGenerateSummary &&
+        adapterRef.current.supportsAutoSummary &&
+        autoGenerateSummaryRef.current &&
         !summaryTriggeredRef.current &&
-        (content !== initialContent || primaryValue !== initialPrimary)
+        dirtyRef.current
       ) {
         summaryTriggeredRef.current = true
         // Fire and forget, but dispatch a graph refresh after a short delay
-        ipcClient.ai.generateSummary({ node_id: nodeId, content: content || undefined })
+        ipcClient.ai.generateSummary({ node_id: nodeId, content: contentRef.current || undefined })
           .then(() => {
             // Give the backend a moment to update the node, then refresh the graph
             setTimeout(() => dispatchPlanGraphRefresh(), 2000)
@@ -221,7 +233,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           .catch(() => {})
       }
     }
-  }, [nodeId, adapter.supportsAutoSummary, autoGenerateSummary, content, primaryValue, initialContent, initialPrimary])
+  }, [nodeId])
 
   // ── Clear timers on unmount ────────────────────────────────────────────────
   useEffect(() => () => {
