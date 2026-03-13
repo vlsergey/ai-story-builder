@@ -41,4 +41,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('stream:event', handler)
     return () => ipcRenderer.removeListener('stream:event', handler)
   },
+
+  /**
+   * Show a native alert dialog (synchronous).
+   * @param {string} text
+   */
+  alert: (text) => {
+    return ipcRenderer.sendSync('alert', text)
+  },
+
+  /**
+   * Show a native confirmation dialog (synchronous).
+   * @param {string} text
+   * @returns {boolean}
+   */
+  confirm: (text) => {
+    return ipcRenderer.sendSync('confirm', text)
+  },
 })

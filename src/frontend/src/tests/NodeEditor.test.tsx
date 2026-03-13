@@ -77,6 +77,8 @@ function setupElectronAPI(invokeImpl?: (channel: string, ...args: unknown[]) => 
     onMenuAction: vi.fn().mockReturnValue(vi.fn()),
     sendMenuState: vi.fn(),
     showErrorDialog: vi.fn(),
+    alert: vi.fn(),
+    confirm: vi.fn().mockReturnValue(true),
     invoke: vi.fn().mockImplementation(invokeImpl ?? ((channel: string) => {
       if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
       if (channel === 'settings:get') return Promise.resolve({ value: null })
@@ -138,8 +140,7 @@ describe('NodeEditor — generate mode behavior', () => {
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
 
     // Node has content; confirm dialog not needed — simulate already loaded with content
-    // Since window.confirm would block, stub it to return true
-    vi.stubGlobal('confirm', () => true)
+    // window.electronAPI.confirm is already mocked to return true
 
     const promptTextarea = screen.getByPlaceholderText('lore.userPrompt')
     fireEvent.change(promptTextarea, { target: { value: 'regenerate this' } })
@@ -167,8 +168,6 @@ describe('NodeEditor — generate mode behavior', () => {
     await act(async () => {
       resolveStream()
     })
-
-    vi.unstubAllGlobals()
   })
 
   it('replaces content progressively as tokens arrive (not appending)', async () => {
@@ -329,8 +328,6 @@ describe('NodeEditor — auto‑summary generation', () => {
 
     const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
     await screen.findByTestId('codemirror', {}, { timeout: 5000 })
-    // Stub confirm dialog to allow regeneration
-    vi.stubGlobal('confirm', () => true)
 
     // Start AI generation (simulate user clicking generate)
     const promptTextarea = screen.getByPlaceholderText('plan.userPrompt')
@@ -374,6 +371,5 @@ describe('NodeEditor — auto‑summary generation', () => {
 
     // dispatchPlanGraphRefresh should also be called after a delay
     await waitFor(() => expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).toHaveBeenCalled(), { timeout: 3000 })
-    vi.unstubAllGlobals()
   })
 })

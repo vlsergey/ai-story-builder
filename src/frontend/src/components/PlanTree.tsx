@@ -303,7 +303,9 @@ export default function PlanTree({
       return n?.parent_id !== null
     })
     if (toDelete.length === 0) return
-    if (!window.confirm(`Delete ${toDelete.length} node${toDelete.length > 1 ? 's' : ''}? All descendants will also be deleted.`)) return
+    const message = `Delete ${toDelete.length} node${toDelete.length > 1 ? 's' : ''}? All descendants will also be deleted.`
+    const confirmed = window.electronAPI.confirm(message)
+    if (!confirmed) return
     await Promise.all(toDelete.map(id => ipcClient.plan.deleteNode(id)))
     setViewState(prev => ({ ...prev, 'plan-tree': { ...prev['plan-tree'], selectedItems: [] } }))
     fetchTree()

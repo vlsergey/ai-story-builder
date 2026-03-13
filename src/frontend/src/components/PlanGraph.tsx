@@ -148,7 +148,9 @@ export default function PlanGraph() {
   }, [nodes])
 
   async function deleteNode(nodeId: string) {
-    if (!window.confirm('Delete this node and all connected edges?')) return
+    const message = 'Delete this node and all connected edges?'
+    const confirmed = window.electronAPI.confirm(message)
+    if (!confirmed) return
     const result = await ipcClient.graph.deleteNode(Number(nodeId))
     if (result.ok) dispatchPlanGraphRefresh()
   }

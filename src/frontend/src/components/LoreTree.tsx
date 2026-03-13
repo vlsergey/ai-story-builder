@@ -458,7 +458,9 @@ export default function LoreTree({
       return n?.parent_id !== null && !n?.to_be_deleted
     })
     if (toDelete.length === 0) return
-    if (!window.confirm(`Mark ${toDelete.length} node${toDelete.length > 1 ? 's' : ''} for deletion? All descendants will also be marked.`)) return
+    const message = `Mark ${toDelete.length} node${toDelete.length > 1 ? 's' : ''} for deletion? All descendants will also be marked.`
+    const confirmed = window.electronAPI.confirm(message)
+    if (!confirmed) return
     await Promise.all(toDelete.map(id => ipcClient.lore.delete(id)))
     setViewState(prev => ({ ...prev, 'lore-tree': { ...prev['lore-tree'], selectedItems: [] } }))
     fetchTree()
@@ -485,11 +487,7 @@ export default function LoreTree({
   }
 
   function showError(message: string) {
-    if (window.electronAPI) {
-      void window.electronAPI.showErrorDialog('Sync Error', message)
-    } else {
-      window.alert(message)
-    }
+    void window.electronAPI.showErrorDialog('Sync Error', message)
   }
 
   async function handleSyncLore() {

@@ -66,6 +66,8 @@ describe('Layout', () => {
       startStream: vi.fn().mockResolvedValue({ ok: true }),
       abortStream: vi.fn().mockResolvedValue({ ok: true }),
       onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
+      alert: vi.fn(),
+      confirm: vi.fn(),
     }
   });
 

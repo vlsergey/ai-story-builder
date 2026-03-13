@@ -317,7 +317,11 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   // ── Mode A: Generate from scratch ─────────────────────────────────────────
   function handleGenerate() {
     if (!effectivePrompt.trim()) return
-    if (hasContent && !window.confirm(tp('overwrite_warning'))) return
+    if (hasContent) {
+      const message = tp('overwrite_warning')
+      const confirmed = window.electronAPI.confirm(message)
+      if (!confirmed) return
+    }
     setThinkingStatus(null)
     setThinkingDetail(null)
     setThinkingDone(false)

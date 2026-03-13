@@ -15,6 +15,8 @@ function setupElectronAPIWithTree(nodes: Partial<LoreNode>[]) {
     onMenuAction: vi.fn().mockReturnValue(vi.fn()),
     sendMenuState: vi.fn(),
     showErrorDialog: vi.fn(),
+    alert: vi.fn(),
+    confirm: vi.fn(),
     invoke: vi.fn().mockImplementation((channel: string) => {
       if (channel === 'lore:tree') return Promise.resolve(currentLoreTreeData)
       return Promise.resolve({})
@@ -67,6 +69,8 @@ describe('LoreTree', () => {
       onMenuAction: vi.fn().mockReturnValue(vi.fn()),
       sendMenuState: vi.fn(),
       showErrorDialog: vi.fn(),
+      alert: vi.fn(),
+      confirm: vi.fn(),
       invoke: vi.fn().mockImplementation((channel: string) => {
         if (channel === 'lore:tree') return Promise.resolve({ error: 'Invalid response' })
         return Promise.resolve({})
@@ -85,6 +89,8 @@ describe('LoreTree', () => {
       onMenuAction: vi.fn().mockReturnValue(vi.fn()),
       sendMenuState: vi.fn(),
       showErrorDialog: vi.fn(),
+      alert: vi.fn(),
+      confirm: vi.fn(),
       invoke: vi.fn().mockImplementation((channel: string) => {
         if (channel === 'lore:tree') return Promise.resolve(null)
         return Promise.resolve({})
