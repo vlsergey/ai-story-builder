@@ -7,7 +7,6 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
-  useReactFlow,
   type Node,
   type Edge,
   type Connection,
@@ -87,7 +86,7 @@ export default function PlanGraph() {
   const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' | 'merge' } | null>(null)
   const [addTitle, setAddTitle] = useState('')
   const addTitleInputRef = useRef<HTMLInputElement>(null)
-  const { fitView: fitViewApi } = useReactFlow()
+  const reactFlowInstance = useRef<any>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
   const hasFitted = useRef(false)
 
@@ -141,11 +140,11 @@ export default function PlanGraph() {
 
   // Fit view after nodes are loaded and when layout changes
   useEffect(() => {
-    if (nodes.length > 0 && !hasFitted.current) {
-      fitViewApi({ padding: 0.2 })
+    if (nodes.length > 0 && !hasFitted.current && reactFlowInstance.current) {
+      reactFlowInstance.current.fitView({ padding: 0.2 })
       hasFitted.current = true
     }
-  }, [nodes, fitViewApi])
+  }, [nodes])
 
   async function deleteNode(nodeId: string) {
     if (!window.confirm('Delete this node and all connected edges?')) return
@@ -241,7 +240,7 @@ export default function PlanGraph() {
         void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
       }
       // Fit view after layout change
-      setTimeout(() => fitViewApi({ padding: 0.2 }), 0)
+      setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
     }
   }
 
@@ -253,7 +252,7 @@ export default function PlanGraph() {
       void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
     }
     // Fit view after layout change
-    setTimeout(() => fitViewApi({ padding: 0.2 }), 0)
+    setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
   }
 
   if (loading) {
@@ -329,6 +328,7 @@ export default function PlanGraph() {
         onViewportChange={setViewport}
         nodesDraggable={!autoLayout}
         zoomOnDoubleClick={false}
+        onInit={(instance) => { reactFlowInstance.current = instance }}
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls />
