@@ -2,16 +2,34 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { PlanGraphNode } from '../../types/models'
 
+type PlanLoreNodeData = PlanGraphNode & { onDelete: (id: string) => void }
+
 export default function PlanLoreNode({ data }: NodeProps) {
-  const node = data as unknown as PlanGraphNode
+  const node = data as unknown as PlanLoreNodeData
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (window.confirm('Delete this node and all connected edges?')) {
+      node.onDelete(String(node.id))
+    }
+  }
 
   return (
-    <div className="bg-background border-2 border-purple-400 rounded shadow-sm w-[200px] cursor-default select-none">
+    <div className="bg-background border-2 border-purple-400 rounded shadow-sm w-[200px] cursor-default select-none group">
       <Handle type="target" position={Position.Left} />
       <div className="p-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-purple-500 text-sm">⬡</span>
-          <span className="text-sm font-medium truncate">{node.title}</span>
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-purple-500 text-sm">⬡</span>
+            <span className="text-sm font-medium truncate">{node.title}</span>
+          </div>
+          <button
+            onClick={handleDelete}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-destructive bg-background border border-border rounded w-4 h-4 flex items-center justify-center"
+            title="Delete node"
+          >
+            ×
+          </button>
         </div>
         <div className="text-[10px] text-muted-foreground mt-0.5">Lore</div>
       </div>

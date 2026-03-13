@@ -114,6 +114,7 @@
   "planGraph.node.notGenerated": "Не сгенерировано",
   "planGraph.node.generated": "Сгенерировано",
   "planGraph.node.review": "На проверке",
+  "planGraph.deleteNode": "Удалить узел",
 
   "lore.generate": "Сгенерировать",
   "lore.regenerate": "Перегенерировать",

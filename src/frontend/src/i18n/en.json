@@ -114,6 +114,7 @@
   "planGraph.node.notGenerated": "Not generated",
   "planGraph.node.generated": "Generated",
   "planGraph.node.review": "Review",
+  "planGraph.deleteNode": "Delete node",
 
   "lore.generate": "Generate",
   "lore.regenerate": "Regenerate",

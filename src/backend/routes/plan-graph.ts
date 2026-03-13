@@ -271,6 +271,9 @@ export function deleteGraphNode(id: number): { ok: boolean } {
   const db = new Database(dbPath)
   const node = db.prepare('SELECT id FROM plan_nodes WHERE id = ?').get(id)
   if (!node) { db.close(); throw makeError('node not found', 404) }
+  // Delete connected edges first
+  db.prepare('DELETE FROM plan_edges WHERE from_node_id = ? OR to_node_id = ?').run(id, id)
+  // Delete the node
   db.prepare('DELETE FROM plan_nodes WHERE id = ?').run(id)
   db.close()
   return { ok: true }
