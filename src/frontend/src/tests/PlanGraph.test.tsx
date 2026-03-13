@@ -10,6 +10,7 @@ vi.mock('@xyflow/react', () => ({
   useNodesState: () => [[], vi.fn(), vi.fn()],
   useEdgesState: () => [[], vi.fn(), vi.fn()],
   addEdge: vi.fn(),
+  useReactFlow: () => ({ fitView: vi.fn() }),
   BackgroundVariant: { Dots: 'dots' },
 }))
 

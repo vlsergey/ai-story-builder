@@ -7,10 +7,11 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  useReactFlow,
   type Node,
   type Edge,
   type Connection,
-  type OnConnectEnd,
+  type Viewport,
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -86,6 +87,9 @@ export default function PlanGraph() {
   const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' | 'merge' } | null>(null)
   const [addTitle, setAddTitle] = useState('')
   const addTitleInputRef = useRef<HTMLInputElement>(null)
+  const { fitView: fitViewApi } = useReactFlow()
+  const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
+  const hasFitted = useRef(false)
 
   const loadGraph = useCallback(async () => {
     try {
@@ -134,6 +138,14 @@ export default function PlanGraph() {
     window.addEventListener(PLAN_NODE_SAVED_EVENT, handler)
     return () => window.removeEventListener(PLAN_NODE_SAVED_EVENT, handler)
   }, [])
+
+  // Fit view after nodes are loaded and when layout changes
+  useEffect(() => {
+    if (nodes.length > 0 && !hasFitted.current) {
+      fitViewApi({ padding: 0.2 })
+      hasFitted.current = true
+    }
+  }, [nodes, fitViewApi])
 
   async function deleteNode(nodeId: string) {
     if (!window.confirm('Delete this node and all connected edges?')) return
@@ -228,6 +240,8 @@ export default function PlanGraph() {
       for (const n of laid) {
         void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
       }
+      // Fit view after layout change
+      setTimeout(() => fitViewApi({ padding: 0.2 }), 0)
     }
   }
 
@@ -238,6 +252,8 @@ export default function PlanGraph() {
     for (const n of laid) {
       void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
     }
+    // Fit view after layout change
+    setTimeout(() => fitViewApi({ padding: 0.2 }), 0)
   }
 
   if (loading) {
@@ -307,10 +323,10 @@ export default function PlanGraph() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
-nodeTypes={nodeTypes}
+        nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
+        viewport={viewport}
+        onViewportChange={setViewport}
         nodesDraggable={!autoLayout}
         zoomOnDoubleClick={false}
       >
