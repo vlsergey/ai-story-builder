@@ -1,5 +1,5 @@
-export type PlanNodeType = 'text' | 'lore'
-export type PlanEdgeType = 'instruction' | 'attachment' | 'system_prompt'
+export type PlanNodeType = 'text' | 'lore' | 'merge'
+export type PlanEdgeType = 'instruction' | 'attachment' | 'system_prompt' | 'merge_into'
 
 export interface PlanNodeRow {
   id: number

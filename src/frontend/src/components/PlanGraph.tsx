@@ -21,6 +21,7 @@ import { PLAN_NODE_SAVED_EVENT, type PlanNodeSavedDetail } from '../lib/plan-eve
 import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
+import PlanMergeNode from './plan-graph/PlanMergeNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './plan-graph/GenerateAllDialog'
 import { ipcClient } from '../ipcClient'
@@ -31,6 +32,7 @@ type PlanGraphEdgeData = { type: string; label?: string; onDelete: (id: string) 
 const nodeTypes = {
   planText: PlanTextNode,
   planLore: PlanLoreNode,
+  planMerge: PlanMergeNode,
 }
 
 const edgeTypes = {
@@ -54,7 +56,7 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
 function toReactFlowNodes(graphNodes: PlanGraphNode[], onDelete: (id: string) => void): Node[] {
   return graphNodes.map(n => ({
     id: String(n.id),
-    type: n.type === 'lore' ? 'planLore' : 'planText',
+    type: n.type === 'lore' ? 'planLore' : n.type === 'merge' ? 'planMerge' : 'planText',
     position: { x: n.x ?? 0, y: n.y ?? 0 },
     data: { ...n, onDelete },
   }))
@@ -81,7 +83,7 @@ export default function PlanGraph() {
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
   const [showGenerateAll, setShowGenerateAll] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' } | null>(null)
+  const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' | 'merge' } | null>(null)
   const [addTitle, setAddTitle] = useState('')
   const addTitleInputRef = useRef<HTMLInputElement>(null)
 
@@ -146,7 +148,7 @@ export default function PlanGraph() {
     }
   }
 
-  function openAddDialog(type: 'text' | 'lore') {
+  function openAddDialog(type: 'text' | 'lore' | 'merge') {
     setAddTitle('')
     setAddDialog({ type })
     // focus the input on next paint
@@ -171,8 +173,31 @@ export default function PlanGraph() {
   }, [autoLayout])
 
   const onConnect = useCallback((connection: Connection) => {
+    // If connecting to a merge node, automatically create a merge_into edge
+    if (connection.target && connection.source) {
+      const targetNode = nodes.find(n => n.id === connection.target)
+      if (targetNode?.data.type === 'merge') {
+        // Create the edge directly without showing dialog
+        void ipcClient.graph.createEdge({
+          from_node_id: Number(connection.source),
+          to_node_id: Number(connection.target),
+          type: 'merge_into',
+        }).then(result => {
+          const newEdge: Edge = {
+            id: String(result.id),
+            source: connection.source!,
+            target: connection.target!,
+            type: 'planEdge',
+            data: { type: 'merge_into', onDelete: deleteEdge },
+          }
+          setEdges(prev => addEdge(newEdge, prev))
+        })
+        return
+      }
+    }
+    // Otherwise show the dialog for other edge types
     setShowConnectDialog(connection)
-  }, [])
+  }, [nodes, deleteEdge])
 
 
   async function confirmConnect(edgeType: string) {
@@ -229,15 +254,24 @@ export default function PlanGraph() {
       <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-background border border-border rounded shadow px-2 py-1.5 flex-wrap">
         <button
           onClick={() => openAddDialog('text')}
+          title={t('planGraph.addTextNode')}
           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
         >
           {t('planGraph.addTextNode')}
         </button>
         <button
           onClick={() => openAddDialog('lore')}
+          title={t('planGraph.addLoreNode')}
           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
         >
           {t('planGraph.addLoreNode')}
+        </button>
+        <button
+          onClick={() => openAddDialog('merge')}
+          title={t('planGraph.addMergeNode')}
+          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+        >
+          {t('planGraph.addMergeNode')}
         </button>
         <div className="w-px h-4 bg-border mx-0.5" />
         <label className="flex items-center gap-1 text-xs cursor-pointer">
@@ -291,7 +325,7 @@ nodeTypes={nodeTypes}
           <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-64">
             <h3 className="text-sm font-semibold mb-3">Select edge type</h3>
             <div className="flex flex-col gap-2">
-              {(['instruction', 'attachment', 'system_prompt'] as const).map(type => (
+              {(['instruction', 'attachment', 'system_prompt', 'merge_into'] as const).map(type => (
                 <button
                   key={type}
                   onClick={() => void confirmConnect(type)}

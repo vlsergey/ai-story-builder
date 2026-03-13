@@ -57,7 +57,7 @@ export interface PlanNodeTree {
 /** Plan graph node (returned by GET /api/plan/graph) */
 export interface PlanGraphNode {
   id: number
-  type: 'text' | 'lore'
+  type: 'text' | 'lore' | 'merge'
   title: string
   content: string | null
   user_prompt: string | null
@@ -81,7 +81,7 @@ export interface PlanGraphEdge {
   id: number
   from_node_id: number
   to_node_id: number
-  type: 'instruction' | 'attachment' | 'system_prompt'
+  type: 'instruction' | 'attachment' | 'system_prompt' | 'merge_into'
   position: number
   label: string | null
   template: string | null

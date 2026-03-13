@@ -1,0 +1,176 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import Database from 'better-sqlite3'
+import os from 'os'
+import path from 'path'
+import fs from 'fs'
+import { setCurrentDbPath } from '../db/state.js'
+import { patchGraphNode, getGraphNode, createGraphNode, createGraphEdge } from './plan-graph.js'
+
+// ── In-memory DB setup ────────────────────────────────────────────────────────
+
+function setupDb(dbPath: string) {
+  const db = new Database(dbPath)
+  db.exec(`
+    CREATE TABLE plan_nodes (
+      id                   INTEGER PRIMARY KEY,
+      parent_id            INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
+      title                TEXT NOT NULL,
+      content              TEXT,
+      position             INTEGER DEFAULT 0,
+      created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+      type                 TEXT NOT NULL DEFAULT 'text',
+      x                    REAL DEFAULT 0,
+      y                    REAL DEFAULT 0,
+      user_prompt          TEXT,
+      system_prompt        TEXT,
+      summary              TEXT,
+      auto_summary         INTEGER DEFAULT 0,
+      ai_sync_info         TEXT,
+      word_count           INTEGER NOT NULL DEFAULT 0,
+      char_count           INTEGER NOT NULL DEFAULT 0,
+      byte_count           INTEGER NOT NULL DEFAULT 0,
+      changes_status       TEXT NULL,
+      review_base_content  TEXT NULL,
+      last_improve_instruction TEXT NULL,
+      merge_settings       TEXT NULL
+    );
+    CREATE TABLE plan_edges (
+      id           INTEGER PRIMARY KEY,
+      from_node_id INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
+      to_node_id   INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
+      type         TEXT NOT NULL DEFAULT 'instruction',
+      position     INTEGER DEFAULT 0,
+      label        TEXT,
+      template     TEXT
+    );
+  `)
+  // Root node
+  db.prepare("INSERT INTO plan_nodes (id, title, type) VALUES (1, 'Root', 'text')").run()
+  db.close()
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('merge-node generation', () => {
+  let dbPath: string
+
+  beforeEach(() => {
+    dbPath = path.join(os.tmpdir(), `merge-node-test-${Date.now()}.sqlite`)
+    setupDb(dbPath)
+    setCurrentDbPath(dbPath)
+  })
+
+  afterEach(() => {
+    setCurrentDbPath(null)
+    try { fs.unlinkSync(dbPath) } catch (_) {}
+  })
+
+  it('creates a merge node with default settings', () => {
+    // Create input nodes
+    const input1 = createGraphNode({ title: 'Input 1', type: 'text' })
+    const input2 = createGraphNode({ title: 'Input 2', type: 'text' })
+    // Create merge node
+    const merge = createGraphNode({ title: 'Merge', type: 'merge' })
+    // Connect inputs to merge via merge_into edges
+    createGraphEdge({ from_node_id: input1.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    createGraphEdge({ from_node_id: input2.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    // Set content for inputs
+    patchGraphNode(input1.id as number, { content: 'Content from input 1' })
+    patchGraphNode(input2.id as number, { content: 'Content from input 2' })
+    // Update merge settings (default) to trigger generation
+    const res = patchGraphNode(merge.id as number, { merge_settings: JSON.stringify({}) })
+    expect(res.ok).toBe(true)
+    // Retrieve merge node
+    const node = getGraphNode(merge.id as number)
+    expect(node.content).toBe('Content from input 1\n\nContent from input 2')
+    expect(node.word_count).toBe(8) // 4 + 4 words
+    expect(node.char_count).toBe(42) // 20 + 2 newlines + 20
+  })
+
+  it('includes node title when includeNodeTitle is true', () => {
+    const input = createGraphNode({ title: 'Input', type: 'text' })
+    const merge = createGraphNode({ title: 'My Merge', type: 'merge' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    patchGraphNode(input.id as number, { content: 'Some content' })
+    const settings = { includeNodeTitle: true }
+    const res = patchGraphNode(merge.id as number, { merge_settings: JSON.stringify(settings) })
+    expect(res.ok).toBe(true)
+    const node = getGraphNode(merge.id as number)
+    expect(node.content).toBe('# My Merge\n\nSome content')
+  })
+
+  it('includes input titles when includeInputTitles is true', () => {
+    const input = createGraphNode({ title: 'Input Title', type: 'text' })
+    const merge = createGraphNode({ title: 'Merge', type: 'merge' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    patchGraphNode(input.id as number, { content: 'Content here' })
+    const settings = { includeInputTitles: true }
+    const res = patchGraphNode(merge.id as number, { merge_settings: JSON.stringify(settings) })
+    expect(res.ok).toBe(true)
+    const node = getGraphNode(merge.id as number)
+    expect(node.content).toBe('## Input Title\n\nContent here')
+  })
+
+  it('fixes headers when fixHeaders is true', () => {
+    const input = createGraphNode({ title: 'Input', type: 'text' })
+    const merge = createGraphNode({ title: 'Merge', type: 'merge' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    // Input content with h1 and h2
+    patchGraphNode(input.id as number, { content: '# Header 1\n\n## Header 2\n\nText' })
+    const settings = { fixHeaders: true }
+    const res = patchGraphNode(merge.id as number, { merge_settings: JSON.stringify(settings) })
+    expect(res.ok).toBe(true)
+    const node = getGraphNode(merge.id as number)
+    // h1 is removed entirely (not turned into plain text), h2 becomes h3
+    expect(node.content).toBe('### Header 2\n\nText')
+  })
+
+  it('regenerates content when merge_settings changes', () => {
+    const input = createGraphNode({ title: 'Input', type: 'text' })
+    const merge = createGraphNode({ title: 'Merge', type: 'merge' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    patchGraphNode(input.id as number, { content: 'Content' })
+    // First with no titles
+    patchGraphNode(merge.id as number, { merge_settings: JSON.stringify({}) })
+    let node = getGraphNode(merge.id as number)
+    expect(node.content).toBe('Content')
+    // Change settings to include titles
+    patchGraphNode(merge.id as number, { merge_settings: JSON.stringify({ includeInputTitles: true }) })
+    node = getGraphNode(merge.id as number)
+    expect(node.content).toBe('## Input\n\nContent')
+  })
+
+  it('overwrites manual content when merge_settings changes', () => {
+    const input = createGraphNode({ title: 'Input', type: 'text' })
+    const merge = createGraphNode({ title: 'Merge', type: 'merge' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    patchGraphNode(input.id as number, { content: 'Input content' })
+    // Manually set content
+    patchGraphNode(merge.id as number, { content: 'Manual content' })
+    // Update merge settings - should regenerate because hasContent is false
+    patchGraphNode(merge.id as number, { merge_settings: JSON.stringify({ includeNodeTitle: true }) })
+    const node = getGraphNode(merge.id as number)
+    expect(node.content).toBe('# Merge\n\nInput content') // regenerated with node title
+  })
+
+  it('generates content when node becomes merge type', () => {
+    const input = createGraphNode({ title: 'Input', type: 'text' })
+    const node = createGraphNode({ title: 'Node', type: 'text' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: node.id as number, type: 'merge_into' })
+    patchGraphNode(input.id as number, { content: 'Input content' })
+    // Change type to merge
+    const res = patchGraphNode(node.id as number, { type: 'merge' })
+    expect(res.ok).toBe(true)
+    const updated = getGraphNode(node.id as number)
+    expect(updated.content).toBe('Input content')
+  })
+
+  it('handles empty inputs gracefully', () => {
+    const merge = createGraphNode({ title: 'Merge', type: 'merge' })
+    const res = patchGraphNode(merge.id as number, { merge_settings: JSON.stringify({}) })
+    expect(res.ok).toBe(true)
+    const node = getGraphNode(merge.id as number)
+    expect(node.content).toBe('')
+    expect(node.word_count).toBe(0)
+  })
+})

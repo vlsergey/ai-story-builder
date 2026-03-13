@@ -1,6 +1,7 @@
 import type { PlanNodeRow, PlanEdgeRow } from '../types/index.js'
 import { getCurrentDbPath } from '../db/state.js'
 import type { PlanGraphData } from '../../shared/plan-graph.js'
+import { generateMergeContent } from './merge-node.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -101,6 +102,7 @@ export function patchGraphNode(
     system_prompt?: string
     summary?: string
     auto_summary?: number
+    merge_settings?: string
     prompt?: string
     start_review?: boolean
     accept_review?: boolean
@@ -108,7 +110,7 @@ export function patchGraphNode(
 ): { ok: boolean; word_count?: number | null; char_count?: number | null; byte_count?: number | null } {
   const {
     title, content, x, y, type,
-    user_prompt, system_prompt, summary, auto_summary,
+    user_prompt, system_prompt, summary, auto_summary, merge_settings,
     prompt, start_review, accept_review,
   } = data
   const dbPath = getCurrentDbPath()
@@ -123,25 +125,99 @@ export function patchGraphNode(
   const hasSystemPrompt = system_prompt !== undefined
   const hasSummary = summary !== undefined
   const hasAutoSummary = auto_summary !== undefined
+  const hasMergeSettings = merge_settings !== undefined
+
+  // Validate type if provided
+  if (hasType && !['text', 'lore', 'merge'].includes(type!)) {
+    throw makeError('invalid node type', 400)
+  }
 
   if (!hasTitle && !hasContent && !hasPosition && !hasType && !hasUserPrompt &&
-      !hasSystemPrompt && !hasSummary && !hasAutoSummary && !accept_review &&
+      !hasSystemPrompt && !hasSummary && !hasAutoSummary && !hasMergeSettings && !accept_review &&
       prompt === undefined) {
     throw makeError('at least one field required', 400)
   }
 
   const db = new Database(dbPath)
+
+  // Fetch current node for merge generation
+  const current = db.prepare('SELECT type, merge_settings, title FROM plan_nodes WHERE id = ?').get(id) as { type: string, merge_settings: string | null, title: string } | undefined;
+  if (!current) {
+    db.close();
+    throw makeError('node not found', 404);
+  }
+  const willBeMerge = (hasType && type === 'merge') || (!hasType && current.type === 'merge');
+  let generatedContent: string | null = null;
+  let generatedWordCount: number | null = null;
+  let generatedCharCount: number | null = null;
+  let generatedByteCount: number | null = null;
+
+  // Determine if we should regenerate merge content
+  if (willBeMerge && !hasContent && (hasMergeSettings || (hasType && type === 'merge'))) {
+    // Parse settings
+    const defaultSettings = {
+      includeNodeTitle: false,
+      includeInputTitles: false,
+      fixHeaders: false,
+      autoUpdate: false,
+    };
+    let settings = defaultSettings;
+    if (hasMergeSettings) {
+      try {
+        settings = { ...defaultSettings, ...JSON.parse(merge_settings!) };
+      } catch (e) {
+        // keep defaults
+      }
+    } else if (current.merge_settings) {
+      try {
+        settings = { ...defaultSettings, ...JSON.parse(current.merge_settings) };
+      } catch (e) {
+        // keep defaults
+      }
+    }
+    const nodeTitle = hasTitle ? title!.trim() : current.title;
+    try {
+      generatedContent = generateMergeContent(db, id, settings, nodeTitle);
+      generatedWordCount = countWords(generatedContent);
+      generatedCharCount = countChars(generatedContent);
+      generatedByteCount = countBytes(generatedContent);
+    } catch (error) {
+      // If generation fails (e.g., no inputs), leave content empty
+      generatedContent = '';
+      generatedWordCount = 0;
+      generatedCharCount = 0;
+      generatedByteCount = 0;
+    }
+  }
+
   const sets: string[] = []
   const params: (string | number | null)[] = []
 
   if (hasTitle) { sets.push('title = ?'); params.push(title!.trim()) }
-  if (hasType) { sets.push('type = ?'); params.push(type!) }
+  if (hasType) {
+    sets.push('type = ?');
+    params.push(type!);
+    // If changing to merge type, ensure content is null (calculated)
+    if (type === 'merge') {
+      sets.push('content = ?');
+      params.push(null);
+    }
+  }
   if (x !== undefined) { sets.push('x = ?'); params.push(x) }
   if (y !== undefined) { sets.push('y = ?'); params.push(y) }
   if (hasUserPrompt) { sets.push('user_prompt = ?'); params.push(user_prompt ?? null) }
   if (hasSystemPrompt) { sets.push('system_prompt = ?'); params.push(system_prompt ?? null) }
   if (hasSummary) { sets.push('summary = ?'); params.push(summary ?? null) }
   if (hasAutoSummary) { sets.push('auto_summary = ?'); params.push(auto_summary ?? 0) }
+  if (hasMergeSettings) { sets.push('merge_settings = ?'); params.push(merge_settings ?? null) }
+
+  // Add generated merge content if any
+  if (generatedContent !== null) {
+    sets.push('content = ?'); params.push(generatedContent);
+    sets.push('word_count = ?'); params.push(generatedWordCount!);
+    sets.push('char_count = ?'); params.push(generatedCharCount!);
+    sets.push('byte_count = ?'); params.push(generatedByteCount!);
+  }
 
   const wordCount = hasContent ? countWords(content!) : null
   const charCount = hasContent ? countChars(content!) : null
@@ -179,8 +255,12 @@ export function patchGraphNode(
     db.prepare(`UPDATE plan_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params, id)
   }
   db.close()
-  return hasContent
-    ? { ok: true, word_count: wordCount, char_count: charCount, byte_count: byteCount }
+  const anyContent = hasContent || generatedContent !== null;
+  const finalWordCount = hasContent ? wordCount : (generatedContent !== null ? generatedWordCount : null);
+  const finalCharCount = hasContent ? charCount : (generatedContent !== null ? generatedCharCount : null);
+  const finalByteCount = hasContent ? byteCount : (generatedContent !== null ? generatedByteCount : null);
+  return anyContent
+    ? { ok: true, word_count: finalWordCount, char_count: finalCharCount, byte_count: finalByteCount }
     : { ok: true }
 }
 
@@ -204,7 +284,7 @@ export function createGraphEdge(data: {
   label?: string
   template?: string
 }): { id: number | bigint } {
-  const { from_node_id, to_node_id, type = 'instruction', position = 0, label, template } = data
+  const { from_node_id, to_node_id, type = (to_node_id ? 'instruction' : 'merge_into'), position = 0, label, template } = data
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   if (from_node_id == null || to_node_id == null) {
@@ -228,6 +308,28 @@ export function patchGraphEdge(
 ): { ok: boolean } {
   const { type, position, label, template } = data
   const dbPath = getCurrentDbPath()
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+
+  // First get the current edge to access to_node_id
+  const readDb = new Database(dbPath, { readonly: true })
+  const currentEdge = readDb.prepare('SELECT to_node_id FROM plan_edges WHERE id = ?').get(id) as { to_node_id: number } | undefined
+  readDb.close()
+
+  if (!currentEdge) {
+    throw makeError('edge not found', 404)
+  }
+
+  // Validate edge type constraints
+  if (type === 'merge_into') {
+    // Get target node to verify it's a merge node
+    const readDb = new Database(dbPath, { readonly: true })
+    const targetNode = readDb.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(currentEdge.to_node_id) as { type: string } | undefined
+    readDb.close()
+    if (!targetNode || targetNode.type !== 'merge') {
+      throw makeError('merge_into edges can only target merge nodes', 400)
+    }
+  }
   if (!dbPath) throw makeError('no project open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
   if (type == null && position == null && label === undefined && template === undefined) {
