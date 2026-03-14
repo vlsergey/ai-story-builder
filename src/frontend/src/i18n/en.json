@@ -118,6 +118,8 @@
   "planGraph.node.generated": "Generated",
   "planGraph.node.review": "Review",
   "planGraph.deleteNode": "Delete node",
+  "planGraph.selectEdgeType": "Select edge type",
+  "planGraph.deleteConfirmation": "Delete this node and all connected edges?",
 
   "lore.generate": "Generate",
   "lore.regenerate": "Regenerate",

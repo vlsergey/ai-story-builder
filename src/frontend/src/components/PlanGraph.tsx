@@ -152,7 +152,7 @@ export default function PlanGraph() {
   }, [nodes])
 
   async function deleteNode(nodeId: string) {
-    const message = 'Delete this node and all connected edges?'
+    const message = t('planGraph.deleteConfirmation')
     const confirmed = window.electronAPI.confirm(message)
     if (!confirmed) return
     const result = await ipcClient.graph.deleteNode(Number(nodeId))
@@ -295,7 +295,7 @@ export default function PlanGraph() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="text-muted-foreground text-sm">Loading…</span>
+        <span className="text-muted-foreground text-sm">{t('billing.loading')}</span>
       </div>
     )
   }
@@ -327,10 +327,10 @@ export default function PlanGraph() {
         </button>
         <button
           onClick={() => openAddDialog('splitter')}
-          title="Add splitter node"
+          title={t('planGraph.addSplitterNode')}
           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
         >
-          Add splitter
+          {t('planGraph.addSplitterNode')}
         </button>
         <div className="w-px h-4 bg-border mx-0.5" />
         <label className="flex items-center gap-1 text-xs cursor-pointer">
@@ -394,7 +394,7 @@ export default function PlanGraph() {
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-64">
-              <h3 className="text-sm font-semibold mb-3">Select edge type</h3>
+              <h3 className="text-sm font-semibold mb-3">{t('planGraph.selectEdgeType')}</h3>
               <div className="flex flex-col gap-2">
                 {allowedEdgeTypes.map(type => (
                   <button
@@ -410,7 +410,7 @@ export default function PlanGraph() {
                 onClick={() => setShowConnectDialog(null)}
                 className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -427,7 +427,10 @@ export default function PlanGraph() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-72">
             <h3 className="text-sm font-semibold mb-3">
-              {addDialog.type === 'text' ? t('planGraph.addTextNode') : t('planGraph.addLoreNode')}
+              {addDialog.type === 'text' ? t('planGraph.addTextNode')
+               : addDialog.type === 'lore' ? t('planGraph.addLoreNode')
+               : addDialog.type === 'merge' ? t('planGraph.addMergeNode')
+               : t('planGraph.addSplitterNode')}
             </h3>
             <input
               ref={addTitleInputRef}

@@ -118,6 +118,8 @@
   "planGraph.node.generated": "Сгенерировано",
   "planGraph.node.review": "На проверке",
   "planGraph.deleteNode": "Удалить узел",
+  "planGraph.selectEdgeType": "Выберите тип связи",
+  "planGraph.deleteConfirmation": "Удалить этот узел и все связанные связи?",
 
   "lore.generate": "Сгенерировать",
   "lore.regenerate": "Перегенерировать",
