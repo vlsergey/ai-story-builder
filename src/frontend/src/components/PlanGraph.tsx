@@ -19,7 +19,7 @@ import { useLocale } from '../lib/locale'
 import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import { PLAN_NODE_SAVED_EVENT, type PlanNodeSavedDetail } from '../lib/plan-events'
 import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
-import type { PlanNodeType, PlanEdgeType } from '@shared/plan-graph'
+import { type PlanNodeType, type PlanEdgeType, NODE_TYPES } from '@shared/plan-graph'
 import { EDGE_TYPES, canCreateEdge } from '@shared/node-edge-dictionary'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
@@ -87,7 +87,7 @@ export default function PlanGraph() {
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
   const [showGenerateAll, setShowGenerateAll] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' | 'merge' | 'splitter' } | null>(null)
+  const [addDialog, setAddDialog] = useState<{ type: PlanNodeType } | null>(null)
   const [addTitle, setAddTitle] = useState('')
   const addTitleInputRef = useRef<HTMLInputElement>(null)
   const reactFlowInstance = useRef<any>(null)
@@ -175,7 +175,7 @@ export default function PlanGraph() {
     }
   }
 
-  function openAddDialog(type: 'text' | 'lore' | 'merge' | 'splitter') {
+  function openAddDialog(type: PlanNodeType) {
     setAddTitle('')
     setAddDialog({ type })
     // focus the input on next paint
@@ -304,34 +304,16 @@ export default function PlanGraph() {
     <div className="relative h-full w-full">
       {/* Toolbar */}
       <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-background border border-border rounded shadow px-2 py-1.5 flex-wrap">
-        <button
-          onClick={() => openAddDialog('text')}
-          title={t('planGraph.addTextNode')}
-          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
-        >
-          {t('planGraph.addTextNode')}
-        </button>
-        <button
-          onClick={() => openAddDialog('lore')}
-          title={t('planGraph.addLoreNode')}
-          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
-        >
-          {t('planGraph.addLoreNode')}
-        </button>
-        <button
-          onClick={() => openAddDialog('merge')}
-          title={t('planGraph.addMergeNode')}
-          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
-        >
-          {t('planGraph.addMergeNode')}
-        </button>
-        <button
-          onClick={() => openAddDialog('splitter')}
-          title={t('planGraph.addSplitterNode')}
-          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
-        >
-          {t('planGraph.addSplitterNode')}
-        </button>
+        {NODE_TYPES.map((nodeType) => (
+          <button
+            key={nodeType}
+            onClick={() => openAddDialog(nodeType)}
+            title={t(`planGraph.add${nodeType.charAt(0).toUpperCase() + nodeType.slice(1)}Node`)}
+            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+          >
+            {t(`planGraph.add${nodeType.charAt(0).toUpperCase() + nodeType.slice(1)}Node`)}
+          </button>
+        ))}
         <div className="w-px h-4 bg-border mx-0.5" />
         <label className="flex items-center gap-1 text-xs cursor-pointer">
           <input
@@ -427,10 +409,7 @@ export default function PlanGraph() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-72">
             <h3 className="text-sm font-semibold mb-3">
-              {addDialog.type === 'text' ? t('planGraph.addTextNode')
-               : addDialog.type === 'lore' ? t('planGraph.addLoreNode')
-               : addDialog.type === 'merge' ? t('planGraph.addMergeNode')
-               : t('planGraph.addSplitterNode')}
+              {t(`planGraph.add${addDialog.type.charAt(0).toUpperCase() + addDialog.type.slice(1)}Node`)}
             </h3>
             <input
               ref={addTitleInputRef}

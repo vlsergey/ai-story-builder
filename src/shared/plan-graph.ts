@@ -1,6 +1,8 @@
 export type PlanNodeType = 'text' | 'lore' | 'merge' | 'splitter'
 export type PlanEdgeType = 'text' | 'textArray'
 
+export const NODE_TYPES: PlanNodeType[] = ['text', 'lore', 'merge', 'splitter']
+
 export interface PlanNodeRow {
   id: number
   type: PlanNodeType
