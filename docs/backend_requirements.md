@@ -17,7 +17,7 @@
 - IPC errors are returned as `{ __ipcError: true, message: string, status: number }` objects; `ipcClient.ts` converts them to thrown `Error` instances with a `status` property.
 
 ### Code Organization
-- All API endpoints should be separated by domain/entity.  For example, routes pertaining to folders, lore, plans, versions, AI calls, etc. should live in their own directory under `src/backend` (e.g. `routes/folders.js`, `routes/lore.js`, etc.).
+- All API endpoints should be separated by domain/entity.  For example, routes pertaining to folders, lore, plans, versions, AI config, etc. should live in their own directory under `src/backend` (e.g. `routes/folders.js`, `routes/lore.js`, etc.).
 - Each individual endpoint implementation (e.g. `GET /folders/tree`, `POST /lore_items/:id/versions`) should reside in its own file or clearly named function to keep files small and maintainable.
 - The backend project must be well‑organized overall; `server.js` should only wire middleware and import route modules, while business logic lives in separate route/handler files and utility modules.
 - Shared utilities (database connection, settings, helpers) should be factored into reusable modules.

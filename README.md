@@ -17,7 +17,7 @@ Key capabilities include:
 
 This project now uses npm workspaces to separate frontend and backend dependencies:
 - `src/frontend` - React frontend application
-- `src/backend` - Express.js backend server
+- `src/backend` - Node.js/TypeScript backend; logic in `routes/`, exposed via Electron IPC (no HTTP server)
 
 ## Dev:
 
@@ -29,23 +29,19 @@ npm install
 npm run dev
 ```
 
-This will start two servers:
-- Frontend development server with hot reloading on http://localhost:3000
-- Backend API server on http://localhost:3001
-
-For development with hot reloading, access http://localhost:3000.
+This starts the Vite frontend dev server with hot reloading on http://localhost:3000 and builds the backend; Electron then launches and communicates with the backend via IPC (no separate backend port). For development, use the Electron window that opens.
 
 ## Build:
 
 ```bash
 npm install
 npm run build
-npm start
+npm run package
 ```
 
-This will start the backend server which serves the built frontend files at http://localhost:3000.
+This builds the frontend and backend, then packages the Electron app. The packaged application is in `release/` (e.g. `AI Story Builder.AppImage` on Linux, `AI Story Builder Setup.exe` on Windows). Run the packaged app; it serves the built frontend and uses no separate server process.
 
-## Package (requires `pkg`):
+## Package:
 
 ```bash
 npm run package

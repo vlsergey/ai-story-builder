@@ -62,18 +62,9 @@ file=<binary>
 purpose=assistants
 ```
 
-### Chat Completion with File Attachments
-```
-POST https://api.x.ai/v1/chat/completions
-Authorization: Bearer {api_key}
-Content-Type: application/json
+### Responses API (generation, streaming)
 
-{
-  "model": "grok-2",
-  "messages": [...],
-  "file_ids": ["file-abc123", ...]   // up to 10 files
-}
-```
+Content generation uses the **xAI Responses API** in **streaming mode**, not Chat Completions. We use the OpenAI SDK: `client.responses.create({ stream: true, ... })`, which calls `POST https://api.x.ai/v1/responses`. The client consumes `response.output_text.delta` events. File attachments (up to 10 per request) use the provider's format (e.g. `{ type: 'input_file', file_id }`). Web search can be enabled via `tools: [{ type: 'web_search' }]`. Connection test still uses `GET /v1/models` to validate the API key.
 
 ---
 

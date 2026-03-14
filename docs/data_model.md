@@ -124,9 +124,12 @@ The plan is a directed graph. Nodes carry content and edges carry semantic roles
   - `template` TEXT — optional template string (e.g. `{{title}}`) for rendering the source node as context
 
 ## Story Parts (generated chapters)
+
+**Note:** The table `plan_node_versions` was removed in migration 7→8. The column `plan_node_version_id` is retained for compatibility; it now effectively references a plan node (semantically: the plan node whose content this story part was generated from). There is no separate version table for plan nodes.
+
 - `story_parts`
   - `id` INTEGER PRIMARY KEY
-  - `plan_node_version_id` INTEGER NOT NULL REFERENCES `plan_node_versions`(`id`) ON DELETE CASCADE
+  - `plan_node_version_id` INTEGER NOT NULL — semantically identifies the plan node; historically referenced `plan_node_versions` (table removed in migration 7→8)
   - `version` INTEGER NOT NULL
   - `content` TEXT NOT NULL
   - `status` TEXT NOT NULL DEFAULT 'GENERATED'   -- GENERATED | EDITED
@@ -147,25 +150,11 @@ The plan is a directed graph. Nodes carry content and edges carry semantic roles
   - `card_definition_id` INTEGER NOT NULL REFERENCES `card_definitions`(`id`) ON DELETE CASCADE
   - `story_part_id` INTEGER NOT NULL REFERENCES `story_parts`(`id`) ON DELETE CASCADE
   - `version` INTEGER NOT NULL
-  - `values` JSON NOT NULL               -- actual filled card data
+  - `data` JSON NOT NULL — actual filled card data (column name is `data` in the schema; API/TypeScript may expose it as `values`)
   - `parent_version_id` INTEGER NULL REFERENCES `card_values`(`id`)
   - `is_obsolete` BOOLEAN DEFAULT FALSE
   - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
   - Unique constraint on (`card_definition_id`, `story_part_id`, `version`)
-
-## AI Interaction Log
-- `ai_calls`
-  - `id` INTEGER PRIMARY KEY
-  - `backend` TEXT NOT NULL
-  - `model` TEXT NOT NULL
-  - `request_type` TEXT
-  - `prompt` TEXT
-  - `response_summary` TEXT
-  - `tokens_input` INTEGER
-  - `tokens_output` INTEGER
-  - `cost` REAL
-  - `related_story_part_id` INTEGER NULL REFERENCES `story_parts`(`id`)
-  - `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 
 ## Design considerations
 - Versioned entities (`story_parts`, `card_values`) support tree-like history via `parent_version_id` and `is_obsolete` flag.
@@ -178,8 +167,9 @@ This data model fully supports all described use cases including dockable UI, mu
 
 Migrations
 ----------
-- Migration logic lives in `src/backend/db/migrations.js` as an ordered array of functions (one per version step).
+- Migration logic lives in `src/backend/db/migrations.ts` as an ordered array of functions (one per version step).
 - Each migration function receives an open `better-sqlite3` Database instance and runs inside a transaction; `PRAGMA user_version` is updated atomically within the same transaction.
 - A backup of the database file is created before migrations run (keep last 7 backups).
 - When running the app, migrate the database to the latest version before opening the application data (mandatory to preserve schema compatibility).
+- Current schema version: **15** (see `CURRENT_VERSION` in `migrations.ts`).
 

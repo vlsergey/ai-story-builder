@@ -10,6 +10,8 @@ Key files:
 - `frontend_requirements.md` — frontend tech stack, UI conventions
 - `data_model.md` — database schema and entity relationships
 - `use_cases.md` — product requirements and user scenarios
+- `ai_yandex.md` — Yandex Cloud AI integration reference
+- `ai_grok.md` — Grok (xAI) integration reference
 
 ## Non-negotiable rules
 

@@ -15,7 +15,7 @@
 
 ### UI
 * Browser with UI should be opened automatically on application startup (defaults to the frontend on port 3000 with hot reload in development mode)
-* On start user should have an ability to select translation (RUS/ENG at least). Translations are stored separately (i.e. there should be files like "Russian" and "English" that contain all MUI-strings.)
+* On start the user can select language (at least Russian and English). Translations are stored in UTF-8 JSON locale files under `src/frontend/src/i18n/` (`en.json`, `ru.json`) and loaded via react-i18next.
 * Create new project option: user can create a new project (new SQLite DB) from the Start screen. On creation the app initializes default folders (locations, abilities, spells, bestiary, characters) and a root "Story Lore" folder. If a database with the chosen name already exists, the application should simply open that existing project instead of creating a duplicate file.
 * On application startup, the UI automatically determines if a project is already open on the server:
   * If open, the main layout is displayed with the project ready to work on
@@ -102,11 +102,11 @@ Age rating is displayed as a colored badge in the Settings panel and is informat
   * If a database is open on the server, the UI automatically loads the main layout with that project
   * If no database is open, the UI displays the Start screen for project selection
 * On startup user can select to:
-    * open one of 3-5 recent used projects (databases)
+    * open one of up to 10 recently used projects (databases)
     * open any SQLite project file present in the projects folder (listed on the Start screen)
 * When a project is opened, the server state is updated to track that database as the current session
 * Before opening database file a backup should be created. System should maintain up to 7 file backups (may be changed in app config)
-* On opening file version check should be performed (i.e. Liquibase schema version check). If old version is detected confirmation should be asked to upgrade file to latest (current) version of db schema. On decline database should be closed and UI returned to project selection
+* On opening a file, schema version is checked via SQLite `PRAGMA user_version` and the embedded migration runner. If the version is older than current, migrations run automatically (after a backup). On migration failure the database is closed and the UI returns to project selection.
 * During usual work with project user can:
   * Close the current project via the "File" menu → "Close Project" option, which returns to the Start screen
   * Quit the application via the "File" menu → "Quit" option, which closes the server session and attempts to close the browser window
