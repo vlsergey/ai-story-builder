@@ -157,9 +157,9 @@ A permanent dockview panel (`id='plan-graph'`) in the center area. Rendered by `
 **Canvas interactions:**
 - Double-click on text node → dispatches `OPEN_PLAN_NODE_EDITOR_EVENT` → `Layout.tsx` opens `plan-node-editor-{id}` panel
 - Drag node (auto=off) → `PATCH /api/plan/graph/nodes/:id` with new `{x, y}`
-- Connect two nodes → shows EdgeTypeDialog (instruction / attachment / system_prompt) → `POST /api/plan/graph/edges`
+- Connect two nodes → creates edge with type 'text' → `POST /api/plan/graph/edges`
 - Hover over edge → shows Delete (×) button
-- Edge colors: instruction=blue, attachment=green, system_prompt=orange
+- Edge color: text=blue (all edges are of type 'text')
 
 **Custom node types:**
 - `PlanTextNode` (`planText`): shows title, status badge (not generated / generated / review), word count, summary snippet

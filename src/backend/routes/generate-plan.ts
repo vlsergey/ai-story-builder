@@ -48,7 +48,7 @@ export async function generatePlan(
       const edges = db.prepare(`
         SELECT from_node_id
         FROM plan_edges
-        WHERE to_node_id = ? AND type = 'instruction'
+        WHERE to_node_id = ? AND type = 'text'
         ORDER BY position
         LIMIT 1
       `).all(nodeId) as Array<{ from_node_id: number }>

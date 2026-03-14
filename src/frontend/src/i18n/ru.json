@@ -108,6 +108,7 @@
   "planGraph.edge.attachment": "Вложение",
   "planGraph.edge.system_prompt": "Системный промпт",
   "planGraph.edge.merge_into": "Объединить в",
+  "planGraph.edge.text": "",
   "planGraph.generateAll.title": "Перегенерировать все узлы?",
   "planGraph.generateAll.body": "{{count}} узлов будет перегенерировано. {{words}} слов существующего контента будут перезаписаны.",
   "planGraph.generateAll.proceed": "Генерировать всё",

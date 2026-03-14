@@ -1,3 +1,5 @@
+import type { PlanNodeType, PlanEdgeType } from '../../../shared/plan-graph.js'
+
 export interface AiEngineSyncRecord {
   /** ISO-8601 UTC timestamp of last successful sync */
   last_synced_at: string
@@ -57,7 +59,7 @@ export interface PlanNodeTree {
 /** Plan graph node (returned by GET /api/plan/graph) */
 export interface PlanGraphNode {
   id: number
-  type: 'text' | 'lore' | 'merge'
+  type: PlanNodeType
   title: string
   content: string | null
   user_prompt: string | null
@@ -81,7 +83,7 @@ export interface PlanGraphEdge {
   id: number
   from_node_id: number
   to_node_id: number
-  type: 'instruction' | 'attachment' | 'system_prompt' | 'merge_into'
+  type: PlanEdgeType
   position: number
   label: string | null
   template: string | null

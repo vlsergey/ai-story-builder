@@ -60,7 +60,7 @@ export function generateMergeContent(
     SELECT n.id, n.title, n.content, e.position
     FROM plan_edges e
     JOIN plan_nodes n ON e.from_node_id = n.id
-    WHERE e.to_node_id = ? AND e.type = 'merge_into'
+    WHERE e.to_node_id = ?
     ORDER BY e.position
   `).all(nodeId) as Array<{ id: number, title: string, content: string | null, position: number }>
 

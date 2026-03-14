@@ -314,7 +314,7 @@ export function createGraphEdge(data: {
   label?: string
   template?: string
 }): { id: number | bigint } {
-  const { from_node_id, to_node_id, type = (to_node_id ? 'instruction' : 'merge_into'), position = 0, label, template } = data
+  const { from_node_id, to_node_id, type = 'text', position = 0, label, template } = data
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   if (from_node_id == null || to_node_id == null) {

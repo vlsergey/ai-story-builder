@@ -25,42 +25,27 @@ export interface EdgeTypeDefinition {
 export const NODE_TYPES: NodeTypeDefinition[] = [
   {
     id: 'text',
-    allowedOutgoingEdgeTypes: ['instruction', 'attachment', 'system_prompt', 'merge_into'],
-    allowedIncomingEdgeTypes: ['instruction', 'attachment', 'system_prompt'],
+    allowedOutgoingEdgeTypes: ['text'],
+    allowedIncomingEdgeTypes: ['text'],
   },
   {
     id: 'lore',
-    allowedOutgoingEdgeTypes: ['instruction', 'attachment', 'system_prompt', 'merge_into'],
-    allowedIncomingEdgeTypes: ['instruction', 'attachment', 'system_prompt'],
+    allowedOutgoingEdgeTypes: ['text'],
+    allowedIncomingEdgeTypes: ['text'],
   },
   {
     id: 'merge',
-    allowedOutgoingEdgeTypes: ['instruction', 'attachment', 'system_prompt', 'merge_into'],
-    allowedIncomingEdgeTypes: ['instruction', 'attachment', 'system_prompt', 'merge_into'],
+    allowedOutgoingEdgeTypes: ['text'],
+    allowedIncomingEdgeTypes: ['text'],
   },
 ]
 
 // Edge type definitions
 export const EDGE_TYPES: EdgeTypeDefinition[] = [
   {
-    id: 'instruction',
+    id: 'text',
     allowedSourceNodeTypes: ['text', 'lore', 'merge'],
     allowedTargetNodeTypes: ['text', 'lore', 'merge'],
-  },
-  {
-    id: 'attachment',
-    allowedSourceNodeTypes: ['text', 'lore', 'merge'],
-    allowedTargetNodeTypes: ['text', 'lore', 'merge'],
-  },
-  {
-    id: 'system_prompt',
-    allowedSourceNodeTypes: ['text', 'lore', 'merge'],
-    allowedTargetNodeTypes: ['text', 'lore', 'merge'],
-  },
-  {
-    id: 'merge_into',
-    allowedSourceNodeTypes: ['text', 'lore', 'merge'],
-    allowedTargetNodeTypes: ['merge'],
   },
 ]
 

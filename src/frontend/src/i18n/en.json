@@ -108,6 +108,7 @@
   "planGraph.edge.attachment": "Attachment",
   "planGraph.edge.system_prompt": "System prompt",
   "planGraph.edge.merge_into": "Merge into",
+  "planGraph.edge.text": "",
   "planGraph.generateAll.title": "Regenerate all nodes?",
   "planGraph.generateAll.body": "{{count}} nodes will be regenerated. {{words}} words of existing content will be overwritten.",
   "planGraph.generateAll.proceed": "Generate all",

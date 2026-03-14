@@ -71,9 +71,9 @@ describe('merge-node generation', () => {
     const input2 = createGraphNode({ title: 'Input 2', type: 'text' })
     // Create merge node
     const merge = createGraphNode({ title: 'Merge', type: 'merge' })
-    // Connect inputs to merge via merge_into edges
-    createGraphEdge({ from_node_id: input1.id as number, to_node_id: merge.id as number, type: 'merge_into' })
-    createGraphEdge({ from_node_id: input2.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    // Connect inputs to merge via text edges
+    createGraphEdge({ from_node_id: input1.id as number, to_node_id: merge.id as number, type: 'text' })
+    createGraphEdge({ from_node_id: input2.id as number, to_node_id: merge.id as number, type: 'text' })
     // Set content for inputs
     patchGraphNode(input1.id as number, { content: 'Content from input 1' })
     patchGraphNode(input2.id as number, { content: 'Content from input 2' })
@@ -90,7 +90,7 @@ describe('merge-node generation', () => {
   it('includes node title when includeNodeTitle is true', () => {
     const input = createGraphNode({ title: 'Input', type: 'text' })
     const merge = createGraphNode({ title: 'My Merge', type: 'merge' })
-    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'text' })
     patchGraphNode(input.id as number, { content: 'Some content' })
     const settings = { includeNodeTitle: true }
     const res = patchGraphNode(merge.id as number, { merge_settings: JSON.stringify(settings) })
@@ -102,7 +102,7 @@ describe('merge-node generation', () => {
   it('includes input titles when includeInputTitles is true', () => {
     const input = createGraphNode({ title: 'Input Title', type: 'text' })
     const merge = createGraphNode({ title: 'Merge', type: 'merge' })
-    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'text' })
     patchGraphNode(input.id as number, { content: 'Content here' })
     const settings = { includeInputTitles: true }
     const res = patchGraphNode(merge.id as number, { merge_settings: JSON.stringify(settings) })
@@ -114,7 +114,7 @@ describe('merge-node generation', () => {
   it('fixes headers when fixHeaders is true', () => {
     const input = createGraphNode({ title: 'Input', type: 'text' })
     const merge = createGraphNode({ title: 'Merge', type: 'merge' })
-    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'text' })
     // Input content with h1 and h2
     patchGraphNode(input.id as number, { content: '# Header 1\n\n## Header 2\n\nText' })
     const settings = { fixHeaders: true }
@@ -128,7 +128,7 @@ describe('merge-node generation', () => {
   it('regenerates content when merge_settings changes', () => {
     const input = createGraphNode({ title: 'Input', type: 'text' })
     const merge = createGraphNode({ title: 'Merge', type: 'merge' })
-    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'text' })
     patchGraphNode(input.id as number, { content: 'Content' })
     // First with no titles
     patchGraphNode(merge.id as number, { merge_settings: JSON.stringify({}) })
@@ -143,7 +143,7 @@ describe('merge-node generation', () => {
   it('overwrites manual content when merge_settings changes', () => {
     const input = createGraphNode({ title: 'Input', type: 'text' })
     const merge = createGraphNode({ title: 'Merge', type: 'merge' })
-    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'merge_into' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: merge.id as number, type: 'text' })
     patchGraphNode(input.id as number, { content: 'Input content' })
     // Manually set content
     patchGraphNode(merge.id as number, { content: 'Manual content' })
@@ -161,7 +161,7 @@ describe('merge-node generation', () => {
     const res = patchGraphNode(node.id as number, { type: 'merge' })
     expect(res.ok).toBe(true)
     // Now create merge_into edge (target is now merge, allowed)
-    createGraphEdge({ from_node_id: input.id as number, to_node_id: node.id as number, type: 'merge_into' })
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: node.id as number, type: 'text' })
     // Trigger generation by updating merge_settings (empty object)
     patchGraphNode(node.id as number, { merge_settings: JSON.stringify({}) })
     const updated = getGraphNode(node.id as number)

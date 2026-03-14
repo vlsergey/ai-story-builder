@@ -118,7 +118,7 @@ The plan is a directed graph. Nodes carry content and edges carry semantic roles
   - `id` INTEGER PRIMARY KEY
   - `from_node_id` INTEGER NOT NULL REFERENCES `plan_nodes`(`id`) ON DELETE CASCADE
   - `to_node_id` INTEGER NOT NULL REFERENCES `plan_nodes`(`id`) ON DELETE CASCADE
-  - `type` TEXT NOT NULL DEFAULT `'instruction'` — `'instruction'` | `'attachment'` | `'system_prompt'`
+  - `type` TEXT NOT NULL DEFAULT `'text'` — `'text'` (unified edge type)
   - `position` INTEGER DEFAULT 0 — display order among edges of the same target
   - `label` TEXT — optional display label override
   - `template` TEXT — optional template string (e.g. `{{title}}`) for rendering the source node as context

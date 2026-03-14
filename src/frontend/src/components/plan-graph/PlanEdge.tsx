@@ -7,10 +7,7 @@ import {
 import { useLocale } from '../../lib/locale'
 
 const EDGE_COLORS: Record<string, string> = {
-  instruction: '#3b82f6',   // blue
-  attachment: '#22c55e',    // green
-  system_prompt: '#f97316', // orange
-  merge_into: '#8b5cf6',    // purple
+  text: '#3b82f6',   // blue
 }
 
 interface PlanEdgeData {
@@ -33,8 +30,8 @@ export default function PlanEdge({
   const [hovered, setHovered] = useState(false)
 
   const edgeData = data as PlanEdgeData | undefined
-  const edgeType = edgeData?.type ?? 'instruction'
-  const color = EDGE_COLORS[edgeType] ?? EDGE_COLORS.instruction
+  const edgeType = edgeData?.type ?? 'text'
+  const color = EDGE_COLORS[edgeType] ?? EDGE_COLORS.text
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -64,7 +61,7 @@ export default function PlanEdge({
         fill="none"
         stroke={color}
         strokeWidth={hovered ? 2.5 : 1.5}
-        strokeDasharray={edgeType === 'attachment' ? '5,3' : undefined}
+        strokeDasharray={undefined}
         markerEnd={`url(#arrow-${edgeType})`}
         style={{ transition: 'stroke-width 0.1s' }}
       />
