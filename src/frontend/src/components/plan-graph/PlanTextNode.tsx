@@ -24,9 +24,7 @@ export default function PlanTextNode({ data }: NodeProps) {
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (window.electronAPI.confirm('Delete this node and all connected edges?')) {
-      node.onDelete(String(node.id))
-    }
+    node.onDelete(String(node.id))
   }
 
   return (

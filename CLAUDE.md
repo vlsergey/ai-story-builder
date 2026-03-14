@@ -24,3 +24,32 @@ Key files:
 - Run `npm test` (both workspaces) before every commit — all tests must pass.
 - Never add AI co-author lines to commit messages.
 - Commit after every significant change before moving on.
+
+## Practical Guidelines
+
+### Developer platform check
+
+Determine the developer's shell environment (Bash or PowerShell). Note that PowerShell lacks standard Unix commands (e.g., `head`, `tail`) and uses different syntax for command chaining: use `;` instead of `&&`. Ensure all generated commands are compatible with the detected shell.
+
+### Workspace commands
+
+The project uses npm workspaces. To run commands in a specific workspace (backend or frontend), use:
+
+```bash
+npm run <script> --workspace src/backend
+```
+or
+```bash
+npm run <script> --workspace src/frontend
+```
+
+Do not change directories with `cd` — this ensures proper dependency resolution and environment.
+
+## References
+
+- [Root README](../README.md) — general project description.
+- [Documentation in /docs/](../docs/) — detailed guides.
+- [CLAUDE.md](../CLAUDE.md) — instructions for Claude.
+
+---
+*This document should be clear to a development agent and serve as a quick reference when performing tasks.*
