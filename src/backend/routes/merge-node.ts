@@ -1,4 +1,5 @@
 import type { PlanNodeRow } from '../types/index.js'
+import { getNodeInputs } from '../lib/node-inputs.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -55,14 +56,8 @@ export function generateMergeContent(
     }
   }
 
-  // Fetch input nodes ordered by edge position
-  const inputs = db.prepare(`
-    SELECT n.id, n.title, n.content, e.position
-    FROM plan_edges e
-    JOIN plan_nodes n ON e.from_node_id = n.id
-    WHERE e.to_node_id = ?
-    ORDER BY e.position
-  `).all(nodeId) as Array<{ id: number, title: string, content: string | null, position: number }>
+  // Fetch input nodes ordered by edge position (including expanded textArray edges)
+  const inputs = getNodeInputs(db, nodeId)
 
   let content = ''
 

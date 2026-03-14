@@ -1,5 +1,5 @@
-export type PlanNodeType = 'text' | 'lore' | 'merge'
-export type PlanEdgeType = 'text'
+export type PlanNodeType = 'text' | 'lore' | 'merge' | 'splitter'
+export type PlanEdgeType = 'text' | 'textArray'
 
 export interface PlanNodeRow {
   id: number

@@ -8,6 +8,7 @@ import { useLocale } from '../../lib/locale'
 
 const EDGE_COLORS: Record<string, string> = {
   text: '#3b82f6',   // blue
+  textArray: '#8b5cf6', // purple
 }
 
 interface PlanEdgeData {

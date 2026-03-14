@@ -24,6 +24,7 @@ import { EDGE_TYPES, canCreateEdge } from '@shared/node-edge-dictionary'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
 import PlanMergeNode from './plan-graph/PlanMergeNode'
+import PlanSplitterNode from './plan-graph/PlanSplitterNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './plan-graph/GenerateAllDialog'
 import { ipcClient } from '../ipcClient'
@@ -35,6 +36,7 @@ const nodeTypes = {
   planText: PlanTextNode,
   planLore: PlanLoreNode,
   planMerge: PlanMergeNode,
+  planSplitter: PlanSplitterNode,
 }
 
 const edgeTypes = {
@@ -58,7 +60,7 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
 function toReactFlowNodes(graphNodes: PlanGraphNode[], onDelete: (id: string) => void): Node[] {
   return graphNodes.map(n => ({
     id: String(n.id),
-    type: n.type === 'lore' ? 'planLore' : n.type === 'merge' ? 'planMerge' : 'planText',
+    type: n.type === 'lore' ? 'planLore' : n.type === 'merge' ? 'planMerge' : n.type === 'splitter' ? 'planSplitter' : 'planText',
     position: { x: n.x ?? 0, y: n.y ?? 0 },
     data: { ...n, onDelete },
   }))
@@ -85,7 +87,7 @@ export default function PlanGraph() {
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
   const [showGenerateAll, setShowGenerateAll] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' | 'merge' } | null>(null)
+  const [addDialog, setAddDialog] = useState<{ type: 'text' | 'lore' | 'merge' | 'splitter' } | null>(null)
   const [addTitle, setAddTitle] = useState('')
   const addTitleInputRef = useRef<HTMLInputElement>(null)
   const reactFlowInstance = useRef<any>(null)
@@ -173,7 +175,7 @@ export default function PlanGraph() {
     }
   }
 
-  function openAddDialog(type: 'text' | 'lore' | 'merge') {
+  function openAddDialog(type: 'text' | 'lore' | 'merge' | 'splitter') {
     setAddTitle('')
     setAddDialog({ type })
     // focus the input on next paint
@@ -322,6 +324,13 @@ export default function PlanGraph() {
           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
         >
           {t('planGraph.addMergeNode')}
+        </button>
+        <button
+          onClick={() => openAddDialog('splitter')}
+          title="Add splitter node"
+          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+        >
+          Add splitter
         </button>
         <div className="w-px h-4 bg-border mx-0.5" />
         <label className="flex items-center gap-1 text-xs cursor-pointer">
