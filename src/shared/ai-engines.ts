@@ -17,7 +17,8 @@
  * are intentionally absent — they live in the frontend i18n locale files (src/frontend/src/i18n/).
  */
 
-export type AgeRating = 'G' | 'PG' | '12' | '16' | '18' | 'NC21'
+export const AGE_RATING_ORDER = ['G', 'PG', '12', '16', '18', 'NC21'] as const
+export type AgeRating = typeof AGE_RATING_ORDER[number]
 
 export interface AgeRatingInfo {
   /** Short rating code shown as a badge (e.g. "G", "18+"). Not translated. */
@@ -28,9 +29,6 @@ export interface AgeRatingInfo {
   /** Text color hex for the badge (used as inline style). */
   fg: string
 }
-
-/** All age ratings in ascending order of maturity. */
-export const AGE_RATING_ORDER: AgeRating[] = ['G', 'PG', '12', '16', '18', 'NC21']
 
 export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
   G:    { label: 'G',      minAge: 0,  bg: '#16a34a', fg: '#fff' }, // green-600
