@@ -2,6 +2,7 @@ import type { PlanNodeRow, PlanEdgeRow } from '../types/index.js'
 import { getCurrentDbPath } from '../db/state.js'
 import type { PlanGraphData } from '../../shared/plan-graph.js'
 import { generateMergeContent } from './merge-node.js'
+import { isValidNodeType, isValidEdgeType, canCreateEdge, getEdgeTypeDefinition, EDGE_TYPES, NODE_TYPES } from '../../shared/node-edge-dictionary.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -17,6 +18,29 @@ function makeError(message: string, status: number): Error {
   const e = new Error(message)
   ;(e as any).status = status
   return e
+}
+
+function makeNodeTypeError(type: string): Error {
+  const valid = NODE_TYPES.map(nt => nt.id).join(', ')
+  return makeError(`Invalid node type "${type}". Valid types: ${valid}`, 400)
+}
+
+function makeEdgeTypeError(type: string): Error {
+  const valid = EDGE_TYPES.map(et => et.id).join(', ')
+  return makeError(`Invalid edge type "${type}". Valid types: ${valid}`, 400)
+}
+
+function makeEdgeCompatibilityError(sourceType: string, targetType: string, edgeType: string): Error {
+  const edgeDef = getEdgeTypeDefinition(edgeType as any)
+  if (edgeDef) {
+    const allowedSource = edgeDef.allowedSourceNodeTypes.join(', ')
+    const allowedTarget = edgeDef.allowedTargetNodeTypes.join(', ')
+    return makeError(
+      `Edge type "${edgeType}" not allowed between source node type "${sourceType}" and target node type "${targetType}". Allowed source types: ${allowedSource}. Allowed target types: ${allowedTarget}.`,
+      400
+    )
+  }
+  return makeError(`Edge type "${edgeType}" not allowed between node types "${sourceType}" and "${targetType}".`, 400)
 }
 
 // ── Content stats helpers ─────────────────────────────────────────────────────
@@ -65,6 +89,9 @@ export function createGraphNode(data: {
   system_prompt?: string
 }): { id: number | bigint } {
   const { type = 'text', title, x = 0, y = 0, user_prompt, system_prompt } = data
+  if (!isValidNodeType(type)) {
+    throw makeNodeTypeError(type)
+  }
   const dbPath = getCurrentDbPath()
   if (!dbPath || !title) throw makeError('title required, db must be open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
@@ -128,8 +155,8 @@ export function patchGraphNode(
   const hasMergeSettings = merge_settings !== undefined
 
   // Validate type if provided
-  if (hasType && !['text', 'lore', 'merge'].includes(type!)) {
-    throw makeError('invalid node type', 400)
+  if (hasType && !isValidNodeType(type!)) {
+    throw makeNodeTypeError(type!)
   }
 
   if (!hasTitle && !hasContent && !hasPosition && !hasType && !hasUserPrompt &&
@@ -294,7 +321,27 @@ export function createGraphEdge(data: {
     throw makeError('from_node_id and to_node_id required', 400)
   }
   if (!Database) throw makeError('SQLite lib missing', 500)
+
+  // Validate edge type
+  if (type && !isValidEdgeType(type)) {
+    throw makeEdgeTypeError(type)
+  }
+
   const db = new Database(dbPath)
+  // Fetch source and target node types
+  const sourceNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(from_node_id) as { type: string } | undefined
+  const targetNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(to_node_id) as { type: string } | undefined
+  if (!sourceNode || !targetNode) {
+    db.close()
+    throw makeError('source or target node not found', 404)
+  }
+
+  // Validate compatibility
+  if (!canCreateEdge(sourceNode.type as any, targetNode.type as any, type as any)) {
+    db.close()
+    throw makeEdgeCompatibilityError(sourceNode.type, targetNode.type, type)
+  }
+
   const info = db
     .prepare(
       `INSERT INTO plan_edges (from_node_id, to_node_id, type, position, label, template)
@@ -314,30 +361,39 @@ export function patchGraphEdge(
   if (!dbPath) throw makeError('no project open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
 
-  // First get the current edge to access to_node_id
+  // First get the current edge to access from_node_id and to_node_id
   const readDb = new Database(dbPath, { readonly: true })
-  const currentEdge = readDb.prepare('SELECT to_node_id FROM plan_edges WHERE id = ?').get(id) as { to_node_id: number } | undefined
+  const currentEdge = readDb.prepare('SELECT from_node_id, to_node_id, type FROM plan_edges WHERE id = ?').get(id) as
+    | { from_node_id: number; to_node_id: number; type: string }
+    | undefined
   readDb.close()
 
   if (!currentEdge) {
     throw makeError('edge not found', 404)
   }
 
-  // Validate edge type constraints
-  if (type === 'merge_into') {
-    // Get target node to verify it's a merge node
-    const readDb = new Database(dbPath, { readonly: true })
-    const targetNode = readDb.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(currentEdge.to_node_id) as { type: string } | undefined
-    readDb.close()
-    if (!targetNode || targetNode.type !== 'merge') {
-      throw makeError('merge_into edges can only target merge nodes', 400)
+  // Validate edge type if provided
+  if (type !== undefined) {
+    if (!isValidEdgeType(type)) {
+      throw makeEdgeTypeError(type)
+    }
+    // Fetch source and target node types
+    const db = new Database(dbPath)
+    const sourceNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(currentEdge.from_node_id) as { type: string } | undefined
+    const targetNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(currentEdge.to_node_id) as { type: string } | undefined
+    db.close()
+    if (!sourceNode || !targetNode) {
+      throw makeError('source or target node not found', 404)
+    }
+    if (!canCreateEdge(sourceNode.type as any, targetNode.type as any, type as any)) {
+      throw makeEdgeCompatibilityError(sourceNode.type, targetNode.type, type)
     }
   }
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
+
   if (type == null && position == null && label === undefined && template === undefined) {
     throw makeError('at least one field required', 400)
   }
+
   const db = new Database(dbPath)
   const sets: string[] = []
   const params: (string | number | null)[] = []

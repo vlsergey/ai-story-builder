@@ -10,6 +10,7 @@ const EDGE_COLORS: Record<string, string> = {
   instruction: '#3b82f6',   // blue
   attachment: '#22c55e',    // green
   system_prompt: '#f97316', // orange
+  merge_into: '#8b5cf6',    // purple
 }
 
 interface PlanEdgeData {

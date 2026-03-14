@@ -19,6 +19,8 @@ import { useLocale } from '../lib/locale'
 import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import { PLAN_NODE_SAVED_EVENT, type PlanNodeSavedDetail } from '../lib/plan-events'
 import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
+import type { PlanNodeType, PlanEdgeType } from '@shared/plan-graph'
+import { EDGE_TYPES, canCreateEdge } from '@shared/node-edge-dictionary'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
 import PlanMergeNode from './plan-graph/PlanMergeNode'
@@ -370,30 +372,41 @@ export default function PlanGraph() {
       </ReactFlow>
 
       {/* Edge type selection dialog */}
-      {showConnectDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-64">
-            <h3 className="text-sm font-semibold mb-3">Select edge type</h3>
-            <div className="flex flex-col gap-2">
-              {(['instruction', 'attachment', 'system_prompt', 'merge_into'] as const).map(type => (
-                <button
-                  key={type}
-                  onClick={() => void confirmConnect(type)}
-                  className="px-3 py-1.5 text-sm rounded border border-border hover:bg-muted text-left"
-                >
-                  {t(`planGraph.edge.${type}` as Parameters<typeof t>[0])}
-                </button>
-              ))}
+      {showConnectDialog && (() => {
+        const sourceNode = nodes.find(n => n.id === showConnectDialog.source)
+        const targetNode = nodes.find(n => n.id === showConnectDialog.target)
+        const sourceType = sourceNode?.data.type as PlanNodeType | undefined
+        const targetType = targetNode?.data.type as PlanNodeType | undefined
+
+        const allowedEdgeTypes = EDGE_TYPES.filter(edgeDef =>
+          sourceType && targetType && canCreateEdge(sourceType, targetType, edgeDef.id)
+        ).map(edgeDef => edgeDef.id)
+
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-64">
+              <h3 className="text-sm font-semibold mb-3">Select edge type</h3>
+              <div className="flex flex-col gap-2">
+                {allowedEdgeTypes.map(type => (
+                  <button
+                    key={type}
+                    onClick={() => void confirmConnect(type)}
+                    className="px-3 py-1.5 text-sm rounded border border-border hover:bg-muted text-left"
+                  >
+                    {t(`planGraph.edge.${type}` as Parameters<typeof t>[0])}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowConnectDialog(null)}
+                className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
             </div>
-            <button
-              onClick={() => setShowConnectDialog(null)}
-              className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground"
-            >
-              Cancel
-            </button>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Generate All dialog */}
       {showGenerateAll && (

@@ -156,11 +156,14 @@ describe('merge-node generation', () => {
   it('generates content when node becomes merge type', () => {
     const input = createGraphNode({ title: 'Input', type: 'text' })
     const node = createGraphNode({ title: 'Node', type: 'text' })
-    createGraphEdge({ from_node_id: input.id as number, to_node_id: node.id as number, type: 'merge_into' })
     patchGraphNode(input.id as number, { content: 'Input content' })
-    // Change type to merge
+    // Change type to merge first (no edge yet)
     const res = patchGraphNode(node.id as number, { type: 'merge' })
     expect(res.ok).toBe(true)
+    // Now create merge_into edge (target is now merge, allowed)
+    createGraphEdge({ from_node_id: input.id as number, to_node_id: node.id as number, type: 'merge_into' })
+    // Trigger generation by updating merge_settings (empty object)
+    patchGraphNode(node.id as number, { merge_settings: JSON.stringify({}) })
     const updated = getGraphNode(node.id as number)
     expect(updated.content).toBe('Input content')
   })
