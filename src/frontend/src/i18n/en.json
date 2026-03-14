@@ -96,7 +96,7 @@
   "planGraph.addTextNode": "Add text node",
   "planGraph.addLoreNode": "Add lore node",
   "planGraph.addMergeNode": "Add merge node",
-  "planGraph.addSplitterNode": "Add splitter node",
+  "planGraph.addSplitNode": "Add split node",
   "planGraph.nodeTitle": "Node title",
   "common.cancel": "Cancel",
   "common.add": "Add",

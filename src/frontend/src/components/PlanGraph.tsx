@@ -60,7 +60,7 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
 function toReactFlowNodes(graphNodes: PlanGraphNode[], onDelete: (id: string) => void): Node[] {
   return graphNodes.map(n => ({
     id: String(n.id),
-    type: n.type === 'lore' ? 'planLore' : n.type === 'merge' ? 'planMerge' : n.type === 'splitter' ? 'planSplitter' : 'planText',
+    type: n.type === 'lore' ? 'planLore' : n.type === 'merge' ? 'planMerge' : n.type === 'split' ? 'planSplitter' : 'planText',
     position: { x: n.x ?? 0, y: n.y ?? 0 },
     data: { ...n, onDelete },
   }))

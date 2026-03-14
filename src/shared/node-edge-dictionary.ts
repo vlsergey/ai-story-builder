@@ -39,7 +39,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     allowedIncomingEdgeTypes: ['text', 'textArray'],
   },
   {
-    id: 'splitter',
+    id: 'split',
     allowedOutgoingEdgeTypes: ['textArray'],
     allowedIncomingEdgeTypes: ['text'],
   },
@@ -50,11 +50,11 @@ export const EDGE_TYPES: EdgeTypeDefinition[] = [
   {
     id: 'text',
     allowedSourceNodeTypes: ['text', 'lore', 'merge'],
-    allowedTargetNodeTypes: ['text', 'lore', 'merge', 'splitter'],
+    allowedTargetNodeTypes: ['text', 'lore', 'merge', 'split'],
   },
   {
     id: 'textArray',
-    allowedSourceNodeTypes: ['splitter'],
+    allowedSourceNodeTypes: ['split'],
     allowedTargetNodeTypes: ['merge'],
   },
 ]

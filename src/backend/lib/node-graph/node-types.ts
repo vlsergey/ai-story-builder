@@ -141,7 +141,7 @@ export function createNode(data: NodeData, context: NodeContext): BaseNode {
       return new TextNode(data, context)
     case 'lore':
       return new LoreNode(data, context)
-    case 'splitter':
+    case 'split':
       return new SplitterNode(data, context)
     case 'merge':
       return new MergeNode(data, context)

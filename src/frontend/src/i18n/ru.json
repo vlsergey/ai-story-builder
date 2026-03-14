@@ -96,7 +96,7 @@
   "planGraph.addTextNode": "Добавить текстовый узел",
   "planGraph.addLoreNode": "Добавить лор-узел",
   "planGraph.addMergeNode": "Добавить узел объединения",
-  "planGraph.addSplitterNode": "Добавить узел-разделитель",
+  "planGraph.addSplitNode": "Добавить узел-разделитель",
   "planGraph.nodeTitle": "Название узла",
   "common.cancel": "Отмена",
   "common.add": "Добавить",

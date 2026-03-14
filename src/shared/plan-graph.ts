@@ -1,4 +1,4 @@
-export const NODE_TYPES = ['text', 'lore', 'merge', 'splitter'] as const
+export const NODE_TYPES = ['text', 'lore', 'merge', 'split'] as const
 export type PlanNodeType = typeof NODE_TYPES[number]
 
 export const EDGE_TYPES = ['text', 'textArray'] as const

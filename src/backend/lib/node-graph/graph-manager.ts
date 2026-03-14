@@ -58,7 +58,7 @@ export class GraphManager implements NodeContext {
    */
   private expandTextArrayEdge(sourceNodeId: number): NodeData[] {
     const source = this.getNode(sourceNodeId)
-    if (!source || source.type !== 'splitter') {
+    if (!source || source.type !== 'split') {
       return []
     }
     // For now, we'll delegate to SplitterNode logic.
