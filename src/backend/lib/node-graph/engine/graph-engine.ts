@@ -49,15 +49,17 @@ export class GraphEngine extends GraphManager {
       if (!sourceNode) continue
       const processor = this.getProcessor(sourceNode.type)
       if (!processor) continue
-      const outputs = processor.computeOutputs(this, sourceNode)
-      const output = outputs.get(edge.type)
-      if (output !== undefined) {
-        inputs.push({
-          edgeType: edge.type,
-          sourceNodeId: edge.from_node_id,
-          output,
-        })
+      const output = processor.computeOutputs(this, sourceNode)
+      // Verify that the edge type matches the processor's output edge type
+      if (processor.getOutputEdgeType() !== edge.type) {
+        // This edge is not the output type of the source node, skip
+        continue
       }
+      inputs.push({
+        edgeType: edge.type,
+        sourceNodeId: edge.from_node_id,
+        output,
+      })
     }
     // Sort by edge position? (not implemented)
     return inputs
@@ -71,9 +73,9 @@ export class GraphEngine extends GraphManager {
     if (!node) throw new Error(`Node ${nodeId} not found`)
     const processor = this.getProcessor(node.type)
     if (!processor) throw new Error(`No processor for node type ${node.type}`)
-    const outputs = processor.computeOutputs(this, node)
-    const output = outputs.get(edgeType)
-    if (output === undefined) {
+    const output = processor.computeOutputs(this, node)
+    // Verify that the requested edge type matches the processor's output edge type
+    if (processor.getOutputEdgeType() !== edgeType) {
       throw new Error(`Node ${nodeId} does not produce edge type ${edgeType}`)
     }
     return output

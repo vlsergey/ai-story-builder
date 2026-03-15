@@ -17,11 +17,8 @@ export class TextProcessor implements NodeProcessor {
     return 'text'
   }
 
-  computeOutputs(context: NodeContext, nodeData: NodeData): Map<PlanEdgeType, unknown> {
-    const output = nodeData.content ?? ''
-    const map = new Map<PlanEdgeType, unknown>()
-    map.set('text', output)
-    return map
+  computeOutputs(context: NodeContext, nodeData: NodeData): unknown {
+    return nodeData.content ?? ''
   }
 
   async onContentChange(context: NodeContext, nodeData: NodeData, oldContent: string | null): Promise<void> {

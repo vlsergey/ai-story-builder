@@ -1,5 +1,5 @@
 import type { NodeData, NodeContext } from '../node-interfaces.js'
-import type { PlanNodeType, PlanEdgeType } from '../../../shared/plan-graph.js'
+import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
 
 /**
  * Processor for a specific node type.
@@ -17,11 +17,11 @@ export interface NodeProcessor {
 
   /**
    * Compute outputs for the given node.
-   * Returns a map from edge type to output value.
+   * Returns the output value.
    * The output must match the type expected by the edge (e.g., string for 'text', string[] for 'textArray').
-   * The map must contain exactly one entry, with the key equal to the node's output edge type.
+   * The edge type is determined by getOutputEdgeType().
    */
-  computeOutputs(context: NodeContext, nodeData: NodeData): Map<PlanEdgeType, unknown>
+  computeOutputs(context: NodeContext, nodeData: NodeData): unknown
 
   /**
    * Called when the node's content changes.

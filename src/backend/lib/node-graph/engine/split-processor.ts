@@ -16,11 +16,8 @@ export class SplitProcessor implements NodeProcessor {
     return 'textArray'
   }
 
-  computeOutputs(context: NodeContext, nodeData: NodeData): Map<PlanEdgeType, unknown> {
-    const output = this.getOutputTexts(context, nodeData)
-    const map = new Map<PlanEdgeType, unknown>()
-    map.set('textArray', output)
-    return map
+  computeOutputs(context: NodeContext, nodeData: NodeData): unknown {
+    return this.getOutputTexts(context, nodeData)
   }
 
   private getOutputTexts(context: NodeContext, nodeData: NodeData): string[] {
