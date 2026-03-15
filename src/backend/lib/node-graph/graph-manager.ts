@@ -75,6 +75,7 @@ export class GraphManager implements NodeContext {
       content: row.content,
       user_prompt: row.user_prompt,
       system_prompt: row.system_prompt,
+      node_type_settings: row.node_type_settings,
     }
   }
 }

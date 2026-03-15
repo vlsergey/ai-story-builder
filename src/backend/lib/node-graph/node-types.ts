@@ -80,7 +80,35 @@ export class SplitterNode extends BaseNode implements TextArrayOutputNode {
   }
 
   getOutputTexts(): string[] {
-    const regexPattern = this.data.content || ''
+    // Try to parse content as JSON array of split parts
+    if (this.data.content) {
+      try {
+        const parsed = JSON.parse(this.data.content)
+        if (Array.isArray(parsed)) {
+          // Assume each element has a 'content' field (or is a string)
+          return parsed.map((item: any) => typeof item === 'string' ? item : item.content || '')
+        }
+      } catch (e) {
+        // Not valid JSON, treat as regex pattern (legacy)
+      }
+    }
+
+    // Fallback to splitting using pattern from node_type_settings
+    let regexPattern = ''
+    if (this.data.node_type_settings) {
+      try {
+        const settings = JSON.parse(this.data.node_type_settings)
+        if (settings.separator !== undefined) {
+          regexPattern = settings.separator
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    // If no separator in settings, fallback to content as regex pattern (legacy)
+    if (!regexPattern && this.data.content) {
+      regexPattern = this.data.content
+    }
     const inputText = this.getInputText()
     if (inputText === null) {
       return []

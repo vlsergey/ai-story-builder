@@ -26,6 +26,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-markdown": "^6.5.0",
     "@dagrejs/dagre": "^2.0.4",
     "@hello-pangea/dnd": "^18.0.1",

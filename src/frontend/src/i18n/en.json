@@ -76,6 +76,13 @@
   "mergeNode.includeInputTitles": "Include input titles (h2)",
   "mergeNode.fixHeaders": "Fix headers in input text",
   "mergeNode.autoUpdate": "Update automatically when inputs change",
+  "splitNode.input": "Input",
+  "splitNode.settings": "Split Settings",
+  "splitNode.strategy": "Strategy",
+  "splitNode.separator": "Separator",
+  "splitNode.regexp": "Regular expression",
+  "splitNode.autoUpdate": "Update automatically when input changes",
+  "splitNode.parts": "Parts",
 
   "plan.generate": "Generate",
   "plan.regenerate": "Regenerate",

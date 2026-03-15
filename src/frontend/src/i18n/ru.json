@@ -76,6 +76,13 @@
   "mergeNode.includeInputTitles": "Включать заголовки входов (h2)",
   "mergeNode.fixHeaders": "Исправлять заголовки во входящем тексте",
   "mergeNode.autoUpdate": "Обновлять автоматически при изменении входов",
+  "splitNode.input": "Вход",
+  "splitNode.settings": "Настройки разделения",
+  "splitNode.strategy": "Стратегия",
+  "splitNode.separator": "Разделитель",
+  "splitNode.regexp": "Регулярное выражение",
+  "splitNode.autoUpdate": "Обновлять автоматически при изменении входа",
+  "splitNode.parts": "Части",
 
   "plan.generate": "Сгенерировать",
   "plan.regenerate": "Перегенерировать",

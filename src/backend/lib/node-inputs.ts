@@ -100,18 +100,51 @@ function getSplitterInputText(db: Database, splitterNodeId: number): string | nu
  */
 export function expandTextArrayEdge(db: Database, sourceNodeId: number, edgePosition: number): NodeInput[] {
   // Fetch splitter node details
-  const node = db.prepare('SELECT content, title FROM plan_nodes WHERE id = ?').get(sourceNodeId) as
-    | { content: string | null; title: string }
+  const node = db.prepare('SELECT content, title, node_type_settings FROM plan_nodes WHERE id = ?').get(sourceNodeId) as
+    | { content: string | null; title: string; node_type_settings: string | null }
     | undefined
   if (!node) {
     return []
   }
-  const regexPattern = node.content || ''
-  const inputText = getSplitterInputText(db, sourceNodeId)
-  if (inputText === null) {
-    return []
+
+  // Try to parse content as JSON array of split parts
+  let parts: string[] = []
+  if (node.content) {
+    try {
+      const parsed = JSON.parse(node.content)
+      if (Array.isArray(parsed)) {
+        // Assume each element has a 'content' field (or is a string)
+        parts = parsed.map((item: any) => typeof item === 'string' ? item : item.content || '')
+      }
+    } catch (e) {
+      // Not valid JSON, treat as regex pattern (legacy)
+    }
   }
-  const parts = splitTextByRegex(inputText, regexPattern)
+
+  // If no parts from JSON, fallback to splitting using pattern from node_type_settings
+  if (parts.length === 0) {
+    let regexPattern = ''
+    if (node.node_type_settings) {
+      try {
+        const settings = JSON.parse(node.node_type_settings)
+        if (settings.separator !== undefined) {
+          regexPattern = settings.separator
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    // If no separator in settings, fallback to content as regex pattern (legacy)
+    if (!regexPattern && node.content) {
+      regexPattern = node.content
+    }
+    const inputText = getSplitterInputText(db, sourceNodeId)
+    if (inputText === null) {
+      return []
+    }
+    parts = splitTextByRegex(inputText, regexPattern)
+  }
+
   return parts.map((part, index) => ({
     id: sourceNodeId,
     title: `${node.title} [${index + 1}]`,

@@ -5,6 +5,7 @@ import NodeEditor, { type NodeEditorAdapter } from './NodeEditor'
 import { ipcClient } from '../ipcClient'
 import { type PlanGraphNode } from '../types/models'
 import MergeNodeEditor from './MergeNodeEditor'
+import SplitNodeEditor from './SplitNodeEditor'
 
 interface PlanEditorProps {
   nodeId: number
@@ -59,6 +60,31 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
     return (
       <div className="h-full overflow-auto">
         <MergeNodeEditor
+          node={node}
+          onUpdate={(content) => {
+            // Update the node content (manual edit)
+            adapter.patchNode(nodeId, { content }).then(() => {
+              // Dispatch saved event
+              adapter.onSaved({
+                nodeId,
+                wordCount: undefined,
+                charCount: undefined,
+                byteCount: undefined
+              })
+            })
+          }}
+          panelApi={panelApi}
+          onNodeUpdated={(updatedNode) => setNode(updatedNode)}
+        />
+      </div>
+    )
+  }
+
+  // For split nodes, show the SplitNodeEditor
+  if (node.type === 'split') {
+    return (
+      <div className="h-full overflow-auto">
+        <SplitNodeEditor
           node={node}
           onUpdate={(content) => {
             // Update the node content (manual edit)

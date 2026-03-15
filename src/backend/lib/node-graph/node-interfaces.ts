@@ -24,6 +24,7 @@ export interface NodeData {
   content: string | null
   user_prompt: string | null
   system_prompt: string | null
+  node_type_settings: string | null
   // other fields as needed
 }
 
