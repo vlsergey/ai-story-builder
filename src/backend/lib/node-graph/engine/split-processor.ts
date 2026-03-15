@@ -16,7 +16,7 @@ export class SplitProcessor implements NodeProcessor {
     return 'textArray'
   }
 
-  computeOutputs(context: NodeContext, nodeData: NodeData): unknown {
+  getOutput(context: NodeContext, nodeData: NodeData): unknown {
     return this.getOutputTexts(context, nodeData)
   }
 

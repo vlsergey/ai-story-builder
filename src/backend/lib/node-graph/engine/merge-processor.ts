@@ -18,7 +18,7 @@ export class MergeProcessor implements NodeProcessor {
     return 'text'
   }
 
-  computeOutputs(context: NodeContext, nodeData: NodeData): unknown {
+  getOutput(context: NodeContext, nodeData: NodeData): unknown {
     // For now, we don't compute merged content automatically because it's heavy.
     // Instead, we rely on explicit generation via regenerate().
     // Return empty string as placeholder.
@@ -157,7 +157,7 @@ export class MergeProcessor implements NodeProcessor {
       } else if (edge.type === 'textArray') {
         // Get splitter output
         const splitProcessor = new (await import('./split-processor.js')).SplitProcessor()
-        const parts = splitProcessor.computeOutputs(context, sourceNode)
+        const parts = splitProcessor.getOutput(context, sourceNode)
         if (Array.isArray(parts)) {
           parts.forEach((part, index) => {
             inputs.push({

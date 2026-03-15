@@ -16,12 +16,12 @@ export interface NodeProcessor {
   getOutputEdgeType(): PlanEdgeType
 
   /**
-   * Compute outputs for the given node.
+   * Get output for the given node.
    * Returns the output value.
    * The output must match the type expected by the edge (e.g., string for 'text', string[] for 'textArray').
    * The edge type is determined by getOutputEdgeType().
    */
-  computeOutputs(context: NodeContext, nodeData: NodeData): unknown
+  getOutput(context: NodeContext, nodeData: NodeData): unknown
 
   /**
    * Called when the node's content changes.

@@ -49,7 +49,7 @@ export class GraphEngine extends GraphManager {
       if (!sourceNode) continue
       const processor = this.getProcessor(sourceNode.type)
       if (!processor) continue
-      const output = processor.computeOutputs(this, sourceNode)
+      const output = processor.getOutput(this, sourceNode)
       // Verify that the edge type matches the processor's output edge type
       if (processor.getOutputEdgeType() !== edge.type) {
         // This edge is not the output type of the source node, skip
@@ -73,7 +73,7 @@ export class GraphEngine extends GraphManager {
     if (!node) throw new Error(`Node ${nodeId} not found`)
     const processor = this.getProcessor(node.type)
     if (!processor) throw new Error(`No processor for node type ${node.type}`)
-    const output = processor.computeOutputs(this, node)
+    const output = processor.getOutput(this, node)
     // Verify that the requested edge type matches the processor's output edge type
     if (processor.getOutputEdgeType() !== edgeType) {
       throw new Error(`Node ${nodeId} does not produce edge type ${edgeType}`)
