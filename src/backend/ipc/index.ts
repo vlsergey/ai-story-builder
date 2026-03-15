@@ -10,7 +10,6 @@ import { getAiBilling } from '../routes/ai-billing.js'
 import { syncLore } from '../routes/ai-sync.js'
 import { generateLore } from '../routes/generate-lore.js'
 import { generatePlan } from '../routes/generate-plan.js'
-import { generatePlanChildren } from '../routes/generate-plan-children.js'
 import { generatePlayground } from '../routes/generate-playground.js'
 import { generateSummary } from '../routes/generate-summary.js'
 import { generate, updateGeneratedPart } from '../routes/generation.js'
@@ -30,7 +29,6 @@ function wrap(fn: (...args: any[]) => any) {
 const STREAM_ENDPOINTS: Record<string, (params: any, onThinking: any, onPartialJson: any) => Promise<any>> = {
   'generate-lore': (p, onThinking, onPartialJson) => generateLore(p, onThinking, onPartialJson),
   'generate-plan': (p, onThinking, onPartialJson) => generatePlan(p, onThinking, onPartialJson),
-  'generate-plan-children': (p, onThinking, onPartialJson) => generatePlanChildren(p, onThinking, onPartialJson),
   'generate-playground': (p, onThinking, onPartialJson) => generatePlayground(p, onThinking, onPartialJson),
 }
 

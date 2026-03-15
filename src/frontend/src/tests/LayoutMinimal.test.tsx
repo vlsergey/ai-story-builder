@@ -24,11 +24,6 @@ vi.mock('../components/LoreSection', () => ({
   }
 }));
 
-vi.mock('../components/PlanSection', () => ({
-  default: function MockPlanSection() {
-    return <div data-testid="plan-section">Plan Section</div>;
-  }
-}));
 
 vi.mock('../components/LoreEditor', () => ({
   default: function MockLoreEditor() {
