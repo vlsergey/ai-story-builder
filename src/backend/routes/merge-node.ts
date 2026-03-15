@@ -1,5 +1,5 @@
 import type { PlanNodeRow } from '../types/index.js'
-import { getNodeInputs } from '../lib/node-inputs.js'
+import { GraphEngine } from '../lib/node-graph/engine/graph-engine.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -57,7 +57,32 @@ export function generateMergeContent(
   }
 
   // Fetch input nodes ordered by edge position (including expanded textArray edges)
-  const inputs = getNodeInputs(db, nodeId)
+  const engine = new GraphEngine(db)
+  const rawInputs = engine.getNodeInputsRaw(nodeId)
+  const inputs: Array<{ title: string; content: string | null }> = []
+
+  for (const raw of rawInputs) {
+    if (raw.edgeType === 'text') {
+      const sourceNode = engine.getNode(raw.sourceNodeId)
+      if (!sourceNode) continue
+      inputs.push({
+        title: sourceNode.title,
+        content: typeof raw.output === 'string' ? raw.output : null,
+      })
+    } else if (raw.edgeType === 'textArray') {
+      const sourceNode = engine.getNode(raw.sourceNodeId)
+      if (!sourceNode) continue
+      const parts = Array.isArray(raw.output) ? raw.output : []
+      parts.forEach((part, index) => {
+        inputs.push({
+          title: `${sourceNode.title} [${index + 1}]`,
+          content: typeof part === 'string' ? part : String(part),
+        })
+      })
+    }
+  }
+
+  // TODO: sort by edge position
 
   let content = ''
 
@@ -82,7 +107,7 @@ export function generateMergeContent(
         const lines = inputContent.split('\n')
         // Detect headers and their levels
         const headerLines: { index: number; level: number; line: string }[] = []
-        lines.forEach((line, idx) => {
+        lines.forEach((line: string, idx: number) => {
           const match = line.match(/^(#{1,6})\s+(.*)/)
           if (match) {
             const level = match[1].length
@@ -96,7 +121,7 @@ export function generateMergeContent(
           // Count headers with minLevel
           const minLevelHeaders = headerLines.filter(h => h.level === minLevel)
           // Check if the first non-empty line is a header of minLevel
-          const firstNonEmptyIdx = lines.findIndex(line => line.trim() !== '')
+          const firstNonEmptyIdx = lines.findIndex((line: string) => line.trim() !== '')
           const isFirstLineHeader = firstNonEmptyIdx >= 0 && headerLines.some(h => h.index === firstNonEmptyIdx && h.level === minLevel)
 
           // If there is exactly one header of minLevel and it's the first non-empty line, remove the line entirely

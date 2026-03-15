@@ -1,4 +1,4 @@
-import type { PlanNodeType } from '../../../shared/plan-graph.js'
+import type { PlanNodeType, PlanEdgeType } from '../../../shared/plan-graph.js'
 
 /**
  * Interface for nodes that can produce a single text output (for 'text' edges).
@@ -33,7 +33,7 @@ export interface NodeData {
  */
 export interface NodeContext {
   getNode(id: number): NodeData | undefined
-  getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: string }>
-  getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: string }>
+  getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: PlanEdgeType }>
+  getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: PlanEdgeType }>
   // Additional helper methods can be added
 }
