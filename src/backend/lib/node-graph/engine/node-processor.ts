@@ -17,11 +17,11 @@ export interface NodeProcessor {
 
   /**
    * Get output for the given node.
-   * Returns the output value.
+   * Returns the current content of the node without updating or recomputing it.
    * The output must match the type expected by the edge (e.g., string for 'text', string[] for 'textArray').
    * The edge type is determined by getOutputEdgeType().
    */
-  getOutput(context: NodeContext, nodeData: NodeData): unknown
+  getOutput(nodeData: NodeData): unknown
 
   /**
    * Called when the node's content changes.

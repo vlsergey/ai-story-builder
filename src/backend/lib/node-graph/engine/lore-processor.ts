@@ -17,7 +17,7 @@ export class LoreProcessor implements NodeProcessor {
     return 'text'
   }
 
-  getOutput(context: NodeContext, nodeData: NodeData): unknown {
+  getOutput(nodeData: NodeData): unknown {
     return nodeData.content ?? ''
   }
 
