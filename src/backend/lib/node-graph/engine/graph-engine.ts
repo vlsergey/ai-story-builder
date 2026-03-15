@@ -6,6 +6,8 @@ import { LoreProcessor } from './lore-processor.js'
 import { SplitProcessor } from './split-processor.js'
 import { MergeProcessor } from './merge-processor.js'
 import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
+import type { NodeData } from '../node-interfaces.js'
+import { mergeNodeSettings } from './settings-helper.js'
 
 /**
  * Extended graph manager that uses node processors for advanced operations.
@@ -31,6 +33,20 @@ export class GraphEngine extends GraphManager {
    */
   getProcessor(nodeType: PlanNodeType) {
     return this.processorRegistry.getProcessor(nodeType)
+  }
+
+  /**
+   * Get merged settings for a node (defaults + node_type_settings).
+   * Returns unknown because the concrete type depends on node type.
+   */
+  private getNodeSettings(node: NodeData): unknown {
+    const processor = this.getProcessor(node.type)
+    if (!processor) {
+      // No processor, return empty object
+      return {}
+    }
+    // processor.defaultSettings is of type unknown, but we know it's a Record<string, any>
+    return mergeNodeSettings(processor.defaultSettings as Record<string, any>, node.node_type_settings)
   }
 
   /**
@@ -111,7 +127,8 @@ export class GraphEngine extends GraphManager {
     if (!node) throw new Error(`Node ${nodeId} not found`)
     const processor = this.getProcessor(node.type)
     if (processor?.regenerate) {
-      return await processor.regenerate(this, node, options)
+      const settings = this.getNodeSettings(node)
+      return await processor.regenerate(this, node, settings)
     }
     return null
   }
@@ -129,7 +146,8 @@ export class GraphEngine extends GraphManager {
       if (!downstreamNode) continue
       const processor = this.getProcessor(downstreamNode.type)
       if (processor?.onInputContentChange) {
-        const updatedNodeData = await processor.onInputContentChange(this, downstreamNode, changedNodeId)
+        const settings = this.getNodeSettings(downstreamNode)
+        const updatedNodeData = await processor.onInputContentChange(this, downstreamNode, changedNodeId, settings)
         if (updatedNodeData && updatedNodeData.content !== downstreamNode.content) {
           // Update the node with new content (other fields are ignored for now)
           await this.updateNodeContent(downstreamNode.id, updatedNodeData.content)

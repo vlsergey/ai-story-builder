@@ -5,7 +5,7 @@ import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
  * Processor for a specific node type.
  * Knows how to compute outputs, react to changes, and regenerate content.
  */
-export interface NodeProcessor {
+export interface NodeProcessor<S = unknown> {
   /** Node types this processor can handle */
   readonly supportedTypes: PlanNodeType[]
 
@@ -14,6 +14,12 @@ export interface NodeProcessor {
 
   /** Edge type that this node produces as output (each node has exactly one output edge type) */
   getOutputEdgeType(): PlanEdgeType
+
+  /**
+   * Default settings for this node type.
+   * These settings are used when node_type_settings is null or missing fields.
+   */
+  readonly defaultSettings: S
 
   /**
    * Get output for the given node.
@@ -36,15 +42,17 @@ export interface NodeProcessor {
    * Returns a NodeData object with updated fields (e.g., content) if the node should be updated,
    * or null if no changes are needed.
    * @param changedInputNodeId The ID of the input node whose content changed.
+   * @param settings The full settings for this node (merged from node_type_settings and defaults).
    */
-  onInputContentChange?(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<NodeData | null>
+  onInputContentChange?(context: NodeContext, nodeData: NodeData, changedInputNodeId: number, settings: S): Promise<NodeData | null>
 
   /**
    * Regenerate the node's content (e.g., AI generation, re‑split, re‑merge).
    * Returns new content (or null if regeneration not applicable).
    * Default implementation returns null.
+   * @param settings The full settings for this node (merged from node_type_settings and defaults).
    */
-  regenerate?(context: NodeContext, nodeData: NodeData, options?: unknown): Promise<string | null>
+  regenerate?(context: NodeContext, nodeData: NodeData, settings: S): Promise<string | null>
 }
 
 /**

@@ -1,12 +1,14 @@
 import type { NodeData, NodeContext } from '../node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
+import type { LoreSettings } from '../../../../shared/node-settings'
 
 /**
  * Processor for 'lore' nodes.
  */
-export class LoreProcessor implements NodeProcessor {
+export class LoreProcessor implements NodeProcessor<LoreSettings> {
   readonly supportedTypes: PlanNodeType[] = ['lore']
+  readonly defaultSettings: LoreSettings = {}
 
   getInputEdgeTypes(): PlanEdgeType[] {
     // Lore nodes are sources; they don't require inputs
@@ -25,7 +27,12 @@ export class LoreProcessor implements NodeProcessor {
     // Nothing to do by default
   }
 
-  async regenerate(context: NodeContext, nodeData: NodeData, options?: unknown): Promise<string | null> {
+  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number, settings: LoreSettings): Promise<NodeData | null> {
+    // Lore nodes have no inputs, so this should never be called
+    return null
+  }
+
+  async regenerate(context: NodeContext, nodeData: NodeData, settings: LoreSettings): Promise<string | null> {
     // No regeneration logic for plain lore nodes (AI generation is handled elsewhere)
     return null
   }

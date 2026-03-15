@@ -1,12 +1,19 @@
 import type { NodeData, NodeContext } from '../node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
+import type { MergeSettings } from '../../../../shared/node-settings'
 
 /**
  * Processor for 'merge' nodes.
  */
-export class MergeProcessor implements NodeProcessor {
+export class MergeProcessor implements NodeProcessor<MergeSettings> {
   readonly supportedTypes: PlanNodeType[] = ['merge']
+  readonly defaultSettings: MergeSettings = {
+    includeNodeTitle: false,
+    includeInputTitles: false,
+    fixHeaders: false,
+    autoUpdate: false,
+  }
 
   getInputEdgeTypes(): PlanEdgeType[] {
     // Merge node can accept both 'text' and 'textArray' edges
@@ -28,15 +35,14 @@ export class MergeProcessor implements NodeProcessor {
     // Do nothing.
   }
 
-  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<NodeData | null> {
+  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number, settings: MergeSettings): Promise<NodeData | null> {
     // Check if auto‑update is enabled
-    const settings = this.parseSettings(nodeData.node_type_settings)
     if (!settings.autoUpdate) {
       return null
     }
 
     // Regenerate merged content
-    const newContent = await this.generateMergedContent(context, nodeData, {})
+    const newContent = await this.regenerate(context, nodeData, settings)
     if (newContent === null || newContent === nodeData.content) {
       // No change or generation failed
       return null
@@ -49,57 +55,17 @@ export class MergeProcessor implements NodeProcessor {
     }
   }
 
-  async regenerate(context: NodeContext, nodeData: NodeData, options?: unknown): Promise<string | null> {
+  async regenerate(context: NodeContext, nodeData: NodeData, settings: MergeSettings): Promise<string | null> {
     // Generate merged content using the existing logic.
-    // We'll need to fetch inputs (including expansion) and apply settings.
-    // For simplicity, we'll delegate to the existing generateMergeContent function.
-    // However, we need a Database instance; context is GraphEngine which has a db.
-    // Since we cannot import generateMergeContent due to circular dependency,
-    // we'll implement the logic here.
-    return this.generateMergedContent(context, nodeData, options as any)
-  }
-
-  private parseSettings(nodeTypeSettings: string | null): { autoUpdate: boolean } {
-    const defaultSettings = {
-      autoUpdate: false,
-    }
-    if (!nodeTypeSettings) {
-      return defaultSettings
-    }
-    try {
-      const parsed = JSON.parse(nodeTypeSettings)
-      return {
-        autoUpdate: parsed.autoUpdate === true,
-      }
-    } catch (e) {
-      return defaultSettings
-    }
+    return this.generateMergedContent(context, nodeData, settings)
   }
 
   private async generateMergedContent(
     context: NodeContext,
     nodeData: NodeData,
-    options?: { overrideSettings?: Record<string, any>; overrideTitle?: string }
+    settings: MergeSettings
   ): Promise<string> {
-    // Parse settings
-    const defaultSettings = {
-      includeNodeTitle: false,
-      includeInputTitles: false,
-      fixHeaders: false,
-      autoUpdate: false,
-    }
-    let settings = defaultSettings
-    if (options?.overrideSettings !== undefined) {
-      settings = { ...defaultSettings, ...options.overrideSettings }
-    } else if (nodeData.node_type_settings) {
-      try {
-        settings = { ...defaultSettings, ...JSON.parse(nodeData.node_type_settings) }
-      } catch (e) {
-        // If JSON invalid, keep defaults
-      }
-    }
-
-    const nodeTitle = options?.overrideTitle ?? nodeData.title
+    const nodeTitle = nodeData.title
 
     // Fetch inputs (expanded)
     const inputs = await this.getExpandedInputs(context, nodeData.id)

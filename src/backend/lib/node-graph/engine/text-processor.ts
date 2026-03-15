@@ -1,12 +1,14 @@
 import type { NodeData, NodeContext } from '../node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
+import type { TextSettings } from '../../../../shared/node-settings'
 
 /**
  * Processor for 'text' nodes.
  */
-export class TextProcessor implements NodeProcessor {
+export class TextProcessor implements NodeProcessor<TextSettings> {
   readonly supportedTypes: PlanNodeType[] = ['text']
+  readonly defaultSettings: TextSettings = {}
 
   getInputEdgeTypes(): PlanEdgeType[] {
     // Text nodes are sources; they don't require inputs
@@ -25,7 +27,12 @@ export class TextProcessor implements NodeProcessor {
     // Nothing to do by default
   }
 
-  async regenerate(context: NodeContext, nodeData: NodeData, options?: unknown): Promise<string | null> {
+  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number, settings: TextSettings): Promise<NodeData | null> {
+    // Text nodes have no inputs, so this should never be called
+    return null
+  }
+
+  async regenerate(context: NodeContext, nodeData: NodeData, settings: TextSettings): Promise<string | null> {
     // No regeneration logic for plain text nodes
     return null
   }

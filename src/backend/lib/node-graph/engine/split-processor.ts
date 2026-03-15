@@ -1,12 +1,19 @@
 import type { NodeData, NodeContext } from '../node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
+import type { SplitSettings } from '../../../../shared/node-settings'
 
 /**
  * Processor for 'split' nodes.
  */
-export class SplitProcessor implements NodeProcessor {
+export class SplitProcessor implements NodeProcessor<SplitSettings> {
   readonly supportedTypes: PlanNodeType[] = ['split']
+  readonly defaultSettings: SplitSettings = {
+    separator: '',
+    dropFirst: 0,
+    dropLast: 0,
+    autoUpdate: false,
+  }
 
   getInputEdgeTypes(): PlanEdgeType[] {
     return ['text']
@@ -36,38 +43,18 @@ export class SplitProcessor implements NodeProcessor {
     return []
   }
 
-  private splitInput(context: NodeContext, nodeData: NodeData): string[] {
-    // Get splitting settings
-    let regexPattern = ''
-    let dropFirst = 0
-    let dropLast = 0
-    if (nodeData.node_type_settings) {
-      try {
-        const settings = JSON.parse(nodeData.node_type_settings)
-        if (settings.separator !== undefined) {
-          regexPattern = settings.separator
-        }
-        if (settings.dropFirst !== undefined) {
-          dropFirst = Number(settings.dropFirst) || 0
-        }
-        if (settings.dropLast !== undefined) {
-          dropLast = Number(settings.dropLast) || 0
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
+  private splitInput(context: NodeContext, nodeData: NodeData, settings: SplitSettings): string[] {
     const inputText = this.getInputText(context, nodeData.id)
     if (inputText === null) {
       return []
     }
-    let parts = this.splitTextByRegex(inputText, regexPattern)
+    let parts = this.splitTextByRegex(inputText, settings.separator)
     // Apply dropFirst and dropLast
-    if (dropFirst > 0) {
-      parts = parts.slice(dropFirst)
+    if (settings.dropFirst > 0) {
+      parts = parts.slice(settings.dropFirst)
     }
-    if (dropLast > 0) {
-      parts = parts.slice(0, -dropLast)
+    if (settings.dropLast > 0) {
+      parts = parts.slice(0, -settings.dropLast)
     }
     return parts
   }
@@ -98,29 +85,12 @@ export class SplitProcessor implements NodeProcessor {
     }
   }
 
-  private parseSettings(nodeTypeSettings: string | null): { autoUpdate: boolean } {
-    const defaultSettings = {
-      autoUpdate: false,
-    }
-    if (!nodeTypeSettings) {
-      return defaultSettings
-    }
-    try {
-      const parsed = JSON.parse(nodeTypeSettings)
-      return {
-        autoUpdate: parsed.autoUpdate === true,
-      }
-    } catch (e) {
-      return defaultSettings
-    }
-  }
-
   async onContentChange(context: NodeContext, nodeData: NodeData, oldContent: string | null): Promise<void> {
     // If split node's content changes (e.g., separator), downstream nodes may need update
     // For now, do nothing (auto‑update could be added later)
   }
 
-  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<NodeData | null> {
+  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number, settings: SplitSettings): Promise<NodeData | null> {
     // Check if the changed input is the one we depend on
     const incoming = context.getIncomingEdges(nodeData.id)
     const depends = incoming.some(edge => edge.from_node_id === changedInputNodeId && edge.type === 'text')
@@ -129,13 +99,12 @@ export class SplitProcessor implements NodeProcessor {
     }
 
     // Check if auto‑update is enabled
-    const settings = this.parseSettings(nodeData.node_type_settings)
     if (!settings.autoUpdate) {
       return null
     }
 
     // Regenerate split content
-    const newContent = await this.regenerate(context, nodeData, {})
+    const newContent = await this.regenerate(context, nodeData, settings)
     if (newContent === null || newContent === nodeData.content) {
       // No change or generation failed
       return null
@@ -148,8 +117,8 @@ export class SplitProcessor implements NodeProcessor {
     }
   }
 
-  async regenerate(context: NodeContext, nodeData: NodeData, options?: unknown): Promise<string | null> {
-    const parts = this.splitInput(context, nodeData)
+  async regenerate(context: NodeContext, nodeData: NodeData, settings: SplitSettings): Promise<string | null> {
+    const parts = this.splitInput(context, nodeData, settings)
     return JSON.stringify(parts)
   }
 }
