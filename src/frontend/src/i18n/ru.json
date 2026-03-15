@@ -83,6 +83,8 @@
   "splitNode.regexp": "Регулярное выражение",
   "splitNode.autoUpdate": "Обновлять автоматически",
   "splitNode.parts": "Части",
+  "splitNode.dropFirst": "Убрать первые N частей",
+  "splitNode.dropLast": "Убрать последние N частей",
 
   "plan.generate": "Сгенерировать",
   "plan.regenerate": "Перегенерировать",

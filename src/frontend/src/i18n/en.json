@@ -83,6 +83,8 @@
   "splitNode.regexp": "Regular expression",
   "splitNode.autoUpdate": "Update automatically",
   "splitNode.parts": "Parts",
+  "splitNode.dropFirst": "Drop first N parts",
+  "splitNode.dropLast": "Drop last N parts",
 
   "plan.generate": "Generate",
   "plan.regenerate": "Regenerate",

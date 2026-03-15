@@ -28,7 +28,9 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   const [settings, setSettings] = useState({
     strategy: 'separator' as 'separator' | 'regexp',
     separator: '',
-    autoUpdate: false
+    autoUpdate: false,
+    dropFirst: 0,
+    dropLast: 0
   })
   const [parts, setParts] = useState<SplitPart[]>([])
   const [inputText, setInputText] = useState<string | null>(null)
@@ -117,8 +119,16 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
         splitParts = inputText.split(settings.separator)
       }
     }
+    // Apply dropFirst and dropLast
+    let filteredParts = splitParts
+    if (settings.dropFirst > 0) {
+      filteredParts = filteredParts.slice(settings.dropFirst)
+    }
+    if (settings.dropLast > 0) {
+      filteredParts = filteredParts.slice(0, -settings.dropLast)
+    }
     // Convert to SplitPart objects with default titles
-    const newParts: SplitPart[] = splitParts.map((content, index) => ({
+    const newParts: SplitPart[] = filteredParts.map((content, index) => ({
       title: `Part ${index + 1}`,
       content: content.trim()
     }))
@@ -173,7 +183,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     if (settings.autoUpdate && inputText) {
       debouncedRegenerateParts()
     }
-  }, [inputText, settings.separator, settings.strategy, debouncedRegenerateParts])
+  }, [inputText, settings.separator, settings.strategy, settings.autoUpdate, settings.dropFirst, settings.dropLast, debouncedRegenerateParts])
 
   // Update panel title
   useEffect(() => {
@@ -259,6 +269,33 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="dropFirst" className="text-sm">
+              {t('splitNode.dropFirst')}
+            </Label>
+            <input
+              id="dropFirst"
+              type="number"
+              min="0"
+              value={settings.dropFirst}
+              onChange={(e) => updateSetting('dropFirst', parseInt(e.target.value) || 0)}
+              className="w-full border rounded px-2 py-1 text-sm"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="dropLast" className="text-sm">
+              {t('splitNode.dropLast')}
+            </Label>
+            <input
+              id="dropLast"
+              type="number"
+              min="0"
+              value={settings.dropLast}
+              onChange={(e) => updateSetting('dropLast', parseInt(e.target.value) || 0)}
+              className="w-full border rounded px-2 py-1 text-sm"
+            />
+          </div>
           {!settings.autoUpdate && (
             <Button onClick={handleManualUpdate} className="w-full">
               {t('common.update')}

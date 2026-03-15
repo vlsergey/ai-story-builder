@@ -95,11 +95,19 @@ export class SplitterNode extends BaseNode implements TextArrayOutputNode {
 
     // Fallback to splitting using pattern from node_type_settings
     let regexPattern = ''
+    let dropFirst = 0
+    let dropLast = 0
     if (this.data.node_type_settings) {
       try {
         const settings = JSON.parse(this.data.node_type_settings)
         if (settings.separator !== undefined) {
           regexPattern = settings.separator
+        }
+        if (settings.dropFirst !== undefined) {
+          dropFirst = Number(settings.dropFirst) || 0
+        }
+        if (settings.dropLast !== undefined) {
+          dropLast = Number(settings.dropLast) || 0
         }
       } catch (e) {
         // ignore
@@ -113,7 +121,15 @@ export class SplitterNode extends BaseNode implements TextArrayOutputNode {
     if (inputText === null) {
       return []
     }
-    return this.splitTextByRegex(inputText, regexPattern)
+    let parts = this.splitTextByRegex(inputText, regexPattern)
+    // Apply dropFirst and dropLast
+    if (dropFirst > 0) {
+      parts = parts.slice(dropFirst)
+    }
+    if (dropLast > 0) {
+      parts = parts.slice(0, -dropLast)
+    }
+    return parts
   }
 
   private getInputText(): string | null {
