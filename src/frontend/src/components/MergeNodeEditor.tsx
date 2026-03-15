@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocale } from '../lib/locale'
 import { ipcClient } from '../ipcClient'
 import { useTheme } from '../lib/theme/theme-provider'
@@ -11,6 +11,7 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-p
 import { GripVertical, SortAsc, SortDesc, RefreshCw } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
+import { debounceAsync } from '../lib/utils'
 
 interface MergeNodeSettingsProps {
   node: PlanGraphNode
@@ -81,12 +82,11 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   }
 
   // Save settings and fetch updated node
-  async function saveSettings(newSettings?: typeof settings): Promise<PlanGraphNode | null> {
-    const settingsToSave = newSettings ?? settings;
+  const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanGraphNode | null> => {
     try {
       // Update the node with new node_type_settings (triggers regeneration)
       await ipcClient.graph.patchNode(node.id, {
-        node_type_settings: JSON.stringify(settingsToSave)
+        node_type_settings: JSON.stringify(newSettings)
       });
       // Fetch updated node
       const updatedNode = await ipcClient.graph.getNode(node.id);
@@ -96,7 +96,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
       console.error('Failed to save settings:', error);
       return null;
     }
-  }
+  }, [node.id, onNodeUpdated]);
 
   // Regenerate content via backend
   async function regenerateContent() {
@@ -112,6 +112,22 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
       console.error('Failed to regenerate content:', error);
     }
   }
+
+  // Debounced regenerate content
+  const regenerateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const debouncedRegenerateContent = useCallback(() => {
+    if (regenerateTimeoutRef.current) clearTimeout(regenerateTimeoutRef.current);
+    regenerateTimeoutRef.current = setTimeout(() => {
+      regenerateContent();
+    }, 1000);
+  }, [regenerateContent]);
+
+  useEffect(() => {
+    return () => {
+      if (regenerateTimeoutRef.current) clearTimeout(regenerateTimeoutRef.current);
+    };
+  }, []);
 
   // Handle drag end
   async function onDragEnd(result: DropResult) {
@@ -177,17 +193,33 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     }
 
     if (settings.autoUpdate) {
-      regenerateContent()
+      debouncedRegenerateContent()
     }
   }
+
+  // Debounced save settings
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const debouncedSaveSettings = useCallback((newSettings: typeof settings) => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveSettings(newSettings);
+    }, 1000);
+  }, [saveSettings]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, []);
 
   // Update setting
   function updateSetting(key: keyof typeof settings, value: boolean) {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
       if (key !== 'autoUpdate' || value) {
-        // Save new settings (triggers backend regeneration)
-        saveSettings(newSettings);
+        // Save new settings with debounce (triggers backend regeneration)
+        debouncedSaveSettings(newSettings);
       }
       return newSettings;
     });
@@ -197,9 +229,9 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Handle auto-update - ensure content is regenerated when any dependency changes
   useEffect(() => {
     if (settings.autoUpdate) {
-      regenerateContent()
+      debouncedRegenerateContent()
     }
-  }, [inputs, settings, node.title])
+  }, [inputs, settings, node.title, debouncedRegenerateContent])
 
   // Manual update button
   function handleManualUpdate() {

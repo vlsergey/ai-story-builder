@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocale } from '../lib/locale'
 import { ipcClient } from '../ipcClient'
 import { useTheme } from '../lib/theme/theme-provider'
@@ -87,11 +87,10 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   }, [node.content])
 
   // Save settings
-  async function saveSettings(newSettings?: typeof settings): Promise<PlanGraphNode | null> {
-    const settingsToSave = newSettings ?? settings
+  const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanGraphNode | null> => {
     try {
       await ipcClient.graph.patchNode(node.id, {
-        node_type_settings: JSON.stringify(settingsToSave)
+        node_type_settings: JSON.stringify(newSettings)
       })
       const updatedNode = await ipcClient.graph.getNode(node.id)
       onNodeUpdated?.(updatedNode)
@@ -100,7 +99,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
       console.error('Failed to save settings:', error)
       return null
     }
-  }
+  }, [node.id, onNodeUpdated])
 
   // Regenerate split parts based on input text and settings
   async function regenerateParts() {
@@ -133,12 +132,37 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     onNodeUpdated?.(updatedNode)
   }
 
+  // Debounced save settings
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const debouncedSaveSettings = useCallback((newSettings: typeof settings) => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => {
+      saveSettings(newSettings)
+    }, 1000)
+  }, [saveSettings])
+
+  // Debounced regenerate parts
+  const regenerateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const debouncedRegenerateParts = useCallback(() => {
+    if (regenerateTimeoutRef.current) clearTimeout(regenerateTimeoutRef.current)
+    regenerateTimeoutRef.current = setTimeout(() => {
+      regenerateParts()
+    }, 1000)
+  }, [regenerateParts])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+      if (regenerateTimeoutRef.current) clearTimeout(regenerateTimeoutRef.current)
+    }
+  }, [])
+
   // Update setting
   function updateSetting<K extends keyof typeof settings>(key: K, value: typeof settings[K]) {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value }
       if (key !== 'autoUpdate' || value) {
-        saveSettings(newSettings)
+        debouncedSaveSettings(newSettings)
       }
       return newSettings
     })
@@ -147,9 +171,9 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Handle auto-update when input changes
   useEffect(() => {
     if (settings.autoUpdate && inputText) {
-      regenerateParts()
+      debouncedRegenerateParts()
     }
-  }, [inputText, settings.separator, settings.strategy])
+  }, [inputText, settings.separator, settings.strategy, debouncedRegenerateParts])
 
   // Update panel title
   useEffect(() => {
