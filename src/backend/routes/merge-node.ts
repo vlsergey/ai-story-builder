@@ -28,12 +28,12 @@ export function generateMergeContent(
   let nodeTitle: string
   let nodeMergeSettings: string | null = null
   if (overrideTitle === undefined || overrideSettings === undefined) {
-    const node = db.prepare('SELECT title, merge_settings FROM plan_nodes WHERE id = ? AND type = \'merge\'').get(nodeId) as { title: string, merge_settings: string | null } | undefined
+    const node = db.prepare('SELECT title, node_type_settings FROM plan_nodes WHERE id = ? AND type = \'merge\'').get(nodeId) as { title: string, node_type_settings: string | null } | undefined
     if (!node) {
       throw makeError('Merge node not found', 404)
     }
     nodeTitle = node.title
-    nodeMergeSettings = node.merge_settings
+    nodeMergeSettings = node.node_type_settings
   } else {
     nodeTitle = overrideTitle
   }

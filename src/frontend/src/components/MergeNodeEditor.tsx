@@ -69,10 +69,10 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Load saved settings
   async function loadSettings() {
     try {
-      // Get the node data which now contains merge_settings
+      // Get the node data which now contains node_type_settings
       const nodeData = await ipcClient.graph.getNode(node.id)
-      if (nodeData.merge_settings) {
-        const parsed = JSON.parse(nodeData.merge_settings)
+      if (nodeData.node_type_settings) {
+        const parsed = JSON.parse(nodeData.node_type_settings)
         setSettings(prev => ({ ...prev, ...parsed }))
       }
     } catch (error) {
@@ -84,9 +84,9 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   async function saveSettings(newSettings?: typeof settings): Promise<PlanGraphNode | null> {
     const settingsToSave = newSettings ?? settings;
     try {
-      // Update the node with new merge_settings (triggers regeneration)
+      // Update the node with new node_type_settings (triggers regeneration)
       await ipcClient.graph.patchNode(node.id, {
-        merge_settings: JSON.stringify(settingsToSave)
+        node_type_settings: JSON.stringify(settingsToSave)
       });
       // Fetch updated node
       const updatedNode = await ipcClient.graph.getNode(node.id);
@@ -103,7 +103,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     try {
       // Send current settings to trigger regeneration
       await ipcClient.graph.patchNode(node.id, {
-        merge_settings: JSON.stringify(settings)
+        node_type_settings: JSON.stringify(settings)
       });
       // Fetch updated node
       const updatedNode = await ipcClient.graph.getNode(node.id);

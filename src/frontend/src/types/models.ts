@@ -67,6 +67,7 @@ export interface PlanGraphNode {
   summary: string | null
   auto_summary: number
   ai_sync_info: string | null
+  node_type_settings: string | null
   x: number
   y: number
   word_count: number

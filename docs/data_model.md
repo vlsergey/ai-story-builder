@@ -94,7 +94,7 @@ The plan is a directed graph. Nodes carry content and edges carry semantic roles
   - `parent_id` INTEGER NULL REFERENCES `plan_nodes`(`id`) ON DELETE CASCADE — deprecated (kept for compatibility, superseded by `plan_edges`)
   - `title` TEXT NOT NULL
   - `content` TEXT — direct editable markdown text (nullable)
-  - `type` TEXT NOT NULL DEFAULT `'text'` — `'text'` | `'lore'` | `'merge'`
+  - `type` TEXT NOT NULL DEFAULT `'text'` — `'text'` | `'lore'` | `'merge'` | `'split'`
   - `x` REAL DEFAULT 0 — canvas X position
   - `y` REAL DEFAULT 0 — canvas Y position
   - `user_prompt` TEXT — generation instruction stored per-node (autosaved)
@@ -108,11 +108,15 @@ The plan is a directed graph. Nodes carry content and edges carry semantic roles
   - `changes_status` TEXT NULL — review workflow state: NULL | `'review'`
   - `review_base_content` TEXT NULL — snapshot before AI improvement
   - `last_improve_instruction` TEXT NULL — last AI improve instruction
-  - `merge_settings` TEXT — JSON object with merge node settings when type='merge':
-    - `includeNodeTitle` BOOLEAN — include merge node title as h1
-    - `includeInputTitles` BOOLEAN — include input node titles as h2
-    - `fixHeaders` BOOLEAN — fix header levels in merged content
-    - `autoUpdate` BOOLEAN — automatically update content when inputs change
+  - `node_type_settings` TEXT — JSON object with node-type-specific settings. Structure depends on `type`:
+    - For `type='merge'` (merge node):
+      - `includeNodeTitle` BOOLEAN — include merge node title as h1
+      - `includeInputTitles` BOOLEAN — include input node titles as h2
+      - `fixHeaders` BOOLEAN — fix header levels in merged content
+      - `autoUpdate` BOOLEAN — automatically update content when inputs change
+    - For `type='split'` (splitter node):
+      - `strategy` TEXT — splitting strategy: `'separator'` or `'AI'`
+      - `separator` TEXT (optional) — separator text used when strategy is `'separator'`
 
 - `plan_edges`
   - `id` INTEGER PRIMARY KEY

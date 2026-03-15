@@ -40,7 +40,7 @@ export interface PlanNodeRow {
   summary: string | null
   auto_summary: number
   ai_sync_info: string | null
-  merge_settings: string | null
+  node_type_settings: string | null
   word_count: number
   char_count: number
   byte_count: number

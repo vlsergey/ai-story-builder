@@ -129,7 +129,7 @@ export function patchGraphNode(
     system_prompt?: string
     summary?: string
     auto_summary?: number
-    merge_settings?: string
+    node_type_settings?: string
     prompt?: string
     start_review?: boolean
     accept_review?: boolean
@@ -137,7 +137,7 @@ export function patchGraphNode(
 ): { ok: boolean; word_count?: number | null; char_count?: number | null; byte_count?: number | null } {
   const {
     title, content, x, y, type,
-    user_prompt, system_prompt, summary, auto_summary, merge_settings,
+    user_prompt, system_prompt, summary, auto_summary, node_type_settings,
     prompt, start_review, accept_review,
   } = data
   const dbPath = getCurrentDbPath()
@@ -152,7 +152,7 @@ export function patchGraphNode(
   const hasSystemPrompt = system_prompt !== undefined
   const hasSummary = summary !== undefined
   const hasAutoSummary = auto_summary !== undefined
-  const hasMergeSettings = merge_settings !== undefined
+  const hasNodeTypeSettings = node_type_settings !== undefined
 
   // Validate type if provided
   if (hasType && !isValidNodeType(type!)) {
@@ -160,7 +160,7 @@ export function patchGraphNode(
   }
 
   if (!hasTitle && !hasContent && !hasPosition && !hasType && !hasUserPrompt &&
-      !hasSystemPrompt && !hasSummary && !hasAutoSummary && !hasMergeSettings && !accept_review &&
+      !hasSystemPrompt && !hasSummary && !hasAutoSummary && !hasNodeTypeSettings && !accept_review &&
       prompt === undefined) {
     throw makeError('at least one field required', 400)
   }
@@ -168,7 +168,7 @@ export function patchGraphNode(
   const db = new Database(dbPath)
 
   // Fetch current node for merge generation
-  const current = db.prepare('SELECT type, merge_settings, title FROM plan_nodes WHERE id = ?').get(id) as { type: string, merge_settings: string | null, title: string } | undefined;
+  const current = db.prepare('SELECT type, node_type_settings, title FROM plan_nodes WHERE id = ?').get(id) as { type: string, node_type_settings: string | null, title: string } | undefined;
   if (!current) {
     db.close();
     throw makeError('node not found', 404);
@@ -180,7 +180,7 @@ export function patchGraphNode(
   let generatedByteCount: number | null = null;
 
   // Determine if we should regenerate merge content
-  if (willBeMerge && !hasContent && (hasMergeSettings || (hasType && type === 'merge'))) {
+  if (willBeMerge && !hasContent && (hasNodeTypeSettings || (hasType && type === 'merge'))) {
     // Parse settings
     const defaultSettings = {
       includeNodeTitle: false,
@@ -189,15 +189,15 @@ export function patchGraphNode(
       autoUpdate: false,
     };
     let settings = defaultSettings;
-    if (hasMergeSettings) {
+    if (hasNodeTypeSettings) {
       try {
-        settings = { ...defaultSettings, ...JSON.parse(merge_settings!) };
+        settings = { ...defaultSettings, ...JSON.parse(node_type_settings!) };
       } catch (e) {
         // keep defaults
       }
-    } else if (current.merge_settings) {
+    } else if (current.node_type_settings) {
       try {
-        settings = { ...defaultSettings, ...JSON.parse(current.merge_settings) };
+        settings = { ...defaultSettings, ...JSON.parse(current.node_type_settings) };
       } catch (e) {
         // keep defaults
       }
@@ -236,7 +236,7 @@ export function patchGraphNode(
   if (hasSystemPrompt) { sets.push('system_prompt = ?'); params.push(system_prompt ?? null) }
   if (hasSummary) { sets.push('summary = ?'); params.push(summary ?? null) }
   if (hasAutoSummary) { sets.push('auto_summary = ?'); params.push(auto_summary ?? 0) }
-  if (hasMergeSettings) { sets.push('merge_settings = ?'); params.push(merge_settings ?? null) }
+  if (hasNodeTypeSettings) { sets.push('node_type_settings = ?'); params.push(node_type_settings ?? null) }
 
   // Add generated merge content if any
   if (generatedContent !== null) {
