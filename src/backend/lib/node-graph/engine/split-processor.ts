@@ -17,10 +17,10 @@ export class SplitProcessor implements NodeProcessor {
   }
 
   getOutput(context: NodeContext, nodeData: NodeData): unknown {
-    return this.getOutputTexts(context, nodeData)
+    return this.parseContentAsJsonArray(nodeData)
   }
 
-  private getOutputTexts(context: NodeContext, nodeData: NodeData): string[] {
+  private parseContentAsJsonArray(nodeData: NodeData): string[] {
     // Try to parse content as JSON array of split parts
     if (nodeData.content) {
       try {
@@ -30,11 +30,14 @@ export class SplitProcessor implements NodeProcessor {
           return parsed.map((item: any) => typeof item === 'string' ? item : item.content || '')
         }
       } catch (e) {
-        // Not valid JSON, treat as regex pattern (legacy)
+        // Not valid JSON, treat as empty array
       }
     }
+    return []
+  }
 
-    // Fallback to splitting using pattern from node_type_settings
+  private splitInput(context: NodeContext, nodeData: NodeData): string[] {
+    // Get splitting settings
     let regexPattern = ''
     let dropFirst = 0
     let dropLast = 0
@@ -53,10 +56,6 @@ export class SplitProcessor implements NodeProcessor {
       } catch (e) {
         // ignore
       }
-    }
-    // If no separator in settings, fallback to content as regex pattern (legacy)
-    if (!regexPattern && nodeData.content) {
-      regexPattern = nodeData.content
     }
     const inputText = this.getInputText(context, nodeData.id)
     if (inputText === null) {
@@ -120,8 +119,7 @@ export class SplitProcessor implements NodeProcessor {
   }
 
   async regenerate(context: NodeContext, nodeData: NodeData, options?: unknown): Promise<string | null> {
-    // Regeneration could re‑split based on current input
-    // For now, return null (no new content)
-    return null
+    const parts = this.splitInput(context, nodeData)
+    return JSON.stringify(parts)
   }
 }

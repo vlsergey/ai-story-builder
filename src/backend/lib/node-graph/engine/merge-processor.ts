@@ -19,10 +19,8 @@ export class MergeProcessor implements NodeProcessor {
   }
 
   getOutput(context: NodeContext, nodeData: NodeData): unknown {
-    // For now, we don't compute merged content automatically because it's heavy.
-    // Instead, we rely on explicit generation via regenerate().
-    // Return empty string as placeholder.
-    return ''
+    // Return the current content (which should be the merged content).
+    return nodeData.content ?? ''
   }
 
   async onContentChange(context: NodeContext, nodeData: NodeData, oldContent: string | null): Promise<void> {
