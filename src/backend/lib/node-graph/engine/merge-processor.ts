@@ -28,27 +28,24 @@ export class MergeProcessor implements NodeProcessor {
     // Do nothing.
   }
 
-  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<void> {
+  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<NodeData | null> {
     // Check if auto‑update is enabled
     const settings = this.parseSettings(nodeData.node_type_settings)
     if (!settings.autoUpdate) {
-      return
+      return null
     }
 
     // Regenerate merged content
     const newContent = await this.generateMergedContent(context, nodeData, {})
     if (newContent === null || newContent === nodeData.content) {
       // No change or generation failed
-      return
+      return null
     }
 
-    // Update node content via GraphEngine (assume context is GraphEngine)
-    const engine = context as any
-    if (typeof engine.updateNodeContent === 'function') {
-      await engine.updateNodeContent(nodeData.id, newContent)
-    } else {
-      // Fallback: log warning
-      console.warn('Cannot update merge node content: updateNodeContent not available')
+    // Return updated node data
+    return {
+      ...nodeData,
+      content: newContent,
     }
   }
 

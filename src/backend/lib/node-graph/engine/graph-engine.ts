@@ -84,7 +84,7 @@ export class GraphEngine extends GraphManager {
   /**
    * Update node content and trigger any downstream updates (e.g., auto‑update merge nodes).
    */
-  async updateNodeContent(nodeId: number, newContent: string): Promise<void> {
+  async updateNodeContent(nodeId: number, newContent: string | null): Promise<void> {
     const node = this.getNode(nodeId)
     if (!node) throw new Error(`Node ${nodeId} not found`)
     const oldContent = node.content
@@ -119,6 +119,8 @@ export class GraphEngine extends GraphManager {
   /**
    * Notify all downstream nodes that a node's content has changed.
    * This calls each downstream node's onInputContentChange method (if defined).
+   * If the processor returns updated NodeData, the node will be updated (if content changed)
+   * and downstream notifications will propagate further.
    */
   async notifyDownstreamNodes(changedNodeId: number): Promise<void> {
     const outgoingEdges = this.getOutgoingEdges(changedNodeId)
@@ -127,17 +129,21 @@ export class GraphEngine extends GraphManager {
       if (!downstreamNode) continue
       const processor = this.getProcessor(downstreamNode.type)
       if (processor?.onInputContentChange) {
-        await processor.onInputContentChange(this, downstreamNode, changedNodeId)
+        const updatedNodeData = await processor.onInputContentChange(this, downstreamNode, changedNodeId)
+        if (updatedNodeData && updatedNodeData.content !== downstreamNode.content) {
+          // Update the node with new content (other fields are ignored for now)
+          await this.updateNodeContent(downstreamNode.id, updatedNodeData.content)
+        }
       }
     }
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────────
 
-  private async updateNodeContentInDb(nodeId: number, content: string): Promise<void> {
-    const wordCount = this.countWords(content)
-    const charCount = this.countChars(content)
-    const byteCount = this.countBytes(content)
+  private async updateNodeContentInDb(nodeId: number, content: string | null): Promise<void> {
+    const wordCount = this.countWords(content ?? '')
+    const charCount = this.countChars(content ?? '')
+    const byteCount = this.countBytes(content ?? '')
 
     // @ts-ignore – we need to access the private db field from GraphManager
     const db: Database = this.db

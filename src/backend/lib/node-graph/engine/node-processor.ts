@@ -33,9 +33,11 @@ export interface NodeProcessor {
   /**
    * Called when an input node's content changes.
    * The processor may decide to update its own content (e.g., re‑merge, re‑split) if auto‑update is enabled.
+   * Returns a NodeData object with updated fields (e.g., content) if the node should be updated,
+   * or null if no changes are needed.
    * @param changedInputNodeId The ID of the input node whose content changed.
    */
-  onInputContentChange?(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<void>
+  onInputContentChange?(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<NodeData | null>
 
   /**
    * Regenerate the node's content (e.g., AI generation, re‑split, re‑merge).

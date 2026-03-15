@@ -98,23 +98,53 @@ export class SplitProcessor implements NodeProcessor {
     }
   }
 
+  private parseSettings(nodeTypeSettings: string | null): { autoUpdate: boolean } {
+    const defaultSettings = {
+      autoUpdate: false,
+    }
+    if (!nodeTypeSettings) {
+      return defaultSettings
+    }
+    try {
+      const parsed = JSON.parse(nodeTypeSettings)
+      return {
+        autoUpdate: parsed.autoUpdate === true,
+      }
+    } catch (e) {
+      return defaultSettings
+    }
+  }
+
   async onContentChange(context: NodeContext, nodeData: NodeData, oldContent: string | null): Promise<void> {
     // If split node's content changes (e.g., separator), downstream nodes may need update
     // For now, do nothing (auto‑update could be added later)
   }
 
-  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<void> {
+  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number): Promise<NodeData | null> {
     // Check if the changed input is the one we depend on
     const incoming = context.getIncomingEdges(nodeData.id)
     const depends = incoming.some(edge => edge.from_node_id === changedInputNodeId && edge.type === 'text')
     if (!depends) {
-      return
+      return null
     }
 
-    // Notify downstream nodes that our output may have changed
-    const engine = context as any
-    if (typeof engine.notifyDownstreamNodes === 'function') {
-      await engine.notifyDownstreamNodes(nodeData.id)
+    // Check if auto‑update is enabled
+    const settings = this.parseSettings(nodeData.node_type_settings)
+    if (!settings.autoUpdate) {
+      return null
+    }
+
+    // Regenerate split content
+    const newContent = await this.regenerate(context, nodeData, {})
+    if (newContent === null || newContent === nodeData.content) {
+      // No change or generation failed
+      return null
+    }
+
+    // Return updated node data
+    return {
+      ...nodeData,
+      content: newContent,
     }
   }
 
