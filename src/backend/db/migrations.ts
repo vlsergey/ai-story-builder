@@ -1,314 +1,64 @@
 import type { Database } from 'better-sqlite3'
 
+import migration001 from './migrations/001'
+import migration002 from './migrations/002'
+import migration003 from './migrations/003'
+import migration004 from './migrations/004'
+import migration005 from './migrations/005'
+import migration006 from './migrations/006'
+import migration007 from './migrations/007'
+import migration008 from './migrations/008'
+import migration009 from './migrations/009'
+import migration010 from './migrations/010'
+import migration011 from './migrations/011'
+import migration012 from './migrations/012'
+import migration013 from './migrations/013'
+import migration014 from './migrations/014'
+import migration015 from './migrations/015'
+import migration016 from './migrations/016'
+import migration017 from './migrations/017'
+
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
 const MIGRATIONS: Array<(db: Database) => void> = [
   // version 0 → 1: initial schema
-  (db) => {
-    db.exec(`
-      -- Unified lore tree.
-      -- A node with children acts as a folder; a node with versions holds content.
-      -- There is no separate node_type — behaviour emerges from usage.
-      CREATE TABLE lore_nodes (
-        id             INTEGER PRIMARY KEY,
-        parent_id      INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
-        name           TEXT NOT NULL,
-        content        TEXT,
-        position       INTEGER DEFAULT 0,
-        status         TEXT NOT NULL DEFAULT 'ACTIVE',
-        to_be_deleted  INTEGER NOT NULL DEFAULT 0,
-        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (parent_id, name)
-      );
-
-      CREATE TABLE lore_versions (
-        id           INTEGER PRIMARY KEY,
-        lore_node_id INTEGER NOT NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
-        version      INTEGER NOT NULL,
-        content      TEXT NOT NULL,
-        status       TEXT NOT NULL DEFAULT 'ACTIVE',
-        created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (lore_node_id, version)
-      );
-
-      CREATE TABLE plan_nodes (
-        id            INTEGER PRIMARY KEY,
-        parent_id     INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-        title         TEXT NOT NULL,
-        content       TEXT,
-        position      INTEGER DEFAULT 0,
-        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-        type          TEXT NOT NULL DEFAULT 'text',
-        x             REAL DEFAULT 0,
-        y             REAL DEFAULT 0,
-        user_prompt   TEXT,
-        system_prompt TEXT,
-        summary       TEXT,
-        auto_summary  INTEGER DEFAULT 0,
-        ai_sync_info  TEXT
-      );
-
-      CREATE TABLE plan_edges (
-        id           INTEGER PRIMARY KEY,
-        from_node_id INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-        to_node_id   INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-        type         TEXT NOT NULL DEFAULT 'instruction',
-        position     INTEGER DEFAULT 0,
-        label        TEXT,
-        template     TEXT
-      );
-
-      CREATE TABLE plan_node_versions (
-        id              INTEGER PRIMARY KEY,
-        plan_node_id    INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-        version         INTEGER NOT NULL,
-        instruction     TEXT NOT NULL,
-        result          TEXT,
-        status          TEXT NOT NULL DEFAULT 'DRAFT',
-        parent_version_id INTEGER NULL REFERENCES plan_node_versions(id),
-        is_obsolete     BOOLEAN DEFAULT FALSE,
-        created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (plan_node_id, version)
-      );
-
-      CREATE TABLE story_parts (
-        id                  INTEGER PRIMARY KEY,
-        plan_node_version_id INTEGER NOT NULL REFERENCES plan_node_versions(id) ON DELETE CASCADE,
-        version             INTEGER NOT NULL,
-        content             TEXT NOT NULL,
-        status              TEXT NOT NULL DEFAULT 'GENERATED',
-        parent_version_id   INTEGER NULL REFERENCES story_parts(id),
-        is_obsolete         BOOLEAN DEFAULT FALSE,
-        created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (plan_node_version_id, version)
-      );
-
-      CREATE TABLE card_definitions (
-        id         INTEGER PRIMARY KEY,
-        name       TEXT NOT NULL,
-        definition TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE card_values (
-        id                 INTEGER PRIMARY KEY,
-        card_definition_id INTEGER NOT NULL REFERENCES card_definitions(id) ON DELETE CASCADE,
-        story_part_id      INTEGER NOT NULL REFERENCES story_parts(id) ON DELETE CASCADE,
-        version            INTEGER NOT NULL,
-        data               JSON NOT NULL,
-        parent_version_id  INTEGER NULL REFERENCES card_values(id),
-        is_obsolete        BOOLEAN DEFAULT FALSE,
-        created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (card_definition_id, story_part_id, version)
-      );
-
-      CREATE TABLE ai_calls (
-        id                   INTEGER PRIMARY KEY,
-        backend              TEXT NOT NULL,
-        model                TEXT NOT NULL,
-        request_type         TEXT,
-        prompt               TEXT,
-        response_summary     TEXT,
-        tokens_input         INTEGER,
-        tokens_output        INTEGER,
-        cost                 REAL,
-        related_story_part_id INTEGER NULL REFERENCES story_parts(id),
-        created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE settings (
-        key   TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      );
-    `)
-  },
+  migration001,
   // version 1 → 2: add word/char/byte counts and AI sync info to lore_nodes
-  (db) => {
-    db.exec(`
-      ALTER TABLE lore_nodes ADD COLUMN word_count  INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE lore_nodes ADD COLUMN char_count  INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE lore_nodes ADD COLUMN byte_count  INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE lore_nodes ADD COLUMN ai_sync_info TEXT NULL;
-    `)
-  },
+  migration002,
   // version 2 → 3: backfill word/char/byte counts for existing lore_nodes with content
-  (db) => {
-    const rows = db
-      .prepare('SELECT id, content FROM lore_nodes WHERE content IS NOT NULL')
-      .all() as { id: number; content: string }[]
-    const update = db.prepare(
-      'UPDATE lore_nodes SET word_count = ?, char_count = ?, byte_count = ? WHERE id = ?'
-    )
-    for (const row of rows) {
-      const t = row.content.trim()
-      const words = t === '' ? 0 : t.split(/\s+/).length
-      const chars = [...row.content].length
-      const bytes = Buffer.byteLength(row.content, 'utf8')
-      update.run(words, chars, bytes, row.id)
-    }
-  },
+  migration003,
   // version 3 → 4: add text_language setting (default ru-RU) for existing projects
-  (db) => {
-    db.exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('text_language', 'ru-RU')`)
-  },
+  migration004,
   // version 4 → 5: reset Grok sync state
-  // Files uploaded before this migration may have been created without purpose:'assistants',
-  // making them unusable with the Responses API file attachment. Clear all grok entries so the
-  // next sync re-uploads every file with the correct purpose.
-  (db) => {
-    const rows = db
-      .prepare("SELECT id, ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL")
-      .all() as { id: number; ai_sync_info: string }[]
-    const update = db.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
-    for (const row of rows) {
-      try {
-        const info = JSON.parse(row.ai_sync_info) as Record<string, unknown>
-        if (!('grok' in info)) continue
-        delete info['grok']
-        const newValue = Object.keys(info).length > 0 ? JSON.stringify(info) : null
-        update.run(newValue, row.id)
-      } catch { /* skip malformed JSON */ }
-    }
-  },
+  migration005,
   // version 5 → 6: add source, prompt, response_id to lore_versions
-  (db) => {
-    db.exec(`
-      ALTER TABLE lore_versions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
-      ALTER TABLE lore_versions ADD COLUMN prompt TEXT NULL;
-      ALTER TABLE lore_versions ADD COLUMN response_id TEXT NULL;
-    `)
-  },
+  migration006,
   // version 6 → 7: add review workflow columns to lore_nodes
-  (db) => {
-    db.exec(`
-      ALTER TABLE lore_nodes ADD COLUMN changes_status TEXT NULL;
-      ALTER TABLE lore_nodes ADD COLUMN review_base_content TEXT NULL;
-    `)
-  },
+  migration007,
   // version 7 → 8: remove lore_versions and plan_node_versions tables; add last_improve_instruction to lore_nodes
-  (db) => {
-    db.exec(`
-      DROP TABLE IF EXISTS lore_versions;
-      DROP TABLE IF EXISTS plan_node_versions;
-      ALTER TABLE lore_nodes ADD COLUMN last_improve_instruction TEXT NULL;
-    `)
-  },
+  migration008,
   // version 8 → 9: add stats + review workflow columns to plan_nodes; backfill counts
-  // (note: last_generate_prompt was added in the next migration step)
-  (db) => {
-    db.exec(`
-      ALTER TABLE plan_nodes ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE plan_nodes ADD COLUMN char_count INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE plan_nodes ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE plan_nodes ADD COLUMN changes_status TEXT NULL;
-      ALTER TABLE plan_nodes ADD COLUMN review_base_content TEXT NULL;
-      ALTER TABLE plan_nodes ADD COLUMN last_improve_instruction TEXT NULL;
-    `)
-    const rows = db
-      .prepare('SELECT id, content FROM plan_nodes WHERE content IS NOT NULL')
-      .all() as { id: number; content: string }[]
-    const update = db.prepare(
-      'UPDATE plan_nodes SET word_count = ?, char_count = ?, byte_count = ? WHERE id = ?'
-    )
-    for (const row of rows) {
-      const t = row.content.trim()
-      const words = t === '' ? 0 : t.split(/\s+/).length
-      const chars = [...row.content].length
-      const bytes = Buffer.byteLength(row.content, 'utf8')
-      update.run(words, chars, bytes, row.id)
-    }
-  },
+  migration009,
   // version 9 → 10: add last_generate_prompt to lore_nodes and plan_nodes
-  (db) => {
-    db.exec(`
-      ALTER TABLE lore_nodes ADD COLUMN last_generate_prompt TEXT NULL;
-      ALTER TABLE plan_nodes ADD COLUMN last_generate_prompt TEXT NULL;
-    `)
-  },
+  migration010,
   // version 10 → 11: drop ai_calls table (was never populated, logging not used)
-  (db) => {
-    db.exec(`DROP TABLE IF EXISTS ai_calls`)
-  },
+  migration011,
   // version 11 → 12: add graph columns to plan_nodes + plan_edges table
-  // Uses IF NOT EXISTS / conditional guards because fresh DBs already have these columns.
-  (db) => {
-    const existingCols = (db.pragma('table_info(plan_nodes)') as { name: string }[]).map(c => c.name)
-    const addIfMissing = (col: string, def: string) => {
-      if (!existingCols.includes(col)) {
-        db.exec(`ALTER TABLE plan_nodes ADD COLUMN ${col} ${def}`)
-      }
-    }
-    addIfMissing('type', 'TEXT NOT NULL DEFAULT \'text\'')
-    addIfMissing('x', 'REAL DEFAULT 0')
-    addIfMissing('y', 'REAL DEFAULT 0')
-    addIfMissing('user_prompt', 'TEXT')
-    addIfMissing('system_prompt', 'TEXT')
-    addIfMissing('summary', 'TEXT')
-    addIfMissing('auto_summary', 'INTEGER DEFAULT 0')
-    addIfMissing('ai_sync_info', 'TEXT')
-
-    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='plan_edges'").all() as { name: string }[])
-    if (tables.length === 0) {
-      db.exec(`
-        CREATE TABLE plan_edges (
-          id           INTEGER PRIMARY KEY,
-          from_node_id INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-          to_node_id   INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-          type         TEXT NOT NULL DEFAULT 'instruction',
-          position     INTEGER DEFAULT 0,
-          label        TEXT,
-          template     TEXT
-        )
-      `)
-      // Migrate parent-child relationships → instruction edges
-      const rows = db.prepare(
-        `SELECT id, parent_id, position FROM plan_nodes WHERE parent_id IS NOT NULL`
-      ).all() as Array<{ id: number; parent_id: number; position: number }>
-      const insert = db.prepare(
-        `INSERT INTO plan_edges (from_node_id, to_node_id, type, position) VALUES (?, ?, 'instruction', ?)`
-      )
-      for (const r of rows) insert.run(r.parent_id, r.id, r.position)
-    }
-  },
+  migration012,
   // version 12 → 13: copy last_generate_prompt to user_prompt for plan nodes, add user_prompt and system_prompt to lore_nodes
-  (db) => {
-    // 1. Ensure lore_nodes has user_prompt column (copy from last_generate_prompt)
-    const loreCols = (db.pragma('table_info(lore_nodes)') as { name: string }[]).map(c => c.name)
-    if (!loreCols.includes('user_prompt')) {
-      db.exec('ALTER TABLE lore_nodes ADD COLUMN user_prompt TEXT NULL')
-      // Copy existing last_generate_prompt values
-      db.exec('UPDATE lore_nodes SET user_prompt = last_generate_prompt WHERE last_generate_prompt IS NOT NULL')
-    }
-    if (!loreCols.includes('system_prompt')) {
-      db.exec('ALTER TABLE lore_nodes ADD COLUMN system_prompt TEXT NULL')
-    }
-
-    // 2. For plan nodes, copy last_generate_prompt to user_prompt where user_prompt is NULL
-    const planRows = db
-      .prepare('SELECT id, last_generate_prompt FROM plan_nodes WHERE last_generate_prompt IS NOT NULL AND user_prompt IS NULL')
-      .all() as { id: number; last_generate_prompt: string }[]
-    const updatePlan = db.prepare('UPDATE plan_nodes SET user_prompt = ? WHERE id = ?')
-    for (const row of planRows) {
-      updatePlan.run(row.last_generate_prompt, row.id)
-    }
-  },
+  migration013,
   // version 13 → 14: drop last_generate_prompt column from both tables
-  (db) => {
-    // Drop from lore_nodes
-    const loreCols = (db.pragma('table_info(lore_nodes)') as { name: string }[]).map(c => c.name)
-    if (loreCols.includes('last_generate_prompt')) {
-      db.exec('ALTER TABLE lore_nodes DROP COLUMN last_generate_prompt')
-    }
-    // Drop from plan_nodes
-    const planCols = (db.pragma('table_info(plan_nodes)') as { name: string }[]).map(c => c.name)
-    if (planCols.includes('last_generate_prompt')) {
-      db.exec('ALTER TABLE plan_nodes DROP COLUMN last_generate_prompt')
-    }
-  },
+  migration014,
+  // version 14 → 15: move merge node settings from global settings to plan_nodes.merge_settings
+  migration015,
+  // version 15 → 16: unify edge types to 'text'
+  migration016,
+  // version 16 → 17: rename merge_settings to node_type_settings
+  migration017,
 ]
- 
+
 export const CURRENT_VERSION = 17
- 
+
 /**
  * Runs all pending migrations on an open database connection.
  * foreign_keys is disabled during migration and re-enabled after.
@@ -328,88 +78,3 @@ export function migrateDatabase(db: Database): void {
 
   db.pragma('foreign_keys = ON')
 }
-
-// version 14 → 15: move merge node settings from global settings to plan_nodes.merge_settings
-MIGRATIONS.push((db) => {
-  // Add merge_settings column to plan_nodes
-  const planCols = (db.pragma('table_info(plan_nodes)') as { name: string }[]).map(c => c.name)
-  if (!planCols.includes('merge_settings')) {
-    db.exec('ALTER TABLE plan_nodes ADD COLUMN merge_settings TEXT NULL')
-  }
-
-  // Update plan_nodes type to support 'merge' type
-  if (!planCols.includes('type')) {
-    db.exec("ALTER TABLE plan_nodes ADD COLUMN type TEXT NOT NULL DEFAULT 'text'")
-  }
-
-  // Migrate existing merge node settings from settings table to plan_nodes.merge_settings
-  const settingsRows = db.prepare(`
-    SELECT key, value
-    FROM settings
-    WHERE key LIKE 'merge_node_%'
-  `).all() as { key: string; value: string }[]
-
-  const updateNode = db.prepare(`
-    UPDATE plan_nodes
-    SET merge_settings = ?, type = 'merge'
-    WHERE id = ?
-  `)
-
-  for (const row of settingsRows) {
-    const nodeId = parseInt(row.key.replace('merge_node_', ''), 10)
-    if (!isNaN(nodeId)) {
-      try {
-        // Parse the settings and store in merge_settings column
-        const settings = JSON.parse(row.value)
-        updateNode.run(JSON.stringify(settings), nodeId)
-      } catch (error) {
-        console.error(`Failed to migrate settings for node ${nodeId}:`, error)
-      }
-    }
-  }
-
-  // Remove the migrated settings from the settings table
-  db.exec("DELETE FROM settings WHERE key LIKE 'merge_node_%'")
-})
-
-// version 15 → 16: unify edge types to 'text'
-MIGRATIONS.push((db) => {
-  // Create a new table with the correct default
-  db.exec(`
-    CREATE TABLE plan_edges_new (
-      id           INTEGER PRIMARY KEY,
-      from_node_id INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      to_node_id   INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      type         TEXT NOT NULL DEFAULT 'text',
-      position     INTEGER DEFAULT 0,
-      label        TEXT,
-      template     TEXT
-    )
-  `)
-
-  // Copy all existing edges, converting any type to 'text'
-  db.exec(`
-    INSERT INTO plan_edges_new (id, from_node_id, to_node_id, type, position, label, template)
-    SELECT id, from_node_id, to_node_id, 'text', position, label, template
-    FROM plan_edges
-  `)
-
-  // Drop the old table
-  db.exec('DROP TABLE plan_edges')
-
-  // Rename new table to original name
-  db.exec('ALTER TABLE plan_edges_new RENAME TO plan_edges')
-})
-
-// version 16 → 17: rename merge_settings to node_type_settings
-MIGRATIONS.push((db) => {
-  // Check if column exists
-  const planCols = (db.pragma('table_info(plan_nodes)') as { name: string }[]).map(c => c.name);
-  if (planCols.includes('merge_settings')) {
-    // SQLite 3.25.0+ supports RENAME COLUMN
-    db.exec('ALTER TABLE plan_nodes RENAME COLUMN merge_settings TO node_type_settings');
-  } else if (!planCols.includes('node_type_settings')) {
-    // If merge_settings column is missing (should not happen), add node_type_settings
-    db.exec('ALTER TABLE plan_nodes ADD COLUMN node_type_settings TEXT NULL');
-  }
-})
