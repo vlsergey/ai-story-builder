@@ -4,7 +4,7 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs'
 import { setCurrentDbPath } from '../db/state.js'
-import { patchPlanNode, getPlanNode, deletePlanNode } from './plans.js'
+import { patchPlanNode, getPlanNode, deletePlanNode } from './plan-graph.js'
 
 // ── In-memory DB setup ────────────────────────────────────────────────────────
 
@@ -31,7 +31,8 @@ function setupDb(dbPath: string) {
       byte_count           INTEGER NOT NULL DEFAULT 0,
       changes_status       TEXT NULL,
       review_base_content  TEXT NULL,
-      last_improve_instruction TEXT NULL
+      last_improve_instruction TEXT NULL,
+      node_type_settings   TEXT NULL
     );
     CREATE TABLE plan_edges (
       id           INTEGER PRIMARY KEY,
@@ -139,8 +140,15 @@ describe('deletePlanNode', () => {
     try { getPlanNode(2) } catch (e: any) { expect(e.status).toBe(404) }
   })
 
-  it('refuses to delete root node', () => {
-    expect(() => deletePlanNode(1)).toThrow()
-    try { deletePlanNode(1) } catch (e: any) { expect(e.status).toBe(403) }
+  it('deletes root node (and cascades to child)', () => {
+    const res = deletePlanNode(1)
+    expect(res.ok).toBe(true)
+
+    // Root should be gone
+    expect(() => getPlanNode(1)).toThrow()
+    try { getPlanNode(1) } catch (e: any) { expect(e.status).toBe(404) }
+    // Child should also be deleted due to cascade
+    expect(() => getPlanNode(2)).toThrow()
+    try { getPlanNode(2) } catch (e: any) { expect(e.status).toBe(404) }
   })
 })

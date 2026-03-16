@@ -1,4 +1,5 @@
-import type { PlanNodeRow, PlanEdgeRow } from '../types/index.js'
+
+import type { PlanNodeRow, PlanEdgeRow, PlanNodeTree } from '../types/index.js'
 import { getCurrentDbPath } from '../db/state.js'
 import type { PlanGraphData } from '../../shared/plan-graph.js'
 import { generateMergeContent } from './merge-node.js'
@@ -58,55 +59,36 @@ function countBytes(text: string): number {
   return Buffer.byteLength(text, 'utf8')
 }
 
-// ── Exports ───────────────────────────────────────────────────────────────────
+// ── Plan node functions (from plans.ts) ──────────────────────────────────────
 
-export function getPlanGraph(): PlanGraphData {
+export function getPlanNodes(): PlanNodeTree[] {
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
   const db = new Database(dbPath, { readonly: true })
-  const nodes = db.prepare(
-    `SELECT id, type, title, content, user_prompt, system_prompt, summary, auto_summary,
-            ai_sync_info, x, y, word_count, char_count, byte_count,
-            changes_status, review_base_content, last_improve_instruction,
-            created_at
-     FROM plan_nodes ORDER BY id`
-  ).all() as PlanNodeRow[]
-  const edges = db.prepare(
-    `SELECT id, from_node_id, to_node_id, type, position, label, template
-     FROM plan_edges ORDER BY position, id`
-  ).all() as PlanEdgeRow[]
-  db.close()
-  return { nodes, edges } as PlanGraphData
-}
-
-export function createGraphNode(data: {
-  type?: string
-  title?: string
-  x?: number
-  y?: number
-  user_prompt?: string
-  system_prompt?: string
-}): { id: number | bigint } {
-  const { type = 'text', title, x = 0, y = 0, user_prompt, system_prompt } = data
-  if (!isValidNodeType(type)) {
-    throw makeNodeTypeError(type)
-  }
-  const dbPath = getCurrentDbPath()
-  if (!dbPath || !title) throw makeError('title required, db must be open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
-  const info = db
+  const nodes = db
     .prepare(
-      `INSERT INTO plan_nodes (type, title, x, y, user_prompt, system_prompt, word_count, char_count, byte_count)
-       VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0)`
+      `SELECT id, parent_id, title, content, position, created_at,
+              word_count, char_count, byte_count, changes_status, review_base_content, last_improve_instruction
+       FROM plan_nodes ORDER BY position, id`,
     )
-    .run(type, title, x, y, user_prompt ?? null, system_prompt ?? null)
+    .all() as PlanNodeRow[]
   db.close()
-  return { id: info.lastInsertRowid }
+
+  const map = new Map<number, PlanNodeTree>()
+  nodes.forEach((n) => map.set(n.id, { ...n, children: [] }))
+  const roots: PlanNodeTree[] = []
+  for (const n of map.values()) {
+    if (n.parent_id != null && map.has(n.parent_id)) {
+      map.get(n.parent_id)!.children.push(n)
+    } else {
+      roots.push(n)
+    }
+  }
+  return roots
 }
 
-export function getGraphNode(id: number): PlanNodeRow {
+export function getPlanNode(id: number): PlanNodeRow {
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
@@ -117,7 +99,89 @@ export function getGraphNode(id: number): PlanNodeRow {
   return node as PlanNodeRow
 }
 
-export function patchGraphNode(
+export function createPlanNode(data: {
+  parent_id?: number | null
+  title?: string
+  position?: number
+  content?: string
+  type?: string
+  x?: number
+  y?: number
+  user_prompt?: string
+  system_prompt?: string
+  summary?: string
+  auto_summary?: number
+  ai_sync_info?: string
+  node_type_settings?: string
+}): { id: number | bigint } {
+  const {
+    parent_id,
+    title,
+    position,
+    content,
+    type = 'text',
+    x = 0,
+    y = 0,
+    user_prompt,
+    system_prompt,
+    summary,
+    auto_summary = 0,
+    ai_sync_info,
+    node_type_settings,
+  } = data
+  const dbPath = getCurrentDbPath()
+  if (!dbPath || !title) throw makeError('title required, db must be open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+
+  // Validate node type
+  if (!isValidNodeType(type)) {
+    const valid = ['text', 'lore', 'merge', 'split'].join(', ')
+    throw makeError(`Invalid node type "${type}". Valid types: ${valid}`, 400)
+  }
+
+  const db = new Database(dbPath)
+  const pid = parent_id ?? null
+  const { m } = db
+    .prepare('SELECT COALESCE(MAX(position), -1) AS m FROM plan_nodes WHERE parent_id IS ?')
+    .get(pid) as { m: number }
+  let wordCount = 0, charCount = 0, byteCount = 0
+  if (content) {
+    wordCount = countWords(content)
+    charCount = countChars(content)
+    byteCount = countBytes(content)
+  }
+  const info = db
+    .prepare(`
+      INSERT INTO plan_nodes (
+        parent_id, title, position, content,
+        type, x, y, user_prompt, system_prompt,
+        summary, auto_summary, ai_sync_info, node_type_settings,
+        word_count, char_count, byte_count
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    .run(
+      pid,
+      title,
+      position ?? m + 1,
+      content ?? null,
+      type,
+      x,
+      y,
+      user_prompt ?? null,
+      system_prompt ?? null,
+      summary ?? null,
+      auto_summary,
+      ai_sync_info ?? null,
+      node_type_settings ?? null,
+      wordCount,
+      charCount,
+      byteCount
+    )
+  db.close()
+  return { id: info.lastInsertRowid }
+}
+
+export function patchPlanNode(
   id: number,
   data: {
     title?: string
@@ -156,7 +220,8 @@ export function patchGraphNode(
 
   // Validate type if provided
   if (hasType && !isValidNodeType(type!)) {
-    throw makeNodeTypeError(type!)
+    const valid = NODE_TYPES.map(nt => nt.id).join(', ')
+    throw makeError(`Invalid node type "${type}". Valid types: ${valid}`, 400)
   }
 
   if (!hasTitle && !hasContent && !hasPosition && !hasType && !hasUserPrompt &&
@@ -291,7 +356,7 @@ export function patchGraphNode(
     : { ok: true }
 }
 
-export function deleteGraphNode(id: number): { ok: boolean } {
+export function deletePlanNode(id: number): { ok: boolean } {
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
@@ -300,11 +365,84 @@ export function deleteGraphNode(id: number): { ok: boolean } {
   if (!node) { db.close(); throw makeError('node not found', 404) }
   // Delete connected edges first
   db.prepare('DELETE FROM plan_edges WHERE from_node_id = ? OR to_node_id = ?').run(id, id)
-  // Delete the node
+  // Delete the node (cascades to children via foreign key)
   db.prepare('DELETE FROM plan_nodes WHERE id = ?').run(id)
   db.close()
   return { ok: true }
 }
+
+export function movePlanNode(id: number, data: { parent_id?: number | null }): { ok: boolean } {
+  const { parent_id } = data
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath)
+  const nodeId = Number(id)
+  const newParentId = parent_id ?? null
+
+  const node = db
+    .prepare('SELECT parent_id FROM plan_nodes WHERE id = ?')
+    .get(nodeId) as { parent_id: number | null } | undefined
+  if (!node) { db.close(); throw makeError('node not found', 404) }
+  if (node.parent_id === null) { db.close(); throw makeError('root node cannot be moved', 403) }
+  if (newParentId === nodeId) { db.close(); throw makeError('cannot move node to itself', 400) }
+
+  if (newParentId !== null) {
+    const target = db.prepare('SELECT id FROM plan_nodes WHERE id = ?').get(newParentId)
+    if (!target) { db.close(); throw makeError('target parent does not exist', 400) }
+
+    const getParent = db.prepare('SELECT parent_id FROM plan_nodes WHERE id = ?')
+    let cur: number | null = newParentId
+    while (cur !== null) {
+      if (cur === nodeId) { db.close(); throw makeError('cannot move node into its own descendant', 400) }
+      cur = (getParent.get(cur) as { parent_id: number | null } | undefined)?.parent_id ?? null
+    }
+  }
+
+  db.prepare('UPDATE plan_nodes SET parent_id = ? WHERE id = ?').run(newParentId, nodeId)
+  db.close()
+  return { ok: true }
+}
+
+export function reorderPlanChildren(child_ids: number[]): { ok: boolean } {
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Array.isArray(child_ids)) throw makeError('child_ids must be an array', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath)
+  const update = db.prepare('UPDATE plan_nodes SET position = ? WHERE id = ?')
+  db.transaction(() => { child_ids.forEach((id, i) => update.run(i, id)) })()
+  db.close()
+  return { ok: true }
+}
+export function getPlanGraph(): PlanGraphData {
+  const dbPath = getCurrentDbPath()
+  if (!dbPath) throw makeError('no project open', 400)
+  if (!Database) throw makeError('SQLite lib missing', 500)
+  const db = new Database(dbPath, { readonly: true })
+  const nodes = db.prepare(
+    `SELECT id, type, title, content, user_prompt, system_prompt, summary, auto_summary,
+            ai_sync_info, x, y, word_count, char_count, byte_count,
+            changes_status, review_base_content, last_improve_instruction,
+            created_at
+     FROM plan_nodes ORDER BY id`
+  ).all() as PlanNodeRow[]
+  const edges = db.prepare(
+    `SELECT id, from_node_id, to_node_id, type, position, label, template
+     FROM plan_edges ORDER BY position, id`
+  ).all() as PlanEdgeRow[]
+  db.close()
+  return { nodes, edges } as PlanGraphData
+}
+
+// ── Graph‑specific functions (aliases for compatibility) ──────────────────────
+
+export const createGraphNode = createPlanNode
+export const getGraphNode = getPlanNode
+export const patchGraphNode = patchPlanNode
+export const deleteGraphNode = deletePlanNode
+
+// ── Edge functions ─────────────────────────────────────────────────────────────
 
 export function createGraphEdge(data: {
   from_node_id?: number

@@ -97,7 +97,7 @@ export default function PlanGraph() {
 
   const loadGraph = useCallback(async () => {
     try {
-      const data = await ipcClient.graph.get()
+      const data = await ipcClient.planGraph.get()
 
       const rfEdges = toReactFlowEdges(data.edges, deleteEdge)
       let rfNodes = toReactFlowNodes(data.nodes, deleteNode)
@@ -106,7 +106,7 @@ export default function PlanGraph() {
         rfNodes = applyDagreLayout(rfNodes, rfEdges)
         // Persist positions after auto-layout
         for (const n of rfNodes) {
-          void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+          void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
         }
       }
 
@@ -155,12 +155,12 @@ export default function PlanGraph() {
     const message = t('planGraph.deleteConfirmation')
     const confirmed = window.electronAPI.confirm(message)
     if (!confirmed) return
-    const result = await ipcClient.graph.deleteNode(Number(nodeId))
+    const result = await ipcClient.planGraph.deleteNode(Number(nodeId))
     if (result.ok) dispatchPlanGraphRefresh()
   }
 
   async function deleteEdge(edgeId: string) {
-    const result = await ipcClient.graph.deleteEdge(Number(edgeId))
+    const result = await ipcClient.planGraph.deleteEdge(Number(edgeId))
     if (result.ok) {
       const newEdges = edges.filter(e => e.id !== edgeId)
       setEdges(newEdges)
@@ -168,7 +168,7 @@ export default function PlanGraph() {
         const laid = applyDagreLayout([...nodes], newEdges)
         setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
         for (const n of laid) {
-          void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+          void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
         }
         setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
       }
@@ -190,13 +190,13 @@ export default function PlanGraph() {
     setAddTitle('')
     const centerX = 100 + Math.random() * 200
     const centerY = 100 + Math.random() * 200
-    await ipcClient.graph.createNode({ type, title, x: centerX, y: centerY })
+    await ipcClient.planGraph.createNode({ type, title, x: centerX, y: centerY })
     dispatchPlanGraphRefresh()
   }
 
   const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
     if (autoLayout) return
-    void ipcClient.graph.patchNode(Number(node.id), { x: node.position.x, y: node.position.y })
+    void ipcClient.planGraph.patchNode(Number(node.id), { x: node.position.x, y: node.position.y })
   }, [autoLayout])
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
@@ -214,7 +214,7 @@ export default function PlanGraph() {
       const targetNode = nodes.find(n => n.id === connection.target)
       if (targetNode?.data.type === 'merge') {
         // Create the edge directly without showing dialog
-        void ipcClient.graph.createEdge({
+        void ipcClient.planGraph.createEdge({
           from_node_id: Number(connection.source),
           to_node_id: Number(connection.target),
           type: 'merge_into',
@@ -232,7 +232,7 @@ export default function PlanGraph() {
             const laid = applyDagreLayout([...nodes], updatedEdges)
             setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
             for (const n of laid) {
-              void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+              void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
             }
             setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
           }
@@ -247,7 +247,7 @@ export default function PlanGraph() {
 
   async function confirmConnect(edgeType: string) {
     if (!showConnectDialog?.source || !showConnectDialog?.target) return
-    const result = await ipcClient.graph.createEdge({
+    const result = await ipcClient.planGraph.createEdge({
       from_node_id: Number(showConnectDialog.source),
       to_node_id: Number(showConnectDialog.target),
       type: edgeType,
@@ -265,7 +265,7 @@ export default function PlanGraph() {
       const laid = applyDagreLayout([...nodes], updatedEdges)
       setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
       for (const n of laid) {
-        void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+        void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
       }
       setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
     }
@@ -286,7 +286,7 @@ export default function PlanGraph() {
     const laid = applyDagreLayout([...nodes], [...edges])
     setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
     for (const n of laid) {
-      void ipcClient.graph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+      void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
     }
     // Fit view after layout change
     setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)

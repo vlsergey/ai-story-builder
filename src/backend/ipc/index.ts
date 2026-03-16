@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron'
 import type { WebContents } from 'electron'
 import { getLoreTree, getLoreNode, createLoreNode, patchLoreNode, deleteLoreNode, importLoreNode, moveLoreNode, duplicateLoreNode, sortLoreChildren, reorderLoreChildren, restoreLoreNode } from '../routes/lore.js'
-import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode, movePlanNode, reorderPlanChildren } from '../routes/plans.js'
-import { getPlanGraph, createGraphNode, getGraphNode, patchGraphNode, deleteGraphNode, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../routes/plan-graph.js'
+import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode, movePlanNode, reorderPlanChildren } from '../routes/plan-graph.js'
+import { getPlanGraph, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../routes/plan-graph.js'
 import { getProjectStatus, closeProject, openProject, getRecentProjects, deleteRecentProject, listProjectFiles, openProjectFolder, createProject, applyRuntimeSettings } from '../routes/projects.js'
 import { getLayout, saveLayout, setVerboseAiLogging, getSetting, setSetting } from '../routes/settings.js'
 import { getAiConfig, saveAiConfig, setCurrentEngine, getEngineModels, refreshEngineModels, testEngineConnection } from '../routes/ai-config.js'
@@ -84,21 +84,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('lore:reorder-children', wrap((data: any) => reorderLoreChildren(data.child_ids)))
   ipcMain.handle('lore:restore', wrap((id: number) => restoreLoreNode(id)))
 
-  // Plans
-  ipcMain.handle('plan:nodes', wrap(getPlanNodes))
-  ipcMain.handle('plan:node:get', wrap((id: number) => getPlanNode(id)))
-  ipcMain.handle('plan:node:create', wrap((data: any) => createPlanNode(data)))
-  ipcMain.handle('plan:node:patch', wrap((id: number, data: any) => patchPlanNode(id, data)))
-  ipcMain.handle('plan:node:delete', wrap((id: number) => deletePlanNode(id)))
-  ipcMain.handle('plan:node:move', wrap((id: number, data: any) => movePlanNode(id, data)))
-  ipcMain.handle('plan:nodes:reorder', wrap((data: any) => reorderPlanChildren(data.child_ids)))
 
   // Plan graph
   ipcMain.handle('plan:graph', wrap(getPlanGraph))
-  ipcMain.handle('plan:graph:node:create', wrap((data: any) => createGraphNode(data)))
-  ipcMain.handle('plan:graph:node:get', wrap((id: number) => getGraphNode(id)))
-  ipcMain.handle('plan:graph:node:patch', wrap((id: number, data: any) => patchGraphNode(id, data)))
-  ipcMain.handle('plan:graph:node:delete', wrap((id: number) => deleteGraphNode(id)))
+  ipcMain.handle('plan:graph:nodes', wrap(getPlanNodes))
+  ipcMain.handle('plan:graph:node:create', wrap((data: any) => createPlanNode(data)))
+  ipcMain.handle('plan:graph:node:get', wrap((id: number) => getPlanNode(id)))
+  ipcMain.handle('plan:graph:node:patch', wrap((id: number, data: any) => patchPlanNode(id, data)))
+  ipcMain.handle('plan:graph:node:delete', wrap((id: number) => deletePlanNode(id)))
   ipcMain.handle('plan:graph:edge:create', wrap((data: any) => createGraphEdge(data)))
   ipcMain.handle('plan:graph:edge:patch', wrap((id: number, data: any) => patchGraphEdge(id, data)))
   ipcMain.handle('plan:graph:edge:delete', wrap((id: number) => deleteGraphEdge(id)))

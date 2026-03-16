@@ -18,7 +18,7 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
 
   useEffect(() => {
     setLoading(true)
-    ipcClient.plan.getNode(nodeId).then(data => {
+    ipcClient.planGraph.getNode(nodeId).then(data => {
       setNode(data)
       setLoading(false)
     }).catch(() => {
@@ -27,8 +27,8 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   }, [nodeId])
 
   const adapter = useMemo<NodeEditorAdapter>(() => ({
-    getNode: (id) => ipcClient.plan.getNode(id),
-    patchNode: (id, data) => ipcClient.plan.patchNode(id, data),
+    getNode: (id) => ipcClient.planGraph.getNode(id),
+    patchNode: (id, data) => ipcClient.planGraph.patchNode(id, data),
     primaryField: 'title',
     i18nPrefix: 'plan',
     generateEndpoint: '/api/ai/generate-plan',

@@ -47,7 +47,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Load input nodes connected with merge_into edges
   async function loadInputs() {
     try {
-      const graphData = await ipcClient.graph.get()
+      const graphData = await ipcClient.planGraph.get()
       const inputEdges = graphData.edges.filter(edge => edge.to_node_id === node.id && edge.type === 'merge_into')
       const inputNodes = inputEdges.map(edge => {
         const fromNode = graphData.nodes.find(n => n.id === edge.from_node_id)
@@ -71,7 +71,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   async function loadSettings() {
     try {
       // Get the node data which now contains node_type_settings
-      const nodeData = await ipcClient.graph.getNode(node.id)
+      const nodeData = await ipcClient.planGraph.getNode(node.id)
       if (nodeData.node_type_settings) {
         const parsed = JSON.parse(nodeData.node_type_settings)
         setSettings(prev => ({ ...prev, ...parsed }))
@@ -85,11 +85,11 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanGraphNode | null> => {
     try {
       // Update the node with new node_type_settings (triggers regeneration)
-      await ipcClient.graph.patchNode(node.id, {
+      await ipcClient.planGraph.patchNode(node.id, {
         node_type_settings: JSON.stringify(newSettings)
       });
       // Fetch updated node
-      const updatedNode = await ipcClient.graph.getNode(node.id);
+      const updatedNode = await ipcClient.planGraph.getNode(node.id);
       onNodeUpdated?.(updatedNode);
       return updatedNode;
     } catch (error) {
@@ -102,11 +102,11 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   async function regenerateContent() {
     try {
       // Send current settings to trigger regeneration
-      await ipcClient.graph.patchNode(node.id, {
+      await ipcClient.planGraph.patchNode(node.id, {
         node_type_settings: JSON.stringify(settings)
       });
       // Fetch updated node
-      const updatedNode = await ipcClient.graph.getNode(node.id);
+      const updatedNode = await ipcClient.planGraph.getNode(node.id);
       onNodeUpdated?.(updatedNode);
     } catch (error) {
       console.error('Failed to regenerate content:', error);
@@ -147,11 +147,11 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     
     // Update edge positions
     try {
-      const graphData = await ipcClient.graph.get()
+      const graphData = await ipcClient.planGraph.get()
       const updatePromises = updatedItems.map(async (item, index) => {
         const edge = graphData.edges.find(e => e.from_node_id === item.id && e.to_node_id === node.id)
         if (edge) {
-          await ipcClient.graph.patchEdge(edge.id, { position: index })
+          await ipcClient.planGraph.patchEdge(edge.id, { position: index })
         }
       })
       await Promise.all(updatePromises)
@@ -180,11 +180,11 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     
     // Update edge positions
     try {
-      const graphData = await ipcClient.graph.get()
+      const graphData = await ipcClient.planGraph.get()
       const updatePromises = updated.map(async (item, index) => {
         const edge = graphData.edges.find(e => e.from_node_id === item.id && e.to_node_id === node.id)
         if (edge) {
-          await ipcClient.graph.patchEdge(edge.id, { position: index })
+          await ipcClient.planGraph.patchEdge(edge.id, { position: index })
         }
       })
       await Promise.all(updatePromises)
@@ -369,7 +369,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
         onChange={(value) => {
           onUpdate(value)
           // Also update the node content via IPC
-          ipcClient.graph.patchNode(node.id, { content: value })
+          ipcClient.planGraph.patchNode(node.id, { content: value })
         }}
       />
     </div>
