@@ -114,11 +114,8 @@
   "planGraph.autoLayout": "Auto layout",
   "planGraph.applyLayout": "Apply layout",
   "planGraph.generateAll": "Generate all",
-  "planGraph.edge.instruction": "Instruction",
-  "planGraph.edge.attachment": "Attachment",
-  "planGraph.edge.system_prompt": "System prompt",
-  "planGraph.edge.merge_into": "Merge into",
-  "planGraph.edge.text": "",
+
+  "planGraph.edge.text": "Text",
   "planGraph.edge.textArray": "Text array",
   "planGraph.generateAll.title": "Regenerate all nodes?",
   "planGraph.generateAll.body": "{{count}} nodes will be regenerated. {{words}} words of existing content will be overwritten.",

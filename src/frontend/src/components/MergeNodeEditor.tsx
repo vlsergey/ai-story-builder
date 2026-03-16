@@ -44,11 +44,11 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     loadSettings()
   }, [node.id])
 
-  // Load input nodes connected with merge_into edges
+  // Load input nodes connected with text or textArray edges
   async function loadInputs() {
     try {
       const graphData = await ipcClient.planGraph.get()
-      const inputEdges = graphData.edges.filter(edge => edge.to_node_id === node.id && edge.type === 'merge_into')
+      const inputEdges = graphData.edges.filter(edge => edge.to_node_id === node.id && (edge.type === 'text' || edge.type === 'textArray'))
       const inputNodes = inputEdges.map(edge => {
         const fromNode = graphData.nodes.find(n => n.id === edge.from_node_id)
         return fromNode ? {

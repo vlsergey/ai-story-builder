@@ -209,38 +209,59 @@ export default function PlanGraph() {
   }, [])
 
   const onConnect = useCallback((connection: Connection) => {
-    // If connecting to a merge node, automatically create a merge_into edge
-    if (connection.target && connection.source) {
-      const targetNode = nodes.find(n => n.id === connection.target)
-      if (targetNode?.data.type === 'merge') {
-        // Create the edge directly without showing dialog
-        void ipcClient.planGraph.createEdge({
-          from_node_id: Number(connection.source),
-          to_node_id: Number(connection.target),
-          type: 'merge_into',
-        }).then(result => {
-          const newEdge: Edge = {
-            id: String(result.id),
-            source: connection.source!,
-            target: connection.target!,
-            type: 'planEdge',
-            data: { type: 'merge_into', onDelete: deleteEdge },
-          }
-          const updatedEdges = addEdge(newEdge, edges)
-          setEdges(updatedEdges)
-          if (autoLayout) {
-            const laid = applyDagreLayout([...nodes], updatedEdges)
-            setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
-            for (const n of laid) {
-              void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
-            }
-            setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
-          }
-        })
-        return
-      }
+    if (!connection.source || !connection.target) {
+      return
     }
-    // Otherwise show the dialog for other edge types
+    const sourceNode = nodes.find(n => n.id === connection.source)
+    const targetNode = nodes.find(n => n.id === connection.target)
+    const sourceType = sourceNode?.data.type as PlanNodeType | undefined
+    const targetType = targetNode?.data.type as PlanNodeType | undefined
+
+    if (!sourceType || !targetType) {
+      return
+    }
+
+    const allowedEdgeTypes = EDGE_TYPES.filter(edgeDef =>
+      canCreateEdge(sourceType, targetType, edgeDef.id)
+    ).map(edgeDef => edgeDef.id)
+
+    if (allowedEdgeTypes.length === 0) {
+      // No allowed edge types, maybe show error? For now just ignore.
+      return
+    }
+
+    if (allowedEdgeTypes.length === 1) {
+      // Automatically create the edge
+      const edgeType = allowedEdgeTypes[0]
+      void ipcClient.planGraph.createEdge({
+        from_node_id: Number(connection.source),
+        to_node_id: Number(connection.target),
+        type: edgeType,
+      }).then(result => {
+        const newEdge: Edge = {
+          id: String(result.id),
+          source: connection.source!,
+          target: connection.target!,
+          type: 'planEdge',
+          data: { type: edgeType, onDelete: deleteEdge },
+        }
+        const updatedEdges = addEdge(newEdge, edges)
+        setEdges(updatedEdges)
+        if (autoLayout) {
+          const laid = applyDagreLayout([...nodes], updatedEdges)
+          setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
+          for (const n of laid) {
+            void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+          }
+          setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
+        }
+      }).catch(err => {
+        console.error('Failed to create edge:', err)
+      })
+      return
+    }
+
+    // Multiple allowed edge types, show selection dialog
     setShowConnectDialog(connection)
   }, [nodes, deleteEdge, edges, autoLayout, setNodes, setEdges])
 
