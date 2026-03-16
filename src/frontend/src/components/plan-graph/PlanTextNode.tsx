@@ -3,24 +3,13 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useLocale } from '../../lib/locale'
 import type { PlanGraphNode } from '../../types/models'
 import { dispatchOpenPlanNodeEditor } from '../../lib/plan-graph-events'
+import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 
 type PlanTextNodeData = PlanGraphNode & { onDelete: (id: string) => void }
 
 export default function PlanTextNode({ data }: NodeProps) {
   const { t } = useLocale()
   const node = data as unknown as PlanTextNodeData
-
-  const status = node.changes_status === 'review'
-    ? t('planGraph.node.review')
-    : node.word_count > 0
-      ? t('planGraph.node.generated')
-      : t('planGraph.node.notGenerated')
-
-  const statusColor = node.changes_status === 'review'
-    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-    : node.word_count > 0
-      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      : 'bg-muted text-muted-foreground'
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -37,9 +26,7 @@ export default function PlanTextNode({ data }: NodeProps) {
         <div className="flex items-start justify-between gap-1 mb-1">
           <span className="text-sm font-medium leading-tight truncate flex-1">{node.title}</span>
           <div className="flex items-center gap-1">
-            <span className={`text-[10px] px-1 py-0.5 rounded shrink-0 font-medium ${statusColor}`}>
-              {status}
-            </span>
+            <PlanNodeStatusIcon status={node.status} />
             <button
               onClick={handleDelete}
               className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-destructive bg-background border border-border rounded w-4 h-4 flex items-center justify-center"

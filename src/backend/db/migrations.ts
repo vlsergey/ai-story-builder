@@ -17,6 +17,7 @@ import migration014 from './migrations/014'
 import migration015 from './migrations/015'
 import migration016 from './migrations/016'
 import migration017 from './migrations/017'
+import migration018 from './migrations/018'
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -55,9 +56,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration016,
   // version 16 → 17: rename merge_settings to node_type_settings
   migration017,
+  // version 17 → 18: add status column to plan_nodes
+  migration018,
 ]
 
-export const CURRENT_VERSION = 17
+export const CURRENT_VERSION = 18
 
 /**
  * Runs all pending migrations on an open database connection.

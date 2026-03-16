@@ -1,6 +1,9 @@
 export const NODE_TYPES = ['text', 'lore', 'merge', 'split'] as const
 export type PlanNodeType = typeof NODE_TYPES[number]
 
+export const PLAN_NODE_STATUSES = ['EMPTY', 'GENERATED', 'MANUAL', 'OUTDATED', 'ERROR'] as const
+export type PlanNodeStatus = typeof PLAN_NODE_STATUSES[number]
+
 export const EDGE_TYPES = ['text', 'textArray'] as const
 export type PlanEdgeType = typeof EDGE_TYPES[number]
 
@@ -21,6 +24,7 @@ export interface PlanNodeRow {
   char_count: number
   byte_count: number
   changes_status: string | null
+  status: PlanNodeStatus
   review_base_content: string | null
   last_improve_instruction: string | null
   created_at: string

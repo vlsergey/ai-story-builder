@@ -40,6 +40,8 @@ describe('PlanTextNode double-click', () => {
       word_count: 100,
       summary: null,
       changes_status: null,
+      status: 'EMPTY' as const,
+      onDelete: () => {},
     }
 
     const { container } = render(

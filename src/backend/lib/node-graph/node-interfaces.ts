@@ -1,4 +1,4 @@
-import type { PlanNodeType, PlanEdgeType } from '../../../shared/plan-graph.js'
+import type { PlanNodeType, PlanEdgeType, PlanNodeStatus } from '../../../shared/plan-graph.js'
 
 /**
  * Interface for nodes that can produce a single text output (for 'text' edges).
@@ -25,6 +25,7 @@ export interface NodeData {
   user_prompt: string | null
   system_prompt: string | null
   node_type_settings: string | null
+  status: PlanNodeStatus
   // other fields as needed
 }
 

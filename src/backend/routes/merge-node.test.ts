@@ -30,6 +30,7 @@ function setupDb(dbPath: string) {
       char_count           INTEGER NOT NULL DEFAULT 0,
       byte_count           INTEGER NOT NULL DEFAULT 0,
       changes_status       TEXT NULL,
+      status               TEXT NOT NULL DEFAULT 'EMPTY',
       review_base_content  TEXT NULL,
       last_improve_instruction TEXT NULL,
       node_type_settings   TEXT NULL

@@ -1,4 +1,5 @@
 // Database row types matching the schema defined in db/migrations.ts
+import { PlanNodeStatus } from '../../shared/plan-graph'
 
 export interface LoreNodeRow {
   id: number
@@ -46,6 +47,7 @@ export interface PlanNodeRow {
   byte_count: number
   /** NULL | 'review' — current review workflow state */
   changes_status: string | null
+  status: PlanNodeStatus
   /** Content before the first improvement started; set once when review begins, cleared on accept */
   review_base_content: string | null
   /** Last AI improve instruction used; stored for restoring review state on reopen */

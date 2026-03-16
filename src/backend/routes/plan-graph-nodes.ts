@@ -126,10 +126,13 @@ export function createPlanNode(data: {
     .prepare('SELECT COALESCE(MAX(position), -1) AS m FROM plan_nodes WHERE parent_id IS ?')
     .get(pid) as { m: number }
   let wordCount = 0, charCount = 0, byteCount = 0
+  let status: string = 'EMPTY'
   if (content) {
     wordCount = countWords(content)
     charCount = countChars(content)
     byteCount = countBytes(content)
+    // If content is not empty, set status to MANUAL (user-provided)
+    status = 'MANUAL'
   }
   const info = db
     .prepare(`
@@ -137,8 +140,8 @@ export function createPlanNode(data: {
         parent_id, title, position, content,
         type, x, y, user_prompt, system_prompt,
         summary, auto_summary, ai_sync_info, node_type_settings,
-        word_count, char_count, byte_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        word_count, char_count, byte_count, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .run(
       pid,
@@ -156,7 +159,8 @@ export function createPlanNode(data: {
       node_type_settings ?? null,
       wordCount,
       charCount,
-      byteCount
+      byteCount,
+      status
     )
   db.close()
   return { id: info.lastInsertRowid }
@@ -213,8 +217,8 @@ export function patchPlanNode(
 
   const db = new Database(dbPath)
 
-  // Fetch current node for merge generation
-  const current = db.prepare('SELECT type, node_type_settings, title FROM plan_nodes WHERE id = ?').get(id) as { type: string, node_type_settings: string | null, title: string } | undefined;
+  // Fetch current node for merge generation and status
+  const current = db.prepare('SELECT type, node_type_settings, title, status FROM plan_nodes WHERE id = ?').get(id) as { type: string, node_type_settings: string | null, title: string, status: string } | undefined;
   if (!current) {
     db.close();
     throw makeError('node not found', 404);
@@ -263,6 +267,24 @@ export function patchPlanNode(
     }
   }
 
+  // Determine new status
+  let newStatus = current.status
+  if (generatedContent !== null) {
+    // Generated content (merge node regeneration) -> GENERATED
+    newStatus = 'GENERATED'
+  } else if (hasContent) {
+    // User-provided content
+    if (content === null || content.trim() === '') {
+      newStatus = 'EMPTY'
+    } else {
+      newStatus = 'MANUAL'
+    }
+  }
+  // If status changed, add to update sets
+  if (newStatus !== current.status) {
+    // will be added later
+  }
+
   const sets: string[] = []
   const params: (string | number | null)[] = []
 
@@ -283,6 +305,12 @@ export function patchPlanNode(
   if (hasSummary) { sets.push('summary = ?'); params.push(summary ?? null) }
   if (hasAutoSummary) { sets.push('auto_summary = ?'); params.push(auto_summary ?? 0) }
   if (hasNodeTypeSettings) { sets.push('node_type_settings = ?'); params.push(node_type_settings ?? null) }
+
+  // Update status if changed
+  if (newStatus !== current.status) {
+    sets.push('status = ?');
+    params.push(newStatus);
+  }
 
   // Add generated merge content if any
   if (generatedContent !== null) {

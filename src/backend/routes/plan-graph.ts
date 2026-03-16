@@ -51,7 +51,7 @@ export function getPlanGraph(): PlanGraphData {
     `SELECT id, type, title, content, user_prompt, system_prompt, summary, auto_summary,
             ai_sync_info, x, y, word_count, char_count, byte_count,
             changes_status, review_base_content, last_improve_instruction,
-            created_at
+            status, created_at
      FROM plan_nodes ORDER BY id`
   ).all() as PlanNodeRow[]
   const edges = db.prepare(

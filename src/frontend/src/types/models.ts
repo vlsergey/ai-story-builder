@@ -1,4 +1,4 @@
-import type { PlanNodeType, PlanEdgeType } from '../../../shared/plan-graph.js'
+import type { PlanNodeType, PlanEdgeType, PlanNodeStatus } from '../../../shared/plan-graph.js'
 
 export interface AiEngineSyncRecord {
   /** ISO-8601 UTC timestamp of last successful sync */
@@ -74,6 +74,7 @@ export interface PlanGraphNode {
   char_count: number
   byte_count: number
   changes_status: string | null
+  status: PlanNodeStatus
   review_base_content: string | null
   last_improve_instruction: string | null
   created_at: string
