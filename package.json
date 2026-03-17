@@ -78,9 +78,5 @@
         }
       ]
     }
-  },
-  "dependencies": {
-    "@uiw/react-codemirror": "^4.25.8",
-    "best-effort-json-parser": "^1.4.0"
   }
 }
