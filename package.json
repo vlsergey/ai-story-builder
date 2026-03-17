@@ -78,5 +78,8 @@
         }
       ]
     }
+  },
+  "dependencies": {
+    "@uiw/react-codemirror": "^4.25.8"
   }
 }
