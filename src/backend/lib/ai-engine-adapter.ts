@@ -1,4 +1,6 @@
 import type { AiEngineDefinition } from '../../shared/ai-engines.js'
+import type { GrokAiSettings } from '../../shared/grok-ai-settings.js'
+import type { YandexAiSettings } from '../../shared/yandex-ai-settings.js'
 
 export interface JsonSchemaSpec {
   /** Identifier used in the API call (no spaces, e.g. "lore_node") */
@@ -8,9 +10,25 @@ export interface JsonSchemaSpec {
   schema: Record<string, unknown>
 }
 
+export interface GrokEngineConfig {
+  api_key?: string
+  management_key?: string
+  team_id?: string
+  available_models?: string[]
+  defaultAiSettings?: GrokAiSettings
+}
+
+export interface YandexEngineConfig {
+  api_key?: string
+  folder_id?: string
+  search_index_id?: string
+  available_models?: string[]
+  defaultAiSettings?: YandexAiSettings
+}
+
 export interface AiConfigStore {
-  yandex?: { api_key?: string; folder_id?: string; search_index_id?: string; available_models?: string[]; last_model?: string }
-  grok?: { api_key?: string; management_key?: string; team_id?: string; available_models?: string[]; last_model?: string }
+  yandex?: YandexEngineConfig
+  grok?: GrokEngineConfig
   [key: string]: unknown
 }
 

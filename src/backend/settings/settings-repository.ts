@@ -33,43 +33,11 @@ export class SettingsRepository {
   }
 
   /**
-   * Get a raw string value by key using an explicit database connection.
-   */
-  static getWithDb(db: Database, key: string): string | null {
-    const row = db
-      .prepare('SELECT value FROM settings WHERE key = ?')
-      .get(key) as { value: string } | undefined;
-    return row ? row.value : null;
-  }
-
-  /**
-   * Set a raw string value for a key using an explicit database connection.
-   */
-  static setWithDb(db: Database, key: string, value: string): void {
-    db
-      .prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-      .run(key, value);
-  }
-
-  /**
    * Get a JSON-parsed value by key.
    * Returns null if the key does not exist or parsing fails.
    */
   static getJson<T>(key: string): T | null {
     const raw = this.get(key);
-    if (raw === null) return null;
-    try {
-      return JSON.parse(raw) as T;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Get a JSON-parsed value by key using an explicit database connection.
-   */
-  static getJsonWithDb<T>(db: Database, key: string): T | null {
-    const raw = this.getWithDb(db, key);
     if (raw === null) return null;
     try {
       return JSON.parse(raw) as T;
@@ -86,26 +54,12 @@ export class SettingsRepository {
   }
 
   /**
-   * Set a JSON-serializable value for a key using an explicit database connection.
-   */
-  static setJsonWithDb(db: Database, key: string, value: unknown): void {
-    this.setWithDb(db, key, JSON.stringify(value));
-  }
-
-  /**
    * Delete a key from settings.
    */
   static delete(key: string): void {
     withDbWrite((db: Database) => {
       db.prepare('DELETE FROM settings WHERE key = ?').run(key);
     });
-  }
-
-  /**
-   * Delete a key from settings using an explicit database connection.
-   */
-  static deleteWithDb(db: Database, key: string): void {
-    db.prepare('DELETE FROM settings WHERE key = ?').run(key);
   }
 
   // ─── Specialized getters/setters ──────────────────────────────────────────────
@@ -196,49 +150,4 @@ export class SettingsRepository {
     return val ?? defaultValue;
   }
 
-  // ─── Specialized getters/setters with explicit DB ─────────────────────────────
-
-  static getProjectTitleWithDb(db: Database): string | null {
-    return this.getWithDb(db, 'project_title');
-  }
-
-  static setProjectTitleWithDb(db: Database, title: string | null): void {
-    if (title === null) {
-      this.deleteWithDb(db, 'project_title');
-    } else {
-      this.setWithDb(db, 'project_title', title);
-    }
-  }
-
-  static getTextLanguageWithDb(db: Database): string | null {
-    return this.getWithDb(db, 'text_language');
-  }
-
-  static setTextLanguageWithDb(db: Database, lang: string | null): void {
-    if (lang === null) {
-      this.deleteWithDb(db, 'text_language');
-    } else {
-      this.setWithDb(db, 'text_language', lang);
-    }
-  }
-
-  static getAiConfigWithDb(db: Database): AiConfigStore {
-    return this.getJsonWithDb<AiConfigStore>(db, 'ai_config') ?? {};
-  }
-
-  static saveAiConfigWithDb(db: Database, config: AiConfigStore): void {
-    this.setJsonWithDb(db, 'ai_config', config);
-  }
-
-  static getCurrentBackendWithDb(db: Database): string | null {
-    return this.getWithDb(db, 'current_backend');
-  }
-
-  static setCurrentBackendWithDb(db: Database, engine: string | null): void {
-    if (engine === null) {
-      this.deleteWithDb(db, 'current_backend');
-    } else {
-      this.setWithDb(db, 'current_backend', engine);
-    }
-  }
 }

@@ -284,6 +284,7 @@ export class PlanNodeService {
     }
 
     // Handle fields that are part of PlanNodeInsert
+    if (data.ai_settings !== undefined) updateFields.ai_settings = data.ai_settings ?? null
     if (data.last_improve_instruction !== undefined) updateFields.last_improve_instruction = data.last_improve_instruction ?? null
     if (data.changes_status !== undefined) updateFields.changes_status = data.changes_status ?? null
     if (data.review_base_content !== undefined) updateFields.review_base_content = data.review_base_content ?? null

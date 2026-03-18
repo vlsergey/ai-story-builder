@@ -101,6 +101,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [aiSettings, setAiSettings] = useState<AiSettings>({ webSearch: 'none', includeExistingLore: true, maxTokens: 2048 })
+  const [nodeAiSettings, setNodeAiSettings] = useState<Record<string, AiSettings> | null>(null)
+  const [useCustomAiSettings, setUseCustomAiSettings] = useState(false)
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   // generatePrompt removed, using userPrompt instead
@@ -144,6 +146,17 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       const systemPrompt = node.system_prompt as string ?? ''
       setUserPrompt(userPrompt)
       setSystemPrompt(systemPrompt)
+      // parse ai_settings
+      const aiSettingsRaw = node.ai_settings as string | undefined
+      let parsed: Record<string, AiSettings> | null = null
+      if (aiSettingsRaw && aiSettingsRaw.trim() !== '') {
+        try {
+          parsed = JSON.parse(aiSettingsRaw)
+        } catch {
+          // ignore
+        }
+      }
+      setNodeAiSettings(parsed)
       // generatePrompt removed
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content as string ?? '')
@@ -186,6 +199,38 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       })
       .catch(() => {})
   }, [])
+
+  // ── Determine custom AI settings usage and merge settings ──────────────────
+  useEffect(() => {
+    if (currentEngine && nodeAiSettings) {
+      const hasCustom = nodeAiSettings[currentEngine] !== undefined && Object.keys(nodeAiSettings[currentEngine]).length > 0;
+      setUseCustomAiSettings(hasCustom);
+      if (hasCustom) {
+        // Merge default aiSettings with node-specific settings
+        setAiSettings(prev => ({ ...prev, ...nodeAiSettings[currentEngine] }));
+      }
+    } else {
+      setUseCustomAiSettings(false);
+    }
+  }, [currentEngine, nodeAiSettings]);
+
+  // ── Sync aiSettings to nodeAiSettings when useCustomAiSettings is true ─────
+  useEffect(() => {
+    if (useCustomAiSettings && currentEngine && nodeAiSettings) {
+      // Only update if aiSettings actually changed
+      const current = nodeAiSettings[currentEngine];
+      if (!current || JSON.stringify(current) !== JSON.stringify(aiSettings)) {
+        const updated = { ...nodeAiSettings };
+        updated[currentEngine] = { ...aiSettings };
+        setNodeAiSettings(updated);
+        // Debounce the database update to avoid excessive writes
+        const timer = setTimeout(() => {
+          updateNodeAiSettings(updated);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [aiSettings, useCustomAiSettings, currentEngine, nodeAiSettings]);
 
   // ── Load auto-generate summary setting ─────────────────────────────────────
   useEffect(() => {
@@ -295,6 +340,36 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   function saveAiSettings() {
     if (currentEngine) {
       void ipcClient.ai.saveConfig({ engine: currentEngine, fields: { settings: aiSettings } })
+    }
+  }
+
+  // ── Update node AI settings in database ───────────────────────────────────
+  async function updateNodeAiSettings(newSettings: Record<string, AiSettings> | null) {
+    // If null, set to empty object
+    const toStore = newSettings || {};
+    await adapter.patchNode(nodeId, { ai_settings: JSON.stringify(toStore) });
+    // No need to call onSaved because ai_settings doesn't affect stats
+  }
+
+  // ── Handle checkbox change for custom AI settings ─────────────────────────
+  async function handleUseCustomAiSettingsChange(checked: boolean) {
+    if (!currentEngine) return;
+    setUseCustomAiSettings(checked);
+    if (checked) {
+      // Copy current aiSettings into nodeAiSettings for this engine
+      const updated = { ...(nodeAiSettings || {}) };
+      updated[currentEngine] = { ...aiSettings };
+      setNodeAiSettings(updated);
+      await updateNodeAiSettings(updated);
+    } else {
+      // Remove settings for this engine
+      const updated = { ...(nodeAiSettings || {}) };
+      delete updated[currentEngine];
+      // If object becomes empty, we can set to null
+      const final = Object.keys(updated).length === 0 ? null : updated;
+      setNodeAiSettings(final);
+      await updateNodeAiSettings(final);
+      // Revert aiSettings to global defaults (they will be updated by the effect)
     }
   }
 
@@ -590,6 +665,18 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
               disabled={generating}
               className="flex items-center gap-3 flex-wrap"
             />
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useCustomAiSettings}
+                  onChange={(e) => handleUseCustomAiSettingsChange(e.target.checked)}
+                  disabled={!currentEngine || generating}
+                  className="h-3.5 w-3.5"
+                />
+                <span>Использовать нестандартные настройки AI</span>
+              </label>
+            </div>
             <button
               onClick={handleImprove}
               disabled={isLocked || !improveInstruction.trim()}
@@ -659,6 +746,18 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
               disabled={generating}
               className="flex items-center gap-3 flex-wrap"
             />
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useCustomAiSettings}
+                  onChange={(e) => handleUseCustomAiSettingsChange(e.target.checked)}
+                  disabled={!currentEngine || generating}
+                  className="h-3.5 w-3.5"
+                />
+                <span>Использовать нестандартные настройки AI</span>
+              </label>
+            </div>
             <button
               onClick={handleGenerate}
               disabled={generating || !effectivePrompt.trim()}
@@ -836,6 +935,18 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
               disabled={generating}
               className="flex items-center gap-3 flex-wrap"
             />
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useCustomAiSettings}
+                  onChange={(e) => handleUseCustomAiSettingsChange(e.target.checked)}
+                  disabled={!currentEngine || generating}
+                  className="h-3.5 w-3.5"
+                />
+                <span>Использовать нестандартные настройки AI</span>
+              </label>
+            </div>
             {!generating && adapter.renderEditModeExtras?.(nodeId)}
           </div>
           <div className="flex items-center gap-2">
@@ -882,3 +993,4 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     </div>
   )
 }
+

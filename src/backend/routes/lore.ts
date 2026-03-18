@@ -42,7 +42,7 @@ export function getLoreTree(): LoreTreeNode[] {
   const db = new Database(dbPath, { readonly: true })
   const rows = db.prepare(`
     SELECT n.id, n.parent_id, n.name, n.content, n.position, n.status, n.to_be_deleted, n.created_at,
-      n.word_count, n.char_count, n.byte_count, n.ai_sync_info, n.changes_status, n.review_base_content
+      n.word_count, n.char_count, n.byte_count, n.ai_sync_info, n.ai_settings, n.changes_status, n.review_base_content
     FROM lore_nodes n
     ORDER BY n.parent_id NULLS FIRST, n.position, n.name
   `).all() as LoreNodeRow[]
@@ -136,6 +136,7 @@ export function patchLoreNode(
     accept_review?: boolean
     user_prompt?: string | null
     system_prompt?: string | null
+    ai_settings?: string | null
   }
 ): {
   ok: boolean
@@ -144,7 +145,7 @@ export function patchLoreNode(
   byte_count?: number | null
   ai_sync_info?: Record<string, Record<string, unknown>> | null
 } {
-  const { name, content, prompt, start_review, accept_review, user_prompt, system_prompt } = data
+  const { name, content, prompt, start_review, accept_review, user_prompt, system_prompt, ai_settings } = data
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
@@ -152,9 +153,10 @@ export function patchLoreNode(
   const hasContent = content !== undefined
   const hasUserPrompt = user_prompt !== undefined
   const hasSystemPrompt = system_prompt !== undefined
+  const hasAiSettings = ai_settings !== undefined
   const hasStartReview = start_review === true
   const hasAcceptReview = accept_review === true
-  if (!hasName && !hasContent && !hasUserPrompt && !hasSystemPrompt && prompt === undefined && !hasStartReview && !hasAcceptReview) {
+  if (!hasName && !hasContent && !hasUserPrompt && !hasSystemPrompt && !hasAiSettings && prompt === undefined && !hasStartReview && !hasAcceptReview) {
     throw makeError('name or content required', 400)
   }
 
@@ -194,6 +196,10 @@ export function patchLoreNode(
 
   if (hasSystemPrompt) {
     sets.push('system_prompt = ?'); params.push(system_prompt ?? null)
+  }
+
+  if (hasAiSettings) {
+    sets.push('ai_settings = ?'); params.push(ai_settings ?? null)
   }
 
   if (prompt !== undefined && !start_review) {

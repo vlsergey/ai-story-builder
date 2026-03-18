@@ -1,6 +1,5 @@
-import { getCurrentDbPath } from '../db/state.js';
 import { SettingsRepository } from '../settings/settings-repository.js';
-import type { AiConfigStore } from '../lib/ai-engine-adapter.js';
+import type { AiConfigStore, GrokEngineConfig, YandexEngineConfig } from '../lib/ai-engine-adapter.js';
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -29,14 +28,14 @@ export function getAiConfig(): { current_engine: string | null; grok: object; ya
     grok: {
       api_key: '',
       available_models: [],
-      last_model: null,
+      defaultAiSettings: {},
       ...(config.grok ?? {}),
     },
     yandex: {
       api_key: '',
       folder_id: '',
       available_models: [],
-      last_model: null,
+      defaultAiSettings: {},
       ...(config.yandex ?? {}),
     },
   };

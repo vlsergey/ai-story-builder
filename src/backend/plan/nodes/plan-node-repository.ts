@@ -79,6 +79,7 @@ export class PlanNodeRepository {
       const autoSummary = data.auto_summary ?? 0
       const aiSyncInfo = data.ai_sync_info ?? null
       const nodeTypeSettings = data.node_type_settings ?? null
+      const aiSettings = data.ai_settings ?? null
       const wordCount = data.word_count ?? 0
       const charCount = data.char_count ?? 0
       const byteCount = data.byte_count ?? 0
@@ -91,11 +92,11 @@ export class PlanNodeRepository {
         INSERT INTO plan_nodes (
           parent_id, title, position, content,
           type, x, y, user_prompt, system_prompt,
-          summary, auto_summary, ai_sync_info, node_type_settings,
+          summary, auto_summary, ai_sync_info, node_type_settings, ai_settings,
           word_count, char_count, byte_count, status,
           changes_status, review_base_content, last_improve_instruction
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `)
       const info = stmt.run(
@@ -112,6 +113,7 @@ export class PlanNodeRepository {
         autoSummary,
         aiSyncInfo,
         nodeTypeSettings,
+        aiSettings,
         wordCount,
         charCount,
         byteCount,

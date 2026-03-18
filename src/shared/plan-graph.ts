@@ -20,6 +20,7 @@ export interface PlanNodeRow {
   auto_summary: number
   ai_sync_info: string | null
   node_type_settings: string | null
+  ai_settings: string | null
   x: number
   y: number
   word_count: number
@@ -41,6 +42,8 @@ export const PlanNodeRowDefaults : Partial<PlanNodeInsert> = {
   system_prompt: null,
   summary: null,
   ai_sync_info: null,
+  node_type_settings: null,
+  ai_settings: null,
   word_count: 0,
   char_count: 0,
   byte_count: 0,

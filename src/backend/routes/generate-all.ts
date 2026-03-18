@@ -1,35 +1,13 @@
-import { getCurrentDbPath } from '../db/state.js'
 import { GraphEngine } from '../lib/node-graph/engine/graph-engine.js'
 import { PlanNodeService } from '../plan/nodes/plan-node-service.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
-
-// ── Error helper ──────────────────────────────────────────────────────────────
-
-function makeError(message: string, status: number): Error {
-  const e = new Error(message)
-  ;(e as any).status = status
-  return e
-}
 
 export async function generateAll(
   params: { regenerateManual?: boolean },
   onThinking: (status: string, detail?: string) => void,
   onPartialJson: (data: Record<string, unknown>) => void,
 ): Promise<{ generated: number; skipped: number }> {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-
-  const db = new (Database)(dbPath)
   const nodeService = new PlanNodeService()
-  const engine = new GraphEngine(db, nodeService)
+  const engine = new GraphEngine(nodeService)
 
   const regenerateManual = params.regenerateManual ?? false
 

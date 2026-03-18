@@ -5,6 +5,7 @@ import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 import { PlanEdgeRepository } from '../plan/edges/plan-edge-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -73,12 +74,10 @@ export async function generatePlan(
     const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
     const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
 
-    engine = engineRow?.value
+    engine = SettingsRepository.get('current_backend') || undefined
     if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
-    if (configRow) {
-      try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
-    }
-    textLanguage = langRow?.value
+    config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
+    textLanguage = SettingsRepository.get('text_language') || undefined
 
     if (includeExistingLore && engine) {
       const nodes = db.prepare(

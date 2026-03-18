@@ -1,4 +1,3 @@
-import type { Database } from 'better-sqlite3'
 import { NodeProcessorRegistry } from './node-processor.js'
 import { TextProcessor } from './text-processor.js'
 import { LoreProcessor } from './lore-processor.js'
@@ -11,6 +10,7 @@ import { mergeNodeSettings } from './settings-helper.js'
 import { generateSummary } from '../../../routes/generate-summary.js'
 import { PlanNodeService } from '../../../plan/nodes/plan-node-service.js'
 import { PlanEdgeRepository } from '../../../plan/edges/plan-edge-repository.js'
+import { SettingsRepository } from '../../../settings/settings-repository.js'
 
 /**
  * Graph engine that provides database access, node processing, and advanced operations.
@@ -19,10 +19,8 @@ import { PlanEdgeRepository } from '../../../plan/edges/plan-edge-repository.js'
 export class GraphEngine implements NodeContext {
   private processorRegistry: NodeProcessorRegistry
   private nodeService: PlanNodeService
-  protected db: Database
 
-  constructor(db: Database, nodeService?: PlanNodeService) {
-    this.db = db
+  constructor(nodeService?: PlanNodeService) {
     this.processorRegistry = new NodeProcessorRegistry()
     this.nodeService = nodeService ?? new PlanNodeService()
     this.registerDefaultProcessors()
@@ -75,35 +73,31 @@ export class GraphEngine implements NodeContext {
    * Retrieve AI settings from the project (model, webSearch, etc.).
    */
   getAiSettings(): AiSettings {
-    const configRow = this.db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
-    const engineRow = this.db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
-    if (!configRow || !engineRow) return {}
-    try {
-      const config = JSON.parse(configRow.value) as Record<string, any>
-      const engine = engineRow.value
-      const engineConfig = config[engine] as Record<string, any> | undefined
-      if (!engineConfig) return {}
-      // Map known keys to AiSettings
-      const settings: AiSettings = {}
-      if (typeof engineConfig.model === 'string') {
-        settings.model = engineConfig.model
-      }
-      if (typeof engineConfig.web_search === 'string') {
-        settings.webSearch = engineConfig.web_search
-      }
-      if (typeof engineConfig.include_existing_lore === 'boolean') {
-        settings.includeExistingLore = engineConfig.include_existing_lore
-      }
-      if (typeof engineConfig.max_tokens === 'number') {
-        settings.maxTokens = engineConfig.max_tokens
-      }
-      if (typeof engineConfig.max_completion_tokens === 'number') {
-        settings.maxCompletionTokens = engineConfig.max_completion_tokens
-      }
-      return settings
-    } catch {
-      return {}
+    const engine = SettingsRepository.get('current_backend')
+    const config = SettingsRepository.getAiConfig()
+    if (!engine || !config) return {}
+
+    const engineConfig = config[engine] as Record<string, any> | undefined
+    if (!engineConfig) return {}
+    // Map known keys to AiSettings
+    const settings: AiSettings = {}
+    if (typeof engineConfig.model === 'string') {
+      settings.model = engineConfig.model
     }
+    if (typeof engineConfig.web_search === 'string') {
+      settings.webSearch = engineConfig.web_search
+    }
+    if (typeof engineConfig.include_existing_lore === 'boolean') {
+      settings.includeExistingLore = engineConfig.include_existing_lore
+    }
+    if (typeof engineConfig.max_tokens === 'number') {
+      settings.maxTokens = engineConfig.max_tokens
+    }
+    if (typeof engineConfig.max_completion_tokens === 'number') {
+      settings.maxCompletionTokens = engineConfig.max_completion_tokens
+    }
+    console.log("AI Settings: " + JSON.stringify(engineConfig))
+    return settings
   }
 
   /**
@@ -233,8 +227,8 @@ export class GraphEngine implements NodeContext {
    * Check if auto‑generate‑summary setting is enabled for the current project.
    */
   private getAutoGenerateSummarySetting(): boolean {
-    const row = this.db.prepare("SELECT value FROM settings WHERE key = 'auto_generate_summary'").get() as { value: string } | undefined
-    return row?.value === 'true'
+    const value = SettingsRepository.get('auto_generate_summary')
+    return value === 'true'
   }
 
   /**

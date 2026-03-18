@@ -7,6 +7,7 @@ import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
 
 let testDbPath = ''
 
@@ -60,21 +61,6 @@ describe('getAiConfig', () => {
     expect((res.yandex as any).folder_id).toBe('b1g12345')
   })
 
-  it('returns null last_model when not set', () => {
-    const res = getAiConfig()
-    expect((res.grok as any).last_model).toBeNull()
-    expect((res.yandex as any).last_model).toBeNull()
-  })
-
-  it('returns stored last_model for grok and yandex', () => {
-    saveAiConfig({ engine: 'grok', fields: { last_model: 'grok-3' } })
-    saveAiConfig({ engine: 'yandex', fields: { last_model: 'gpt://b1g999/yandexgpt/latest' } })
-
-    const res = getAiConfig()
-    expect((res.grok as any).last_model).toBe('grok-3')
-    expect((res.yandex as any).last_model).toBe('gpt://b1g999/yandexgpt/latest')
-  })
-
   it('returns extra fields saved via saveAiConfig (e.g. settings object)', () => {
     saveAiConfig({ engine: 'grok', fields: { settings: { model: 'grok-3', maxTokens: 4096, webSearch: 'none' } } })
     const res = getAiConfig()
@@ -82,11 +68,7 @@ describe('getAiConfig', () => {
   })
 
   it('returns saved current_engine', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', 'grok')").run()
-    db.close()
+    SettingsRepository.set('current_backend', 'grok')
 
     const res = getAiConfig()
     expect(res.current_engine).toBe('grok')
@@ -151,11 +133,7 @@ describe('setCurrentEngine', () => {
   })
 
   it('clears engine when null is passed', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', 'grok')").run()
-    db.close()
+    SettingsRepository.set('current_backend', 'grok')
 
     const res = setCurrentEngine({ engine: null })
     expect(res.ok).toBe(true)
@@ -249,14 +227,8 @@ describe('getEngineModels', () => {
   })
 
   it('returns cached models after they are saved', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
     const models = ['gpt://b1g999/yandexgpt/latest', 'gpt://b1g999/yandexgpt-lite/latest']
-    db.prepare("INSERT INTO settings (key, value) VALUES ('ai_config', ?)").run(
-      JSON.stringify({ yandex: { api_key: 'k', folder_id: 'b1g999', available_models: models } })
-    )
-    db.close()
+    SettingsRepository.setJson('ai_config', { yandex: { api_key: 'k', folder_id: 'b1g999', available_models: models } })
 
     const res = getEngineModels('yandex')
     expect(res.models).toEqual(models)

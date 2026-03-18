@@ -255,14 +255,14 @@ export async function syncLore(): Promise<{
   unchanged: number
   search_index_id: string | null
 }> {
+  // Step 1 — load settings and nodes
+  const currentEngine = SettingsRepository.getCurrentBackend()
+  const config = SettingsRepository.getAiConfig()
+
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   if (!Database) throw makeError('SQLite lib missing', 500)
-
-  // Step 1 — load settings and nodes
   const db = getDb(dbPath, true)
-  const currentEngine = SettingsRepository.getCurrentBackendWithDb(db)
-  const config = SettingsRepository.getAiConfigWithDb(db)
 
   const rows = db
     .prepare('SELECT id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info FROM lore_nodes')
@@ -358,36 +358,34 @@ export async function syncLore(): Promise<{
 
     // Commit to DB
     const db2 = getDb(dbPath)
-    db2.transaction(() => {
-      const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
+    const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
 
-      for (const result of results) {
-        const { group, action, newFileId } = result
-        const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
+    for (const result of results) {
+      const { group, action, newFileId } = result
+      const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
 
-        if (action === 'delete') {
-          for (const row of groupRows) {
-            const existing = parseAiSyncInfoMap(row.ai_sync_info)
-            delete existing['grok']
-            updateStmt.run(JSON.stringify(existing), row.id)
-          }
-        } else if (action === 'upload' && newFileId) {
-          const l2Row = idToRow.get(group.level2NodeId)!
-          const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
-          existing['grok'] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
-          updateStmt.run(JSON.stringify(existing), group.level2NodeId)
+      if (action === 'delete') {
+        for (const row of groupRows) {
+          const existing = parseAiSyncInfoMap(row.ai_sync_info)
+          delete existing['grok']
+          updateStmt.run(JSON.stringify(existing), row.id)
+        }
+      } else if (action === 'upload' && newFileId) {
+        const l2Row = idToRow.get(group.level2NodeId)!
+        const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
+        existing['grok'] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
+        updateStmt.run(JSON.stringify(existing), group.level2NodeId)
 
-          for (const row of groupRows) {
-            if (row.id === group.level2NodeId) continue
-            const existing = parseAiSyncInfoMap(row.ai_sync_info)
-            existing['grok'] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
-            updateStmt.run(JSON.stringify(existing), row.id)
-          }
+        for (const row of groupRows) {
+          if (row.id === group.level2NodeId) continue
+          const existing = parseAiSyncInfoMap(row.ai_sync_info)
+          existing['grok'] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
+          updateStmt.run(JSON.stringify(existing), row.id)
         }
       }
+    }
 
-      db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
-    })()
+    db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
     db2.close()
 
     const uploaded = results.filter(r => r.action === 'upload').length
@@ -524,41 +522,39 @@ export async function syncLore(): Promise<{
   const now = new Date().toISOString()
   const db2 = getDb(dbPath)
 
-  db2.transaction(() => {
-    const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
+  const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
 
-    for (const [nodeId, fileId] of newFileIds.entries()) {
-      const nodeRow = rows.find(r => r.id === nodeId)
-      const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
-      existing['yandex'] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
-      updateStmt.run(JSON.stringify(existing), nodeId)
-    }
+  for (const [nodeId, fileId] of newFileIds.entries()) {
+    const nodeRow = rows.find(r => r.id === nodeId)
+    const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
+    existing['yandex'] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
+    updateStmt.run(JSON.stringify(existing), nodeId)
+  }
 
-    for (const node of toDelete) {
-      const nodeRow = rows.find(r => r.id === node.id)
-      const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
-      if (node.to_be_deleted === 1) {
-        delete existing['yandex']
-      } else {
-        existing['yandex'] = { last_synced_at: now }
-      }
-      updateStmt.run(JSON.stringify(existing), node.id)
-    }
-
-    const updatedConfig = { ...config }
-    if (!updatedConfig.yandex) updatedConfig.yandex = {}
-    if (newSearchIndexId) {
-      updatedConfig.yandex = { ...updatedConfig.yandex, search_index_id: newSearchIndexId }
+  for (const node of toDelete) {
+    const nodeRow = rows.find(r => r.id === node.id)
+    const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
+    if (node.to_be_deleted === 1) {
+      delete existing['yandex']
     } else {
-      const { search_index_id: _removed, ...rest } = updatedConfig.yandex
-      void _removed
-      updatedConfig.yandex = rest
+      existing['yandex'] = { last_synced_at: now }
     }
+    updateStmt.run(JSON.stringify(existing), node.id)
+  }
 
-    SettingsRepository.saveAiConfigWithDb(db2, updatedConfig)
+  const updatedConfig = { ...config }
+  if (!updatedConfig.yandex) updatedConfig.yandex = {}
+  if (newSearchIndexId) {
+    updatedConfig.yandex = { ...updatedConfig.yandex, search_index_id: newSearchIndexId }
+  } else {
+    const { search_index_id: _removed, ...rest } = updatedConfig.yandex
+    void _removed
+    updatedConfig.yandex = rest
+  }
 
-    db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
-  })()
+  SettingsRepository.saveAiConfig(updatedConfig)
+
+  db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
 
   db2.close()
 

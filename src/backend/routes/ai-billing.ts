@@ -1,25 +1,14 @@
 import { getCurrentDbPath } from '../db/state.js'
 import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
+import { SettingsRepository } from '../settings/settings-repository.js'
 
 const MANAGEMENT_API_BASE = 'https://management-api.x.ai'
 
 /** Reads Grok management credentials from project settings. */
 function readGrokManagementConfig(dbPath: string): { managementKey: string; teamId: string } | null {
-  if (!Database) return null
   try {
-    const db = new (Database)(dbPath, { readonly: true })
-    const row = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
-    db.close()
-    if (!row) return null
-    const config = JSON.parse(row.value) as AiConfigStore
+    const config = SettingsRepository.getJson<AiConfigStore>('ai_config')
+    if (!config) return null
     const managementKey = (config.grok as any)?.management_key?.trim()
     const teamId = (config.grok as any)?.team_id?.trim()
     if (!managementKey || !teamId) return null

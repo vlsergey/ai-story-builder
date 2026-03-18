@@ -56,7 +56,7 @@ export function generateMergeContent(
   }
 
   // Fetch input nodes ordered by edge position (including expanded textArray edges)
-  const engine = new GraphEngine(db)
+  const engine = new GraphEngine()
   const rawInputs = engine.getNodeInputsRaw(nodeId)
   const inputs: Array<{ title: string; content: string | null }> = []
 

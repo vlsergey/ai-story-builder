@@ -29,7 +29,7 @@ CREATE TABLE lore_nodes (
       position       INTEGER DEFAULT 0,
       status         TEXT NOT NULL DEFAULT 'ACTIVE',
       to_be_deleted  INTEGER NOT NULL DEFAULT 0,
-      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP, word_count  INTEGER NOT NULL DEFAULT 0, char_count  INTEGER NOT NULL DEFAULT 0, byte_count  INTEGER NOT NULL DEFAULT 0, ai_sync_info TEXT NULL, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, user_prompt TEXT NULL, system_prompt TEXT NULL,
+      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP, word_count  INTEGER NOT NULL DEFAULT 0, char_count  INTEGER NOT NULL DEFAULT 0, byte_count  INTEGER NOT NULL DEFAULT 0, ai_sync_info TEXT NULL, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, user_prompt TEXT NULL, system_prompt TEXT NULL, ai_settings TEXT,
       UNIQUE (parent_id, name)
     );
 
@@ -58,7 +58,7 @@ CREATE TABLE plan_nodes (
       summary       TEXT,
       auto_summary  INTEGER DEFAULT 0,
       ai_sync_info  TEXT
-    , word_count INTEGER NOT NULL DEFAULT 0, char_count INTEGER NOT NULL DEFAULT 0, byte_count INTEGER NOT NULL DEFAULT 0, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, node_type_settings TEXT NULL, status TEXT NOT NULL DEFAULT 'EMPTY');
+    , word_count INTEGER NOT NULL DEFAULT 0, char_count INTEGER NOT NULL DEFAULT 0, byte_count INTEGER NOT NULL DEFAULT 0, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, node_type_settings TEXT NULL, status TEXT NOT NULL DEFAULT 'EMPTY', ai_settings TEXT);
 
 CREATE TABLE settings (
       key   TEXT PRIMARY KEY,

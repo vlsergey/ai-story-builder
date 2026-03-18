@@ -89,7 +89,7 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
     // Auto-create root plan node if none exist
     const planCount = (db.prepare('SELECT COUNT(*) AS c FROM plan_nodes').get() as { c: number }).c
     if (planCount === 0) {
-      const rootTitle = SettingsRepository.getProjectTitleWithDb(db) ?? 'Plan'
+      const rootTitle = SettingsRepository.getProjectTitle() ?? 'Plan'
       db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(rootTitle)
     }
     db.close()
@@ -193,9 +193,9 @@ export function createProject(data: { name?: string; text_language?: string }): 
     const rootId = root.lastInsertRowid
     for (const f of defaultNodes.children) insertNode.run(rootId, f)
 
-    SettingsRepository.setProjectTitleWithDb(db, name)
-    SettingsRepository.setWithDb(db, 'locale', 'en')
-    SettingsRepository.setTextLanguageWithDb(db, text_language)
+    SettingsRepository.setProjectTitle(name)
+    SettingsRepository.set('locale', 'en')
+    SettingsRepository.setTextLanguage(text_language)
 
     db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(name)
 

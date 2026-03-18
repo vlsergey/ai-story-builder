@@ -20,6 +20,7 @@ import migration015 from './migrations/015'
 import migration016 from './migrations/016'
 import migration017 from './migrations/017'
 import migration018 from './migrations/018'
+import migration019 from './migrations/019'
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -60,9 +61,17 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration017,
   // version 17 → 18: add status column to plan_nodes
   migration018,
+  // version 18 → 19: add ai_settings column to plan_nodes and lore_nodes
+  migration019,
 ]
 
-export const CURRENT_VERSION = 18
+export const CURRENT_VERSION = 19
+
+function loadSchemaFromFile(db: Database): void {
+  const schemaPath = path.join(__dirname, 'schema.sql')
+  const sql = fs.readFileSync(schemaPath, 'utf-8')
+  db.exec(sql)
+}
 
 /**
  * Runs all pending migrations on an open database connection.
@@ -73,16 +82,12 @@ export function migrateDatabase(db: Database): void {
   db.pragma('foreign_keys = OFF')
   const fromVersion = db.pragma('user_version', { simple: true }) as number
 
-  // Fresh database – create directly from schema.sql
+  // Fresh database – load schema.sql and set version to CURRENT_VERSION
   if (fromVersion === 0) {
-    const schemaPath = path.resolve(__dirname, 'schema.sql')
-    const stored = fs.readFileSync(schemaPath, 'utf-8')
-    // Remove header comments (lines starting with --)
-    const schema = stored.replace(/^--.*\n/gm, '').trim()
-    db.exec(schema)
+    console.log(`[db] creating fresh database from schema.sql (version ${CURRENT_VERSION})`)
+    loadSchemaFromFile(db)
     db.pragma(`user_version = ${CURRENT_VERSION}`)
     db.pragma('foreign_keys = ON')
-    console.log(`[db] created fresh database from schema.sql (version ${CURRENT_VERSION})`)
     return
   }
 

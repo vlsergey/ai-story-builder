@@ -3,6 +3,7 @@ import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiSettings } from '../../shared/ai-settings.js'
 import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -40,14 +41,9 @@ export async function generatePlayground(
 
   try {
     const db = new (Database)(dbPath, { readonly: true })
-    const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
-    const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
-
-    engine = engineRow?.value
+    engine = SettingsRepository.get('current_backend') || undefined
     if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
-    if (configRow) {
-      try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
-    }
+    config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
 
     if (includeExistingLore && engine) {
       const nodes = db.prepare(
