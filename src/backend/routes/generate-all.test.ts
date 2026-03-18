@@ -6,6 +6,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { migrateDatabase } from '../db/migrations.js'
 
 let testDbPath = ''
 
@@ -50,45 +51,7 @@ function setupDb(opts?: {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
   const db = new Database(file)
-  db.exec(`
-    CREATE TABLE plan_nodes (
-      id                 INTEGER PRIMARY KEY,
-      parent_id          INTEGER NULL,
-      title              TEXT NOT NULL,
-      content            TEXT,
-      position           INTEGER DEFAULT 0,
-      created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
-      type               TEXT NOT NULL DEFAULT 'text',
-      x                  REAL DEFAULT 0,
-      y                  REAL DEFAULT 0,
-      user_prompt        TEXT,
-      system_prompt      TEXT,
-      summary            TEXT,
-      auto_summary       INTEGER DEFAULT 0,
-      ai_sync_info       TEXT,
-      node_type_settings TEXT,
-      word_count         INTEGER DEFAULT 0,
-      char_count         INTEGER DEFAULT 0,
-      byte_count         INTEGER DEFAULT 0,
-      changes_status     TEXT NULL,
-      status             TEXT NOT NULL DEFAULT 'EMPTY',
-      review_base_content TEXT NULL,
-      last_improve_instruction TEXT NULL
-    );
-    CREATE TABLE plan_edges (
-      id           INTEGER PRIMARY KEY,
-      from_node_id INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      to_node_id   INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      type         TEXT NOT NULL DEFAULT 'text',
-      position     INTEGER DEFAULT 0,
-      label        TEXT,
-      template     TEXT
-    );
-    CREATE TABLE settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `)
+  migrateDatabase(db)
 
   const engine = opts?.currentEngine ?? 'grok'
   db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', ?)").run(engine)

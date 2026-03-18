@@ -1,4 +1,6 @@
 import type { Database } from 'better-sqlite3'
+import fs from 'fs'
+import path from 'path'
 
 import migration001 from './migrations/001'
 import migration002 from './migrations/002'
@@ -70,6 +72,19 @@ export const CURRENT_VERSION = 18
 export function migrateDatabase(db: Database): void {
   db.pragma('foreign_keys = OFF')
   const fromVersion = db.pragma('user_version', { simple: true }) as number
+
+  // Fresh database – create directly from schema.sql
+  if (fromVersion === 0) {
+    const schemaPath = path.resolve(__dirname, 'schema.sql')
+    const stored = fs.readFileSync(schemaPath, 'utf-8')
+    // Remove header comments (lines starting with --)
+    const schema = stored.replace(/^--.*\n/gm, '').trim()
+    db.exec(schema)
+    db.pragma(`user_version = ${CURRENT_VERSION}`)
+    db.pragma('foreign_keys = ON')
+    console.log(`[db] created fresh database from schema.sql (version ${CURRENT_VERSION})`)
+    return
+  }
 
   for (let v = fromVersion; v < CURRENT_VERSION; v++) {
     db.transaction(() => {

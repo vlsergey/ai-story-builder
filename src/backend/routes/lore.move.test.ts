@@ -33,6 +33,8 @@ const { moveLoreNode } = await import('./lore.js')
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+import { migrateDatabase } from '../db/migrations.js'
+
 /**
  * Creates a fresh in-memory-style temp SQLite file with a small tree:
  *
@@ -48,17 +50,9 @@ function setupDb(): string {
   const Database = require('better-sqlite3')
   const db = new Database(file)
 
+  migrateDatabase(db)
+
   db.exec(`
-    CREATE TABLE lore_nodes (
-      id             INTEGER PRIMARY KEY,
-      parent_id      INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
-      name           TEXT NOT NULL,
-      position       INTEGER DEFAULT 0,
-      status         TEXT NOT NULL DEFAULT 'ACTIVE',
-      to_be_deleted  INTEGER NOT NULL DEFAULT 0,
-      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (parent_id, name)
-    );
     INSERT INTO lore_nodes (id, parent_id, name) VALUES
       (1, NULL,  'root'),
       (2, 1,     'child-a'),

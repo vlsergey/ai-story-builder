@@ -6,6 +6,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { migrateDatabase } from '../db/migrations.js'
 
 let testDbPath = ''
 
@@ -58,18 +59,7 @@ function setupDb(opts?: {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
   const db = new Database(file)
-  db.exec(`
-    CREATE TABLE plan_nodes (
-      id            INTEGER PRIMARY KEY,
-      content       TEXT,
-      summary       TEXT,
-      auto_summary  INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `)
+  migrateDatabase(db)
 
   const engine = opts?.currentEngine
     ?? (opts?.grokApiKey ? 'grok' : opts?.yandexApiKey ? 'yandex' : undefined)
@@ -111,9 +101,11 @@ function setupDb(opts?: {
 
   if (opts?.planNode) {
     db.prepare(
-      'INSERT INTO plan_nodes (id, content, summary, auto_summary) VALUES (?, ?, ?, ?)'
+      'INSERT INTO plan_nodes (id, title, type, content, summary, auto_summary) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(
       opts.planNode.id,
+      'Test Node',
+      'text',
       opts.planNode.content ?? null,
       opts.planNode.summary ?? null,
       opts.planNode.auto_summary ?? 0

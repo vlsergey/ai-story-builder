@@ -6,6 +6,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { migrateDatabase } from '../db/migrations.js'
 
 let testDbPath = ''
 
@@ -61,23 +62,7 @@ function setupDb(opts?: {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
   const db = new Database(file)
-  db.exec(`
-    CREATE TABLE lore_nodes (
-      id            INTEGER PRIMARY KEY,
-      parent_id     INTEGER NULL,
-      name          TEXT NOT NULL,
-      content       TEXT,
-      word_count    INTEGER NOT NULL DEFAULT 0,
-      char_count    INTEGER NOT NULL DEFAULT 0,
-      byte_count    INTEGER NOT NULL DEFAULT 0,
-      to_be_deleted INTEGER NOT NULL DEFAULT 0,
-      ai_sync_info  TEXT NULL
-    );
-    CREATE TABLE settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `)
+  migrateDatabase(db)
 
   const engine = opts?.currentEngine
     ?? (opts?.grokApiKey ? 'grok' : opts?.yandexApiKey ? 'yandex' : undefined)

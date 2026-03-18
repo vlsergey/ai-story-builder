@@ -4,47 +4,14 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs'
 import { setCurrentDbPath } from '../db/state.js'
+import { migrateDatabase } from '../db/migrations.js'
 import { patchPlanNode, getPlanNode, createPlanNode, createGraphEdge } from '../plan/plan-routes.js'
 
 // ── In-memory DB setup ────────────────────────────────────────────────────────
 
 function setupDb(dbPath: string) {
   const db = new Database(dbPath)
-  db.exec(`
-    CREATE TABLE plan_nodes (
-      id                   INTEGER PRIMARY KEY,
-      parent_id            INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      title                TEXT NOT NULL,
-      content              TEXT,
-      position             INTEGER DEFAULT 0,
-      created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
-      type                 TEXT NOT NULL DEFAULT 'text',
-      x                    REAL DEFAULT 0,
-      y                    REAL DEFAULT 0,
-      user_prompt          TEXT,
-      system_prompt        TEXT,
-      summary              TEXT,
-      auto_summary         INTEGER DEFAULT 0,
-      ai_sync_info         TEXT,
-      word_count           INTEGER NOT NULL DEFAULT 0,
-      char_count           INTEGER NOT NULL DEFAULT 0,
-      byte_count           INTEGER NOT NULL DEFAULT 0,
-      changes_status       TEXT NULL,
-      status               TEXT NOT NULL DEFAULT 'EMPTY',
-      review_base_content  TEXT NULL,
-      last_improve_instruction TEXT NULL,
-      node_type_settings   TEXT NULL
-    );
-    CREATE TABLE plan_edges (
-      id           INTEGER PRIMARY KEY,
-      from_node_id INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      to_node_id   INTEGER NOT NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      type         TEXT NOT NULL DEFAULT 'instruction',
-      position     INTEGER DEFAULT 0,
-      label        TEXT,
-      template     TEXT
-    );
-  `)
+  migrateDatabase(db)
   // Root node
   db.prepare("INSERT INTO plan_nodes (id, title, type) VALUES (1, 'Root', 'text')").run()
   db.close()

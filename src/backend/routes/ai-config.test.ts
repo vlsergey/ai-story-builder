@@ -6,6 +6,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { migrateDatabase } from '../db/migrations.js'
 
 let testDbPath = ''
 
@@ -24,12 +25,7 @@ function setupDb(): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
   const db = new Database(file)
-  db.exec(`
-    CREATE TABLE settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `)
+  migrateDatabase(db)
   db.close()
   return file
 }

@@ -6,6 +6,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { migrateDatabase } from '../db/migrations.js'
 
 let testDbPath = ''
 
@@ -24,27 +25,8 @@ function setupDb(): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
   const db = new Database(file)
+  migrateDatabase(db)
   db.exec(`
-    CREATE TABLE lore_nodes (
-      id                      INTEGER PRIMARY KEY,
-      parent_id               INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
-      name                    TEXT NOT NULL,
-      content                 TEXT,
-      word_count              INTEGER NOT NULL DEFAULT 0,
-      char_count              INTEGER NOT NULL DEFAULT 0,
-      byte_count              INTEGER NOT NULL DEFAULT 0,
-      ai_sync_info            TEXT NULL,
-      position                INTEGER DEFAULT 0,
-      status                  TEXT NOT NULL DEFAULT 'ACTIVE',
-      to_be_deleted           INTEGER NOT NULL DEFAULT 0,
-      created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
-      changes_status          TEXT NULL,
-      review_base_content     TEXT NULL,
-      last_improve_instruction TEXT NULL,
-      user_prompt             TEXT NULL,
-      system_prompt           TEXT NULL,
-      UNIQUE (parent_id, name)
-    );
     INSERT INTO lore_nodes (id, parent_id, name, content) VALUES
       (1, NULL, 'root', NULL),
       (2, 1,    'chapter', NULL);
