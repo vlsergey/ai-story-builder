@@ -1,7 +1,5 @@
-import Database from 'better-sqlite3'
 import type { PlanNodeTree } from '../../types/index'
 import type { PlanNodeCreate, PlanNodeRow, PlanNodeUpdate } from '../../../shared/plan-graph'
-import { getCurrentDbPath } from '../../db/state'
 import { isValidNodeType, NODE_TYPES } from '../../../shared/node-edge-dictionary'
 import { PlanNodeService } from './plan-node-service'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'

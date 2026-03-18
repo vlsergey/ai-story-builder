@@ -1,5 +1,5 @@
 // Database row types matching the schema defined in db/migrations.ts
-import { PlanNodeStatus, PlanNodeType, PlanNodeRow } from '../../shared/plan-graph'
+import { PlanNodeRow } from '../../shared/plan-graph'
 
 export interface LoreNodeRow {
   id: number
