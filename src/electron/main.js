@@ -1,7 +1,8 @@
 'use strict'
 
-const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell } = require('electron')
+const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell, session } = require('electron')
 const path = require('path')
+const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer')
 
 /** Native menu label translations. */
 const MENU_STRINGS = {
@@ -315,7 +316,7 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
   }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   checkNativeDeps()
   buildApplicationMenu()
 
@@ -324,6 +325,15 @@ app.whenReady().then(() => {
 
   if (isDev) {
     serverUrl = 'http://localhost:3000'
+    // Install React Developer Tools
+    try {
+      await installExtension(REACT_DEVELOPER_TOOLS, {
+        loadExtensionOptions: { allowFileAccess: true },
+      })
+      console.log('React Developer Tools installed')
+    } catch (err) {
+      console.warn('Failed to install React Developer Tools:', err)
+    }
   } else {
     serverUrl = `file://${path.join(app.getAppPath(), 'dist', 'index.html')}`
   }

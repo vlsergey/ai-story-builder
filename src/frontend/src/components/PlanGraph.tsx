@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import {
   ReactFlow,
   Background,
@@ -28,7 +28,6 @@ import PlanSplitterNode from './plan-graph/PlanSplitterNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './plan-graph/GenerateAllDialog'
 import { ipcClient } from '../ipcClient'
-
 
 const nodeTypes = {
   planText: PlanTextNode,
@@ -78,6 +77,7 @@ export default function PlanGraph() {
   const { t } = useLocale()
   const [nodes, setNodes, onNodesChange] = useNodesState<any>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([])
+
   const [autoLayout, setAutoLayout] = useState<boolean>(() => {
     try { return localStorage.getItem('planGraph.autoLayout') !== 'false' }
     catch { return true }
@@ -104,18 +104,22 @@ export default function PlanGraph() {
   const deleteEdge = useCallback(async (edgeId: string) => {
     const result = await ipcClient.planGraph.deleteEdge(Number(edgeId))
     if (result.ok) {
-      const newEdges = edges.filter(e => e.id !== edgeId)
-      setEdges(newEdges)
-      if (autoLayout) {
-        const laid = applyDagreLayout([...nodes], newEdges)
-        setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
-        for (const n of laid) {
-          void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+      setEdges(prev => {
+        const newEdges = prev.filter(e => e.id !== edgeId)
+        if (autoLayout) {
+          setNodes(prevNodes => {
+            const laid = applyDagreLayout([...prevNodes], newEdges)
+            for (const n of laid) {
+              void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+            }
+            return laid.map(node => ({ ...node, transitionDuration: 1000 }))
+          })
+          setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
         }
-        setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
-      }
+        return newEdges
+      })
     }
-  }, [edges, nodes, autoLayout, setEdges, setNodes])
+  }, [autoLayout])
 
   const loadGraph = useCallback(async () => {
     try {
