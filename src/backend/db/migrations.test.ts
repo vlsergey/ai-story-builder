@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import Database from 'better-sqlite3'
 import { migrateDatabase, CURRENT_VERSION } from './migrations'
+import fs from 'fs'
+import path from 'path'
 
 function inMemoryDb() {
   return new Database(':memory:')
@@ -52,20 +54,6 @@ describe('migrateDatabase', () => {
     db.close()
   })
 
-  it('card_values has data column (not the reserved keyword values)', () => {
-    const db = inMemoryDb()
-    migrateDatabase(db)
-
-    const cols = (
-      db.pragma('table_info(card_values)') as { name: string }[]
-    ).map((c) => c.name)
-
-    expect(cols).toContain('data')
-    expect(cols).not.toContain('values')
-
-    db.close()
-  })
-
   it('can insert and query rows after migration', () => {
     const db = inMemoryDb()
     migrateDatabase(db)
@@ -77,48 +65,34 @@ describe('migrateDatabase', () => {
     db.close()
   })
 
-  it('migration 4→5: clears grok key from ai_sync_info, preserving other engine data', () => {
+  it('schema matches schema.sql file', () => {
     const db = inMemoryDb()
     migrateDatabase(db)
 
-    // Insert nodes with various ai_sync_info states
-    db.prepare(`
-      INSERT INTO lore_nodes (id, name, ai_sync_info) VALUES
-        (1, 'GrokOnly',   '{"grok":{"file_id":"f1","last_synced_at":"2025-01-01T00:00:00.000Z"}}'),
-        (2, 'GrokAndYandex', '{"grok":{"file_id":"f2","last_synced_at":"2025-01-01T00:00:00.000Z"},"yandex":{"file_id":"y1","last_synced_at":"2025-01-01T00:00:00.000Z"}}'),
-        (3, 'YandexOnly', '{"yandex":{"file_id":"y2","last_synced_at":"2025-01-01T00:00:00.000Z"}}'),
-        (4, 'NullInfo',   NULL)
-    `).run()
+    // Generate schema from the database
+    const rows = db.prepare(`
+      SELECT type, name, sql
+      FROM sqlite_master
+      WHERE sql IS NOT NULL
+        AND name NOT LIKE 'sqlite_%'
+      ORDER BY type, name
+    `).all() as Array<{ type: string; name: string; sql: string }>
 
-    // Re-run the migration step (simulate applying it to existing data)
-    const rows = db
-      .prepare("SELECT id, ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL")
-      .all() as { id: number; ai_sync_info: string }[]
-    const update = db.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
-    for (const row of rows) {
-      const info = JSON.parse(row.ai_sync_info) as Record<string, unknown>
-      if (!('grok' in info)) continue
-      delete info['grok']
-      const newValue = Object.keys(info).length > 0 ? JSON.stringify(info) : null
-      update.run(newValue, row.id)
-    }
+    const generated = rows
+      .map(row => {
+        let sql = row.sql.trim()
+        if (!sql.endsWith(';')) sql += ';'
+        return sql
+      })
+      .join('\n\n') + '\n'
 
-    const getInfo = (id: number) => {
-      const r = db.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = ?').get(id) as { ai_sync_info: string | null }
-      return r.ai_sync_info
-    }
+    // Read the stored schema file
+    const schemaPath = path.resolve(__dirname, 'schema.sql')
+    const stored = fs.readFileSync(schemaPath, 'utf-8')
+    // Remove the header comment (first three lines)
+    const storedSchema = stored.replace(/^--.*\n/gm, '').trim() + '\n'
 
-    // grok-only → NULL
-    expect(getInfo(1)).toBeNull()
-    // grok+yandex → yandex only
-    const mixed = JSON.parse(getInfo(2)!) as Record<string, unknown>
-    expect(mixed).not.toHaveProperty('grok')
-    expect(mixed).toHaveProperty('yandex')
-    // yandex-only → unchanged
-    expect(getInfo(3)).toContain('yandex')
-    // null → still null
-    expect(getInfo(4)).toBeNull()
-
+    expect(generated).toBe(storedSchema)
     db.close()
   })
 })
