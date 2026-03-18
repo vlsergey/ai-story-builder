@@ -27,9 +27,6 @@ function setupElectronAPIWithTree(nodes: Partial<LoreNode>[]) {
   }
 }
 
-function setLoreTreeData(nodes: Partial<LoreNode>[]) {
-  currentLoreTreeData = nodes
-}
 
 const mockProps = { onSelectLoreNode: vi.fn() };
 
@@ -495,7 +492,7 @@ describe('LoreTree', () => {
     // 'Item' must disappear from DOM after collapse
     await waitFor(() => expect(screen.queryByText('Item')).toBeNull())
 
-    const invokeMock = window.electronAPI!.invoke as ReturnType<typeof vi.fn>
+    const invokeMock = window.electronAPI.invoke as ReturnType<typeof vi.fn>
     const loreTreeCallsBefore = invokeMock.mock.calls.filter((call: unknown[]) => call[0] === 'lore:tree').length
 
     // Simulate a tree refresh (e.g. after creating a child node)

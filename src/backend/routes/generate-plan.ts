@@ -3,6 +3,8 @@ import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiSettings } from '../../shared/ai-settings.js'
 import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
+import { PlanEdgeRepository } from '../plan/edges/plan-edge-repository.js'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -44,26 +46,17 @@ export async function generatePlan(
   let finalPrompt = prompt.trim()
   if (nodeId !== undefined) {
     try {
-      const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
-      const edges = db.prepare(`
-        SELECT from_node_id
-        FROM plan_edges
-        WHERE to_node_id = ? AND type = 'text'
-        ORDER BY position
-        LIMIT 1
-      `).all(nodeId) as Array<{ from_node_id: number }>
-      if (edges.length > 0) {
-        const fromNodeId = edges[0].from_node_id
-        const fromNode = db.prepare(`
-          SELECT title, content FROM plan_nodes WHERE id = ?
-        `).get(fromNodeId) as { title: string, content: string } | undefined
+      const edgeRepo = new PlanEdgeRepository()
+      const edge = edgeRepo.getFirstByToNodeIdAndType(nodeId, 'text')
+      if (edge) {
+        const nodeRepo = new PlanNodeRepository()
+        const fromNode = nodeRepo.getById(edge.from_node_id)
         if (fromNode) {
           const placeholder = `{{${fromNode.title}}}`
           const content = fromNode.content || ''
           finalPrompt = finalPrompt.split(placeholder).join(content)
         }
       }
-      db.close()
     } catch (e) {
       console.error('Failed to apply template substitution:', e)
     }
@@ -75,7 +68,7 @@ export async function generatePlan(
   const engineFileIds: string[] = []
 
   try {
-    const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
+    const db = new (Database)(dbPath, { readonly: true })
     const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
     const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
     const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
@@ -110,7 +103,7 @@ export async function generatePlan(
   const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
   if (!engineDef) throw makeError(`Plan generation is not supported for engine '${engine}'`, 400)
 
-  const adapter = getEngineAdapter(engine!)
+  const adapter = getEngineAdapter(engine)
   if (!adapter) throw makeError(`Plan generation is not supported for engine '${engine}'`, 400)
 
   const systemPrompt = (mode === 'improve' && baseContent)

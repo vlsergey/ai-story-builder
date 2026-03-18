@@ -9,7 +9,7 @@ const api = {
     }
     const res = await fetch('/api' + path, opts)
     const text = await res.text()
-    try { return JSON.parse(text) as T } catch (e) { return text as unknown as T }
+    try { return JSON.parse(text) as T } catch (_) { return text as unknown as T }
   },
   get<T = unknown>(path: string): Promise<T> { return api.request<T>('GET', path) },
   post<T = unknown>(path: string, body?: unknown): Promise<T> { return api.request<T>('POST', path, body) },

@@ -2,6 +2,7 @@ import type { NodeData, NodeContext } from '../node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
 import type { TextSettings } from '../../../../shared/node-settings'
+import { generateNodeContent } from '../../ai-generation.js'
 
 /**
  * Processor for 'text' nodes.
@@ -33,7 +34,11 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
   }
 
   async regenerate(context: NodeContext, nodeData: NodeData, settings: TextSettings): Promise<string | null> {
-    // No regeneration logic for plain text nodes
-    return null
+    // Generate content using AI for text nodes
+    console.log(`[TextProcessor] regenerating node ${nodeData.id} (title: ${nodeData.title})`)
+    const aiSettings = context.getAiSettings()
+    const content = await generateNodeContent(nodeData, aiSettings)
+    console.log(`[TextProcessor] generated content length: ${content?.length ?? 'null'}`)
+    return content
   }
 }

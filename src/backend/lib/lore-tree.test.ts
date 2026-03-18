@@ -221,7 +221,7 @@ describe('collapseLoreTree', () => {
     }
     const result = collapseLoreTree(rows, 10) as CollapsedGroup[]
     expect(Array.isArray(result)).toBe(true)
-    expect((result as CollapsedGroup[]).length).toBe(10) // 1 root + 9 l2
+    expect((result).length).toBe(10) // 1 root + 9 l2
 
     // 10 level-2 nodes + root → 11 total, exceeds maxFiles=10
     rows.push(node(11, 1, 'Cat11', 'content 11', 1))

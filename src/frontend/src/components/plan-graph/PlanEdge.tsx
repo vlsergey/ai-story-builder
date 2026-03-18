@@ -47,7 +47,7 @@ export default function PlanEdge({
   const isArray = edgeType === 'textArray'
   const offsets = isArray ? [-4, 4, 0] : [0]
 
-  const label = edgeData?.label ?? t(`planGraph.edge.${edgeType}` as Parameters<typeof t>[0])
+  const label = edgeData?.label ?? t(`planGraph.edge.${edgeType}`)
 
   return (
     <>
@@ -61,7 +61,7 @@ export default function PlanEdge({
         onMouseLeave={() => setHovered(false)}
         style={{ cursor: 'pointer' }}
       />
-      {offsets.map((offset, idx) => {
+      {offsets.map((offset) => {
         // const translateX = normal.x * offset
         // const translateY = normal.y * offset
         const hasArrow = offset === 0
@@ -75,6 +75,7 @@ export default function PlanEdge({
         })[0]
         return (
           <path
+            key={offset}
             d={pathD}
             fill="none"
             stroke={color}

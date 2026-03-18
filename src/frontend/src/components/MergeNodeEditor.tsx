@@ -11,7 +11,6 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-p
 import { GripVertical, SortAsc, SortDesc, RefreshCw } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
-import { debounceAsync } from '../lib/utils'
 
 interface MergeNodeSettingsProps {
   node: PlanGraphNode
@@ -38,14 +37,8 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     autoUpdate: false
   })
 
-  // Load inputs and settings
-  useEffect(() => {
-    loadInputs()
-    loadSettings()
-  }, [node.id])
-
   // Load input nodes connected with text or textArray edges
-  async function loadInputs() {
+  const loadInputs = useCallback(async () => {
     try {
       const graphData = await ipcClient.planGraph.get()
       const inputEdges = graphData.edges.filter(edge => edge.to_node_id === node.id && (edge.type === 'text' || edge.type === 'textArray'))
@@ -65,10 +58,10 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     } catch (error) {
       console.error('Failed to load inputs:', error)
     }
-  }
+  }, [node.id])
 
   // Load saved settings
-  async function loadSettings() {
+  const loadSettings = useCallback(async () => {
     try {
       // Get the node data which now contains node_type_settings
       const nodeData = await ipcClient.planGraph.getNode(node.id)
@@ -79,7 +72,14 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     } catch (error) {
       console.error('Failed to load settings:', error)
     }
-  }
+  }, [node.id])
+
+  // Load inputs and settings
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadInputs()
+    loadSettings()
+  }, [node.id, loadInputs, loadSettings])
 
   // Save settings and fetch updated node
   const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanGraphNode | null> => {
@@ -99,7 +99,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   }, [node.id, onNodeUpdated]);
 
   // Regenerate content via backend
-  async function regenerateContent() {
+  const regenerateContent = useCallback(async () => {
     try {
       // Send current settings to trigger regeneration
       await ipcClient.planGraph.patchNode(node.id, {
@@ -111,7 +111,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     } catch (error) {
       console.error('Failed to regenerate content:', error);
     }
-  }
+  }, [node.id, settings, onNodeUpdated]);
 
   // Debounced regenerate content
   const regenerateTimeoutRef = useRef<NodeJS.Timeout | null>(null);

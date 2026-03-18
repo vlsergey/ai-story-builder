@@ -16,10 +16,6 @@ function formatCost(ticks: number | null | undefined): string {
   return `$${usd.toFixed(2)}`
 }
 
-function formatTokens(n: number | null | undefined): string {
-  if (n == null) return '—'
-  return n.toLocaleString()
-}
 
 function timeAgo(isoStr: string): string {
   const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000)

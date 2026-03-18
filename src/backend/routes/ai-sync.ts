@@ -69,7 +69,7 @@ interface LoreNodeRow {
 function getDb(dbPath: string, readonly = false) {
   if (!Database) throw new Error('SQLite lib missing')
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return new (Database as typeof import('better-sqlite3'))(dbPath, readonly ? { readonly: true } : undefined)
+  return new (Database)(dbPath, readonly ? { readonly: true } : undefined)
 }
 
 

@@ -1,5 +1,3 @@
-import type { NodeData } from '../node-interfaces.js'
-import type { NodeProcessor } from './node-processor.js'
 
 /**
  * Merge node_type_settings JSON with default settings.
@@ -25,7 +23,7 @@ export function mergeNodeSettings<T extends Record<string, any>>(
       }
     }
     return result
-  } catch (e) {
+  } catch (_) {
     return defaultSettings
   }
 }

@@ -36,7 +36,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
           // Assume each element has a 'content' field (or is a string)
           return parsed.map((item: any) => typeof item === 'string' ? item : item.content || '')
         }
-      } catch (e) {
+      } catch (_) {
         // Not valid JSON, treat as empty array
       }
     }
@@ -79,7 +79,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     try {
       const regex = new RegExp(regexPattern, 'g')
       return text.split(regex)
-    } catch (error) {
+    } catch (_) {
       // If regex is invalid, treat as literal string split
       return text.split(regexPattern)
     }

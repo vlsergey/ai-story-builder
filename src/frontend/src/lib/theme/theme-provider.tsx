@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { ThemePreference, ResolvedTheme } from '../../types/models'
 import { ipcClient } from '../../ipcClient'
 
@@ -34,6 +34,14 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemePro
     () => window.matchMedia('(prefers-color-scheme: dark)').matches
   )
 
+  /** Persists preference to localStorage and tries to sync to the open project (silent fail). */
+  const setPreference = useCallback((pref: string) => {
+    if (!VALID_PREFERENCES.includes(pref as ThemePreference)) return
+    localStorage.setItem(STORAGE_KEY, pref)
+    setPreferenceState(pref as ThemePreference)
+    ipcClient.settings.set('ui_theme', pref).catch(() => {})
+  }, [])
+
   // Sync preference to Electron native menu on mount and on change
   useEffect(() => {
     window.electronAPI?.sendMenuState?.('theme', preference)
@@ -48,7 +56,7 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemePro
       setPreference(action.slice(10))
     })
     return unsub
-  }, [])
+  }, [setPreference])
 
   // Track OS-level dark/light changes
   useEffect(() => {
@@ -66,14 +74,6 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemePro
     root.classList.remove('light', 'dark')
     root.classList.add(resolved === 'obsidian' ? 'dark' : 'light')
   }, [preference, systemDark])
-
-  /** Persists preference to localStorage and tries to sync to the open project (silent fail). */
-  const setPreference = (pref: string) => {
-    if (!VALID_PREFERENCES.includes(pref as ThemePreference)) return
-    localStorage.setItem(STORAGE_KEY, pref)
-    setPreferenceState(pref as ThemePreference)
-    ipcClient.settings.set('ui_theme', pref).catch(() => {})
-  }
 
   return (
     <ThemeContext.Provider value={{

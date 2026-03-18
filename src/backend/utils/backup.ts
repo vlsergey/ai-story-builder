@@ -38,9 +38,9 @@ export function trimBackups(filename: string, backupsDir: string): void {
     all.sort()
     while (all.length > 7) {
       const rm = all.shift()
-      try { fs.unlinkSync(path.join(backupsDir, rm!)) } catch (e) {}
+      try { fs.unlinkSync(path.join(backupsDir, rm!)) } catch (_) { /* ignore */ }
     }
-  } catch (e) {
+  } catch (_) {
     // Ignore errors in trimming
   }
 }
@@ -61,7 +61,7 @@ export function getLatestBackup(dbPath: string): string | null {
 
     all.sort()
     return path.join(backupsDir, all[all.length - 1])
-  } catch (e) {
+  } catch (_) {
     return null
   }
 }

@@ -312,7 +312,7 @@ export default function LoreTree({
   // ── Selection ─────────────────────────────────────────────────────────────
 
   const selectedNodeIds = new Set<number>(
-    ((viewState['lore-tree']?.selectedItems ?? []) as TreeItemIndex[]).map(id => Number(id))
+    ((viewState['lore-tree']?.selectedItems ?? [])).map(id => Number(id))
   )
 
   function handleSelectItems(ids: TreeItemIndex[]) {

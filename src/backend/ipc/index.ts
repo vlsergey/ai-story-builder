@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron'
 import type { WebContents } from 'electron'
 import { getLoreTree, getLoreNode, createLoreNode, patchLoreNode, deleteLoreNode, importLoreNode, moveLoreNode, duplicateLoreNode, sortLoreChildren, reorderLoreChildren, restoreLoreNode } from '../routes/lore.js'
-import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode, movePlanNode, reorderPlanChildren } from '../routes/plan-graph.js'
-import { getPlanGraph, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../routes/plan-graph.js'
+import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode } from '../plan/plan-routes.js'
+import { getPlanGraph, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../plan/plan-routes.js'
 import { getProjectStatus, closeProject, openProject, getRecentProjects, deleteRecentProject, listProjectFiles, openProjectFolder, createProject, applyRuntimeSettings } from '../routes/projects.js'
 import { getLayout, saveLayout, setVerboseAiLogging, getSetting, setSetting } from '../routes/settings.js'
 import { getAiConfig, saveAiConfig, setCurrentEngine, getEngineModels, refreshEngineModels, testEngineConnection } from '../routes/ai-config.js'
@@ -11,9 +11,19 @@ import { syncLore } from '../routes/ai-sync.js'
 import { generateLore } from '../routes/generate-lore.js'
 import { generatePlan } from '../routes/generate-plan.js'
 import { generatePlayground } from '../routes/generate-playground.js'
+import { generateAll } from '../routes/generate-all.js'
 import { generateSummary } from '../routes/generate-summary.js'
 import { generate, updateGeneratedPart } from '../routes/generation.js'
 import { restoreLastOpenedProject } from '../db/state.js'
+
+// Unify stdout/stderr to avoid log buffering issues
+const nodeConsole = require('console')
+// Create a new console instance where both streams go to stdout
+const unifiedConsole = new nodeConsole.Console(process.stdout, process.stdout)
+console.log = unifiedConsole.log.bind(unifiedConsole)
+console.error = unifiedConsole.error.bind(unifiedConsole)
+console.warn = unifiedConsole.warn.bind(unifiedConsole)
+console.info = unifiedConsole.info.bind(unifiedConsole)
 
 // Map of active stream AbortControllers
 const activeStreams = new Map<string, AbortController>()
@@ -30,6 +40,7 @@ const STREAM_ENDPOINTS: Record<string, (params: any, onThinking: any, onPartialJ
   'generate-lore': (p, onThinking, onPartialJson) => generateLore(p, onThinking, onPartialJson),
   'generate-plan': (p, onThinking, onPartialJson) => generatePlan(p, onThinking, onPartialJson),
   'generate-playground': (p, onThinking, onPartialJson) => generatePlayground(p, onThinking, onPartialJson),
+  'generate-all': (p, onThinking, onPartialJson) => generateAll(p, onThinking, onPartialJson),
 }
 
 function startStreamHandler(sender: WebContents, streamId: string, endpoint: string, params: unknown) {

@@ -1,4 +1,3 @@
-import type { PlanNodeRow } from '../types/index.js'
 import { GraphEngine } from '../lib/node-graph/engine/graph-engine.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -51,7 +50,7 @@ export function generateMergeContent(
   } else if (nodeMergeSettings) {
     try {
       settings = { ...defaultSettings, ...JSON.parse(nodeMergeSettings) }
-    } catch (e) {
+    } catch (_) {
       // If JSON invalid, keep defaults
     }
   }

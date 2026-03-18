@@ -10,7 +10,7 @@ class IpcError extends Error {
 }
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
-  const result = await window.electronAPI!.invoke(channel, ...args) as any
+  const result = await window.electronAPI.invoke(channel, ...args) as any
   if (result && typeof result === 'object' && result.__ipcError) {
     throw new IpcError(result.message as string, result.status as number)
   }

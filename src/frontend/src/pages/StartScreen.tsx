@@ -16,7 +16,6 @@ function projectDisplayName(fullPath: string): string {
 
 function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectData) => void }) {
   const navigate = useNavigate()
-  const { t } = useLocale()
   const [name, setName] = React.useState('MyProject')
   const [textLanguage, setTextLanguage] = React.useState('ru-RU')
   const [busy, setBusy] = React.useState(false)

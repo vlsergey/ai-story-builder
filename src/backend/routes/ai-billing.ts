@@ -15,7 +15,7 @@ const MANAGEMENT_API_BASE = 'https://management-api.x.ai'
 function readGrokManagementConfig(dbPath: string): { managementKey: string; teamId: string } | null {
   if (!Database) return null
   try {
-    const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
+    const db = new (Database)(dbPath, { readonly: true })
     const row = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
     db.close()
     if (!row) return null

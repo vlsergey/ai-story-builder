@@ -1,0 +1,11 @@
+node_modules
+dist
+release
+*.js
+*.d.ts
+src/backend/**/*.js
+src/backend/**/*.d.ts
+src/shared/**/*.js
+src/shared/**/*.d.ts
+src/electron/**/*.js
+src/frontend/vite.config.ts

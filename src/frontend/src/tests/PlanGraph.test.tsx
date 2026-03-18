@@ -24,7 +24,7 @@ vi.mock('../components/plan-graph/PlanEdge', () => ({ default: () => null }))
 vi.mock('../components/plan-graph/GenerateAllDialog', () => ({ default: () => null }))
 vi.mock('@dagrejs/dagre', () => ({
   default: {
-    graphlib: { Graph: class { setGraph() {}; setDefaultEdgeLabel() {}; setNode() {}; setEdge() {}; node() { return { x: 0, y: 0 } } } },
+    graphlib: { Graph: class { setGraph() {} setDefaultEdgeLabel() {} setNode() {} setEdge() {} node() { return { x: 0, y: 0 } } } },
     layout: vi.fn(),
   }
 }))

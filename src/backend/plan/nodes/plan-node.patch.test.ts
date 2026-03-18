@@ -3,8 +3,8 @@ import Database from 'better-sqlite3'
 import os from 'os'
 import path from 'path'
 import fs from 'fs'
-import { setCurrentDbPath } from '../db/state.js'
-import { patchPlanNode, getPlanNode, deletePlanNode } from './plan-graph.js'
+import { setCurrentDbPath } from '../../db/state.js'
+import { patchPlanNode, getPlanNode, deletePlanNode } from '../plan-routes.js'
 
 // ── In-memory DB setup ────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ describe('patchPlanNode', () => {
 
   afterEach(() => {
     setCurrentDbPath(null)
-    try { fs.unlinkSync(dbPath) } catch (_) {}
+    try { fs.unlinkSync(dbPath) } catch (_) { /* ignore */ }
   })
 
   it('updates title', () => {
@@ -130,7 +130,7 @@ describe('deletePlanNode', () => {
 
   afterEach(() => {
     setCurrentDbPath(null)
-    try { fs.unlinkSync(dbPath) } catch (_) {}
+    try { fs.unlinkSync(dbPath) } catch (_) { /* ignore */ }
   })
 
   it('deletes a child node', () => {

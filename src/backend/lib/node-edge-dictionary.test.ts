@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { NODE_TYPES, EDGE_TYPES, type NodeTypeDefinition, type EdgeTypeDefinition } from '../../shared/node-edge-dictionary.js'
+import { NODE_TYPES, EDGE_TYPES } from '../../shared/node-edge-dictionary.js'
 import type { PlanNodeType, PlanEdgeType } from '../../shared/plan-graph.js'
 
 describe('node-edge-dictionary consistency', () => {

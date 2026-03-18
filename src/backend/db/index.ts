@@ -2,7 +2,7 @@ import { migrateDatabase, CURRENT_VERSION } from './migrations'
 import { createBackup } from './backup'
 
 let DatabaseConstructor: typeof import('better-sqlite3') | null = null
-try { DatabaseConstructor = require('better-sqlite3') } catch (e) { DatabaseConstructor = null }
+try { DatabaseConstructor = require('better-sqlite3') } catch (_) { DatabaseConstructor = null }
 
 /**
  * Opens a project database, creates a backup of any existing file, runs all

@@ -22,12 +22,12 @@ export async function generateNodeStream(
   const streamId = crypto.randomUUID()
 
   await new Promise<void>((resolve, reject) => {
-    const unsub = window.electronAPI!.onStreamEvent((event) => {
+    const unsub = window.electronAPI.onStreamEvent((event) => {
       if (event.streamId !== streamId) return
       if (event.type === 'thinking') {
         options.onThinking?.(event.data.status as string, event.data.detail as string | undefined)
       } else if (event.type === 'partial_json') {
-        options.onPartialJson?.(event.data as Record<string, unknown>)
+        options.onPartialJson?.(event.data)
       } else if (event.type === 'done') {
         unsub()
         options.onDone?.(event.data as { response_id?: string })
@@ -41,7 +41,7 @@ export async function generateNodeStream(
     if (options.signal) {
       options.signal.addEventListener('abort', () => {
         unsub()
-        window.electronAPI!.abortStream(streamId)
+        window.electronAPI.abortStream(streamId)
         reject(new DOMException('Aborted', 'AbortError'))
       }, { once: true })
     }
@@ -50,12 +50,55 @@ export async function generateNodeStream(
     // endpoint is like '/api/ai/generate-lore' or '/api/ai/generate-plan'
     const ipcEndpoint = endpoint.replace('/api/ai/', '')
 
-    window.electronAPI!.startStream(streamId, ipcEndpoint, {
+    window.electronAPI.startStream(streamId, ipcEndpoint, {
       prompt: options.prompt,
       mode: options.mode,
       baseContent: options.baseContent,
       settings: options.settings,
       nodeId: options.nodeId,
+    }).catch(reject)
+  })
+}
+
+export interface GenerateAllOptions {
+  regenerateManual?: boolean
+  onThinking?: (status: string, detail?: string) => void
+  onPartialJson?: (data: Record<string, unknown>) => void
+  onDone?: (data: { generated: number; skipped: number }) => void
+  signal?: AbortSignal
+}
+
+export async function generateAllStream(options: GenerateAllOptions): Promise<void> {
+  const streamId = crypto.randomUUID()
+
+  await new Promise<void>((resolve, reject) => {
+    const unsub = window.electronAPI.onStreamEvent((event) => {
+      if (event.streamId !== streamId) return
+      if (event.type === 'thinking') {
+        options.onThinking?.(event.data.status as string, event.data.detail as string | undefined)
+      } else if (event.type === 'partial_json') {
+        options.onPartialJson?.(event.data)
+      } else if (event.type === 'done') {
+        unsub()
+        options.onDone?.(event.data as { generated: number; skipped: number })
+        resolve()
+      } else if (event.type === 'error') {
+        unsub()
+        reject(new Error(event.data.message as string))
+      }
+    })
+
+    if (options.signal) {
+      options.signal.addEventListener('abort', () => {
+        unsub()
+        window.electronAPI.abortStream(streamId)
+        reject(new DOMException('Aborted', 'AbortError'))
+      }, { once: true })
+    }
+
+    const ipcEndpoint = 'generate-all'
+    window.electronAPI.startStream(streamId, ipcEndpoint, {
+      regenerateManual: options.regenerateManual ?? false,
     }).catch(reject)
   })
 }

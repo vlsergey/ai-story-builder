@@ -37,7 +37,7 @@ export function maskedHeaders(raw: HeadersField | undefined): Record<string, str
       out[k] = k.toLowerCase() === 'authorization' ? maskAuth(v) : v
     }
   } else {
-    for (const [k, v] of Object.entries(raw as Record<string, string>)) {
+    for (const [k, v] of Object.entries(raw)) {
       out[k] = k.toLowerCase() === 'authorization' ? maskAuth(v) : v
     }
   }
@@ -78,7 +78,6 @@ export function makeLoggingFetch(
         console.log(`[${providerName}] REQ body: ${init.body}`)
       } else if (init?.body instanceof FormData) {
         const fields: Record<string, string> = {}
-        // @ts-ignore entries may be missing in some environments
         for (const [k, v] of (init.body as any).entries()) {
           fields[k] = v instanceof Blob ? `<Blob size=${v.size} type=${v.type}>` : String(v)
         }

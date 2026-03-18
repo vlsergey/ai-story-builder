@@ -76,8 +76,9 @@ export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(
     case 'text':
     case 'lore':
       return {} as NodeTypeSettingsMap[T]
-    default:
+    default: {
       const exhaustiveCheck: never = nodeType
       throw new Error(`Unhandled node type: ${exhaustiveCheck}`)
+    }
   }
 }

@@ -70,7 +70,7 @@ export async function generateLore(
   const engineFileIds: string[] = []
 
   try {
-    const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
+    const db = new (Database)(dbPath, { readonly: true })
     const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
     const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
     const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
@@ -109,7 +109,7 @@ export async function generateLore(
     throw makeError(`Lore generation is not supported for engine '${engine}'`, 400)
   }
 
-  const adapter = getEngineAdapter(engine!)
+  const adapter = getEngineAdapter(engine)
   if (!adapter) {
     throw makeError(`Lore generation is not supported for engine '${engine}'`, 400)
   }
@@ -137,7 +137,7 @@ export async function generateLore(
 
   const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
     {
-      prompt: prompt!.trim(),
+      prompt: prompt.trim(),
       systemPrompt,
       model: requestedModel?.trim() ?? '',
       includeExistingLore: includeExistingLore ?? false,

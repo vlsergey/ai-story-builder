@@ -52,7 +52,7 @@ function getProjectInitialData(dbPath: string): ProjectInitialData {
     if (layoutRow) {
       try {
         layout = JSON.parse(layoutRow.value)
-      } catch (_) {}
+      } catch (_) { /* ignore */ }
     }
     return { layout, projectTitle: titleRow ? titleRow.value : null }
   } catch (e) {

@@ -19,7 +19,7 @@ import { useLocale } from '../lib/locale'
 import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import { PLAN_NODE_SAVED_EVENT, type PlanNodeSavedDetail } from '../lib/plan-events'
 import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
-import { type PlanNodeType, type PlanEdgeType, NODE_TYPES } from '@shared/plan-graph'
+import { type PlanNodeType, NODE_TYPES } from '@shared/plan-graph'
 import { EDGE_TYPES, canCreateEdge } from '@shared/node-edge-dictionary'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
@@ -29,8 +29,6 @@ import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './plan-graph/GenerateAllDialog'
 import { ipcClient } from '../ipcClient'
 
-type PlanGraphNodeData = PlanGraphNode & { onDelete: (id: string) => void }
-type PlanGraphEdgeData = { type: string; label?: string; onDelete: (id: string) => void }
 
 const nodeTypes = {
   planText: PlanTextNode,
@@ -95,6 +93,30 @@ export default function PlanGraph() {
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null)
   const hasFitted = useRef(false)
 
+  const deleteNode = useCallback(async (nodeId: string) => {
+    const message = t('planGraph.deleteConfirmation')
+    const confirmed = window.electronAPI.confirm(message)
+    if (!confirmed) return
+    const result = await ipcClient.planGraph.deleteNode(Number(nodeId))
+    if (result.ok) dispatchPlanGraphRefresh()
+  }, [t])
+
+  const deleteEdge = useCallback(async (edgeId: string) => {
+    const result = await ipcClient.planGraph.deleteEdge(Number(edgeId))
+    if (result.ok) {
+      const newEdges = edges.filter(e => e.id !== edgeId)
+      setEdges(newEdges)
+      if (autoLayout) {
+        const laid = applyDagreLayout([...nodes], newEdges)
+        setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
+        for (const n of laid) {
+          void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
+        }
+        setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
+      }
+    }
+  }, [edges, nodes, autoLayout, setEdges, setNodes])
+
   const loadGraph = useCallback(async () => {
     try {
       const data = await ipcClient.planGraph.get()
@@ -116,9 +138,10 @@ export default function PlanGraph() {
     } catch {
       setLoading(false)
     }
-  }, [autoLayout]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoLayout, deleteEdge, deleteNode, setNodes, setEdges])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadGraph()
   }, [loadGraph])
 
@@ -141,7 +164,7 @@ export default function PlanGraph() {
     }
     window.addEventListener(PLAN_NODE_SAVED_EVENT, handler)
     return () => window.removeEventListener(PLAN_NODE_SAVED_EVENT, handler)
-  }, [])
+  }, [setNodes])
 
   // Fit view after nodes are loaded and when layout changes
   useEffect(() => {
@@ -149,31 +172,7 @@ export default function PlanGraph() {
       reactFlowInstance.current.fitView({ padding: 0.2 })
       hasFitted.current = true
     }
-  }, [nodes])
-
-  async function deleteNode(nodeId: string) {
-    const message = t('planGraph.deleteConfirmation')
-    const confirmed = window.electronAPI.confirm(message)
-    if (!confirmed) return
-    const result = await ipcClient.planGraph.deleteNode(Number(nodeId))
-    if (result.ok) dispatchPlanGraphRefresh()
-  }
-
-  async function deleteEdge(edgeId: string) {
-    const result = await ipcClient.planGraph.deleteEdge(Number(edgeId))
-    if (result.ok) {
-      const newEdges = edges.filter(e => e.id !== edgeId)
-      setEdges(newEdges)
-      if (autoLayout) {
-        const laid = applyDagreLayout([...nodes], newEdges)
-        setNodes(laid.map(node => ({ ...node, transitionDuration: 1000 })))
-        for (const n of laid) {
-          void ipcClient.planGraph.patchNode(Number(n.id), { x: n.position.x, y: n.position.y })
-        }
-        setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
-      }
-    }
-  }
+  }, [nodes, setNodes])
 
   function openAddDialog(type: PlanNodeType) {
     setAddTitle('')
@@ -240,8 +239,8 @@ export default function PlanGraph() {
       }).then(result => {
         const newEdge: Edge = {
           id: String(result.id),
-          source: connection.source!,
-          target: connection.target!,
+          source: connection.source,
+          target: connection.target,
           type: 'planEdge',
           data: { type: edgeType, onDelete: deleteEdge },
         }
@@ -405,7 +404,7 @@ export default function PlanGraph() {
                     onClick={() => void confirmConnect(type)}
                     className="px-3 py-1.5 text-sm rounded border border-border hover:bg-muted text-left"
                   >
-                    {t(`planGraph.edge.${type}` as Parameters<typeof t>[0])}
+                    {t(`planGraph.edge.${type}`)}
                   </button>
                 ))}
               </div>

@@ -1,23 +1,30 @@
 import type { Database } from 'better-sqlite3'
-import { GraphManager } from '../graph-manager.js'
 import { NodeProcessorRegistry } from './node-processor.js'
 import { TextProcessor } from './text-processor.js'
 import { LoreProcessor } from './lore-processor.js'
 import { SplitProcessor } from './split-processor.js'
 import { MergeProcessor } from './merge-processor.js'
-import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
-import type { NodeData } from '../node-interfaces.js'
+import type { PlanNodeType, PlanEdgeType, PlanNodeStatus } from '../../../../shared/plan-graph'
+import type { NodeData, NodeContext } from '../node-interfaces.js'
+import type { AiSettings } from '../../../../shared/ai-settings.js'
 import { mergeNodeSettings } from './settings-helper.js'
+import { generateSummary } from '../../../routes/generate-summary.js'
+import { PlanNodeService } from '../../../plan/nodes/plan-node-service.js'
+import { PlanEdgeRepository } from '../../../plan/edges/plan-edge-repository.js'
 
 /**
- * Extended graph manager that uses node processors for advanced operations.
+ * Graph engine that provides database access, node processing, and advanced operations.
+ * Implements NodeContext directly, merging the former GraphManager functionality.
  */
-export class GraphEngine extends GraphManager {
+export class GraphEngine implements NodeContext {
   private processorRegistry: NodeProcessorRegistry
+  private nodeService: PlanNodeService
+  protected db: Database
 
-  constructor(db: Database) {
-    super(db)
+  constructor(db: Database, nodeService?: PlanNodeService) {
+    this.db = db
     this.processorRegistry = new NodeProcessorRegistry()
+    this.nodeService = nodeService ?? new PlanNodeService()
     this.registerDefaultProcessors()
   }
 
@@ -26,6 +33,77 @@ export class GraphEngine extends GraphManager {
     this.processorRegistry.register(new LoreProcessor())
     this.processorRegistry.register(new SplitProcessor())
     this.processorRegistry.register(new MergeProcessor())
+  }
+
+  /**
+   * Get a node by ID using the node service.
+   */
+  getNode(id: number): NodeData | undefined {
+    const row = this.nodeService.getById(id)
+    if (!row) return undefined
+    return {
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      content: row.content,
+      user_prompt: row.user_prompt,
+      system_prompt: row.system_prompt,
+      node_type_settings: row.node_type_settings,
+      status: row.status,
+    }
+  }
+
+  /**
+   * Get incoming edges for a node.
+   */
+  getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: PlanEdgeType }> {
+    const edgeRepo = new PlanEdgeRepository()
+    const edges = edgeRepo.getByToNodeId(nodeId)
+    return edges.map(edge => ({ from_node_id: edge.from_node_id, type: edge.type }))
+  }
+
+  /**
+   * Get outgoing edges for a node.
+   */
+  getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: PlanEdgeType }> {
+    const edgeRepo = new PlanEdgeRepository()
+    const edges = edgeRepo.getByFromNodeId(nodeId)
+    return edges.map(edge => ({ to_node_id: edge.to_node_id, type: edge.type }))
+  }
+
+  /**
+   * Retrieve AI settings from the project (model, webSearch, etc.).
+   */
+  getAiSettings(): AiSettings {
+    const configRow = this.db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
+    const engineRow = this.db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
+    if (!configRow || !engineRow) return {}
+    try {
+      const config = JSON.parse(configRow.value) as Record<string, any>
+      const engine = engineRow.value
+      const engineConfig = config[engine] as Record<string, any> | undefined
+      if (!engineConfig) return {}
+      // Map known keys to AiSettings
+      const settings: AiSettings = {}
+      if (typeof engineConfig.model === 'string') {
+        settings.model = engineConfig.model
+      }
+      if (typeof engineConfig.web_search === 'string') {
+        settings.webSearch = engineConfig.web_search
+      }
+      if (typeof engineConfig.include_existing_lore === 'boolean') {
+        settings.includeExistingLore = engineConfig.include_existing_lore
+      }
+      if (typeof engineConfig.max_tokens === 'number') {
+        settings.maxTokens = engineConfig.max_tokens
+      }
+      if (typeof engineConfig.max_completion_tokens === 'number') {
+        settings.maxCompletionTokens = engineConfig.max_completion_tokens
+      }
+      return settings
+    } catch {
+      return {}
+    }
   }
 
   /**
@@ -98,15 +176,33 @@ export class GraphEngine extends GraphManager {
   }
 
   /**
+   * Retrieve all nodes in the graph.
+   */
+  private getAllNodes(): NodeData[] {
+    const rows = this.nodeService.getAll()
+    return rows.map(row => ({
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      content: row.content,
+      user_prompt: row.user_prompt,
+      system_prompt: row.system_prompt,
+      node_type_settings: row.node_type_settings,
+      status: row.status,
+    }))
+  }
+
+  /**
    * Update node content and trigger any downstream updates (e.g., auto‑update merge nodes).
    */
-  async updateNodeContent(nodeId: number, newContent: string | null): Promise<void> {
+  async updateNodeContent(nodeId: number, newContent: string | null, newStatus?: string): Promise<void> {
     const node = this.getNode(nodeId)
     if (!node) throw new Error(`Node ${nodeId} not found`)
     const oldContent = node.content
 
+    console.log(`[GraphEngine] updateNodeContent node ${nodeId}, newStatus=${newStatus ?? '(none)'}`)
     // Update in database
-    await this.updateNodeContentInDb(nodeId, newContent)
+    await this.updateNodeContentInDb(nodeId, newContent, newStatus)
 
     // Notify the node's own processor
     const processor = this.getProcessor(node.type)
@@ -122,7 +218,7 @@ export class GraphEngine extends GraphManager {
    * Regenerate node content (e.g., AI generation, re‑split, re‑merge).
    * Returns new content if regeneration succeeded, otherwise null.
    */
-  async regenerateNode(nodeId: number, options?: unknown): Promise<string | null> {
+  async regenerateNode(nodeId: number): Promise<string | null> {
     const node = this.getNode(nodeId)
     if (!node) throw new Error(`Node ${nodeId} not found`)
     const processor = this.getProcessor(node.type)
@@ -131,6 +227,149 @@ export class GraphEngine extends GraphManager {
       return await processor.regenerate(this, node, settings)
     }
     return null
+  }
+
+  /**
+   * Check if auto‑generate‑summary setting is enabled for the current project.
+   */
+  private getAutoGenerateSummarySetting(): boolean {
+    const row = this.db.prepare("SELECT value FROM settings WHERE key = 'auto_generate_summary'").get() as { value: string } | undefined
+    return row?.value === 'true'
+  }
+
+  /**
+   * Generate a summary for a node if the project setting allows it.
+   * This is a fire‑and‑forget operation; errors are logged but not propagated.
+   */
+  private async maybeGenerateSummary(nodeId: number, content: string): Promise<void> {
+    if (!this.getAutoGenerateSummarySetting()) {
+      return
+    }
+    try {
+      await generateSummary({ node_id: nodeId, content })
+    } catch (error) {
+      console.error(`[GraphEngine] Failed to generate summary for node ${nodeId}:`, error)
+    }
+  }
+
+  /**
+   * Generate content for all nodes in topological order, respecting dependencies.
+   * @param options.regenerateManual If true, MANUAL nodes will be regenerated; otherwise they are skipped.
+   * @param options.onProgress Optional callback to report progress (nodeId, status, queueSize).
+   */
+  async generateAllNodes(options?: {
+    regenerateManual?: boolean
+    onProgress?: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number) => void
+  }): Promise<void> {
+    const regenerateManual = options?.regenerateManual ?? false
+    const onProgress = options?.onProgress
+
+    // Get all nodes and build adjacency
+    const nodes = this.getAllNodes()
+    const nodeIds = nodes.map(n => n.id)
+    const incomingEdges = new Map<number, number[]>()
+    const outgoingEdges = new Map<number, number[]>()
+
+    for (const nodeId of nodeIds) {
+      incomingEdges.set(nodeId, [])
+      outgoingEdges.set(nodeId, [])
+    }
+
+    // Fill adjacency from edges
+    const edgeRows = new PlanEdgeRepository().getAll()
+    for (const edge of edgeRows) {
+      incomingEdges.get(edge.to_node_id)!.push(edge.from_node_id)
+      outgoingEdges.get(edge.from_node_id)!.push(edge.to_node_id)
+    }
+
+    // Set of nodes that have been checked (processed)
+    const checked = new Set<number>()
+    // Queue of nodes to check (initialized with nodes that have no incoming edges)
+    const queue: number[] = nodeIds.filter(id => incomingEdges.get(id)!.length === 0)
+    // Map from node id to its data
+    const nodeMap = new Map<number, NodeData>()
+    for (const node of nodes) {
+      nodeMap.set(node.id, node)
+    }
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift()!
+      const node = nodeMap.get(nodeId)!
+      console.log(`[GraphEngine] processing node ${nodeId} (${node.type}) status=${node.status}, queue size=${queue.length}`)
+      if (onProgress) onProgress(nodeId, 'processing', queue.length)
+
+      // Check if all sources are already checked
+      const sources = incomingEdges.get(nodeId)!
+      const allSourcesChecked = sources.every(srcId => checked.has(srcId))
+      if (!allSourcesChecked) {
+        // Not ready yet, put back at the end of queue (will be revisited later)
+        console.log(`[GraphEngine] node ${nodeId} not ready, missing sources: ${sources.filter(srcId => !checked.has(srcId)).join(',')}`)
+        queue.push(nodeId)
+        continue
+      }
+
+      // Determine if we should regenerate this node
+      let shouldRegenerate = false
+      if (node.status === 'ERROR' || node.status === 'EMPTY' || node.status === 'OUTDATED') {
+        shouldRegenerate = true
+      } else if (node.status === 'MANUAL' && regenerateManual) {
+        shouldRegenerate = true
+      }
+      console.log(`[GraphEngine] shouldRegenerate=${shouldRegenerate} (regenerateManual=${regenerateManual})`)
+
+      if (shouldRegenerate) {
+        // Generate content using the node's processor
+        const processor = this.getProcessor(node.type)
+        if (processor?.regenerate) {
+          console.log(`[GraphEngine] calling regenerate for node ${nodeId}`)
+          const settings = this.getNodeSettings(node)
+          try {
+            const newContent = await processor.regenerate(this, node, settings)
+            console.log(`[GraphEngine] regenerate returned content length=${newContent?.length ?? 'null'}`)
+            if (newContent !== null) {
+              await this.updateNodeContent(nodeId, newContent, 'GENERATED')
+              // Generate summary if project setting allows
+              await this.maybeGenerateSummary(nodeId, newContent)
+              // Update node data after content change (status may have changed)
+              const updatedNode = this.getNode(nodeId)
+              if (updatedNode) nodeMap.set(nodeId, updatedNode)
+              if (onProgress) onProgress(nodeId, 'generated', queue.length)
+            } else {
+              // No content generated (e.g., no prompt) – treat as skipped
+              console.log(`[GraphEngine] no content generated for node ${nodeId}, skipping`)
+              if (onProgress) onProgress(nodeId, 'skipped', queue.length)
+            }
+          } catch (error) {
+            console.error(`[GraphEngine] regeneration failed for node ${nodeId}:`, error)
+            // Set status to ERROR, keep existing content
+            console.log(`[GraphEngine] setting node ${nodeId} status to ERROR`)
+            await this.updateNodeContent(nodeId, node.content, 'ERROR')
+            const updatedNode = this.getNode(nodeId)
+            if (updatedNode) nodeMap.set(nodeId, updatedNode)
+            console.log(`[GraphEngine] node ${nodeId} status updated to ERROR`)
+            if (onProgress) onProgress(nodeId, 'error', queue.length)
+          }
+        } else {
+          console.log(`[GraphEngine] no processor or regenerate method for node ${nodeId}`)
+          // Cannot regenerate, treat as skipped
+          if (onProgress) onProgress(nodeId, 'skipped', queue.length)
+        }
+      } else {
+        console.log(`[GraphEngine] skipping node ${nodeId}`)
+        if (onProgress) onProgress(nodeId, 'skipped', queue.length)
+      }
+
+      // Mark as checked
+      checked.add(nodeId)
+
+      // Add outgoing nodes to queue if not already in queue and not checked
+      const outgoing = outgoingEdges.get(nodeId)!
+      for (const outId of outgoing) {
+        if (!checked.has(outId) && !queue.includes(outId)) {
+          queue.push(outId)
+        }
+      }
+    }
   }
 
   /**
@@ -158,28 +397,11 @@ export class GraphEngine extends GraphManager {
 
   // ── Private helpers ──────────────────────────────────────────────────────────────
 
-  private async updateNodeContentInDb(nodeId: number, content: string | null): Promise<void> {
-    const wordCount = this.countWords(content ?? '')
-    const charCount = this.countChars(content ?? '')
-    const byteCount = this.countBytes(content ?? '')
-
-    // @ts-ignore – we need to access the private db field from GraphManager
-    const db: Database = this.db
-    db.prepare(
-      `UPDATE plan_nodes SET content = ?, word_count = ?, char_count = ?, byte_count = ? WHERE id = ?`
-    ).run(content, wordCount, charCount, byteCount, nodeId)
+  private async updateNodeContentInDb(nodeId: number, content: string | null, newStatus?: string): Promise<void> {
+    console.log(`[GraphEngine] updating node ${nodeId} content length=${content?.length ?? 'null'}, status=${newStatus ?? '(unchanged)'}`)
+    this.nodeService.updateContent(nodeId, content, {
+      status: newStatus as PlanNodeStatus | undefined,
+    })
   }
 
-  private countWords(text: string): number {
-    const t = text.trim()
-    return t === '' ? 0 : t.split(/\s+/).length
-  }
-
-  private countChars(text: string): number {
-    return [...text].length
-  }
-
-  private countBytes(text: string): number {
-    return Buffer.byteLength(text, 'utf8')
-  }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 interface ResizableTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value'> {
   value: string;
@@ -37,7 +37,25 @@ export default function ResizableTextarea({
     if (initialHeight !== height) {
       setHeight(initialHeight);
     }
-  }, [initialHeight]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [initialHeight, height]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging.current) return;
+    const delta = e.clientY - startY.current;
+    let newHeight = startHeight.current + delta;
+    if (newHeight < minHeight) newHeight = minHeight;
+    if (newHeight > maxHeight) newHeight = maxHeight;
+    setHeight(newHeight);
+    onHeightChange?.(newHeight);
+  }, [minHeight, maxHeight, onHeightChange]);
+
+  const handleMouseUp = useCallback(() => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    // eslint-disable-next-line react-hooks/immutability
+    document.removeEventListener('mouseup', handleMouseUp);
+  }, [handleMouseMove]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -48,22 +66,6 @@ export default function ResizableTextarea({
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging.current) return;
-    const delta = e.clientY - startY.current;
-    let newHeight = startHeight.current + delta;
-    if (newHeight < minHeight) newHeight = minHeight;
-    if (newHeight > maxHeight) newHeight = maxHeight;
-    setHeight(newHeight);
-    onHeightChange?.(newHeight);
-  };
-
-  const handleMouseUp = () => {
-    isDragging.current = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -72,7 +74,7 @@ export default function ResizableTextarea({
         document.removeEventListener('mouseup', handleMouseUp);
       }
     };
-  }, []);
+  }, [handleMouseMove, handleMouseUp]);
 
   return (
     <div className="relative">

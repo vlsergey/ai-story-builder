@@ -1,6 +1,5 @@
 import React from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { useLocale } from '../../lib/locale'
 import type { PlanGraphNode } from '../../types/models'
 import { dispatchOpenPlanNodeEditor } from '../../lib/plan-graph-events'
 import PlanNodeStatusIcon from './PlanNodeStatusIcon'
@@ -8,7 +7,6 @@ import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 type PlanTextNodeData = PlanGraphNode & { onDelete: (id: string) => void }
 
 export default function PlanTextNode({ data }: NodeProps) {
-  const { t } = useLocale()
   const node = data as unknown as PlanTextNodeData
 
   const handleDelete = (e: React.MouseEvent) => {

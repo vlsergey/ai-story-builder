@@ -84,7 +84,7 @@ describe('Layout', () => {
 
   it('loads layout via IPC on mount', async () => {
     render(<Layout {...mockProps} />);
-    await waitFor(() => expect(window.electronAPI!.invoke).toHaveBeenCalledWith('settings:layout:get'));
+    await waitFor(() => expect(window.electronAPI.invoke).toHaveBeenCalledWith('settings:layout:get'));
   });
 
   it('default layout: lore, plan-graph and cards panels render', async () => {
@@ -103,7 +103,7 @@ describe('Layout', () => {
   it('registers an IPC menu-action listener on mount', async () => {
     render(<Layout {...mockProps} />);
     await waitFor(() => expect(screen.getByTestId('folder-section')).toBeInTheDocument());
-    expect(window.electronAPI!.onMenuAction).toHaveBeenCalled();
+    expect(window.electronAPI.onMenuAction).toHaveBeenCalled();
   });
 
   it('tab bar becomes visible when a lore editor is opened', async () => {
@@ -196,7 +196,7 @@ describe('Layout', () => {
     act(() => { menuActionHandler!('reset-layouts') });
 
     await waitFor(() => {
-      expect(window.electronAPI!.invoke).toHaveBeenCalledWith(
+      expect(window.electronAPI.invoke).toHaveBeenCalledWith(
         'settings:layout:save',
         expect.anything()
       );

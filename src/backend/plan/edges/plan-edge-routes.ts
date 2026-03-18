@@ -1,14 +1,7 @@
-import type { PlanEdgeRow } from '../types/index.js'
-import { getCurrentDbPath } from '../db/state.js'
-import { isValidEdgeType, canCreateEdge, getEdgeTypeDefinition, EDGE_TYPES } from '../../shared/node-edge-dictionary.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
+import type { PlanEdgeType } from '../../../shared/plan-graph.js'
+import { PlanEdgeRepository } from './plan-edge-repository.js'
+import { PlanNodeRepository } from '../nodes/plan-node-repository.js'
+import { isValidEdgeType, canCreateEdge, getEdgeTypeDefinition, EDGE_TYPES } from '../../../shared/node-edge-dictionary.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -47,41 +40,38 @@ export function createGraphEdge(data: {
   template?: string
 }): { id: number | bigint } {
   const { from_node_id, to_node_id, type = 'text', position = 0, label, template } = data
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
   if (from_node_id == null || to_node_id == null) {
     throw makeError('from_node_id and to_node_id required', 400)
   }
-  if (!Database) throw makeError('SQLite lib missing', 500)
 
   // Validate edge type
   if (type && !isValidEdgeType(type)) {
     throw makeEdgeTypeError(type)
   }
 
-  const db = new Database(dbPath)
-  // Fetch source and target node types
-  const sourceNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(from_node_id) as { type: string } | undefined
-  const targetNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(to_node_id) as { type: string } | undefined
+  const nodeRepo = new PlanNodeRepository()
+  const sourceNode = nodeRepo.getById(from_node_id)
+  const targetNode = nodeRepo.getById(to_node_id)
   if (!sourceNode || !targetNode) {
-    db.close()
     throw makeError('source or target node not found', 404)
   }
 
   // Validate compatibility
   if (!canCreateEdge(sourceNode.type as any, targetNode.type as any, type as any)) {
-    db.close()
     throw makeEdgeCompatibilityError(sourceNode.type, targetNode.type, type)
   }
 
-  const info = db
-    .prepare(
-      `INSERT INTO plan_edges (from_node_id, to_node_id, type, position, label, template)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .run(from_node_id, to_node_id, type, position, label ?? null, template ?? null)
-  db.close()
-  return { id: info.lastInsertRowid }
+  const edgeRepo = new PlanEdgeRepository()
+  const edgeType: PlanEdgeType = type as PlanEdgeType
+  const id = edgeRepo.insert({
+    from_node_id,
+    to_node_id,
+    type: edgeType,
+    position,
+    label: label ?? null,
+    template: template ?? null,
+  })
+  return { id }
 }
 
 export function patchGraphEdge(
@@ -89,17 +79,8 @@ export function patchGraphEdge(
   data: { type?: string; position?: number; label?: string; template?: string }
 ): { ok: boolean } {
   const { type, position, label, template } = data
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-
-  // First get the current edge to access from_node_id and to_node_id
-  const readDb = new Database(dbPath, { readonly: true })
-  const currentEdge = readDb.prepare('SELECT from_node_id, to_node_id, type FROM plan_edges WHERE id = ?').get(id) as
-    | { from_node_id: number; to_node_id: number; type: string }
-    | undefined
-  readDb.close()
-
+  const edgeRepo = new PlanEdgeRepository()
+  const currentEdge = edgeRepo.getById(id)
   if (!currentEdge) {
     throw makeError('edge not found', 404)
   }
@@ -109,11 +90,9 @@ export function patchGraphEdge(
     if (!isValidEdgeType(type)) {
       throw makeEdgeTypeError(type)
     }
-    // Fetch source and target node types
-    const db = new Database(dbPath)
-    const sourceNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(currentEdge.from_node_id) as { type: string } | undefined
-    const targetNode = db.prepare('SELECT type FROM plan_nodes WHERE id = ?').get(currentEdge.to_node_id) as { type: string } | undefined
-    db.close()
+    const nodeRepo = new PlanNodeRepository()
+    const sourceNode = nodeRepo.getById(currentEdge.from_node_id)
+    const targetNode = nodeRepo.getById(currentEdge.to_node_id)
     if (!sourceNode || !targetNode) {
       throw makeError('source or target node not found', 404)
     }
@@ -126,28 +105,22 @@ export function patchGraphEdge(
     throw makeError('at least one field required', 400)
   }
 
-  const db = new Database(dbPath)
-  const sets: string[] = []
-  const params: (string | number | null)[] = []
-  if (type !== undefined) { sets.push('type = ?'); params.push(type) }
-  if (position !== undefined) { sets.push('position = ?'); params.push(position) }
-  if (label !== undefined) { sets.push('label = ?'); params.push(label ?? null) }
-  if (template !== undefined) { sets.push('template = ?'); params.push(template ?? null) }
-  if (sets.length > 0) {
-    db.prepare(`UPDATE plan_edges SET ${sets.join(', ')} WHERE id = ?`).run(...params, id)
-  }
-  db.close()
+  const updateFields: any = {}
+  if (type !== undefined) updateFields.type = type as PlanEdgeType
+  if (position !== undefined) updateFields.position = position
+  if (label !== undefined) updateFields.label = label ?? null
+  if (template !== undefined) updateFields.template = template ?? null
+
+  edgeRepo.update(id, updateFields)
   return { ok: true }
 }
 
 export function deleteGraphEdge(id: number): { ok: boolean } {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
-  const edge = db.prepare('SELECT id FROM plan_edges WHERE id = ?').get(id)
-  if (!edge) { db.close(); throw makeError('edge not found', 404) }
-  db.prepare('DELETE FROM plan_edges WHERE id = ?').run(id)
-  db.close()
+  const edgeRepo = new PlanEdgeRepository()
+  const edge = edgeRepo.getById(id)
+  if (!edge) {
+    throw makeError('edge not found', 404)
+  }
+  edgeRepo.delete(id)
   return { ok: true }
 }

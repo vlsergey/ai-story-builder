@@ -39,7 +39,7 @@ export async function generatePlayground(
   const engineFileIds: string[] = []
 
   try {
-    const db = new (Database as typeof import('better-sqlite3'))(dbPath, { readonly: true })
+    const db = new (Database)(dbPath, { readonly: true })
     const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
     const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
 
@@ -71,7 +71,7 @@ export async function generatePlayground(
   const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
   if (!engineDef) throw makeError(`Playground is not supported for engine '${engine}'`, 400)
 
-  const adapter = getEngineAdapter(engine!)
+  const adapter = getEngineAdapter(engine)
   if (!adapter) throw makeError(`Playground is not supported for engine '${engine}'`, 400)
 
   let accumulated = ''
@@ -85,7 +85,7 @@ export async function generatePlayground(
 
   const { response_id } = await adapter.generateResponse(
     {
-      prompt: prompt!.trim(),
+      prompt: prompt.trim(),
       systemPrompt: systemPrompt?.trim() ?? '',
       model: requestedModel?.trim() ?? '',
       includeExistingLore: includeExistingLore ?? false,

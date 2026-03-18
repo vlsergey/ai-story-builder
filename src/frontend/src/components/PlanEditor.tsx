@@ -17,6 +17,7 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     ipcClient.planGraph.getNode(nodeId).then(data => {
       setNode(data)

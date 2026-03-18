@@ -61,7 +61,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const { resolvedTheme } = useTheme()
   const { wordWrap } = useEditorSettings()
   const { t } = useLocale()
-  const tp = (s: string) => t(`${adapter.i18nPrefix}.${s}` as Parameters<typeof t>[0])
+  const tp = (s: string) => t(`${adapter.i18nPrefix}.${s}`)
 
   // ── Node data ──────────────────────────────────────────────────────────────
   const [primaryValue, setPrimaryValue] = useState('')
@@ -534,15 +534,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     }, 1000)
   }
 
-  const aiControls = (
-    <AiGenerationSettings
-      engineId={currentEngine}
-      availableModels={availableModels}
-      settings={aiSettings}
-      onSettingsChange={setAiSettings}
-      disabled={generating}
-    />
-  )
 
   if (loading) {
     return (

@@ -126,7 +126,7 @@ export default function SettingsPanel() {
           if (!prev) return prev
           return {
             ...prev,
-            [engineId]: { ...(prev[engineId as keyof ConfigData] as object), available_models: data.models! },
+            [engineId]: { ...(prev[engineId as keyof ConfigData] as object), available_models: data.models },
           } as ConfigData
         })
       }

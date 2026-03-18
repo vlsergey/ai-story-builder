@@ -2,6 +2,7 @@ import type { NodeData, NodeContext } from '../node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
 import type { LoreSettings } from '../../../../shared/node-settings'
+import { generateNodeContent } from '../../ai-generation.js'
 
 /**
  * Processor for 'lore' nodes.
@@ -33,7 +34,9 @@ export class LoreProcessor implements NodeProcessor<LoreSettings> {
   }
 
   async regenerate(context: NodeContext, nodeData: NodeData, settings: LoreSettings): Promise<string | null> {
-    // No regeneration logic for plain lore nodes (AI generation is handled elsewhere)
-    return null
+    // Generate content using AI for lore nodes
+    const aiSettings = context.getAiSettings()
+    const content = await generateNodeContent(nodeData, aiSettings)
+    return content
   }
 }

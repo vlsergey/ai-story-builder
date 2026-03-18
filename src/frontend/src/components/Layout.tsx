@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useCallback } from 'react'
 import { DockviewReact, DockviewDefaultTab } from 'dockview'
 import { useTheme } from '../lib/theme/theme-provider'
 import { ipcClient } from '../ipcClient'
@@ -144,7 +144,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     ipcClient.settings.get('ui_theme')
       .then((data) => { if (data.value) setPreference(data.value) })
       .catch(() => {})
-  }, [])
+  }, [setPreference])
 
   // Listen for open-plan-node-editor events from the PlanGraph canvas
   useEffect(() => {
@@ -174,80 +174,31 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   // Lock every group that has no panels (watermark groups).
   // Called after any layout application — both fromJSON() and setupDefaultLayout() —
   // so old saved layouts without the locked flag are also covered.
-  const lockWatermarkGroups = () => {
+  const lockWatermarkGroups = useCallback(() => {
     if (!dockviewRef.current) return
     for (const group of dockviewRef.current.groups) {
       if (group.panels.length === 0) {
         // Prevent the group from being a drag/drop target
+        // eslint-disable-next-line react-hooks/immutability
         group.locked = 'no-drop-target'
         // Hide the tab bar entirely — it contains dv-void-container/dv-draggable
         // which lets the user drag the group even when there are no panels
         group.header.hidden = true
       }
     }
-  }
-
-  // helper used after ready or when project is loaded
-  const restoreLayout = async () => {
-    if (!dockviewRef.current) return
-    const savedLayout = initialLayout != null ? initialLayout : await loadLayoutFromDatabase()
-    if (savedLayout) {
-      try {
-        dockviewRef.current.fromJSON(normalizeLayout(savedLayout))
-      } catch (e) {
-        console.warn('Failed to restore layout', e)
-        setupDefaultLayout()
-      }
-    } else {
-      setupDefaultLayout()
-    }
-    lockWatermarkGroups()
-  }
-
-  // Load layout only once when component mounts (project is already open in server)
-  useEffect(() => {
-    restoreLayout()
   }, [])
 
   // Load layout from database
-  const loadLayoutFromDatabase = async () => {
+  const loadLayoutFromDatabase = useCallback(async () => {
     try {
       return await ipcClient.settings.getLayout()
     } catch (e) {
       console.error('Failed to load layout from database:', e)
       return null
     }
-  }
-
-  // Save layout to database
-  const saveLayoutToDatabase = async (layout: any) => {
-    // guard: don't save empty layouts (can happen during React cleanup or Strict Mode double-invoke)
-    const panelsCount = layout?.panels ? Object.keys(layout.panels).length : 0
-    if (panelsCount === 0) return
-
-    try {
-      await ipcClient.settings.saveLayout(layout)
-    } catch (e) {
-      console.error('Failed to save layout to database:', e)
-    }
-  }
-
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Note: beforeunload is unreliable—in dev mode React can unmount/remount components
-      // causing this to fire with invalid state. Layout is now only explicitly saved when:
-      // - user resets layout (handleResetLayouts)
-      // - layout change events fire (handleLayoutChange)
-      // - Never implicitly on page unload
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
   }, [])
 
-  const setupDefaultLayout = () => {
+  const setupDefaultLayout = useCallback(() => {
     if (!dockviewRef.current) return
 
     dockviewRef.current.clear()
@@ -291,7 +242,58 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       position: { referencePanel: 'cards-panel', direction: 'below' },
       minimumHeight: 100,
     })
+  }, [])
+
+  // helper used after ready or when project is loaded
+  const restoreLayout = useCallback(async () => {
+    if (!dockviewRef.current) return
+    const savedLayout = initialLayout != null ? initialLayout : await loadLayoutFromDatabase()
+    if (savedLayout) {
+      try {
+        dockviewRef.current.fromJSON(normalizeLayout(savedLayout))
+      } catch (e) {
+        console.warn('Failed to restore layout', e)
+        setupDefaultLayout()
+      }
+    } else {
+      setupDefaultLayout()
+    }
+    lockWatermarkGroups()
+  }, [initialLayout, loadLayoutFromDatabase, setupDefaultLayout, lockWatermarkGroups])
+
+  // Load layout only once when component mounts (project is already open in server)
+  useEffect(() => {
+    restoreLayout()
+  }, [restoreLayout])
+
+  // Save layout to database
+  const saveLayoutToDatabase = async (layout: any) => {
+    // guard: don't save empty layouts (can happen during React cleanup or Strict Mode double-invoke)
+    const panelsCount = layout?.panels ? Object.keys(layout.panels).length : 0
+    if (panelsCount === 0) return
+
+    try {
+      await ipcClient.settings.saveLayout(layout)
+    } catch (e) {
+      console.error('Failed to save layout to database:', e)
+    }
   }
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Note: beforeunload is unreliable—in dev mode React can unmount/remount components
+      // causing this to fire with invalid state. Layout is now only explicitly saved when:
+      // - user resets layout (handleResetLayouts)
+      // - layout change events fire (handleLayoutChange)
+      // - Never implicitly on page unload
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
+
 
   const onReady = (event: any) => {
     dockviewRef.current = event.api
@@ -378,8 +380,8 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       const group = props.api?.group
       if (group && group.panels.length === 1) {
         // Last panel — remove without destroying the group
-        ;(props.containerApi as any).component.removePanel(
-          (props.api as any).panel,
+        (props.containerApi).component.removePanel(
+          (props.api).panel,
           { removeEmptyGroup: false }
         )
       } else {

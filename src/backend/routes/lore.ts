@@ -152,22 +152,25 @@ export function patchLoreNode(
   const hasContent = content !== undefined
   const hasUserPrompt = user_prompt !== undefined
   const hasSystemPrompt = system_prompt !== undefined
-  if (!hasName && !hasContent && !accept_review && !hasUserPrompt && !hasSystemPrompt && prompt === undefined)
+  const hasStartReview = start_review === true
+  const hasAcceptReview = accept_review === true
+  if (!hasName && !hasContent && !hasUserPrompt && !hasSystemPrompt && prompt === undefined && !hasStartReview && !hasAcceptReview) {
     throw makeError('name or content required', 400)
+  }
 
   const db = new Database(dbPath)
   const sets: string[] = []
   const params: (string | number | null)[] = []
-  if (hasName) { sets.push('name = ?'); params.push(name!.trim()) }
-  const wordCount = hasContent ? countWords(content!) : null
-  const charCount = hasContent ? countChars(content!) : null
-  const byteCount = hasContent ? countBytes(content!) : null
+  if (hasName) { sets.push('name = ?'); params.push(name.trim()) }
+  const wordCount = hasContent ? countWords(content) : null
+  const charCount = hasContent ? countChars(content) : null
+  const byteCount = hasContent ? countBytes(content) : null
   let updatedSyncInfo: Record<string, Record<string, unknown>> | null = null
   if (hasContent) {
-    sets.push('content = ?'); params.push(content!)
-    sets.push('word_count = ?');  params.push(wordCount!)
-    sets.push('char_count = ?');  params.push(charCount!)
-    sets.push('byte_count = ?');  params.push(byteCount!)
+    sets.push('content = ?'); params.push(content)
+    sets.push('word_count = ?');  params.push(wordCount)
+    sets.push('char_count = ?');  params.push(charCount)
+    sets.push('byte_count = ?');  params.push(byteCount)
     const now = new Date().toISOString()
     const existingRow = db
       .prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = ?')

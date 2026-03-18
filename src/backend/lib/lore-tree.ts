@@ -103,29 +103,36 @@ export function collapseLoreTree(
     })
   }
 
+  // Helper function that uses closure over idToRow and childrenMap
+  function collectNode(
+    nodeId: number,
+    depth: number,
+    ancestorPath: string[],
+    allNodeIds: number[],
+    contentParts: string[]
+  ): void {
+    const row = idToRow.get(nodeId)!
+    allNodeIds.push(nodeId)
+    const currentPath = [...ancestorPath, row.name]
+
+    if (row.to_be_deleted === 0 && row.word_count > 0 && row.content) {
+      const heading = '#'.repeat(depth)
+      // From depth 2 onwards include ancestor breadcrumbs in the heading
+      const headingText = depth >= 2 ? currentPath.join(' / ') : row.name
+      contentParts.push(`${heading} ${headingText}\n\n${row.content}`)
+    }
+
+    for (const childId of childrenMap.get(nodeId) ?? []) {
+      collectNode(childId, depth + 1, currentPath, allNodeIds, contentParts)
+    }
+  }
+
   for (const l2Id of level2Ids) {
     const l2Row = idToRow.get(l2Id)!
     const allNodeIds: number[] = []
     const contentParts: string[] = []
 
-    function collectNode(nodeId: number, depth: number, ancestorPath: string[]): void {
-      const row = idToRow.get(nodeId)!
-      allNodeIds.push(nodeId)
-      const currentPath = [...ancestorPath, row.name]
-
-      if (row.to_be_deleted === 0 && row.word_count > 0 && row.content) {
-        const heading = '#'.repeat(depth)
-        // From depth 2 onwards include ancestor breadcrumbs in the heading
-        const headingText = depth >= 2 ? currentPath.join(' / ') : row.name
-        contentParts.push(`${heading} ${headingText}\n\n${row.content}`)
-      }
-
-      for (const childId of childrenMap.get(nodeId) ?? []) {
-        collectNode(childId, depth + 1, currentPath)
-      }
-    }
-
-    collectNode(l2Id, 1, [])
+    collectNode(l2Id, 1, [], allNodeIds, contentParts)
 
     const content = contentParts.join('\n\n---\n\n')
     groups.push({

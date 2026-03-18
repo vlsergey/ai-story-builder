@@ -35,14 +35,8 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   const [parts, setParts] = useState<SplitPart[]>([])
   const [inputText, setInputText] = useState<string | null>(null)
 
-  // Load settings and input
-  useEffect(() => {
-    loadSettings()
-    loadInput()
-  }, [node.id])
-
   // Load split settings from node_type_settings
-  async function loadSettings() {
+  const loadSettings = useCallback(async () => {
     try {
       const nodeData = await ipcClient.planGraph.getNode(node.id)
       if (nodeData.node_type_settings) {
@@ -52,10 +46,10 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     } catch (error) {
       console.error('Failed to load settings:', error)
     }
-  }
+  }, [node.id])
 
   // Load input text from incoming edge
-  async function loadInput() {
+  const loadInput = useCallback(async () => {
     try {
       const graphData = await ipcClient.planGraph.get()
       const inputEdge = graphData.edges.find(edge => edge.to_node_id === node.id && edge.type === 'text')
@@ -68,7 +62,14 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     } catch (error) {
       console.error('Failed to load input:', error)
     }
-  }
+  }, [node.id])
+
+  // Load settings and input
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSettings()
+    loadInput()
+  }, [node.id, loadSettings, loadInput])
 
   // Parse content as JSON array of parts
   useEffect(() => {
@@ -76,14 +77,18 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
       try {
         const parsed = JSON.parse(node.content)
         if (Array.isArray(parsed)) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setParts(parsed)
         } else {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setParts([])
         }
       } catch {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setParts([])
       }
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setParts([])
     }
   }, [node.content])
@@ -104,7 +109,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   }, [node.id, onNodeUpdated])
 
   // Regenerate split parts based on input text and settings
-  async function regenerateParts() {
+  const regenerateParts = useCallback(async () => {
     if (!inputText) return
     let splitParts: string[] = []
     if (settings.strategy === 'separator') {
@@ -114,7 +119,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
       try {
         const regex = new RegExp(settings.separator, 'g')
         splitParts = inputText.split(regex)
-      } catch (error) {
+      } catch (_error) {
         // fallback to literal split
         splitParts = inputText.split(settings.separator)
       }
@@ -140,7 +145,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     // Fetch updated node
     const updatedNode = await ipcClient.planGraph.getNode(node.id)
     onNodeUpdated?.(updatedNode)
-  }
+  }, [inputText, settings, node.id, onUpdate, onNodeUpdated])
 
   // Debounced save settings
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)

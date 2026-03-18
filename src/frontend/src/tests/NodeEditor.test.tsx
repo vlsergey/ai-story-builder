@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import NodeEditor, { type NodeEditorAdapter } from '../components/NodeEditor'
 import * as streamModule from '../lib/generate-node-stream'
-import { PLAN_GRAPH_REFRESH_EVENT } from '../lib/plan-graph-events'
 import * as planGraphEvents from '../lib/plan-graph-events'
 
 // ── Dependency mocks ────────────────────────────────────────────────────────
@@ -150,8 +149,8 @@ describe('NodeEditor — generate mode behavior', () => {
 
     // BEFORE first token: existing content should still be visible
     await waitFor(() => {
-      expect(screen.getByTestId('codemirror').getAttribute('value') ?? (screen.getByTestId('codemirror') as HTMLTextAreaElement).value)
-        .toBe('existing content')
+      const textarea = screen.getByTestId('codemirror') as HTMLTextAreaElement
+      expect(textarea.value).toBe('existing content')
     })
 
     // Send first streaming token
@@ -193,13 +192,14 @@ describe('NodeEditor — generate mode behavior', () => {
 
     // Send first partial (accumulated content "He")
     await act(async () => { triggerPartial({ content: 'He' }) })
-    expect((screen.getByTestId('codemirror') as HTMLTextAreaElement).value).toBe('He')
+    const textarea = screen.getByTestId('codemirror') as HTMLTextAreaElement
+    expect(textarea.value).toBe('He')
 
     // Send second partial (accumulated content "Hello")
     await act(async () => { triggerPartial({ content: 'Hello' }) })
-    expect((screen.getByTestId('codemirror') as HTMLTextAreaElement).value).toBe('Hello')
+    expect(textarea.value).toBe('Hello')
     // Must be replacement, not append: "HeHello" would be wrong
-    expect((screen.getByTestId('codemirror') as HTMLTextAreaElement).value).not.toBe('HeHello')
+    expect(textarea.value).not.toBe('HeHello')
 
     await act(async () => { resolveStream() })
   })
@@ -243,14 +243,14 @@ describe('NodeEditor — auto‑summary generation', () => {
     await screen.findByTestId('codemirror', {}, { timeout: 5000 })
 
     // Change content (simulate typing)
-    const codemirror = screen.getByTestId('codemirror')
+    const codemirror = screen.getByTestId('codemirror') as HTMLTextAreaElement
     fireEvent.change(codemirror, { target: { value: 'updated content' } })
 
     // Unmount component (simulate editor close) – this should trigger the cleanup effect
     unmount()
 
     // Expect invoke to have been called with 'ai:generate-summary'
-    expect(window.electronAPI!.invoke).toHaveBeenCalledWith(
+    expect(window.electronAPI.invoke).toHaveBeenCalledWith(
       'ai:generate-summary',
       { node_id: 42, content: 'updated content' }
     )
@@ -281,13 +281,13 @@ describe('NodeEditor — auto‑summary generation', () => {
     const { unmount } = render(<NodeEditor nodeId={42} adapter={planAdapter} />)
     await screen.findByTestId('codemirror', {}, { timeout: 5000 })
 
-    const codemirror = screen.getByTestId('codemirror')
+    const codemirror = screen.getByTestId('codemirror') as HTMLTextAreaElement
     fireEvent.change(codemirror, { target: { value: 'changed' } })
 
     unmount()
 
     // No call to 'ai:generate-summary'
-    expect(window.electronAPI!.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+    expect(window.electronAPI.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
     // dispatchPlanGraphRefresh should not be called either
     expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).not.toHaveBeenCalled()
   })
@@ -345,7 +345,7 @@ describe('NodeEditor — auto‑summary generation', () => {
     // At this point, content has changed due to streaming.
     // With the bug, the summary generation would have been triggered.
     // With the fix, it should NOT be triggered.
-    expect(window.electronAPI!.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+    expect(window.electronAPI.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
 
     // Send another token
     await act(async () => {
@@ -353,7 +353,7 @@ describe('NodeEditor — auto‑summary generation', () => {
     })
 
     // Still no summary call
-    expect(window.electronAPI!.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+    expect(window.electronAPI.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
 
     // Finish streaming
     await act(async () => {
@@ -364,7 +364,7 @@ describe('NodeEditor — auto‑summary generation', () => {
     unmount()
 
     // Now summary generation should be triggered because content changed (final content)
-    expect(window.electronAPI!.invoke).toHaveBeenCalledWith(
+    expect(window.electronAPI.invoke).toHaveBeenCalledWith(
       'ai:generate-summary',
       { node_id: 42, content: 'more partial content' }
     )
