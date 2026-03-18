@@ -10,6 +10,7 @@ import {
 } from '../db/state.js'
 import { setVerboseLogging } from '../lib/ai-logging.js'
 import { sanitizeProjectName } from '../lib/project-name.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -38,23 +39,11 @@ try {
 }
 
 function getProjectInitialData(dbPath: string): ProjectInitialData {
-  if (!Database) return { layout: null, projectTitle: null }
+  // SettingsRepository uses the current project, which should already be set via setCurrentDbPath
   try {
-    const db = new Database(dbPath, { readonly: true })
-    const layoutRow = db
-      .prepare("SELECT value FROM settings WHERE key = 'layout'")
-      .get() as { value: string } | undefined
-    const titleRow = db
-      .prepare("SELECT value FROM settings WHERE key = 'project_title'")
-      .get() as { value: string } | undefined
-    db.close()
-    let layout: unknown = null
-    if (layoutRow) {
-      try {
-        layout = JSON.parse(layoutRow.value)
-      } catch (_) { /* ignore */ }
-    }
-    return { layout, projectTitle: titleRow ? titleRow.value : null }
+    const layout = SettingsRepository.getLayout()
+    const projectTitle = SettingsRepository.getProjectTitle()
+    return { layout, projectTitle }
   } catch (e) {
     console.warn('[getProjectInitialData] failed to read initial data from', dbPath, (e as Error).message)
     return { layout: null, projectTitle: null }
@@ -63,14 +52,9 @@ function getProjectInitialData(dbPath: string): ProjectInitialData {
 
 /** Reads runtime flags (e.g. verbose_ai_logging) from the project DB and applies them. */
 export function applyRuntimeSettings(dbPath: string): void {
-  if (!Database) return
   try {
-    const db = new Database(dbPath, { readonly: true })
-    const row = db
-      .prepare("SELECT value FROM settings WHERE key = 'verbose_ai_logging'")
-      .get() as { value: string } | undefined
-    db.close()
-    setVerboseLogging(row?.value === 'true')
+    const verbose = SettingsRepository.getVerboseAiLogging()
+    setVerboseLogging(verbose)
   } catch {
     // non-fatal — leave current flag value unchanged
   }
@@ -105,10 +89,7 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
     // Auto-create root plan node if none exist
     const planCount = (db.prepare('SELECT COUNT(*) AS c FROM plan_nodes').get() as { c: number }).c
     if (planCount === 0) {
-      const titleRow = db
-        .prepare("SELECT value FROM settings WHERE key = 'project_title'")
-        .get() as { value: string } | undefined
-      const rootTitle = titleRow?.value ?? 'Plan'
+      const rootTitle = SettingsRepository.getProjectTitleWithDb(db) ?? 'Plan'
       db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(rootTitle)
     }
     db.close()
@@ -212,10 +193,9 @@ export function createProject(data: { name?: string; text_language?: string }): 
     const rootId = root.lastInsertRowid
     for (const f of defaultNodes.children) insertNode.run(rootId, f)
 
-    const setSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-    setSetting.run('project_title', name)
-    setSetting.run('locale', 'en')
-    setSetting.run('text_language', text_language)
+    SettingsRepository.setProjectTitleWithDb(db, name)
+    SettingsRepository.setWithDb(db, 'locale', 'en')
+    SettingsRepository.setTextLanguageWithDb(db, text_language)
 
     db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(name)
 

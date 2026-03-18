@@ -4,7 +4,7 @@ import { getLoreTree, getLoreNode, createLoreNode, patchLoreNode, deleteLoreNode
 import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode, startPlanNodeReview, acceptPlanNodeReview } from '../plan/plan-routes.js'
 import { getPlanGraph, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../plan/plan-routes.js'
 import { getProjectStatus, closeProject, openProject, getRecentProjects, deleteRecentProject, listProjectFiles, openProjectFolder, createProject, applyRuntimeSettings } from '../routes/projects.js'
-import { getLayout, saveLayout, setVerboseAiLogging, getSetting, setSetting } from '../routes/settings.js'
+import { getLayout, saveLayout, setVerboseAiLogging, getSetting, setSetting } from '../settings/settings-routes.js'
 import { getAiConfig, saveAiConfig, setCurrentEngine, getEngineModels, refreshEngineModels, testEngineConnection } from '../routes/ai-config.js'
 import { getAiBilling } from '../routes/ai-billing.js'
 import { syncLore } from '../routes/ai-sync.js'

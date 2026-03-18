@@ -5,6 +5,7 @@ import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import { createYandexClient, makeLoggingFetch } from '../lib/yandex-client.js'
 import { createGrokClient } from '../lib/grok-client.js'
 import { collapseLoreTree } from '../lib/lore-tree.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -260,19 +261,14 @@ export async function syncLore(): Promise<{
 
   // Step 1 — load settings and nodes
   const db = getDb(dbPath, true)
-  const engineRow = db
-    .prepare("SELECT value FROM settings WHERE key = 'current_backend'")
-    .get() as { value: string } | undefined
-  const configRow = db
-    .prepare("SELECT value FROM settings WHERE key = 'ai_config'")
-    .get() as { value: string } | undefined
+  const currentEngine = SettingsRepository.getCurrentBackendWithDb(db)
+  const config = SettingsRepository.getAiConfigWithDb(db)
 
   const rows = db
     .prepare('SELECT id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info FROM lore_nodes')
     .all() as LoreNodeRow[]
   db.close()
 
-  const currentEngine = engineRow?.value
   if (!currentEngine) {
     throw makeError('no AI engine configured', 400)
   }
@@ -280,11 +276,6 @@ export async function syncLore(): Promise<{
   const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
   if (!engineDef) {
     throw makeError(`Lore sync is not supported for engine '${currentEngine}'`, 400)
-  }
-
-  let config: AiConfigStore = {}
-  if (configRow) {
-    try { config = JSON.parse(configRow.value) as AiConfigStore } catch { /* ignore */ }
   }
 
   // ── Grok sync (collapsed tree, file attachment, no vector store) ──────────
@@ -564,8 +555,7 @@ export async function syncLore(): Promise<{
       updatedConfig.yandex = rest
     }
 
-    db2.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_config', ?)")
-      .run(JSON.stringify(updatedConfig))
+    SettingsRepository.saveAiConfigWithDb(db2, updatedConfig)
 
     db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
   })()

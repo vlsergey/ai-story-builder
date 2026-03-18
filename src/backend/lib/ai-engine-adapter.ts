@@ -9,8 +9,8 @@ export interface JsonSchemaSpec {
 }
 
 export interface AiConfigStore {
-  yandex?: { api_key?: string; folder_id?: string; search_index_id?: string }
-  grok?: { api_key?: string; management_key?: string; team_id?: string }
+  yandex?: { api_key?: string; folder_id?: string; search_index_id?: string; available_models?: string[]; last_model?: string }
+  grok?: { api_key?: string; management_key?: string; team_id?: string; available_models?: string[]; last_model?: string }
   [key: string]: unknown
 }
 
