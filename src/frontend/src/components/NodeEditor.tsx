@@ -405,6 +405,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     if (!fromReview) {
       setReviewBaseContent(content)
       if (contentDirty) await flushContentSave(content)
+      // Start review before generation
+      await ipcClient.planGraph.startReview(nodeId, { prompt: improveInstruction })
     }
 
     setContent('')
@@ -443,12 +445,9 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
       const patchBody: Record<string, unknown> = {
         content: finalContent,
-        prompt: improveInstruction,
+        last_improve_instruction: improveInstruction,
       }
       if (finalPrimary.trim()) patchBody[adapter.primaryField] = finalPrimary.trim()
-      if (!fromReview) {
-        patchBody['start_review'] = true
-      }
 
       const data = await adapter.patchNode(nodeId, patchBody)
       if (data.ok) {
@@ -487,7 +486,10 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   // ── Mode D→B: Accept changes ───────────────────────────────────────────────
   async function acceptChanges(contentToAccept: string) {
-    const data = await adapter.patchNode(nodeId, { accept_review: true, content: contentToAccept })
+    // Accept review via IPC (plan nodes only)
+    await ipcClient.planGraph.acceptReview(nodeId)
+    // Update content via adapter
+    const data = await adapter.patchNode(nodeId, { content: contentToAccept })
     if (data.ok) {
       adapter.onSaved({
         nodeId,

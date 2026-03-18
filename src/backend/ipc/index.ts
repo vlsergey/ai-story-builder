@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import type { WebContents } from 'electron'
 import { getLoreTree, getLoreNode, createLoreNode, patchLoreNode, deleteLoreNode, importLoreNode, moveLoreNode, duplicateLoreNode, sortLoreChildren, reorderLoreChildren, restoreLoreNode } from '../routes/lore.js'
-import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode } from '../plan/plan-routes.js'
+import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode, startPlanNodeReview, acceptPlanNodeReview } from '../plan/plan-routes.js'
 import { getPlanGraph, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../plan/plan-routes.js'
 import { getProjectStatus, closeProject, openProject, getRecentProjects, deleteRecentProject, listProjectFiles, openProjectFolder, createProject, applyRuntimeSettings } from '../routes/projects.js'
 import { getLayout, saveLayout, setVerboseAiLogging, getSetting, setSetting } from '../routes/settings.js'
@@ -102,6 +102,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('plan:graph:node:create', wrap((data: any) => createPlanNode(data)))
   ipcMain.handle('plan:graph:node:get', wrap((id: number) => getPlanNode(id)))
   ipcMain.handle('plan:graph:node:patch', wrap((id: number, data: any) => patchPlanNode(id, data)))
+  ipcMain.handle('plan:graph:node:start-review', wrap((id: number, options?: any) => startPlanNodeReview(id, options)))
+  ipcMain.handle('plan:graph:node:accept-review', wrap((id: number) => acceptPlanNodeReview(id)))
   ipcMain.handle('plan:graph:node:delete', wrap((id: number) => deletePlanNode(id)))
   ipcMain.handle('plan:graph:edge:create', wrap((data: any) => createGraphEdge(data)))
   ipcMain.handle('plan:graph:edge:patch', wrap((id: number, data: any) => patchGraphEdge(id, data)))

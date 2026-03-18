@@ -5,7 +5,7 @@ import path from 'path'
 import fs from 'fs'
 import { setCurrentDbPath } from '../../db/state.js'
 import { migrateDatabase } from '../../db/migrations.js'
-import { patchPlanNode, getPlanNode, deletePlanNode } from '../plan-routes.js'
+import { patchPlanNode, getPlanNode, deletePlanNode, startPlanNodeReview, acceptPlanNodeReview } from '../plan-routes.js'
 
 // ── In-memory DB setup ────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ describe('patchPlanNode', () => {
 
   it('start_review sets changes_status and captures review_base_content', () => {
     patchPlanNode(2, { content: 'Original content' })
-    patchPlanNode(2, { content: 'Improved content', start_review: true, prompt: 'Make it better' })
+    startPlanNodeReview(2, { prompt: 'Make it better', content: 'Improved content' })
 
     const node = getPlanNode(2)
     expect(node.changes_status).toBe('review')
@@ -61,8 +61,8 @@ describe('patchPlanNode', () => {
 
   it('start_review on repeat does not overwrite review_base_content', () => {
     patchPlanNode(2, { content: 'Base' })
-    patchPlanNode(2, { content: 'First improve', start_review: true, prompt: 'first' })
-    patchPlanNode(2, { content: 'Second improve', start_review: true, prompt: 'second' })
+    startPlanNodeReview(2, { prompt: 'first', content: 'First improve' })
+    startPlanNodeReview(2, { prompt: 'second', content: 'Second improve' })
 
     const node = getPlanNode(2)
     expect(node.review_base_content).toBe('Base')
@@ -71,8 +71,8 @@ describe('patchPlanNode', () => {
 
   it('accept_review clears review state', () => {
     patchPlanNode(2, { content: 'Base' })
-    patchPlanNode(2, { content: 'Improved', start_review: true, prompt: 'fix it' })
-    patchPlanNode(2, { content: 'Improved', accept_review: true })
+    startPlanNodeReview(2, { prompt: 'fix it', content: 'Improved' })
+    acceptPlanNodeReview(2)
 
     const node = getPlanNode(2)
     expect(node.changes_status).toBeNull()

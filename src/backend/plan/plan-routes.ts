@@ -11,6 +11,8 @@ export {
   deletePlanNode,
   movePlanNode,
   reorderPlanChildren,
+  startPlanNodeReview,
+  acceptPlanNodeReview,
 } from './nodes/plan-node-routes.js'
 
 // Re‑export edge functions
