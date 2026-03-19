@@ -21,7 +21,7 @@ function writeAiConfig(config: AiConfigStore): void {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-export function getAiConfig(): { current_engine: string | null; grok: object; yandex: object } {
+export function getAiConfig(): { current_engine: string | null; grok: GrokEngineConfig; yandex: YandexEngineConfig } {
   const config = readAiConfig();
   return {
     current_engine: SettingsRepository.getCurrentBackend(),

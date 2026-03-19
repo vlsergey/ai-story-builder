@@ -7,6 +7,9 @@ import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
+import { setCurrentDbPath } from '../db/state.js'
 
 let testDbPath = ''
 
@@ -14,6 +17,7 @@ vi.mock('../db/state.js', () => ({
   getCurrentDbPath: () => testDbPath,
   getDataDir: () => '/tmp/test-data',
   restoreLastOpenedProject: () => null,
+  setCurrentDbPath: (p: string | null) => { testDbPath = p ?? '' },
 }))
 
 // ─── AI engine adapter mock ──────────────────────────────────────────────────
@@ -60,11 +64,15 @@ function setupDb(opts?: {
   const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
+  db.close()
+
+  // Set current DB path so repositories can find it
+  setCurrentDbPath(file)
 
   const engine = opts?.currentEngine
     ?? (opts?.grokApiKey ? 'grok' : opts?.yandexApiKey ? 'yandex' : undefined)
   if (engine) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', ?)").run(engine)
+    SettingsRepository.setCurrentBackend(engine)
   }
 
   const aiConfig: Record<string, unknown> = {}
@@ -84,35 +92,45 @@ function setupDb(opts?: {
     (aiConfig[engine] as Record<string, unknown>).summary_settings = opts.summarySettings
   }
   if (Object.keys(aiConfig).length > 0) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('ai_config', ?)").run(
-      JSON.stringify(aiConfig)
-    )
+    SettingsRepository.saveAiConfig(aiConfig)
   }
 
   const lang = opts?.textLanguage !== undefined ? opts.textLanguage : 'ru-RU'
   if (lang !== null) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('text_language', ?)").run(lang)
+    SettingsRepository.setTextLanguage(lang)
   }
 
   const autoGenerate = opts?.autoGenerateSummary ?? true
-  db.prepare("INSERT INTO settings (key, value) VALUES ('auto_generate_summary', ?)").run(
-    String(autoGenerate)
-  )
+  SettingsRepository.setAutoGenerateSummary(autoGenerate)
 
   if (opts?.planNode) {
-    db.prepare(
-      'INSERT INTO plan_nodes (id, title, type, content, summary, auto_summary) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(
-      opts.planNode.id,
-      'Test Node',
-      'text',
-      opts.planNode.content ?? null,
-      opts.planNode.summary ?? null,
-      opts.planNode.auto_summary ?? 0
-    )
+    const repo = new PlanNodeRepository()
+    repo.insert({
+      title: 'Test Node',
+      type: 'text',
+      content: opts.planNode.content ?? null,
+      summary: opts.planNode.summary ?? null,
+      auto_summary: opts.planNode.auto_summary ?? 0,
+      parent_id: null,
+      position: 0,
+      x: 0,
+      y: 0,
+      user_prompt: null,
+      system_prompt: null,
+      ai_sync_info: null,
+      node_type_settings: null,
+      ai_settings: null,
+      word_count: 0,
+      char_count: 0,
+      byte_count: 0,
+      status: 'EMPTY',
+      changes_status: null,
+      review_base_content: null,
+      last_improve_instruction: null,
+    })
+    // inserted id will be 1 (first row)
   }
 
-  db.close()
   return file
 }
 
@@ -188,17 +206,11 @@ describe('generateSummary', () => {
     expect(result.cost_usd_ticks).toBe(100)
 
     // Verify that the node was updated
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    const row = db.prepare('SELECT summary, auto_summary FROM plan_nodes WHERE id = 1').get() as {
-      summary: string
-      auto_summary: number
-    } | undefined
-    db.close()
-    expect(row).toBeDefined()
-    expect(row?.auto_summary).toBe(1)
-    expect(row?.summary).toBe('Summary text')
+    const nodeRepo = new PlanNodeRepository()
+    const node = nodeRepo.getById(1)
+    expect(node).toBeDefined()
+    expect(node?.auto_summary).toBe(1)
+    expect(node?.summary).toBe('Summary text')
   })
 
   it('uses content from params if provided', async () => {
@@ -252,17 +264,11 @@ describe('generateSummary', () => {
     expect(result.summary).toBe('A plain text summary')
     expect(result.response_id).toBe('resp-xyz')
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    const row = db.prepare('SELECT summary, auto_summary FROM plan_nodes WHERE id = 1').get() as {
-      summary: string
-      auto_summary: number
-    } | undefined
-    db.close()
-    expect(row).toBeDefined()
-    expect(row?.auto_summary).toBe(1)
-    expect(row?.summary).toBe('A plain text summary')
-    expect(() => JSON.parse(row!.summary)).toThrow()
+    const nodeRepo = new PlanNodeRepository()
+    const node = nodeRepo.getById(1)
+    expect(node).toBeDefined()
+    expect(node?.auto_summary).toBe(1)
+    expect(node?.summary).toBe('A plain text summary')
+    expect(() => JSON.parse(node!.summary!)).toThrow()
   })
 })

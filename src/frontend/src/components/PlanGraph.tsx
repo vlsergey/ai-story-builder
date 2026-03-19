@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -119,7 +119,7 @@ export default function PlanGraph() {
         return newEdges
       })
     }
-  }, [autoLayout])
+  }, [autoLayout, setEdges, setNodes])
 
   const loadGraph = useCallback(async () => {
     try {

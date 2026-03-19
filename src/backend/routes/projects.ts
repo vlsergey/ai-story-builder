@@ -11,6 +11,8 @@ import {
 import { setVerboseLogging } from '../lib/ai-logging.js'
 import { sanitizeProjectName } from '../lib/project-name.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -27,15 +29,6 @@ function openProjectDatabase(dbPath: string): import('better-sqlite3').Database 
     openProjectDatabase: (p: string) => import('better-sqlite3').Database
   }
   return mod.openProjectDatabase(dbPath)
-}
-
-// better-sqlite3 is optional
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
 }
 
 function getProjectInitialData(dbPath: string): ProjectInitialData {
@@ -86,18 +79,22 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
 
   try {
     const db = openProjectDatabase(dbPath) // runs any pending migrations
+    db.close() // close the migration connection
+
+    // Now set the current project so repositories can work
+    setCurrentDbPath(dbPath)
+
     // Auto-create root plan node if none exist
-    const planCount = (db.prepare('SELECT COUNT(*) AS c FROM plan_nodes').get() as { c: number }).c
+    const planRepo = new PlanNodeRepository()
+    const planCount = planRepo.count()
     if (planCount === 0) {
       const rootTitle = SettingsRepository.getProjectTitle() ?? 'Plan'
-      db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(rootTitle)
+      planRepo.insert({ title: rootTitle, parent_id: null, position: 0 })
     }
-    db.close()
   } catch (e) {
     throw makeError('failed to open database: ' + String(e), 500)
   }
 
-  setCurrentDbPath(dbPath)
   applyRuntimeSettings(dbPath)
   updateRecent(dbPath)
   return { path: dbPath, ...getProjectInitialData(dbPath) }
@@ -168,15 +165,16 @@ export function createProject(data: { name?: string; text_language?: string }): 
 
   if (fs.existsSync(dbPath)) {
     try {
-      const db = openProjectDatabase(dbPath) // runs migrations on any existing DB
-      const hasRoot = db.prepare('SELECT id FROM lore_nodes WHERE parent_id IS NULL LIMIT 1').get()
-      if (!hasRoot) {
-        const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
-        const root = insertNode.run(null, defaultNodes.root)
-        const rootId = root.lastInsertRowid
-        for (const f of defaultNodes.children) insertNode.run(rootId, f)
+      // Ensure the project is set as current for repositories
+      setCurrentDbPath(dbPath)
+      const loreRepo = new LoreNodeRepository()
+      const rootNodes = loreRepo.getAll().filter(n => n.parent_id === null)
+      if (rootNodes.length === 0) {
+        const rootId = loreRepo.insert({ parent_id: null, name: defaultNodes.root })
+        for (const childName of defaultNodes.children) {
+          loreRepo.insert({ parent_id: rootId, name: childName })
+        }
       }
-      db.close()
     } catch (e) {
       throw makeError(String(e), 500)
     }
@@ -188,16 +186,20 @@ export function createProject(data: { name?: string; text_language?: string }): 
   try {
     const db: import('better-sqlite3').Database = openProjectDatabase(dbPath)
 
-    const insertNode = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)')
-    const root = insertNode.run(null, defaultNodes.root)
-    const rootId = root.lastInsertRowid
-    for (const f of defaultNodes.children) insertNode.run(rootId, f)
+    // Create default lore nodes using repository
+    setCurrentDbPath(dbPath) // temporary for repositories
+    const loreRepo = new LoreNodeRepository()
+    const root = loreRepo.insert({ parent_id: null, name: defaultNodes.root })
+    for (const childName of defaultNodes.children) {
+      loreRepo.insert({ parent_id: root, name: childName })
+    }
 
     SettingsRepository.setProjectTitle(name)
     SettingsRepository.set('locale', 'en')
     SettingsRepository.setTextLanguage(text_language)
 
-    db.prepare('INSERT INTO plan_nodes (parent_id, title, position) VALUES (NULL, ?, 0)').run(name)
+    const planRepo = new PlanNodeRepository()
+    planRepo.insert({ parent_id: null, title: name, position: 0 })
 
     db.close()
 

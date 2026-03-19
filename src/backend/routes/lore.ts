@@ -1,6 +1,7 @@
 import fs from 'fs'
 import type { LoreNodeRow, LoreTreeNode } from '../types/index.js'
 import { getCurrentDbPath } from '../db/state.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -36,18 +37,8 @@ function countBytes(text: string): number {
 // ── Tree ──────────────────────────────────────────────────────────────────────
 
 export function getLoreTree(): LoreTreeNode[] {
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) return []
-  const db = new Database(dbPath, { readonly: true })
-  const rows = db.prepare(`
-    SELECT n.id, n.parent_id, n.name, n.content, n.position, n.status, n.to_be_deleted, n.created_at,
-      n.word_count, n.char_count, n.byte_count, n.ai_sync_info, n.ai_settings, n.changes_status, n.review_base_content
-    FROM lore_nodes n
-    ORDER BY n.parent_id NULLS FIRST, n.position, n.name
-  `).all() as LoreNodeRow[]
-  db.close()
-
+  const repo = new LoreNodeRepository()
+  const rows = repo.getAll()
   const map = new Map<number, LoreTreeNode>()
   rows.forEach(r => map.set(r.id, {
     ...r,
@@ -69,61 +60,49 @@ export function getLoreTree(): LoreTreeNode[] {
 
 export function importLoreNode(data: { name: string; content: string; parentId: number }): { id: number | bigint } {
   const { name, content, parentId } = data
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('db not open', 400)
   const wordCount = countWords(content)
   const charCount = countChars(content)
   const byteCount = countBytes(content)
-  const db = new Database(dbPath)
-  const info = db
-    .prepare('INSERT INTO lore_nodes (parent_id, name, content, word_count, char_count, byte_count) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(parentId, name, content, wordCount, charCount, byteCount)
-  const nodeId = info.lastInsertRowid
-  db.close()
-  return { id: nodeId }
+  const repo = new LoreNodeRepository()
+  const id = repo.insert({
+    parent_id: parentId,
+    name,
+    content,
+    word_count: wordCount,
+    char_count: charCount,
+    byte_count: byteCount,
+  })
+  return { id }
 }
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
 export function createLoreNode(data: { parent_id?: number | null; name: string }): { id: number | bigint } {
   const { parent_id, name } = data
-  const dbPath = getCurrentDbPath()
-  if (!dbPath || !name?.trim()) throw makeError('name required and db must be open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
+  if (!name?.trim()) throw makeError('name required', 400)
+  const repo = new LoreNodeRepository()
   const pid = parent_id ?? null
-  const { m } = db
-    .prepare('SELECT COALESCE(MAX(position), -1) AS m FROM lore_nodes WHERE parent_id IS ?')
-    .get(pid) as { m: number }
-  const info = db
-    .prepare('INSERT INTO lore_nodes (parent_id, name, position) VALUES (?, ?, ?)')
-    .run(pid, name.trim(), m + 1)
-  db.close()
-  return { id: info.lastInsertRowid }
+  const maxPos = repo.getMaxPosition(pid)
+  const id = repo.insert({
+    parent_id: pid,
+    name: name.trim(),
+    position: maxPos + 1,
+  })
+  return { id }
 }
 
 export function reorderLoreChildren(child_ids: number[]): { ok: boolean } {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
   if (!Array.isArray(child_ids)) throw makeError('child_ids must be an array', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
-  const update = db.prepare('UPDATE lore_nodes SET position = ? WHERE id = ?')
-  db.transaction(() => { child_ids.forEach((id, i) => update.run(i, id)) })()
-  db.close()
+  const repo = new LoreNodeRepository()
+  repo.reorderChildren(child_ids)
   return { ok: true }
 }
 
 export function getLoreNode(id: number): LoreNodeRow {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath, { readonly: true })
-  const node = db.prepare('SELECT * FROM lore_nodes WHERE id = ?').get(id)
-  db.close()
+  const repo = new LoreNodeRepository()
+  const node = repo.getById(id)
   if (!node) throw makeError('node not found', 404)
-  return node as LoreNodeRow
+  return node
 }
 
 export function patchLoreNode(
@@ -146,9 +125,6 @@ export function patchLoreNode(
   ai_sync_info?: Record<string, Record<string, unknown>> | null
 } {
   const { name, content, prompt, start_review, accept_review, user_prompt, system_prompt, ai_settings } = data
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
   const hasName = typeof name === 'string' && name.trim().length > 0
   const hasContent = content !== undefined
   const hasUserPrompt = user_prompt !== undefined
@@ -160,211 +136,132 @@ export function patchLoreNode(
     throw makeError('name or content required', 400)
   }
 
-  const db = new Database(dbPath)
-  const sets: string[] = []
-  const params: (string | number | null)[] = []
-  if (hasName) { sets.push('name = ?'); params.push(name.trim()) }
-  const wordCount = hasContent ? countWords(content) : null
-  const charCount = hasContent ? countChars(content) : null
-  const byteCount = hasContent ? countBytes(content) : null
+  const repo = new LoreNodeRepository()
+  const node = repo.getById(id)
+  if (!node) throw makeError('node not found', 404)
+
+  const updates: Partial<LoreNodeRow> = {}
+  if (hasName) updates.name = name.trim()
+  let wordCount: number | null = null
+  let charCount: number | null = null
+  let byteCount: number | null = null
   let updatedSyncInfo: Record<string, Record<string, unknown>> | null = null
   if (hasContent) {
-    sets.push('content = ?'); params.push(content)
-    sets.push('word_count = ?');  params.push(wordCount)
-    sets.push('char_count = ?');  params.push(charCount)
-    sets.push('byte_count = ?');  params.push(byteCount)
-    const now = new Date().toISOString()
-    const existingRow = db
-      .prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = ?')
-      .get(id) as { ai_sync_info: string | null } | undefined
-    if (existingRow?.ai_sync_info) {
+    wordCount = countWords(content)
+    charCount = countChars(content)
+    byteCount = countBytes(content)
+    updates.content = content
+    updates.word_count = wordCount
+    updates.char_count = charCount
+    updates.byte_count = byteCount
+    if (node.ai_sync_info) {
       try {
-        const syncInfo = JSON.parse(existingRow.ai_sync_info) as Record<string, Record<string, unknown>>
+        const syncInfo = JSON.parse(node.ai_sync_info) as Record<string, Record<string, unknown>>
+        const now = new Date().toISOString()
         for (const engine of Object.keys(syncInfo)) {
           syncInfo[engine] = { ...syncInfo[engine], content_updated_at: now }
         }
-        sets.push('ai_sync_info = ?')
-        params.push(JSON.stringify(syncInfo))
+        updates.ai_sync_info = JSON.stringify(syncInfo)
         updatedSyncInfo = syncInfo
       } catch { /* ignore malformed JSON */ }
     }
   }
 
   if (hasUserPrompt) {
-    sets.push('user_prompt = ?'); params.push(user_prompt ?? null)
+    updates.user_prompt = user_prompt ?? null
   }
 
   if (hasSystemPrompt) {
-    sets.push('system_prompt = ?'); params.push(system_prompt ?? null)
+    updates.system_prompt = system_prompt ?? null
   }
 
   if (hasAiSettings) {
-    sets.push('ai_settings = ?'); params.push(ai_settings ?? null)
+    updates.ai_settings = ai_settings ?? null
   }
 
   if (prompt !== undefined && !start_review) {
-    sets.push('last_improve_instruction = ?'); params.push(prompt ?? null)
+    updates.last_improve_instruction = prompt ?? null
   }
 
   if (start_review && hasContent) {
-    const cur = db
-      .prepare('SELECT content, changes_status FROM lore_nodes WHERE id = ?')
-      .get(id) as { content: string | null; changes_status: string | null } | undefined
-    sets.push('changes_status = ?'); params.push('review')
-    sets.push('last_improve_instruction = ?'); params.push(prompt ?? null)
-    if (!cur || cur.changes_status !== 'review') {
-      sets.push('review_base_content = ?'); params.push(cur?.content ?? '')
+    updates.changes_status = 'review'
+    updates.last_improve_instruction = prompt ?? null
+    if (node.changes_status !== 'review') {
+      updates.review_base_content = node.content ?? ''
     }
   }
 
   if (accept_review) {
-    sets.push('changes_status = ?'); params.push(null)
-    sets.push('review_base_content = ?'); params.push(null)
-    sets.push('last_improve_instruction = ?'); params.push(null)
+    updates.changes_status = null
+    updates.review_base_content = null
+    updates.last_improve_instruction = null
   }
 
-  if (sets.length > 0) {
-    db.prepare(`UPDATE lore_nodes SET ${sets.join(', ')} WHERE id = ?`).run(...params, id)
+  if (Object.keys(updates).length > 0) {
+    repo.update(id, updates)
   }
-  db.close()
+
   return hasContent
     ? { ok: true, word_count: wordCount, char_count: charCount, byte_count: byteCount, ai_sync_info: updatedSyncInfo }
     : { ok: true }
 }
 
 export function deleteLoreNode(id: number): { ok: boolean } {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
-  const node = db
-    .prepare('SELECT parent_id FROM lore_nodes WHERE id = ?')
-    .get(id) as { parent_id: number | null } | undefined
-  if (!node) { db.close(); throw makeError('node not found', 404) }
-  if (node.parent_id === null) {
-    db.close()
-    throw makeError('root node cannot be deleted', 403)
-  }
-  db.prepare(`
-    WITH RECURSIVE sub AS (
-      SELECT id FROM lore_nodes WHERE id = ?
-      UNION ALL
-      SELECT n.id FROM lore_nodes n INNER JOIN sub s ON n.parent_id = s.id
-    )
-    UPDATE lore_nodes SET to_be_deleted = 1 WHERE id IN (SELECT id FROM sub)
-  `).run(id)
-  db.close()
+  const repo = new LoreNodeRepository()
+  const node = repo.getById(id)
+  if (!node) throw makeError('node not found', 404)
+  if (node.parent_id === null) throw makeError('root node cannot be deleted', 403)
+  repo.markForDeletionRecursive(id)
   return { ok: true }
 }
 
 export function restoreLoreNode(id: number): { ok: boolean } {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
-  db.prepare(`
-    WITH RECURSIVE sub AS (
-      SELECT id FROM lore_nodes WHERE id = ?
-      UNION ALL
-      SELECT n.id FROM lore_nodes n INNER JOIN sub s ON n.parent_id = s.id
-    )
-    UPDATE lore_nodes SET to_be_deleted = 0 WHERE id IN (SELECT id FROM sub)
-  `).run(id)
-  db.close()
+  const repo = new LoreNodeRepository()
+  repo.restoreRecursive(id)
   return { ok: true }
 }
 
 export function sortLoreChildren(id: number): { ok: boolean; sorted: number } {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
-  const children = db
-    .prepare('SELECT id FROM lore_nodes WHERE parent_id = ? ORDER BY name COLLATE NOCASE ASC')
-    .all(id) as { id: number }[]
-  const update = db.prepare('UPDATE lore_nodes SET position = ? WHERE id = ?')
-  db.transaction(() => { children.forEach((c, i) => update.run(i, c.id)) })()
-  db.close()
-  return { ok: true, sorted: children.length }
+  const repo = new LoreNodeRepository()
+  const sorted = repo.sortChildrenByName(id)
+  return { ok: true, sorted }
 }
 
 export function moveLoreNode(id: number, data: { parent_id?: number | null }): { ok: boolean } {
   const { parent_id } = data
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
+  const repo = new LoreNodeRepository()
   const nodeId = Number(id)
   const newParentId = parent_id ?? null
 
-  const node = db
-    .prepare('SELECT parent_id, to_be_deleted FROM lore_nodes WHERE id = ?')
-    .get(nodeId) as { parent_id: number | null; to_be_deleted: number } | undefined
-  if (!node) { db.close(); throw makeError('node not found', 404) }
-  if (node.parent_id === null) { db.close(); throw makeError('root node cannot be moved', 403) }
+  const node = repo.getNodeInfo(nodeId)
+  if (!node) throw makeError('node not found', 404)
+  if (node.parent_id === null) throw makeError('root node cannot be moved', 403)
 
-  if (newParentId === nodeId) { db.close(); throw makeError('cannot move node to itself', 400) }
+  if (newParentId === nodeId) throw makeError('cannot move node to itself', 400)
 
   if (newParentId !== null) {
-    const target = db
-      .prepare('SELECT id, to_be_deleted FROM lore_nodes WHERE id = ?')
-      .get(newParentId) as { id: number; to_be_deleted: number } | undefined
-    if (!target) { db.close(); throw makeError('target parent does not exist', 400) }
+    const target = repo.getNodeInfo(newParentId)
+    if (!target) throw makeError('target parent does not exist', 400)
     if (target.to_be_deleted && !node.to_be_deleted) {
-      db.close()
       throw makeError('cannot move active node into a node marked for deletion', 400)
     }
   }
 
   if (newParentId !== null) {
-    const getParent = db.prepare('SELECT parent_id FROM lore_nodes WHERE id = ?')
-    let cur: number | null = newParentId
-    while (cur !== null) {
-      if (cur === nodeId) {
-        db.close()
-        throw makeError('cannot move node into its own descendant', 400)
-      }
-      cur = (getParent.get(cur) as { parent_id: number | null } | undefined)?.parent_id ?? null
+    const parentChain = repo.getParentChain(newParentId)
+    if (parentChain.includes(nodeId)) {
+      throw makeError('cannot move node into its own descendant', 400)
     }
   }
 
-  db.prepare('UPDATE lore_nodes SET parent_id = ? WHERE id = ?').run(newParentId, nodeId)
-  db.close()
+  repo.updateParent(nodeId, newParentId)
   return { ok: true }
 }
 
 export function duplicateLoreNode(id: number): { id: number | bigint } {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath)
-  const src = db
-    .prepare('SELECT parent_id, name, content FROM lore_nodes WHERE id = ?')
-    .get(id) as { parent_id: number | null; name: string; content: string | null } | undefined
-  if (!src) { db.close(); throw makeError('node not found', 404) }
-
-  const baseName = src.name + ' copy'
-  const existing = db
-    .prepare("SELECT name FROM lore_nodes WHERE parent_id IS ? AND name LIKE ? || '%'")
-    .all(src.parent_id, baseName) as { name: string }[]
-  const usedNames = new Set(existing.map(r => r.name))
-  let newName = baseName
-  let n = 2
-  while (usedNames.has(newName)) newName = `${baseName} ${n++}`
-
-  let info
-  if (src.content) {
-    const wordCount = countWords(src.content)
-    const charCount = countChars(src.content)
-    const byteCount = countBytes(src.content)
-    info = db.prepare(
-      'INSERT INTO lore_nodes (parent_id, name, content, word_count, char_count, byte_count) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(src.parent_id, newName, src.content, wordCount, charCount, byteCount)
-  } else {
-    info = db.prepare('INSERT INTO lore_nodes (parent_id, name) VALUES (?, ?)').run(src.parent_id, newName)
-  }
-  db.close()
-  return { id: info.lastInsertRowid }
+  const repo = new LoreNodeRepository()
+  const newId = repo.duplicate(id)
+  return { id: newId }
 }
 
 // Keep fs import used only by older callers; unused here but kept for compat

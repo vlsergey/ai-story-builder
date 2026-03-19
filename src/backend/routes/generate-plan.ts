@@ -6,14 +6,7 @@ import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 import { PlanEdgeRepository } from '../plan/edges/plan-edge-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -38,7 +31,6 @@ export async function generatePlan(
 }> {
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
 
   const { prompt, mode, baseContent, settings = {}, nodeId } = params
   const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
@@ -69,31 +61,24 @@ export async function generatePlan(
   const engineFileIds: string[] = []
 
   try {
-    const db = new (Database)(dbPath, { readonly: true })
-    const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
-    const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
-    const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
-
     engine = SettingsRepository.get('current_backend') || undefined
-    if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
+    if (!engine) throw makeError('no AI engine configured', 400)
     config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
     textLanguage = SettingsRepository.get('text_language') || undefined
 
     if (includeExistingLore && engine) {
-      const nodes = db.prepare(
-        'SELECT ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL AND to_be_deleted = 0'
-      ).all() as { ai_sync_info: string }[]
+      const loreRepo = new LoreNodeRepository()
+      const nodes = loreRepo.getAllWithAiSyncInfo()
       for (const node of nodes) {
         try {
-          const info = JSON.parse(node.ai_sync_info) as Record<string, { file_id?: string }>
+          const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
           const fileId = info[engine]?.file_id
           if (fileId) engineFileIds.push(fileId)
         } catch { /* ignore */ }
       }
     }
 
-    if (!textLanguage) { db.close(); throw makeError('text_language is not configured', 400) }
-    db.close()
+    if (!textLanguage) throw makeError('text_language is not configured', 400)
   } catch (e: any) {
     if (e.status) throw e
     throw makeError('failed to read project settings: ' + String(e), 500)

@@ -1,4 +1,5 @@
 import { GraphEngine } from '../lib/node-graph/engine/graph-engine.js'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -18,7 +19,6 @@ function makeError(message: string, status: number): Error {
 //   * All remaining headers are shifted so that the highest level becomes h3.
 // - autoUpdate: not used in backend generation; frontend may use it for live updates.
 export function generateMergeContent(
-  db: import('better-sqlite3').Database,
   nodeId: number,
   overrideSettings?: Record<string, any>,
   overrideTitle?: string
@@ -27,8 +27,9 @@ export function generateMergeContent(
   let nodeTitle: string
   let nodeMergeSettings: string | null = null
   if (overrideTitle === undefined || overrideSettings === undefined) {
-    const node = db.prepare('SELECT title, node_type_settings FROM plan_nodes WHERE id = ? AND type = \'merge\'').get(nodeId) as { title: string, node_type_settings: string | null } | undefined
-    if (!node) {
+    const nodeRepo = new PlanNodeRepository()
+    const node = nodeRepo.getById(nodeId)
+    if (!node || node.type !== 'merge') {
       throw makeError('Merge node not found', 404)
     }
     nodeTitle = node.title

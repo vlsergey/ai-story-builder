@@ -7,11 +7,15 @@ import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
+import { setCurrentDbPath } from '../db/state.js'
 
 let testDbPath = ''
 
 vi.mock('../db/state.js', () => ({
   getCurrentDbPath: () => testDbPath,
+  setCurrentDbPath: (p: string | null) => { testDbPath = p ?? '' },
 }))
 
 // ─── OpenAI mock (used by Yandex) ─────────────────────────────────────────────
@@ -63,11 +67,15 @@ function setupDb(opts?: {
   const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
+  db.close()
+
+  // Set current DB path so repositories can find it
+  setCurrentDbPath(file)
 
   const engine = opts?.currentEngine
     ?? (opts?.grokApiKey ? 'grok' : opts?.yandexApiKey ? 'yandex' : undefined)
   if (engine) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', ?)").run(engine)
+    SettingsRepository.setCurrentBackend(engine)
   }
 
   const aiConfig: Record<string, unknown> = {}
@@ -82,36 +90,29 @@ function setupDb(opts?: {
     aiConfig['grok'] = { api_key: opts.grokApiKey }
   }
   if (Object.keys(aiConfig).length > 0) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('ai_config', ?)").run(
-      JSON.stringify(aiConfig)
-    )
+    SettingsRepository.saveAiConfig(aiConfig)
   }
 
   // Default to 'ru-RU' so tests don't need to specify it explicitly.
   // Pass null to leave text_language unset (for testing the "not configured" error).
   const lang = opts?.textLanguage !== undefined ? opts.textLanguage : 'ru-RU'
   if (lang !== null) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('text_language', ?)").run(lang)
+    SettingsRepository.setTextLanguage(lang)
   }
 
-  const insertNode = db.prepare(
-    `INSERT INTO lore_nodes (id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  )
-  let autoId = 1
+  const loreRepo = new LoreNodeRepository()
   for (const n of opts?.nodes ?? []) {
-    insertNode.run(
-      n.id ?? autoId++,
-      n.parent_id ?? null,
-      n.name,
-      n.content ?? null,
-      n.word_count ?? 0,
-      n.to_be_deleted ?? 0,
-      n.ai_sync_info ?? null
-    )
+    loreRepo.insert({
+      id: n.id,
+      parent_id: n.parent_id ?? null,
+      name: n.name,
+      content: n.content ?? null,
+      word_count: n.word_count ?? 0,
+      to_be_deleted: n.to_be_deleted ?? 0,
+      ai_sync_info: n.ai_sync_info ?? null,
+    })
   }
 
-  db.close()
   return file
 }
 

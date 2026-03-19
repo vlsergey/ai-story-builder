@@ -7,12 +7,16 @@ import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
+import { setCurrentDbPath } from '../db/state.js'
 
 let testDbPath = ''
 
 vi.mock('../db/state.js', () => ({
   getCurrentDbPath: () => testDbPath,
   getDataDir: () => os.tmpdir(),
+  setCurrentDbPath: (p: string | null) => { testDbPath = p ?? '' },
 }))
 
 // ─── OpenAI mock ──────────────────────────────────────────────────────────────
@@ -65,11 +69,15 @@ function setupDb(opts?: {
   const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
+  db.close()
+
+  // Set current DB path so repositories can find it
+  setCurrentDbPath(file)
 
   const currentEngine = opts?.currentEngine
     ?? (opts?.grokApiKey ? 'grok' : opts?.apiKey || opts?.folderId ? 'yandex' : undefined)
   if (currentEngine) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', ?)").run(currentEngine)
+    SettingsRepository.setCurrentBackend(currentEngine)
   }
 
   const aiConfig: Record<string, unknown> = {}
@@ -84,29 +92,23 @@ function setupDb(opts?: {
     aiConfig['grok'] = { api_key: opts.grokApiKey }
   }
   if (Object.keys(aiConfig).length > 0) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('ai_config', ?)").run(
-      JSON.stringify(aiConfig)
-    )
+    SettingsRepository.saveAiConfig(aiConfig)
   }
 
-  const insertNode = db.prepare(
-    `INSERT INTO lore_nodes (id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  )
+  const repo = new LoreNodeRepository()
   let autoId = 1
   for (const n of opts?.nodes ?? []) {
-    insertNode.run(
-      n.id ?? autoId++,
-      n.parent_id ?? null,
-      n.name,
-      n.content ?? null,
-      n.word_count ?? 0,
-      n.to_be_deleted ?? 0,
-      n.ai_sync_info ?? null
-    )
+    repo.insert({
+      id: n.id ?? autoId++,
+      parent_id: n.parent_id ?? null,
+      name: n.name,
+      content: n.content ?? null,
+      word_count: n.word_count ?? 0,
+      to_be_deleted: n.to_be_deleted ?? 0,
+      ai_sync_info: n.ai_sync_info ?? null,
+    })
   }
 
-  db.close()
   return file
 }
 
@@ -222,12 +224,10 @@ describe('syncLore', () => {
     expect(result.search_index_id).toBe('idx-1')
 
     // Verify DB was updated
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = 42').get() as { ai_sync_info: string }
-    db.close()
-    const syncInfo = JSON.parse(row.ai_sync_info) as { yandex: { file_id: string } }
+    const repo = new LoreNodeRepository()
+    const node = repo.getById(42)
+    expect(node).toBeDefined()
+    const syncInfo = JSON.parse(node!.ai_sync_info!) as { yandex: { file_id: string } }
     expect(syncInfo.yandex.file_id).toBe('remote-file-1')
 
     // Verify toFile was called with .md filename and correct content
@@ -299,12 +299,10 @@ describe('syncLore', () => {
     expect(result.uploaded).toBe(1)
 
     // Verify new file_id stored
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = 20').get() as { ai_sync_info: string }
-    db.close()
-    const syncInfo = JSON.parse(row.ai_sync_info) as { yandex: { file_id: string } }
+    const repo = new LoreNodeRepository()
+    const node = repo.getById(20)
+    expect(node).toBeDefined()
+    const syncInfo = JSON.parse(node!.ai_sync_info!) as { yandex: { file_id: string } }
     expect(syncInfo.yandex.file_id).toBe('new-file-id')
   })
 
@@ -337,12 +335,9 @@ describe('syncLore', () => {
     expect(mockFilesDel).toHaveBeenCalledWith('del-file')
 
     // Row must be physically removed from DB after sync
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT id FROM lore_nodes WHERE id = 30').get()
-    db.close()
-    expect(row).toBeUndefined()
+    const repo = new LoreNodeRepository()
+    const node = repo.getById(30)
+    expect(node).toBeUndefined()
   })
 
   it('Yandex: physically removes to_be_deleted=1 node that was never synced (no file_id)', async () => {
@@ -366,12 +361,9 @@ describe('syncLore', () => {
     expect(mockFilesDel).not.toHaveBeenCalled()
 
     // Row must be physically removed from DB
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT id FROM lore_nodes WHERE id = 31').get()
-    db.close()
-    expect(row).toBeUndefined()
+    const repo = new LoreNodeRepository()
+    const node = repo.getById(31)
+    expect(node).toBeUndefined()
     void result
   })
 
@@ -399,12 +391,10 @@ describe('syncLore', () => {
     expect(result.deleted).toBe(1)
 
     // Verify ai_sync_info.yandex has no file_id (but record still exists)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = 40').get() as { ai_sync_info: string }
-    db.close()
-    const syncInfo = JSON.parse(row.ai_sync_info) as { yandex: { last_synced_at: string; file_id?: string } }
+    const repo = new LoreNodeRepository()
+    const node = repo.getById(40)
+    expect(node).toBeDefined()
+    const syncInfo = JSON.parse(node!.ai_sync_info!) as { yandex: { last_synced_at: string; file_id?: string } }
     expect(syncInfo.yandex).toBeDefined()
     expect(syncInfo.yandex.last_synced_at).toBeDefined()
     expect(syncInfo.yandex.file_id).toBeUndefined()
@@ -443,13 +433,8 @@ describe('syncLore', () => {
     expect(mockVsRetrieve).toHaveBeenCalledWith('new-idx-456')
 
     // Verify search_index_id stored in settings
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string }
-    db.close()
-    const config = JSON.parse(configRow.value) as { yandex: { search_index_id: string } }
-    expect(config.yandex.search_index_id).toBe('new-idx-456')
+    const config = SettingsRepository.getAiConfig()
+    expect(config.yandex?.search_index_id).toBe('new-idx-456')
   })
 
   // ─── 10. Empty allFileIds: delete old index, don't create new one ────────
@@ -482,13 +467,8 @@ describe('syncLore', () => {
     expect(mockVsCreate).not.toHaveBeenCalled()
 
     // Verify search_index_id cleared in settings
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string }
-    db.close()
-    const config = JSON.parse(configRow.value) as { yandex: { search_index_id?: string } }
-    expect(config.yandex.search_index_id).toBeUndefined()
+    const config = SettingsRepository.getAiConfig()
+    expect(config.yandex?.search_index_id).toBeUndefined()
   })
 
   // ─── 11. Files uploaded first, then vector store created (Yandex) ─────────
@@ -617,12 +597,9 @@ describe('syncLore', () => {
 
     await syncLore()
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const rows = db.prepare('SELECT id FROM lore_nodes WHERE to_be_deleted = 1').all() as { id: number }[]
-    db.close()
-    expect(rows).toHaveLength(0)
+    const repo = new LoreNodeRepository()
+    const deletedNodes = repo.getAll().filter(n => n.to_be_deleted === 1)
+    expect(deletedNodes).toHaveLength(0)
   })
 
   it('Grok: uploads collapsed group for new nodes', async () => {
@@ -646,17 +623,17 @@ describe('syncLore', () => {
     expect(result.search_index_id).toBeNull()
 
     // Level-2 node gets file_id; level-3 node gets merged_into_parent
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const rows = db.prepare('SELECT id, ai_sync_info FROM lore_nodes WHERE id IN (2,3)').all() as { id: number; ai_sync_info: string }[]
-    db.close()
-
-    const byId = Object.fromEntries(rows.map(r => [r.id, JSON.parse(r.ai_sync_info)]))
-    expect(byId[2].grok.file_id).toBe('grok-file-1')
-    expect(byId[2].grok.merged_into_parent).toBeUndefined()
-    expect(byId[3].grok.merged_into_parent).toBe(true)
-    expect(byId[3].grok.file_id).toBeUndefined()
+    const repo = new LoreNodeRepository()
+    const node2 = repo.getById(2)
+    const node3 = repo.getById(3)
+    expect(node2).toBeDefined()
+    expect(node3).toBeDefined()
+    const sync2 = JSON.parse(node2!.ai_sync_info!) as { grok: { file_id: string; merged_into_parent?: boolean } }
+    const sync3 = JSON.parse(node3!.ai_sync_info!) as { grok: { file_id?: string; merged_into_parent?: boolean } }
+    expect(sync2.grok.file_id).toBe('grok-file-1')
+    expect(sync2.grok.merged_into_parent).toBeUndefined()
+    expect(sync3.grok.merged_into_parent).toBe(true)
+    expect(sync3.grok.file_id).toBeUndefined()
   })
 
   it('Grok: does not re-upload unchanged group', async () => {
@@ -709,12 +686,10 @@ describe('syncLore', () => {
     expect(mockFilesDel).not.toHaveBeenCalled()
 
     // Verify new file_id stored on level-2 node
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = 2').get() as { ai_sync_info: string }
-    db.close()
-    const syncInfo = JSON.parse(row.ai_sync_info) as { grok: { file_id: string } }
+    const repo = new LoreNodeRepository()
+    const node = repo.getById(2)
+    expect(node).toBeDefined()
+    const syncInfo = JSON.parse(node!.ai_sync_info!) as { grok: { file_id: string } }
     expect(syncInfo.grok.file_id).toBe('new-grok-file')
   })
 

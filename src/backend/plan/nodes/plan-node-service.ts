@@ -2,7 +2,6 @@ import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNod
 import { PlanNodeRepository } from './plan-node-repository.js'
 import { generateMergeContent } from '../../routes/merge-node.js'
 import { isValidNodeType } from '../../../shared/node-edge-dictionary.js'
-import { withDb } from '../../db/connection.js'
 
 export type NodeUpdateEvent = {
   nodeId: number
@@ -222,7 +221,7 @@ export class PlanNodeService {
       }
       const nodeTitle = hasTitle ? data.title!.trim() : oldNode.title
       try {
-        generatedContent = withDb(false, db => generateMergeContent(db, id, settings, nodeTitle))
+        generatedContent = generateMergeContent(id, settings, nodeTitle)
         generatedWordCount = this.countWords(generatedContent)
         generatedCharCount = this.countChars(generatedContent)
         generatedByteCount = this.countBytes(generatedContent)

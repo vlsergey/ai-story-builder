@@ -4,6 +4,7 @@ import type { AiSettings } from '../../shared/ai-settings.js'
 import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -40,25 +41,21 @@ export async function generatePlayground(
   const engineFileIds: string[] = []
 
   try {
-    const db = new (Database)(dbPath, { readonly: true })
     engine = SettingsRepository.get('current_backend') || undefined
-    if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
+    if (!engine) throw makeError('no AI engine configured', 400)
     config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
 
     if (includeExistingLore && engine) {
-      const nodes = db.prepare(
-        'SELECT ai_sync_info FROM lore_nodes WHERE ai_sync_info IS NOT NULL AND to_be_deleted = 0'
-      ).all() as { ai_sync_info: string }[]
+      const repo = new LoreNodeRepository()
+      const nodes = repo.getAllWithAiSyncInfo()
       for (const node of nodes) {
         try {
-          const info = JSON.parse(node.ai_sync_info) as Record<string, { file_id?: string }>
+          const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
           const fileId = info[engine]?.file_id
           if (fileId) engineFileIds.push(fileId)
         } catch { /* ignore */ }
       }
     }
-
-    db.close()
   } catch (e: any) {
     if (e.status) throw e
     throw makeError('failed to read project settings: ' + String(e), 500)

@@ -7,6 +7,7 @@ import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 let testDbPath = ''
 
@@ -26,12 +27,14 @@ function setupDb(): string {
   const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
-  db.exec(`
-    INSERT INTO lore_nodes (id, parent_id, name, content) VALUES
-      (1, NULL, 'root', NULL),
-      (2, 1,    'chapter', NULL);
-  `)
   db.close()
+
+  const prev = testDbPath
+  testDbPath = file
+  const repo = new LoreNodeRepository()
+  repo.insert({ id: 1, parent_id: null, name: 'root', content: null })
+  repo.insert({ id: 2, parent_id: 1, name: 'chapter', content: null })
+  testDbPath = prev
   return file
 }
 
@@ -63,13 +66,8 @@ describe('patchLoreNode', () => {
   })
 
   it('returns updated ai_sync_info with content_updated_at when node has existing sync records', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare("UPDATE lore_nodes SET ai_sync_info = ? WHERE id = 2").run(
-      JSON.stringify({ yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'f1' } })
-    )
-    db.close()
+    const repo = new LoreNodeRepository()
+    repo.updateAiSyncInfo(2, JSON.stringify({ yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'f1' } }))
 
     const before = new Date().toISOString()
     const res = patchLoreNode(2, { content: 'Updated content' })
@@ -91,104 +89,60 @@ describe('patchLoreNode', () => {
   })
 
   it('persists updated content_updated_at inside ai_sync_info in DB when content is saved', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare("UPDATE lore_nodes SET ai_sync_info = ? WHERE id = 2").run(
-      JSON.stringify({ yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'f1' } })
-    )
-    db.close()
+    const repo = new LoreNodeRepository()
+    repo.updateAiSyncInfo(2, JSON.stringify({ yandex: { last_synced_at: '2025-01-01T00:00:00.000Z', file_id: 'f1' } }))
 
     patchLoreNode(2, { content: 'Some content' })
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database2 = require('better-sqlite3')
-    const db2 = new Database2(testDbPath, { readonly: true })
-    const row = db2.prepare('SELECT ai_sync_info FROM lore_nodes WHERE id = 2').get() as { ai_sync_info: string }
-    db2.close()
-
-    const syncInfo = JSON.parse(row.ai_sync_info) as { yandex: { content_updated_at?: string } }
+    const node = repo.getById(2)
+    expect(node).toBeDefined()
+    const syncInfo = JSON.parse(node!.ai_sync_info!) as { yandex: { content_updated_at?: string } }
     expect(syncInfo.yandex.content_updated_at).toBeDefined()
   })
 
   it('start_review captures current content as review_base_content and sets changes_status=review', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare("UPDATE lore_nodes SET content = ? WHERE id = 2").run('Original content')
-    db.close()
+    const repo = new LoreNodeRepository()
+    repo.update(2, { content: 'Original content' })
 
     const res = patchLoreNode(2, { content: 'AI improved content', prompt: 'Make it better', start_review: true })
 
     expect(res.ok).toBe(true)
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database2 = require('better-sqlite3')
-    const db2 = new Database2(testDbPath, { readonly: true })
-    const row = db2.prepare('SELECT content, changes_status, review_base_content FROM lore_nodes WHERE id = 2').get() as {
-      content: string; changes_status: string | null; review_base_content: string | null
-    }
-    db2.close()
-
-    expect(row.content).toBe('AI improved content')
-    expect(row.changes_status).toBe('review')
-    expect(row.review_base_content).toBe('Original content')
+    const node = repo.getById(2)
+    expect(node!.content).toBe('AI improved content')
+    expect(node!.changes_status).toBe('review')
+    expect(node!.review_base_content).toBe('Original content')
   })
 
   it('start_review saves prompt as last_improve_instruction', () => {
     patchLoreNode(2, { content: 'New content', prompt: 'Make it epic', start_review: true })
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath, { readonly: true })
-    const row = db.prepare('SELECT last_improve_instruction FROM lore_nodes WHERE id = 2').get() as { last_improve_instruction: string | null }
-    db.close()
-
-    expect(row.last_improve_instruction).toBe('Make it epic')
+    const repo = new LoreNodeRepository()
+    const node = repo.getById(2)
+    expect(node!.last_improve_instruction).toBe('Make it epic')
   })
 
   it('start_review does not overwrite review_base_content when already in review', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare("UPDATE lore_nodes SET content = ?, changes_status = 'review', review_base_content = ? WHERE id = 2")
-      .run('First AI result', 'Original content')
-    db.close()
+    const repo = new LoreNodeRepository()
+    repo.update(2, { content: 'First AI result', changes_status: 'review', review_base_content: 'Original content' })
 
     patchLoreNode(2, { content: 'Second AI result', start_review: true })
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database2 = require('better-sqlite3')
-    const db2 = new Database2(testDbPath, { readonly: true })
-    const row = db2.prepare('SELECT review_base_content FROM lore_nodes WHERE id = 2').get() as {
-      review_base_content: string | null
-    }
-    db2.close()
-
-    expect(row.review_base_content).toBe('Original content')
+    const node = repo.getById(2)
+    expect(node!.review_base_content).toBe('Original content')
   })
 
   it('accept_review clears changes_status, review_base_content, and last_improve_instruction', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare("UPDATE lore_nodes SET changes_status = 'review', review_base_content = 'Old', last_improve_instruction = 'some instruction' WHERE id = 2").run()
-    db.close()
+    const repo = new LoreNodeRepository()
+    repo.update(2, { changes_status: 'review', review_base_content: 'Old', last_improve_instruction: 'some instruction' })
 
     const res = patchLoreNode(2, { accept_review: true })
 
     expect(res.ok).toBe(true)
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database2 = require('better-sqlite3')
-    const db2 = new Database2(testDbPath, { readonly: true })
-    const row = db2.prepare('SELECT changes_status, review_base_content, last_improve_instruction FROM lore_nodes WHERE id = 2').get() as {
-      changes_status: string | null; review_base_content: string | null; last_improve_instruction: string | null
-    }
-    db2.close()
-
-    expect(row.changes_status).toBeNull()
-    expect(row.review_base_content).toBeNull()
-    expect(row.last_improve_instruction).toBeNull()
+    const node = repo.getById(2)
+    expect(node!.changes_status).toBeNull()
+    expect(node!.review_base_content).toBeNull()
+    expect(node!.last_improve_instruction).toBeNull()
   })
 })

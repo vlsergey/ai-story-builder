@@ -6,6 +6,7 @@ import { createYandexClient, makeLoggingFetch } from '../lib/yandex-client.js'
 import { createGrokClient } from '../lib/grok-client.js'
 import { collapseLoreTree } from '../lib/lore-tree.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 let Database: typeof import('better-sqlite3') | null = null
 try {
@@ -261,13 +262,8 @@ export async function syncLore(): Promise<{
 
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = getDb(dbPath, true)
-
-  const rows = db
-    .prepare('SELECT id, parent_id, name, content, word_count, to_be_deleted, ai_sync_info FROM lore_nodes')
-    .all() as LoreNodeRow[]
-  db.close()
+  const repo = new LoreNodeRepository()
+  const rows = repo.getAll()
 
   if (!currentEngine) {
     throw makeError('no AI engine configured', 400)
@@ -357,9 +353,6 @@ export async function syncLore(): Promise<{
     }
 
     // Commit to DB
-    const db2 = getDb(dbPath)
-    const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
-
     for (const result of results) {
       const { group, action, newFileId } = result
       const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
@@ -368,25 +361,24 @@ export async function syncLore(): Promise<{
         for (const row of groupRows) {
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
           delete existing['grok']
-          updateStmt.run(JSON.stringify(existing), row.id)
+          repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
         }
       } else if (action === 'upload' && newFileId) {
         const l2Row = idToRow.get(group.level2NodeId)!
         const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
         existing['grok'] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
-        updateStmt.run(JSON.stringify(existing), group.level2NodeId)
+        repo.updateAiSyncInfo(group.level2NodeId, JSON.stringify(existing))
 
         for (const row of groupRows) {
           if (row.id === group.level2NodeId) continue
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
           existing['grok'] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
-          updateStmt.run(JSON.stringify(existing), row.id)
+          repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
         }
       }
     }
 
-    db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
-    db2.close()
+    repo.deleteMarkedForDeletion()
 
     const uploaded = results.filter(r => r.action === 'upload').length
     const deleted = results.filter(r => r.action === 'delete').length
@@ -520,15 +512,12 @@ export async function syncLore(): Promise<{
   }
 
   const now = new Date().toISOString()
-  const db2 = getDb(dbPath)
-
-  const updateStmt = db2.prepare('UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?')
 
   for (const [nodeId, fileId] of newFileIds.entries()) {
     const nodeRow = rows.find(r => r.id === nodeId)
     const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
     existing['yandex'] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
-    updateStmt.run(JSON.stringify(existing), nodeId)
+    repo.updateAiSyncInfo(nodeId, JSON.stringify(existing))
   }
 
   for (const node of toDelete) {
@@ -539,7 +528,7 @@ export async function syncLore(): Promise<{
     } else {
       existing['yandex'] = { last_synced_at: now }
     }
-    updateStmt.run(JSON.stringify(existing), node.id)
+    repo.updateAiSyncInfo(node.id, JSON.stringify(existing))
   }
 
   const updatedConfig = { ...config }
@@ -554,9 +543,7 @@ export async function syncLore(): Promise<{
 
   SettingsRepository.saveAiConfig(updatedConfig)
 
-  db2.prepare('DELETE FROM lore_nodes WHERE to_be_deleted = 1').run()
-
-  db2.close()
+  repo.deleteMarkedForDeletion()
 
   return {
     ok: true,

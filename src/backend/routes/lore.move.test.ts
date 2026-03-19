@@ -34,6 +34,7 @@ const { moveLoreNode } = await import('./lore.js')
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 import { migrateDatabase } from '../db/migrations.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 /**
  * Creates a fresh in-memory-style temp SQLite file with a small tree:
@@ -49,27 +50,28 @@ function setupDb(): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
   const db = new Database(file)
-
   migrateDatabase(db)
-
-  db.exec(`
-    INSERT INTO lore_nodes (id, parent_id, name) VALUES
-      (1, NULL,  'root'),
-      (2, 1,     'child-a'),
-      (3, 1,     'child-b'),
-      (4, 2,     'grandchild');
-  `)
   db.close()
+
+  // Temporarily set global testDbPath so repository uses this file
+  const prev = testDbPath
+  testDbPath = file
+  const repo = new LoreNodeRepository()
+  repo.insert({ id: 1, parent_id: null, name: 'root' })
+  repo.insert({ id: 2, parent_id: 1, name: 'child-a' })
+  repo.insert({ id: 3, parent_id: 1, name: 'child-b' })
+  repo.insert({ id: 4, parent_id: 2, name: 'grandchild' })
+  testDbPath = prev
   return file
 }
 
 function parentOf(file: string, id: number): number | null {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3')
-  const db = new Database(file, { readonly: true })
-  const row = db.prepare('SELECT parent_id FROM lore_nodes WHERE id = ?').get(id) as { parent_id: number | null }
-  db.close()
-  return row?.parent_id ?? null
+  const prev = testDbPath
+  testDbPath = file
+  const repo = new LoreNodeRepository()
+  const node = repo.getById(id)
+  testDbPath = prev
+  return node?.parent_id ?? null
 }
 
 // ── Test lifecycle ─────────────────────────────────────────────────────────
@@ -105,11 +107,8 @@ describe('moveLoreNode — invalid cases', () => {
   })
 
   it('throws 400 when moving a node to a deeper descendant (indirect cycle)', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare('INSERT INTO lore_nodes (id, parent_id, name) VALUES (5, 4, ?)').run('great-grandchild')
-    db.close()
+    const repo = new LoreNodeRepository()
+    repo.insert({ id: 5, parent_id: 4, name: 'great-grandchild' })
 
     await expect(() => moveLoreNode(2, { parent_id: 5 })).toThrow(/descendant/)
     try { moveLoreNode(2, { parent_id: 5 }) } catch (e: any) { expect(e.status).toBe(400) }
@@ -127,11 +126,8 @@ describe('moveLoreNode — invalid cases', () => {
   })
 
   it('throws 400 when moving an active node into a to_be_deleted parent', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    db.prepare('UPDATE lore_nodes SET to_be_deleted = 1 WHERE id = 2').run()
-    db.close()
+    const repo = new LoreNodeRepository()
+    repo.update(2, { to_be_deleted: 1 })
 
     await expect(() => moveLoreNode(3, { parent_id: 2 })).toThrow(/marked for deletion/)
     try { moveLoreNode(3, { parent_id: 2 }) } catch (e: any) { expect(e.status).toBe(400) }

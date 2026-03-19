@@ -12,8 +12,6 @@ import { patchPlanNode, getPlanNode, createPlanNode, createGraphEdge } from '../
 function setupDb(dbPath: string) {
   const db = new Database(dbPath)
   migrateDatabase(db)
-  // Root node
-  db.prepare("INSERT INTO plan_nodes (id, title, type) VALUES (1, 'Root', 'text')").run()
   db.close()
 }
 

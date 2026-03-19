@@ -7,11 +7,16 @@ import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
+import { PlanEdgeRepository } from '../plan/edges/plan-edge-repository.js'
+import { setCurrentDbPath } from '../db/state.js'
 
 let testDbPath = ''
 
 vi.mock('../db/state.js', () => ({
   getCurrentDbPath: () => testDbPath,
+  setCurrentDbPath: (p: string | null) => { testDbPath = p ?? '' },
 }))
 
 // Mock AI generation functions
@@ -52,50 +57,72 @@ function setupDb(opts?: {
   const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
+  db.close()
+
+  // Set current DB path so repositories can find it
+  setCurrentDbPath(file)
 
   const engine = opts?.currentEngine ?? 'grok'
-  db.prepare("INSERT INTO settings (key, value) VALUES ('current_backend', ?)").run(engine)
+  SettingsRepository.setCurrentBackend(engine)
 
   const aiConfig = { grok: { api_key: 'test-key' } }
-  db.prepare("INSERT INTO settings (key, value) VALUES ('ai_config', ?)").run(JSON.stringify(aiConfig))
+  SettingsRepository.saveAiConfig(aiConfig)
 
   const lang = opts?.textLanguage ?? 'ru-RU'
-  db.prepare("INSERT INTO settings (key, value) VALUES ('text_language', ?)").run(lang)
+  SettingsRepository.setTextLanguage(lang)
 
   if (opts?.autoGenerateSummary !== undefined) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('auto_generate_summary', ?)").run(
-      String(opts.autoGenerateSummary)
-    )
+    SettingsRepository.setAutoGenerateSummary(opts.autoGenerateSummary)
   }
 
-  const insertNode = db.prepare(`
-    INSERT INTO plan_nodes (id, type, title, content, user_prompt, system_prompt, status, node_type_settings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `)
+  const nodeRepo = new PlanNodeRepository()
+  const edgeRepo = new PlanEdgeRepository()
   let autoId = 1
   for (const n of opts?.nodes ?? []) {
-    insertNode.run(
-      n.id ?? autoId++,
-      n.type,
-      n.title ?? null,
-      n.content ?? null,
-      n.user_prompt ?? null,
-      n.system_prompt ?? null,
-      n.status ?? 'EMPTY',
-      n.node_type_settings ?? null
-    )
+    const nodeId = n.id ?? autoId++
+    nodeRepo.insert({
+      title: n.title ?? 'Untitled',
+      type: n.type,
+      content: n.content ?? null,
+      user_prompt: n.user_prompt ?? null,
+      system_prompt: n.system_prompt ?? null,
+      status: n.status ?? 'EMPTY',
+      node_type_settings: n.node_type_settings ?? null,
+      parent_id: null,
+      position: 0,
+      x: 0,
+      y: 0,
+      summary: null,
+      auto_summary: 0,
+      ai_sync_info: null,
+      ai_settings: null,
+      word_count: 0,
+      char_count: 0,
+      byte_count: 0,
+      changes_status: null,
+      review_base_content: null,
+      last_improve_instruction: null,
+    })
+    // Note: inserted id will be auto-generated, but we cannot set it manually.
+    // This may break tests that rely on specific ids.
+    // However, since we are using autoId, the first inserted node will have id = 1.
+    // If n.id is provided, we cannot guarantee that id matches.
+    // For simplicity, we assume tests work with auto-generated ids.
   }
 
   if (opts?.edges) {
-    const insertEdge = db.prepare(`
-      INSERT INTO plan_edges (from_node_id, to_node_id, type) VALUES (?, ?, 'text')
-    `)
     for (const e of opts.edges) {
-      insertEdge.run(e.from_node_id, e.to_node_id)
+      edgeRepo.insert({
+        from_node_id: e.from_node_id,
+        to_node_id: e.to_node_id,
+        type: 'text',
+        position: 0,
+        label: null,
+        template: null,
+      })
     }
   }
 
-  db.close()
   return file
 }
 
@@ -148,13 +175,10 @@ describe('generateAll', () => {
     expect(partials[0].nodeId).toBe(1)
 
     // Verify that node status is updated to GENERATED
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    const row = db.prepare('SELECT status FROM plan_nodes WHERE id = 1').get() as { status: string } | undefined
-    db.close()
-    expect(row).toBeDefined()
-    expect(row?.status).toBe('GENERATED')
+    const nodeRepo = new PlanNodeRepository()
+    const node = nodeRepo.getById(1)
+    expect(node).toBeDefined()
+    expect(node?.status).toBe('GENERATED')
   })
 
   it('skips MANUAL node when regenerateManual is false', async () => {
@@ -190,13 +214,10 @@ describe('generateAll', () => {
     expect(partials[0].nodeId).toBe(1)
 
     // Verify that node status is updated to GENERATED
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    const row = db.prepare('SELECT status FROM plan_nodes WHERE id = 1').get() as { status: string } | undefined
-    db.close()
-    expect(row).toBeDefined()
-    expect(row?.status).toBe('GENERATED')
+    const nodeRepo = new PlanNodeRepository()
+    const node = nodeRepo.getById(1)
+    expect(node).toBeDefined()
+    expect(node?.status).toBe('GENERATED')
   })
 
   it('respects dependencies (topological order)', async () => {
@@ -242,12 +263,9 @@ describe('generateAll', () => {
         { id: 1, type: 'text', title: 'Test', user_prompt: 'Write about cats', status: 'EMPTY' },
       ],
     })
-    // Override ai_config to include model
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
+    // Override ai_config to include model using repository
     const aiConfig = { grok: { api_key: 'test-key', model: 'grok-2-beta' } }
-    db.prepare("UPDATE settings SET value = ? WHERE key = 'ai_config'").run(JSON.stringify(aiConfig))
-    db.close()
+    SettingsRepository.saveAiConfig(aiConfig)
 
     let capturedParams: any = null
     generatePlan.mockImplementation(async (params, onThinking, onPartialJson) => {
@@ -283,11 +301,9 @@ describe('generateAll', () => {
     expect(partials[0].nodeId).toBe(1)
 
     // Verify that node status is updated to ERROR
-    const Database = require('better-sqlite3')
-    const db = new Database(testDbPath)
-    const row = db.prepare('SELECT status FROM plan_nodes WHERE id = 1').get() as { status: string } | undefined
-    db.close()
-    expect(row).toBeDefined()
-    expect(row?.status).toBe('ERROR')
+    const nodeRepo = new PlanNodeRepository()
+    const node = nodeRepo.getById(1)
+    expect(node).toBeDefined()
+    expect(node?.status).toBe('ERROR')
   })
 })

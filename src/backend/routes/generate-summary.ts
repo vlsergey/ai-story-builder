@@ -1,17 +1,9 @@
-import { getCurrentDbPath } from '../db/state.js'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiSettings } from '../../shared/ai-settings.js'
 import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -34,12 +26,10 @@ export async function generateSummary(params: { node_id?: number; content?: stri
   reasoning_tokens?: number
   cost_usd_ticks?: number
 }> {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-
   const { node_id, content } = params
   if (!node_id) throw makeError('node_id is required', 400)
+
+  const nodeRepo = new PlanNodeRepository()
 
   let engine: string | undefined
   let config: AiConfigStore = {}
@@ -48,22 +38,16 @@ export async function generateSummary(params: { node_id?: number; content?: stri
   const engineFileIds: string[] = []
 
   try {
-    const db = new (Database)(dbPath, { readonly: true })
-    const engineRow = db.prepare("SELECT value FROM settings WHERE key = 'current_backend'").get() as { value: string } | undefined
-    const configRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_config'").get() as { value: string } | undefined
-    const langRow = db.prepare("SELECT value FROM settings WHERE key = 'text_language'").get() as { value: string } | undefined
-
     engine = SettingsRepository.get('current_backend') || undefined
-    if (!engine) { db.close(); throw makeError('no AI engine configured', 400) }
+    if (!engine) throw makeError('no AI engine configured', 400)
     config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
     textLanguage = SettingsRepository.get('text_language') || undefined
 
     nodeContent = content ?? ''
     if (nodeContent === '') {
-      const node = db.prepare('SELECT content FROM plan_nodes WHERE id = ?').get(node_id) as { content: string | null } | undefined
+      const node = nodeRepo.getById(node_id)
       nodeContent = node?.content ?? ''
     }
-    db.close()
     if (!nodeContent || nodeContent.trim().length === 0) {
       throw makeError('plan node content is empty', 400)
     }
@@ -120,11 +104,7 @@ Output only the summary text.`
   // Update the plan node with the generated summary
   if (accumulated.trim().length > 0) {
     try {
-      const db = new (Database)(dbPath)
-      db.prepare(
-        'UPDATE plan_nodes SET summary = ?, auto_summary = 1 WHERE id = ?'
-      ).run(accumulated.trim(), node_id)
-      db.close()
+      nodeRepo.updateSummary(node_id, accumulated.trim(), 1)
     } catch (updateError) {
       console.error('[generate-summary] Failed to update node summary:', updateError)
     }
