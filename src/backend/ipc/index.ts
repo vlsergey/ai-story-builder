@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import type { WebContents } from 'electron'
-import { getLoreTree, getLoreNode, createLoreNode, patchLoreNode, deleteLoreNode, importLoreNode, moveLoreNode, duplicateLoreNode, sortLoreChildren, reorderLoreChildren, restoreLoreNode } from '../routes/lore.js'
+import { getLoreTree, getLoreNode, createLoreNode, patchLoreNode, deleteLoreNode, importLoreNode, moveLoreNode, duplicateLoreNode, sortLoreChildren, reorderLoreChildren, restoreLoreNode } from '../lore/lore-routes.js'
 import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode, startPlanNodeReview, acceptPlanNodeReview } from '../plan/plan-routes.js'
 import { getPlanGraph, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../plan/plan-routes.js'
 import { getProjectStatus, closeProject, openProject, getRecentProjects, deleteRecentProject, listProjectFiles, openProjectFolder, createProject, applyRuntimeSettings } from '../routes/projects.js'

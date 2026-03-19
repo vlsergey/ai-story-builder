@@ -29,12 +29,12 @@ vi.mock('../db/state.js', () => ({
 }))
 
 // Import pure functions AFTER mock is registered
-const { moveLoreNode } = await import('./lore.js')
+const { moveLoreNode } = await import('./lore-routes.js')
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 import { migrateDatabase } from '../db/migrations.js'
-import { LoreNodeRepository } from '../lore/lore-node-repository.js'
+import { LoreNodeRepository } from './lore-node-repository.js'
 
 /**
  * Creates a fresh in-memory-style temp SQLite file with a small tree:

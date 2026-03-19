@@ -1,15 +1,6 @@
 import fs from 'fs'
 import type { LoreNodeRow, LoreTreeNode } from '../types/index.js'
-import { getCurrentDbPath } from '../db/state.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 

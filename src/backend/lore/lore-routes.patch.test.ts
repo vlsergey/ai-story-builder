@@ -7,7 +7,7 @@ import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
-import { LoreNodeRepository } from '../lore/lore-node-repository.js'
+import { LoreNodeRepository } from './lore-node-repository.js'
 
 let testDbPath = ''
 
@@ -16,7 +16,7 @@ vi.mock('../db/state.js', () => ({
   getDataDir: () => os.tmpdir(),
 }))
 
-const { patchLoreNode } = await import('./lore.js')
+const { patchLoreNode } = await import('./lore-routes.js')
 
 function setupDb(): string {
   const file = path.join(
