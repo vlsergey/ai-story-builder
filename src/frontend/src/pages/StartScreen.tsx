@@ -26,7 +26,7 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
     setBusy(true)
     setCreateError(null)
     try {
-      const j = await ipcClient.project.create({ name, text_language: textLanguage }) as ProjectData
+      const j = await ipcClient.project.create.mutate({ name, text_language: textLanguage }) as ProjectData
       onCreated(j.path, j)
       navigate('/project')
     } catch (err) {
@@ -75,24 +75,24 @@ export default function StartScreen({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    ipcClient.project.recent().then(r => setRecent(r)).catch(() => setRecent([]))
-    ipcClient.project.files().then(r => setProjectsData(r)).catch(() => setProjectsData(null))
+    ipcClient.project.recent.query().then(r => setRecent(r)).catch(() => setRecent([]))
+    ipcClient.project.files.query().then(r => setProjectsData(r)).catch(() => setProjectsData(null))
   }, [])
 
   function openFolder() {
-    ipcClient.project.openFolder().catch(console.error)
+    ipcClient.project.openFolder.mutate().catch(console.error)
   }
 
   async function removeRecent(e: React.MouseEvent, p: string) {
     e.stopPropagation()
-    await ipcClient.project.deleteRecent(p)
+    await ipcClient.project.recentDelete.mutate(p)
     setRecent(prev => prev.filter(r => r !== p))
   }
 
   async function openRecent(path: string) {
     setError(null)
     try {
-      const data = await ipcClient.project.open(path) as ProjectData
+      const data = await ipcClient.project.open.mutate(path) as ProjectData
       onOpenProject(data.path, data)
     } catch (err) {
       setError('Error opening project: ' + (err as Error).message)

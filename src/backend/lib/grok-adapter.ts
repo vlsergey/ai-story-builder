@@ -11,7 +11,7 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     onDelta: (text: string) => void,
   ): Promise<{ response_id?: string; tokensInput?: number; tokensOutput?: number; tokensTotal?: number; cachedTokens?: number; reasoningTokens?: number; costUsdTicks?: number }> {
 
-    const engineConfig = SettingsRepository.getAiConfig().grok ?? {}
+    const engineConfig = SettingsRepository.getAllAiEnginesConfig().grok ?? {}
 
     const apiKey = engineConfig.api_key?.trim()
     if (!apiKey) throw new Error('Grok api_key is required')

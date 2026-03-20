@@ -115,7 +115,10 @@ export interface ProjectInitialData {
 }
 
 export interface AppSettings {
-  recent: string[]
+  recent: string[];
   /** Last successfully opened project path — restored on backend restart. */
-  lastOpenedPath?: string
+  lastOpenedPath?: string;
 }
+
+export type AppRouter = typeof import('../router').appRouter;
+

@@ -13,8 +13,8 @@ declare global {
       sendMenuState: (key: string, value: boolean | string) => void;
       /** Show a native error dialog with a "Copy to Clipboard" button. */
       showErrorDialog: (title: string, message: string) => Promise<void>;
-      /** Generic IPC invocation */
-      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+      /** Invoke a tRPC procedure via IPC */
+      invoke: (path: string, ...args: unknown[]) => Promise<unknown>;
       /** Start a streaming generation job */
       startStream: (streamId: string, endpoint: string, params: unknown) => Promise<{ ok: boolean }>;
       /** Abort an in‑progress stream */
@@ -25,11 +25,6 @@ declare global {
       alert: (text: string) => void;
       /** Show a native confirmation dialog (synchronous). */
       confirm: (text: string) => boolean;
-      /** tRPC bridge */
-      trpc: {
-        /** Invoke a tRPC procedure via IPC */
-        invoke: (path: string, input?: unknown) => Promise<unknown>;
-      };
     };
   }
 }

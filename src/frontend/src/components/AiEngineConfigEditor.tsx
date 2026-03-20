@@ -3,7 +3,7 @@ import { AiEngineConfig } from "@shared/ai-engine-config";
 import { AGE_RATING_INFO, AGE_RATING_ORDER, AiEngineDefinition, CAPABILITY_KEYS } from "@shared/ai-engines";
 import { useCallback, useState } from "react";
 import { Button } from "./ui/button";
-import { ipcClient } from "@/ipcClient";
+import { trpc } from "@/ipcClient";
 import AiGenerationSettings from "./AiGenerationSettings";
 import { AiGenerationSettings as AiGenerationSettingsDto } from "@shared/ai-generation-settings";
 
@@ -14,15 +14,8 @@ interface AiEngineConfigEditorProps<T extends AiEngineConfig = AiEngineConfig> {
     onChange: (value: T) => void,
 }
 
-interface TestState {
-  loading: boolean
-  result?: { ok: boolean; detail?: string; error?: string }
-}
-
 export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngineConfig>({active, engine, value, onChange}: AiEngineConfigEditorProps<T>) {
     const { t } = useLocale()
-    const [testState, setTestState] = useState<TestState>({ loading: false })
-    const [isRefreshingModels, setRefreshingModels] = useState<boolean>(false)
     const [showField, setShowField] = useState<Record<string, boolean>>({})
     const [formValues, setFormValues] = useState<Record<string, string>>({})
 
@@ -36,17 +29,12 @@ export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngine
         onChange({...value, [fieldKey]: fieldValue})
     }, [value, onChange])
 
-    const onRefreshingModels = useCallback(async () => {
-        setRefreshingModels(true)
-        try {
-            const data = await ipcClient.ai.refreshModels(engine.id)
-            if (data.models) {
-                onChange({ ...value, available_models: data.models })
-            }
-        } finally {
-            setRefreshingModels(false)
-        }
-    }, [engine, onChange, setRefreshingModels, value])
+    const utils = trpc.useUtils()
+    const { mutate: refreshEngineModels, isPending: isRefreshingModelsPending } = trpc.settings.allAiEnginesConfig.refreshEngineModels.useMutation({
+        onSettled: () => utils.settings.allAiEnginesConfig.invalidate(),
+    })
+
+    const onRefreshingModels = useCallback(() => refreshEngineModels(engine.id), [engine, refreshEngineModels])
 
     const onDefaultAiGenerationSettingsChange = useCallback((defaultAiGenerationSettings: AiGenerationSettingsDto) => {
         onChange( {...value, defaultAiGenerationSettings} )
@@ -56,15 +44,7 @@ export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngine
         onChange( {...value, summaryAiGenerationSettings} )
     }, [onChange, value])
 
-    const onTest = useCallback(async () => {
-        setTestState({ loading: true })
-        try {
-            const result = await ipcClient.ai.test(engine.id, value)
-            setTestState({ loading: false, result })
-        } catch (e) {
-            setTestState({ loading: false, result: { ok: false, error: String(e) } })
-        }
-    }, [engine, setTestState, value])
+    const testMutation = trpc.ai.test.useMutation()
 
     return (
     <section
@@ -166,9 +146,9 @@ export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngine
         <Button
             variant="outline"
             onClick={onRefreshingModels}
-            disabled={isRefreshingModels}
+            disabled={isRefreshingModelsPending}
         >
-            {isRefreshingModels ? t('settings.models.refreshing') : t('settings.models.refresh')}
+            {isRefreshingModelsPending ? t('settings.models.refreshing') : t('settings.models.refresh')}
         </Button>
         </div>
 
@@ -202,18 +182,18 @@ export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngine
         <div className="flex items-center gap-2 mb-4">
         <Button
             variant="outline"
-            onClick={onTest}
-            disabled={testState?.loading}
+            onClick={() => testMutation.mutate({engineId: engine.id, aiEngineConfig: value})}
+            disabled={testMutation.isPending}
         >
-            {testState?.loading ? t('settings.testing') : t('settings.testConnection')}
+            {testMutation.isPending ? t('settings.testing') : t('settings.testConnection')}
         </Button>
-        {testState?.result && (
+        {(testMutation.isError || testMutation.isSuccess) && (
             <span
-            className={`text-xs ${testState.result.ok ? 'text-green-600' : 'text-destructive'}`}
+            className={`text-xs ${(testMutation.isSuccess && testMutation.data.ok) ? 'text-green-600' : 'text-destructive'}`}
             >
-            {testState.result.ok
-                ? `✓ ${testState.result.detail}`
-                : `✗ ${testState.result.error}`}
+            {testMutation.isSuccess && testMutation.data.ok
+                ? `✓ ${testMutation.data.detail}`
+                : `✗ ${testMutation.data?.detail || testMutation.error?.message || 'unknown error'}`}
             </span>
         )}
         </div>

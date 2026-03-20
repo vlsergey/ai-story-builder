@@ -39,7 +39,7 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemePro
     if (!VALID_PREFERENCES.includes(pref as ThemePreference)) return
     localStorage.setItem(STORAGE_KEY, pref)
     setPreferenceState(pref as ThemePreference)
-    ipcClient.settings.set('ui_theme', pref).catch(() => {})
+    ipcClient.settings.set.mutate(['ui_theme', pref]).catch(() => {})
   }, [])
 
   // Sync preference to Electron native menu on mount and on change

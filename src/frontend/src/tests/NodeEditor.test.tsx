@@ -78,7 +78,6 @@ function setupElectronAPI(invokeImpl?: (channel: string, ...args: unknown[]) => 
     showErrorDialog: vi.fn(),
     alert: vi.fn(),
     confirm: vi.fn().mockReturnValue(true),
-    trpc: { invoke: vi.fn() },
     invoke: vi.fn().mockImplementation(invokeImpl ?? ((channel: string) => {
       if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
       if (channel === 'settings:get') return Promise.resolve({ value: null })

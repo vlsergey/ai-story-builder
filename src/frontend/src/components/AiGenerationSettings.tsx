@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { BUILTIN_ENGINES } from '../../../shared/ai-engines'
 import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
 import EngineAiSettingsField from './EngineAiSettingsField'
-import { ipcClient } from '@/ipcClient'
+import { trpc } from '@/ipcClient'
 import { Input } from './ui/input'
+import { AiEngineConfig } from '@shared/ai-engine-config'
 
 function shortModelName(modelId: string): string {
   return modelId.replace(/^gpt:\/\/[^/]+\//, '')
@@ -25,30 +26,16 @@ export default function AiGenerationSettings({
   className = 'flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap',
 }: AiGenerationSettingsProps) {
   const engineDef = BUILTIN_ENGINES.find(e => e.id === engineId)
-  const [availableModels, setAvailableModels] = useState<string[]>([])
+
+  const allAiEnginesConfig = trpc.settings.allAiEnginesConfig.get.useQuery().data
+  const aiEngineConfig: AiEngineConfig = engineId ? (allAiEnginesConfig || {})[engineId] || {} : {}
+  const availableModels = aiEngineConfig.available_models || []
 
   const set = (patch: Partial<AiGenerationSettingsDto>) => onChange({ ...value, ...patch })
 
   const handleEngineFieldChange = (engine: string, fieldKey: string, value: any) => {
     set({ [fieldKey]: value })
   }
-
-  // load models
-  useEffect(() => {
-    if (!engineId) {
-      setAvailableModels([])
-      return
-    }
-    ipcClient.ai.getAiConfigStore().then( aiConfigStore => {
-      if (!engineId) {
-        setAvailableModels([])
-        return
-      }
-
-      const currentEngineConfig = aiConfigStore[engineId] ?? {}
-      setAvailableModels(currentEngineConfig.available_models ?? [])
-    } )
-  }, [engineId, setAvailableModels]);
 
   return (
     <div className={className}>

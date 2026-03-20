@@ -2,7 +2,8 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import type { AppSettings } from '../types/index.js'
-import { app } from 'electron'
+import electron from 'electron'
+const { app } = electron
 
 /**
  * Returns the root data directory for user data.

@@ -10,7 +10,7 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
     onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
   ): Promise<{ response_id?: string }> {
-    const engineConfig = SettingsRepository.getAiConfig().yandex ?? {}
+    const engineConfig = SettingsRepository.getAllAiEnginesConfig().yandex ?? {}
 
     const apiKey = engineConfig?.api_key?.trim()
     const folderId = engineConfig?.folder_id?.trim()

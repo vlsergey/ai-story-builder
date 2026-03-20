@@ -2,7 +2,7 @@ import { AiEngineKey } from '../../shared/ai-engines.js';
 import { AiGenerationSettings } from '../../shared/ai-generation-settings.js';
 import { withDbRead, withDbWrite } from '../db/connection.js';
 import type { Database } from 'better-sqlite3';
-import { AiConfigStore, AiEngineConfig } from '../../shared/ai-engine-config.js'
+import { AiEngineConfig, AllAiEnginesConfig } from '../../shared/ai-engine-config.js'
 
 /**
  * Repository for accessing and modifying the `settings` table.
@@ -83,22 +83,33 @@ export class SettingsRepository {
     this.set('verbose_ai_logging', enabled ? 'true' : 'false');
   }
 
-  static getAiConfig(): AiConfigStore {
-    return this.getJson<AiConfigStore>('ai_config') ?? {};
+  static getAllAiEnginesConfig(): AllAiEnginesConfig {
+    return this.getJson<AllAiEnginesConfig>('ai_config') ?? {};
   }
 
-  static getAiEngineConfig() : AiEngineConfig<AiGenerationSettings> {
+  static getCurrentEngineConfig() : AiEngineConfig {
     const engine = SettingsRepository.getCurrentBackend()
-    const config = SettingsRepository.getAiConfig()
-    if (!engine || !config) return {}
-    return config[engine] ?? {}
+    if (!engine) return {}
+    return this.getAllAiEnginesConfig()[engine] ?? {}
+  }
+
+  static getCurrentEngineAvailableModels(): string[] {
+    return SettingsRepository.getCurrentEngineConfig().available_models ?? []
+  }
+
+  static getCurrentEngineDefaultAiGenerationSettings(): AiGenerationSettings {
+    return SettingsRepository.getCurrentEngineConfig().defaultAiGenerationSettings ?? {}
+  }
+
+  static getCurrentEngineSummaryAiGenerationSettings(): AiGenerationSettings {
+    return SettingsRepository.getCurrentEngineConfig().summaryAiGenerationSettings ?? {}
   }
 
   static getDefaultAiSettings() : AiGenerationSettings {
-    return SettingsRepository.getAiEngineConfig()?.defaultAiSettings ?? {}
+    return SettingsRepository.getCurrentEngineConfig()?.defaultAiSettings ?? {}
   }
 
-  static saveAiConfig(config: AiConfigStore): void {
+  static saveAllAiEnginesConfig(config: AllAiEnginesConfig): void {
     this.setJson('ai_config', config);
   }
 

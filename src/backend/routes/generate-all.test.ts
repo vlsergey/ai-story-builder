@@ -65,7 +65,7 @@ function setupDb(opts?: {
   SettingsRepository.setCurrentBackend(engine)
 
   const aiConfig = { grok: { api_key: 'test-key' } }
-  SettingsRepository.saveAiConfig(aiConfig)
+  SettingsRepository.saveAllAiEnginesConfig(aiConfig)
 
   const lang = opts?.textLanguage ?? 'ru-RU'
   SettingsRepository.setTextLanguage(lang)
@@ -262,7 +262,7 @@ describe('generateAll', () => {
     })
     // Override ai_config to include model using repository
     const aiConfig = { grok: { api_key: 'test-key', model: 'grok-2-beta' } }
-    SettingsRepository.saveAiConfig(aiConfig)
+    SettingsRepository.saveAllAiEnginesConfig(aiConfig)
 
     let capturedParams: any = null
     generatePlan.mockImplementation(async (params, onThinking, onPartialJson) => {

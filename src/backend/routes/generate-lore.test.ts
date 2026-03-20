@@ -10,7 +10,7 @@ import { migrateDatabase } from '../db/migrations.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 import { setCurrentDbPath } from '../db/state.js'
-import { AiConfigStore } from '../../shared/ai-engine-config.js'
+import { AllAiEnginesConfig } from '../../shared/ai-engine-config.js'
 import Database from 'better-sqlite3'
 
 let testDbPath = ''
@@ -78,7 +78,7 @@ function setupDb(opts?: {
     SettingsRepository.setCurrentBackend(engine)
   }
 
-  const aiConfig: AiConfigStore = {}
+  const aiConfig: AllAiEnginesConfig = {}
   if (opts?.yandexApiKey || opts?.folderId) {
     const yandex: Record<string, string> = {}
     if (opts.yandexApiKey) yandex['api_key'] = opts.yandexApiKey
@@ -90,7 +90,7 @@ function setupDb(opts?: {
     aiConfig['grok'] = { api_key: opts.grokApiKey }
   }
   if (Object.keys(aiConfig).length > 0) {
-    SettingsRepository.saveAiConfig(aiConfig)
+    SettingsRepository.saveAllAiEnginesConfig(aiConfig)
   }
 
   // Default to 'ru-RU' so tests don't need to specify it explicitly.

@@ -13,7 +13,8 @@ import { sanitizeProjectName } from '../lib/project-name.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-import { shell } from 'electron'
+import electron from 'electron'
+const { shell } = electron
 import { exec } from 'child_process'
 
 // ── Error helper ──────────────────────────────────────────────────────────────

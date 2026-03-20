@@ -91,7 +91,7 @@ export default function AiBillingPanel() {
   async function fetchBilling() {
     setLoading(true)
     try {
-      const data = await ipcClient.ai.billing() as BillingData
+      const data = (await ipcClient.ai.billing.get.query()) as BillingData
       setBilling(data)
     } catch {
       /* ignore */

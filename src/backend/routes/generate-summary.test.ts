@@ -10,7 +10,7 @@ import { migrateDatabase } from '../db/migrations.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 import { setCurrentDbPath } from '../db/state.js'
-import { AiConfigStore } from '../../shared/ai-engine-config.js'
+import { AllAiEnginesConfig } from '../../shared/ai-engine-config.js'
 import Database from 'better-sqlite3'
 
 let testDbPath = ''
@@ -75,7 +75,7 @@ function setupDb(opts?: {
     SettingsRepository.setCurrentBackend(engine)
   }
 
-  const aiConfig: AiConfigStore = {}
+  const aiConfig: AllAiEnginesConfig = {}
   if (opts?.yandexApiKey || opts?.folderId) {
     const yandex: Record<string, string> = {}
     if (opts.yandexApiKey) yandex['api_key'] = opts.yandexApiKey
@@ -92,7 +92,7 @@ function setupDb(opts?: {
     (aiConfig[engine] as Record<string, unknown>).summary_settings = opts.summarySettings
   }
   if (Object.keys(aiConfig).length > 0) {
-    SettingsRepository.saveAiConfig(aiConfig)
+    SettingsRepository.saveAllAiEnginesConfig(aiConfig)
   }
 
   const lang = opts?.textLanguage !== undefined ? opts.textLanguage : 'ru-RU'

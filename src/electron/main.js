@@ -2,6 +2,8 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shel
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { default as installExtension, REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer'
+import { appRouter } from './router';
+import { createIPCHandler } from 'electron-trpc/main';
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -331,10 +333,9 @@ app.whenReady().then(async () => {
   console.log('Application menu built')
 
   // Import tRPC IPC handlers instead of the old HTTP server
-  const { registerIpcHandlers } = await import('../../src/backend/trpc.js')
-  console.log('tRPC IPC handlers imported')
-  registerIpcHandlers()
-  console.log('tRPC IPC handlers registered')
+  console.log('Creating tRPC IPC handler')
+  createIPCHandler({ router: appRouter, windows: [window] });
+  console.log('tRPC IPC handler created')
 
   if (isDev) {
     serverUrl = 'http://localhost:3000'

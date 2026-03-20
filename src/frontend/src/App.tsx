@@ -6,7 +6,10 @@ import './styles.css'
 import { ThemeProvider } from './lib/theme/theme-provider'
 import { LocaleProvider } from './lib/locale'
 import { ProjectData } from './types/models'
-import { ipcClient } from './ipcClient'
+import { trpc, ipcClient } from './ipcClient'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient();
 
 /**
  * Root application component
@@ -24,7 +27,7 @@ export default function App() {
   useEffect(() => {
     const checkProjectStatus = async () => {
       try {
-        const data = await ipcClient.project.status()
+        const data = await ipcClient.project.status.query()
         setProjectOpen(data.isOpen)
         if (data.isOpen) {
           navigate('/project', { replace: true })
@@ -46,7 +49,7 @@ export default function App() {
 
   async function handleCloseProject() {
     try {
-      await ipcClient.project.close()
+      await ipcClient.project.close.mutate()
       setProjectOpen(false)
       navigate('/', { replace: true })
     } catch (e) {
@@ -59,32 +62,34 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <ThemeProvider>
-        <LocaleProvider>
-          <div className="app-root h-full flex items-center justify-center">
-            <div className="text-muted-foreground">Loading...</div>
-          </div>
-        </LocaleProvider>
-      </ThemeProvider>
+      <LocaleProvider>
+        <div className="app-root h-full flex items-center justify-center">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </LocaleProvider>
     )
   }
 
   return (
-    <ThemeProvider>
-      <LocaleProvider>
-        <div className="app-root h-full">
-          <Routes>
-            <Route path="/" element={<StartScreen onOpenProject={handleOpenProject} />} />
-            <Route path="/project" element={
-              projectOpen ? (
-                <Layout onClose={handleCloseProject} initialLayout={initialLayout} />
-              ) : (
-                <StartScreen onOpenProject={handleOpenProject} />
-              )
-            } />
-          </Routes>
-        </div>
-      </LocaleProvider>
-    </ThemeProvider>
+    <trpc.Provider client={ipcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <LocaleProvider>
+            <div className="app-root h-full">
+              <Routes>
+                <Route path="/" element={<StartScreen onOpenProject={handleOpenProject} />} />
+                <Route path="/project" element={
+                  projectOpen ? (
+                    <Layout onClose={handleCloseProject} initialLayout={initialLayout} />
+                  ) : (
+                    <StartScreen onOpenProject={handleOpenProject} />
+                  )
+                } />
+              </Routes>
+            </div>
+          </LocaleProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </trpc.Provider>
   )
 }

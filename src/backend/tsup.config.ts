@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ['server.ts'],
+  entry: ['server.ts', 'trpc.ts'],
   format: ['esm'],
   target: 'node16',
   platform: 'node',

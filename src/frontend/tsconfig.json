@@ -12,7 +12,9 @@
       "@/*": ["./src/*"],
       "@shared/*": ["../shared/*"]
     },
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node"],
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true
   },
   "include": ["src"]
 }

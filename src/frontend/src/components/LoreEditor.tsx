@@ -9,8 +9,8 @@ interface LoreEditorProps {
 }
 
 const loreAdapter: NodeEditorAdapter = {
-  getNode: (id) => ipcClient.lore.get(id),
-  patchNode: (id, data) => ipcClient.lore.patch(id, data),
+  getNode: (id) => ipcClient.lore.get.query(id),
+  patchNode: (id, data) => ipcClient.lore.patch.mutate({id, data}),
   primaryField: 'name',
   i18nPrefix: 'lore',
   generateEndpoint: '/api/ai/generate-lore',

@@ -10,8 +10,8 @@ import { migrateDatabase } from '../db/migrations.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 import { setCurrentDbPath } from '../db/state.js'
-import { AiConfigStore } from '../../shared/ai-engine-config.js'
 import Database from 'better-sqlite3'
+import { AllAiEnginesConfig } from '../../shared/ai-engine-config.js'
 
 let testDbPath = ''
 
@@ -80,7 +80,7 @@ function setupDb(opts?: {
     SettingsRepository.setCurrentBackend(currentEngine)
   }
 
-  const aiConfig: AiConfigStore = {}
+  const aiConfig: AllAiEnginesConfig = {}
   if (opts?.apiKey || opts?.folderId) {
     const yandex: Record<string, string> = {}
     if (opts.apiKey) yandex['api_key'] = opts.apiKey
@@ -92,7 +92,7 @@ function setupDb(opts?: {
     aiConfig['grok'] = { api_key: opts.grokApiKey }
   }
   if (Object.keys(aiConfig).length > 0) {
-    SettingsRepository.saveAiConfig(aiConfig)
+    SettingsRepository.saveAllAiEnginesConfig(aiConfig)
   }
 
   const repo = new LoreNodeRepository()
@@ -433,7 +433,7 @@ describe('syncLore', () => {
     expect(mockVsRetrieve).toHaveBeenCalledWith('new-idx-456')
 
     // Verify search_index_id stored in settings
-    const config = SettingsRepository.getAiConfig()
+    const config = SettingsRepository.getAllAiEnginesConfig()
     expect(config.yandex?.search_index_id).toBe('new-idx-456')
   })
 
@@ -467,7 +467,7 @@ describe('syncLore', () => {
     expect(mockVsCreate).not.toHaveBeenCalled()
 
     // Verify search_index_id cleared in settings
-    const config = SettingsRepository.getAiConfig()
+    const config = SettingsRepository.getAllAiEnginesConfig()
     expect(config.yandex?.search_index_id).toBeUndefined()
   })
 

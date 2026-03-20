@@ -25,10 +25,9 @@ export default function AiPlayground() {
   useEffect(() => {
 
     Promise.all([
-      ipcClient.ai.getAiConfigStore(),
-      ipcClient.settings.get('current_backend'),
-    ]).then(([loadedAiConfigStore, loadedCurrentBackend]) => {
-        const engine = loadedCurrentBackend.value
+      ipcClient.settings.allAiEnginesConfig.get.query(),
+      ipcClient.settings.allAiEnginesConfig.currentEngine.get.query(),
+    ]).then(([loadedAiConfigStore, engine]) => {
         setCurrentEngine(engine)
         if (!engine) return
 

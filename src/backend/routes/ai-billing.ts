@@ -1,5 +1,4 @@
 import { getCurrentDbPath } from '../db/state.js'
-import { AiConfigStore } from '../../shared/ai-engine-config.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 
 const MANAGEMENT_API_BASE = 'https://management-api.x.ai'
@@ -7,7 +6,7 @@ const MANAGEMENT_API_BASE = 'https://management-api.x.ai'
 /** Reads Grok management credentials from project settings. */
 function readGrokManagementConfig(dbPath: string): { managementKey: string; teamId: string } | null {
   try {
-    const config = SettingsRepository.getJson<AiConfigStore>('ai_config')
+    const config = SettingsRepository.getAllAiEnginesConfig()
     if (!config) return null
     const managementKey = (config.grok as any)?.management_key?.trim()
     const teamId = (config.grok as any)?.team_id?.trim()

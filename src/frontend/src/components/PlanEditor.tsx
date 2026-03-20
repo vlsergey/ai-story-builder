@@ -19,7 +19,7 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    ipcClient.planGraph.getNode(nodeId).then(data => {
+    ipcClient.planGraph.getNode.query(nodeId).then(data => {
       setNode(data)
       setLoading(false)
     }).catch(() => {
@@ -28,8 +28,8 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   }, [nodeId])
 
   const adapter = useMemo<NodeEditorAdapter>(() => ({
-    getNode: (id) => ipcClient.planGraph.getNode(id),
-    patchNode: (id, data) => ipcClient.planGraph.patchNode(id, data),
+    getNode: (id) => ipcClient.planGraph.getNode.query(id),
+    patchNode: (id, data) => ipcClient.planGraph.patchNode.mutate({id, data}),
     primaryField: 'title',
     i18nPrefix: 'plan',
     generateEndpoint: '/api/ai/generate-plan',

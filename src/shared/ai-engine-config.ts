@@ -3,7 +3,7 @@ import type { GrokAiGenerationSettings } from './grok-ai-generation-settings.js'
 import type { YandexAiGenerationSettings } from './yandex-ai-generation-settings.js'
 import type { AiEngineKey } from './ai-engines.js'
 
-export interface AiConfigStore {
+export interface AllAiEnginesConfig {
   'grok'?: GrokEngineConfig
   'yandex'?: YandexEngineConfig
   [key: AiEngineKey]: AiEngineConfig | undefined

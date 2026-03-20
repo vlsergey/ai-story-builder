@@ -1,73 +1,50 @@
-import React, { useEffect, useState } from 'react'
-import { BUILTIN_ENGINES, AiEngineKey } from '../lib/ai-engines'
-import { ipcClient } from '../ipcClient'
-import { dispatchAiEngineChanged } from '../lib/lore-events'
+import React, { useCallback, useState } from 'react'
+import { BUILTIN_ENGINES } from '../lib/ai-engines'
 import { useLocale } from '../lib/locale'
 import { useTheme } from '../lib/theme/theme-provider'
-import { AiConfigStore, AiEngineConfig } from '@shared/ai-engine-config'
 import AiEngineConfigEditor from './AiEngineConfigEditor'
+import { trpc } from '../ipcClient';
+import { Input } from './ui/input'
+import { AiEngineConfig } from '@shared/ai-engine-config'
+
+function setAndInvalidate<T extends { set: any; invalidate: () => any }>(node: T) {
+  return node.set.useMutation({
+    onSettled: () => node.invalidate()
+  });
+}
 
 export default function SettingsPanel() {
   const { t, locale, setLocale } = useLocale()
   const { preference: themePreference, setPreference: setThemePreference } = useTheme()
-  const [loading, setLoading] = useState(true)
-  const [aiConfigStore, setAiConfigStore] = useState<AiConfigStore | null>(null)
-  const [currentBackend, setCurrentBackend] = useState<string | null>(null)
+
+  const {data: aiConfigStore, isLoading: isAiConfigStoreLoading} = trpc.settings.allAiEnginesConfig.get.useQuery()
+  const {data: currentEngine, isLoading: isCurrentEngineLoading} = trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery()
+  const {data: autoGenerateSummary, isLoading: isAutoGenerateSummaryLoading} = trpc.settings.autoGenerateSummary.get.useQuery()
+  const {data: textLanguage, isLoading: isTextLanguageLoading} = trpc.settings.textLanguage.get.useQuery()
+  const {data: verboseAiLogging, isLoading: isVerboseAiLoggingLoading} = trpc.settings.verboseAiLogging.get.useQuery()
   const [engineError, setEngineError] = useState<string | null>(null)
-  const [textLanguage, setTextLanguage] = useState('ru-RU')
-  const [verboseAiLogging, setVerboseAiLogging] = useState(false)
-  const [autoGenerateSummary, setAutoGenerateSummary] = useState(false)
+  const utils = trpc.useUtils()
 
-  useEffect(() => {
-    Promise.all([
-      ipcClient.ai.getAiConfigStore(),
-      ipcClient.settings.get('current_backend'),
-      ipcClient.settings.get('text_language'),
-      ipcClient.settings.get('verbose_ai_logging'),
-      ipcClient.settings.get('auto_generate_summary'),
-    ]).then(([loadedAiConfigStore, loadedCurrentBackend, langData, verboseData, summaryData]) => {
-        setAiConfigStore(loadedAiConfigStore)
-        setCurrentBackend(loadedCurrentBackend.value)
-        if (langData.value) setTextLanguage(langData.value)
-        setVerboseAiLogging(verboseData.value === 'true')
-        setAutoGenerateSummary(summaryData.value === 'true')
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
+  const setCurrentEngine = trpc.settings.allAiEnginesConfig.currentEngine.set.useMutation({
+    onSuccess: () => setEngineError(null),
+    onError: (error) => setEngineError(error.message),
+    onSettled: () => utils.settings.allAiEnginesConfig.currentEngine.invalidate(),
+  }).mutate
 
-  async function handleVerboseAiLoggingChange(enabled: boolean) {
-    setVerboseAiLogging(enabled)
-    await ipcClient.settings.setVerboseAiLogging(String(enabled))
-  }
+  const setAllAiEnginesConfig = setAndInvalidate(utils.settings.allAiEnginesConfig)
+  const setAutoGenerateSummary = setAndInvalidate(utils.settings.autoGenerateSummary)
+  const setTextLanguage = setAndInvalidate(utils.settings.textLanguage)
+  const setVerboseAiLogging = setAndInvalidate(utils.settings.verboseAiLogging)
 
-  async function handleAutoGenerateSummaryChange(enabled: boolean) {
-    setAutoGenerateSummary(enabled)
-    await ipcClient.settings.set('auto_generate_summary', String(enabled))
-  }
+  const setAiEngineConfig = useCallback((engineId: string, aiEngineConfig: AiEngineConfig) => {
+    setAllAiEnginesConfig({
+      ...aiConfigStore,
+      [engineId]: aiEngineConfig,
+    })
+    utils.settings.allAiEnginesConfig.invalidate()
+  }, [aiConfigStore, setAllAiEnginesConfig, utils.settings.allAiEnginesConfig])
 
-  async function handleTextLanguageChange(lang: string) {
-    setTextLanguage(lang)
-    await ipcClient.settings.set('text_language', lang)
-  }
-
-  async function handleEngineSelect(engine: string | null) {
-    setEngineError(null)
-    try {
-      await ipcClient.ai.setCurrentEngine(engine)
-      setCurrentBackend(engine)
-      dispatchAiEngineChanged()
-    } catch (e) {
-      setEngineError((e as Error).message ?? 'Failed to save')
-    }
-  }
-
-  async function handleAiEngineConfigChange(engineId: AiEngineKey, aiEngineConfig: AiEngineConfig) {
-    setAiConfigStore(prev => ({...prev, [engineId]: aiEngineConfig}))
-    await ipcClient.ai.saveAiEngineConfig(engineId, aiEngineConfig)
-  }
-
-  if (loading) {
+  if (isAiConfigStoreLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <span className="text-muted-foreground text-sm">{t('settings.loading')}</span>
@@ -111,8 +88,9 @@ export default function SettingsPanel() {
           <h2 className="text-base font-semibold mb-3">{t('settings.textLanguage.title')}</h2>
           <div className="flex flex-col gap-1.5">
             <select
-              value={textLanguage}
-              onChange={e => handleTextLanguageChange(e.target.value)}
+              disabled={isTextLanguageLoading}
+              value={textLanguage || ''}
+              onChange={e => setTextLanguage(e.target.value)}
               className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
             >
               <option value="ru-RU">Русский (ru-RU)</option>
@@ -128,10 +106,11 @@ export default function SettingsPanel() {
         <section>
           <h2 className="text-base font-semibold mb-3">{t('settings.autoSummary.title')}</h2>
           <label className="flex items-start gap-2 cursor-pointer">
-            <input
+            <Input
+              disabled={isAutoGenerateSummaryLoading}
               type="checkbox"
               checked={autoGenerateSummary}
-              onChange={e => handleAutoGenerateSummaryChange(e.target.checked)}
+              onChange={e => setAutoGenerateSummary(e.target.checked)}
               className="mt-0.5 shrink-0"
             />
             <div>
@@ -148,8 +127,9 @@ export default function SettingsPanel() {
           <h2 className="text-base font-semibold mb-3">{t('settings.aiEngine.title')}</h2>
           <div className="flex flex-col gap-1.5">
             <select
-              value={currentBackend ?? ''}
-              onChange={e => handleEngineSelect(e.target.value || null)}
+              disabled={isCurrentEngineLoading}
+              value={currentEngine ?? ''}
+              onChange={e => setCurrentEngine(e.target.value || null)}
               className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
             >
               <option value="">{t('settings.aiEngine.none')}</option>
@@ -171,9 +151,9 @@ export default function SettingsPanel() {
           <AiEngineConfigEditor
             key={engine.id}
             engine={engine}
-            active={currentBackend === engine.id}
+            active={currentEngine === engine.id}
             value={aiConfigStore?.[engine.id] ?? {}}
-            onChange={(value: AiConfigStore) => handleAiEngineConfigChange(engine.id, value)}
+            onChange={(value) => setAiEngineConfig(engine.id, value)}
             />
         )}
 
@@ -181,10 +161,11 @@ export default function SettingsPanel() {
         <section>
           <h2 className="text-base font-semibold mb-3">{t('settings.debug.title')}</h2>
           <label className="flex items-start gap-2 cursor-pointer">
-            <input
+            <Input
               type="checkbox"
+              disabled={isVerboseAiLoggingLoading}
               checked={verboseAiLogging}
-              onChange={e => handleVerboseAiLoggingChange(e.target.checked)}
+              onChange={e => setVerboseAiLogging(e.target.checked)}
               className="mt-0.5 shrink-0"
             />
             <div>

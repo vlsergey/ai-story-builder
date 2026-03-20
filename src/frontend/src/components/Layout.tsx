@@ -133,7 +133,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   /** Creates a new blank child node under the given parent, then opens it in LoreEditor. */
   async function openLoreWizard(node: LoreNode) {
     try {
-      const { id } = await ipcClient.lore.create({ parent_id: node.id, name: 'New lore item' })
+      const { id } = await ipcClient.lore.create.mutate({ parent_id: node.id, name: 'New lore item' })
       window.dispatchEvent(new Event(LORE_TREE_REFRESH_EVENT))
       openLoreEditor({ id, name: 'New lore item', parent_id: node.id } as LoreNode)
     } catch { /* ignore */ }
@@ -141,8 +141,8 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
 
   // Load saved theme preference from the project settings
   useEffect(() => {
-    ipcClient.settings.get('ui_theme')
-      .then((data) => { if (data.value) setPreference(data.value) })
+    ipcClient.settings.get.query('ui_theme')
+      .then((value) => { if (value) setPreference(value) })
       .catch(() => {})
   }, [setPreference])
 
@@ -191,7 +191,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   // Load layout from database
   const loadLayoutFromDatabase = useCallback(async () => {
     try {
-      return await ipcClient.settings.getLayout()
+      return await ipcClient.settings.layout.get.query
     } catch (e) {
       console.error('Failed to load layout from database:', e)
       return null
@@ -273,7 +273,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     if (panelsCount === 0) return
 
     try {
-      await ipcClient.settings.saveLayout(layout)
+      await ipcClient.settings.layout.set.mutate(layout)
     } catch (e) {
       console.error('Failed to save layout to database:', e)
     }

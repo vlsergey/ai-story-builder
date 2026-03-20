@@ -1,18 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { LoreStatMode } from '../types/models'
-import { AI_ENGINE_CHANGED_EVENT } from './lore-events'
-import { ipcClient } from '../ipcClient'
 
 const LORE_STAT_KEY = 'ai-story-builder-lore-stat'
 
 export interface LoreSettings {
   statMode: LoreStatMode
-  currentAiEngine: string | null
 }
 
 export const LoreSettingsContext = createContext<LoreSettings>({
   statMode: 'words',
-  currentAiEngine: null,
 })
 
 export function useLoreSettings(): LoreSettings {
@@ -23,23 +19,6 @@ export function LoreSettingsProvider({ children }: { children: React.ReactNode }
   const [statMode, setStatMode] = useState<LoreStatMode>(
     () => (localStorage.getItem(LORE_STAT_KEY) as LoreStatMode | null) ?? 'words'
   )
-  const [currentAiEngine, setCurrentAiEngine] = useState<string | null>(null)
-
-  function fetchCurrentEngine() {
-    ipcClient.settings.get('current_backend')
-      .then(data => setCurrentAiEngine(data.value ?? null))
-      .catch(() => setCurrentAiEngine(null))
-  }
-
-  useEffect(() => {
-    fetchCurrentEngine()
-  }, [])
-
-  // Re-fetch the active engine whenever SettingsPanel changes it.
-  useEffect(() => {
-    window.addEventListener(AI_ENGINE_CHANGED_EVENT, fetchCurrentEngine)
-    return () => window.removeEventListener(AI_ENGINE_CHANGED_EVENT, fetchCurrentEngine)
-  }, [])
 
   // Sync statMode to Electron native menu radio on mount/change
   useEffect(() => {
@@ -59,7 +38,7 @@ export function LoreSettingsProvider({ children }: { children: React.ReactNode }
   }, [])
 
   return (
-    <LoreSettingsContext.Provider value={{ statMode, currentAiEngine }}>
+    <LoreSettingsContext.Provider value={{ statMode }}>
       {children}
     </LoreSettingsContext.Provider>
   )

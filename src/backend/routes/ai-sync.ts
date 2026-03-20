@@ -228,7 +228,7 @@ export async function syncLore(): Promise<{
 }> {
   // Step 1 — load settings and nodes
   const currentEngine = SettingsRepository.getCurrentBackend()
-  const config = SettingsRepository.getAiConfig()
+  const config = SettingsRepository.getAllAiEnginesConfig()
 
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
@@ -511,8 +511,6 @@ export async function syncLore(): Promise<{
     void _removed
     updatedConfig.yandex = rest
   }
-
-  SettingsRepository.saveAiConfig(updatedConfig)
 
   repo.deleteMarkedForDeletion()
 
