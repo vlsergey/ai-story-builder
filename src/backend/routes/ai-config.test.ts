@@ -8,6 +8,7 @@ import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { migrateDatabase } from '../db/migrations.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
+import Database from 'better-sqlite3'
 
 let testDbPath = ''
 
@@ -23,8 +24,6 @@ function setupDb(): string {
     os.tmpdir(),
     `ai_config_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`
   )
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
   db.close()

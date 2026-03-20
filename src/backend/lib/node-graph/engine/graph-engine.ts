@@ -5,7 +5,6 @@ import { SplitProcessor } from './split-processor.js'
 import { MergeProcessor } from './merge-processor.js'
 import type { PlanNodeType, PlanEdgeType, PlanNodeStatus } from '../../../../shared/plan-graph'
 import type { NodeData, NodeContext } from '../node-interfaces.js'
-import type { AiSettings } from '../../../../shared/ai-settings.js'
 import { mergeNodeSettings } from './settings-helper.js'
 import { generateSummary } from '../../../routes/generate-summary.js'
 import { PlanNodeService } from '../../../plan/nodes/plan-node-service.js'
@@ -37,18 +36,7 @@ export class GraphEngine implements NodeContext {
    * Get a node by ID using the node service.
    */
   getNode(id: number): NodeData | undefined {
-    const row = this.nodeService.getById(id)
-    if (!row) return undefined
-    return {
-      id: row.id,
-      type: row.type,
-      title: row.title,
-      content: row.content,
-      user_prompt: row.user_prompt,
-      system_prompt: row.system_prompt,
-      node_type_settings: row.node_type_settings,
-      status: row.status,
-    }
+    return this.nodeService.getById(id)
   }
 
   /**
@@ -67,37 +55,6 @@ export class GraphEngine implements NodeContext {
     const edgeRepo = new PlanEdgeRepository()
     const edges = edgeRepo.getByFromNodeId(nodeId)
     return edges.map(edge => ({ to_node_id: edge.to_node_id, type: edge.type }))
-  }
-
-  /**
-   * Retrieve AI settings from the project (model, webSearch, etc.).
-   */
-  getAiSettings(): AiSettings {
-    const engine = SettingsRepository.get('current_backend')
-    const config = SettingsRepository.getAiConfig()
-    if (!engine || !config) return {}
-
-    const engineConfig = config[engine] as Record<string, any> | undefined
-    if (!engineConfig) return {}
-    // Map known keys to AiSettings
-    const settings: AiSettings = {}
-    if (typeof engineConfig.model === 'string') {
-      settings.model = engineConfig.model
-    }
-    if (typeof engineConfig.web_search === 'string') {
-      settings.webSearch = engineConfig.web_search
-    }
-    if (typeof engineConfig.include_existing_lore === 'boolean') {
-      settings.includeExistingLore = engineConfig.include_existing_lore
-    }
-    if (typeof engineConfig.max_tokens === 'number') {
-      settings.maxTokens = engineConfig.max_tokens
-    }
-    if (typeof engineConfig.max_completion_tokens === 'number') {
-      settings.maxCompletionTokens = engineConfig.max_completion_tokens
-    }
-    console.log("AI Settings: " + JSON.stringify(engineConfig))
-    return settings
   }
 
   /**
@@ -173,17 +130,7 @@ export class GraphEngine implements NodeContext {
    * Retrieve all nodes in the graph.
    */
   private getAllNodes(): NodeData[] {
-    const rows = this.nodeService.getAll()
-    return rows.map(row => ({
-      id: row.id,
-      type: row.type,
-      title: row.title,
-      content: row.content,
-      user_prompt: row.user_prompt,
-      system_prompt: row.system_prompt,
-      node_type_settings: row.node_type_settings,
-      status: row.status,
-    }))
+    return this.nodeService.getAll()
   }
 
   /**

@@ -1,18 +1,7 @@
-import { getCurrentDbPath } from '../db/state.js'
-import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import type { AiSettings } from '../../shared/ai-settings.js'
-import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
-import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
-import { SettingsRepository } from '../settings/settings-repository.js'
-import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
+import type { AiGenerationSettings } from '../../shared/ai-generation-settings'
+import { getEngineAdapter } from '../lib/ai-engine-adapter'
+import { SettingsRepository } from '../settings/settings-repository'
+import { LoreNodeRepository } from '../lore/lore-node-repository'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -23,27 +12,20 @@ function makeError(message: string, status: number): Error {
 }
 
 export async function generatePlayground(
-  params: { systemPrompt?: string; prompt?: string; settings?: AiSettings },
+  params: { systemPrompt?: string; prompt?: string; settings?: AiGenerationSettings; includeExistingLore?: boolean },
   onThinking: (status: string, detail?: string) => void,
   onPartialJson: (data: Record<string, unknown>) => void,
 ): Promise<{ response_id?: string }> {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-
-  const { systemPrompt, prompt, settings = {} } = params
-  const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
+  const { systemPrompt, prompt, settings = {}, includeExistingLore = false } = params
 
   if (!prompt?.trim()) throw makeError('prompt is required', 400)
 
   let engine: string | undefined
-  let config: AiConfigStore = {}
   const engineFileIds: string[] = []
 
   try {
     engine = SettingsRepository.get('current_backend') || undefined
     if (!engine) throw makeError('no AI engine configured', 400)
-    config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
 
     if (includeExistingLore && engine) {
       const repo = new LoreNodeRepository()
@@ -61,9 +43,6 @@ export async function generatePlayground(
     throw makeError('failed to read project settings: ' + String(e), 500)
   }
 
-  const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
-  if (!engineDef) throw makeError(`Playground is not supported for engine '${engine}'`, 400)
-
   const adapter = getEngineAdapter(engine)
   if (!adapter) throw makeError(`Playground is not supported for engine '${engine}'`, 400)
 
@@ -80,14 +59,9 @@ export async function generatePlayground(
     {
       prompt: prompt.trim(),
       systemPrompt: systemPrompt?.trim() ?? '',
-      model: requestedModel?.trim() ?? '',
-      includeExistingLore: includeExistingLore ?? false,
-      webSearch: webSearch ?? 'none',
+      includeExistingLore,
+      aiGenerationSettings: settings,
       engineFileIds,
-      engineDef,
-      config,
-      maxTokens: maxTokens ?? undefined,
-      maxCompletionTokens: maxCompletionTokens ?? undefined,
     },
     (status, detail) => onThinking(status, detail),
     onDelta,

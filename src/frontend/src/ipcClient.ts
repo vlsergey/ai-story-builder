@@ -1,6 +1,9 @@
 // Typed IPC client that replaces fetch('/api/...') calls.
 // Uses window.electronAPI.invoke() to call IPC handlers registered in main.js.
 
+import { AiEngineKey } from "@shared/ai-engines"
+import { AiConfigStore, AiEngineConfig } from "../../shared/ai-engine-config"
+
 class IpcError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -65,12 +68,12 @@ export const ipcClient = {
     updatePart: (id: number, data: { content: string }) => invoke<{ ok: boolean }>('generated-part:update', id, data),
   },
   ai: {
-    getConfig: () => invoke<Record<string, unknown>>('ai:config:get'),
-    saveConfig: (data: { engine: string; fields: Record<string, unknown> }) => invoke<{ ok: boolean }>('ai:config:save', data),
-    setCurrentEngine: (data: { engine: string | null }) => invoke<{ ok: boolean }>('ai:current-engine', data),
-    getModels: (engine: string) => invoke<{ models: string[] }>('ai:models:get', engine),
+    getAiConfigStore: () => invoke<AiConfigStore>('ai:config-store:get'),
+    saveAiEngineConfig: (engine: AiEngineKey, data: AiEngineConfig) => invoke<{ ok: boolean }>('ai:config-store:save', data),
+    getCurrentEngine: () => invoke<{ ok: boolean }>('ai:current-engine:get'),
+    setCurrentEngine: (engine: string | null) => invoke<{ ok: boolean }>('ai:current-engine:set', engine),
     refreshModels: (engine: string) => invoke<{ models: string[] }>('ai:models:refresh', engine),
-    test: (engine: string, creds: Record<string, string>) => invoke<{ ok: boolean; detail?: string; error?: string }>('ai:test', engine, creds),
+    test: (engine: string, creds: AiEngineConfig) => invoke<{ ok: boolean; detail?: string; error?: string }>('ai:test', engine, creds),
     billing: () => invoke<{ configured: boolean; totals?: Record<string, unknown>; error?: string }>('ai:billing'),
     syncLore: () => invoke<{ ok: boolean; uploaded: number; deleted: number; unchanged: number; search_index_id: string | null }>('ai:sync-lore'),
     generateSummary: (params: { node_id: number; content?: string }) => invoke<{ summary: string; response_id?: string }>('ai:generate-summary', params),

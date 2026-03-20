@@ -77,18 +77,14 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
       try {
         const parsed = JSON.parse(node.content)
         if (Array.isArray(parsed)) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setParts(parsed)
         } else {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setParts([])
         }
       } catch {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setParts([])
       }
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setParts([])
     }
   }, [node.content])

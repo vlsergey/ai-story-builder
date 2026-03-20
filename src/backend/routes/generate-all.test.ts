@@ -11,6 +11,7 @@ import { SettingsRepository } from '../settings/settings-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 import { PlanEdgeRepository } from '../plan/edges/plan-edge-repository.js'
 import { setCurrentDbPath } from '../db/state.js'
+import Database from 'better-sqlite3'
 
 let testDbPath = ''
 
@@ -53,8 +54,6 @@ function setupDb(opts?: {
     os.tmpdir(),
     `generate_all_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`
   )
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
   db.close()
@@ -77,9 +76,7 @@ function setupDb(opts?: {
 
   const nodeRepo = new PlanNodeRepository()
   const edgeRepo = new PlanEdgeRepository()
-  let autoId = 1
   for (const n of opts?.nodes ?? []) {
-    const nodeId = n.id ?? autoId++
     nodeRepo.insert({
       title: n.title ?? 'Untitled',
       type: n.type,

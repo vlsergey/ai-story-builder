@@ -1,19 +1,32 @@
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import type { AppSettings } from '../types/index.js'
+import { app } from 'electron'
 
 /**
  * Returns the root data directory for user data.
  * In production (Electron): app.getPath('userData') — the OS-standard location.
- * In development (plain Node.js / tests): <cwd>/data as a local fallback.
+ * In development (plain Node.js / tests): use OS-specific user data directory.
  */
 export function getDataDir(): string {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { app: electronApp } = require('electron') as typeof import('electron')
-    return electronApp.getPath('userData')
+    return app.getPath('userData')
   } catch (_) {
-    return path.join(process.cwd(), 'data')
+    // Fallback for development mode: mimic Electron's userData path
+    const home = os.homedir()
+    let appData: string
+    switch (process.platform) {
+      case 'win32':
+        appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming')
+        break
+      case 'darwin':
+        appData = path.join(home, 'Library', 'Application Support')
+        break
+      default: // Linux and other
+        appData = process.env.XDG_CONFIG_HOME || path.join(home, '.config')
+    }
+    return path.join(appData, 'ai-story-builder')
   }
 }
 

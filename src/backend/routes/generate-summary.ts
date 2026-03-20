@@ -1,9 +1,8 @@
-import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import type { AiSettings } from '../../shared/ai-settings.js'
-import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
-import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
-import { SettingsRepository } from '../settings/settings-repository.js'
-import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
+import { BUILTIN_ENGINES } from '../../shared/ai-engines'
+import type { JsonSchemaSpec } from '../lib/ai-engine-adapter'
+import { getEngineAdapter } from '../lib/ai-engine-adapter'
+import { SettingsRepository } from '../settings/settings-repository'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -32,7 +31,6 @@ export async function generateSummary(params: { node_id?: number; content?: stri
   const nodeRepo = new PlanNodeRepository()
 
   let engine: string | undefined
-  let config: AiConfigStore = {}
   let textLanguage: string | undefined
   let nodeContent: string = ''
   const engineFileIds: string[] = []
@@ -40,7 +38,6 @@ export async function generateSummary(params: { node_id?: number; content?: stri
   try {
     engine = SettingsRepository.get('current_backend') || undefined
     if (!engine) throw makeError('no AI engine configured', 400)
-    config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
     textLanguage = SettingsRepository.get('text_language') || undefined
 
     nodeContent = content ?? ''
@@ -62,14 +59,7 @@ export async function generateSummary(params: { node_id?: number; content?: stri
   const adapter = getEngineAdapter(engine)
   if (!adapter) throw makeError(`Summary generation is not supported for engine '${engine}'`, 400)
 
-  const engineConfig = config[engine as keyof AiConfigStore] as Record<string, unknown> | undefined
-  const summarySettings = engineConfig?.summary_settings as AiSettings | undefined
-
-  const model = summarySettings?.model ?? ''
-  const includeExistingLore = summarySettings?.includeExistingLore ?? false
-  const webSearch = summarySettings?.webSearch ?? 'none'
-  const maxTokens = summarySettings?.maxTokens
-  const maxCompletionTokens = summarySettings?.maxCompletionTokens
+  const includeExistingLore = false // summary doesn't need lore attachments
 
   const systemPrompt = `You are a concise summarization assistant.
 Language: ${textLanguage}.
@@ -88,14 +78,8 @@ Output only the summary text.`
     {
       prompt: prompt.trim(),
       systemPrompt,
-      model: model || '',
-      includeExistingLore: includeExistingLore,
-      webSearch: webSearch,
+      includeExistingLore,
       engineFileIds,
-      engineDef,
-      config,
-      maxTokens: maxTokens,
-      maxCompletionTokens: maxCompletionTokens,
     },
     () => {}, // ignore thinking events
     onDelta,

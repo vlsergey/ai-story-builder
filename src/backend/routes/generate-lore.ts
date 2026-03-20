@@ -1,7 +1,7 @@
 import { parse as parsePartialJson } from 'best-effort-json-parser'
 import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import type { AiSettings } from '../../shared/ai-settings.js'
-import type { AiConfigStore, JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
+import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
+import type { JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
@@ -32,7 +32,8 @@ export interface GenerateLoreParams {
   prompt?: string
   mode?: 'generate' | 'improve'
   baseContent?: string
-  settings?: AiSettings
+  aiGenerationSettings?: AiGenerationSettings
+  includeExistingLore?: boolean
 }
 
 export async function generateLore(
@@ -48,22 +49,19 @@ export async function generateLore(
   cached_tokens?: number
   reasoning_tokens?: number
 }> {
-  const { prompt, mode, baseContent, settings = {} } = params
-  const { model: requestedModel, webSearch, includeExistingLore, maxTokens, maxCompletionTokens } = settings
+  const { prompt, mode, baseContent, aiGenerationSettings = {}, includeExistingLore = false } = params
   const responseSchema = LORE_RESPONSE_SCHEMA
   if (!prompt?.trim()) throw makeError('prompt is required', 400)
 
   let engine: string | undefined
-  let config: AiConfigStore = {}
-  let textLanguage: string | undefined
+  let textLanguage: string | null
   const engineFileIds: string[] = []
 
   try {
     engine = SettingsRepository.get('current_backend') || undefined
     if (!engine) throw makeError('no AI engine configured', 400)
 
-    config = SettingsRepository.getJson<AiConfigStore>('ai_config') ?? {}
-    textLanguage = SettingsRepository.get('text_language') || undefined
+    textLanguage = SettingsRepository.getTextLanguage()
 
     if (includeExistingLore && engine) {
       const loreRepo = new LoreNodeRepository()
@@ -118,15 +116,10 @@ export async function generateLore(
     {
       prompt: prompt.trim(),
       systemPrompt,
-      model: requestedModel?.trim() ?? '',
-      includeExistingLore: includeExistingLore ?? false,
-      webSearch: webSearch ?? 'none',
+      includeExistingLore,
+      aiGenerationSettings,
       engineFileIds,
-      engineDef,
-      config,
       responseSchema,
-      maxTokens: maxTokens ?? undefined,
-      maxCompletionTokens: maxCompletionTokens ?? undefined,
     },
     (status, detail) => onThinking(status, detail),
     onDelta,

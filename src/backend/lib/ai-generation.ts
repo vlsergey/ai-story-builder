@@ -1,7 +1,8 @@
 import { generatePlan } from '../routes/generate-plan.js';
 import { generateLore } from '../routes/generate-lore.js';
 import type { NodeData } from './node-graph/node-interfaces.js';
-import type { AiSettings } from '../../shared/ai-settings.js';
+import type { AiGenerationSettings } from '../../shared/ai-generation-settings'
+import { SettingsRepository } from '../settings/settings-repository.js';
 
 /**
  * Generate content for a node using AI.
@@ -9,7 +10,6 @@ import type { AiSettings } from '../../shared/ai-settings.js';
  */
 export async function generateNodeContent(
   node: NodeData,
-  aiSettings?: AiSettings
 ): Promise<string | null> {
   console.log(`[generateNodeContent] node ${node.id} type ${node.type} prompt: ${node.user_prompt || node.title}`);
   const prompt = node.user_prompt || node.title;
@@ -19,11 +19,17 @@ export async function generateNodeContent(
     return null;
   }
 
+  const currentEngine = SettingsRepository.getCurrentBackend()
+  if (!currentEngine)
+    throw Error("No AI engine configured")
+
+  const aiGenerationSettings: AiGenerationSettings = (node.ai_settings ? JSON.parse(node.ai_settings) : {})[currentEngine]
+
   const params = {
     prompt: prompt.trim(),
     mode: 'generate' as const,
     baseContent: node.content || undefined,
-    settings: aiSettings || {},
+    aiGenerationSettings: aiGenerationSettings,
     nodeId: node.id,
   };
 

@@ -37,7 +37,6 @@ export default function ResizableTextarea({
     if (initialHeight !== height) {
       setHeight(initialHeight);
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [initialHeight, height]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {

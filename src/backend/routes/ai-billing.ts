@@ -1,5 +1,5 @@
 import { getCurrentDbPath } from '../db/state.js'
-import type { AiConfigStore } from '../lib/ai-engine-adapter.js'
+import { AiConfigStore } from '../../shared/ai-engine-config.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 
 const MANAGEMENT_API_BASE = 'https://management-api.x.ai'

@@ -34,9 +34,6 @@ export class LoreProcessor implements NodeProcessor<LoreSettings> {
   }
 
   async regenerate(context: NodeContext, nodeData: NodeData, settings: LoreSettings): Promise<string | null> {
-    // Generate content using AI for lore nodes
-    const aiSettings = context.getAiSettings()
-    const content = await generateNodeContent(nodeData, aiSettings)
-    return content
+    return await generateNodeContent(nodeData)
   }
 }

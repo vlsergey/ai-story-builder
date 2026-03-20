@@ -4,6 +4,7 @@
   "description": "AI-powered story building tool",
   "author": "Sergey Vladimirov",
   "private": true,
+  "type": "module",
   "main": "src/electron/main.js",
   "workspaces": [
     "src/frontend",
@@ -11,7 +12,7 @@
   ],
   "scripts": {
     "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "dev": "electron-rebuild -f -w better-sqlite3 && concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/server.js tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "dev": "electron-rebuild -f -w better-sqlite3 && concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/server.mjs tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "build": "npm run build --workspace=src/frontend",
     "build:backend": "npm run build --workspace=src/backend",
     "test": "npm rebuild better-sqlite3 && npm run test --workspace=src/backend && npm run test --workspace=src/frontend",
@@ -22,7 +23,7 @@
     "generate-schema": "tsx scripts/generate-schema.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.4",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.57.1",
     "@vitejs/plugin-react": "^6.0.1",
@@ -32,7 +33,7 @@
     "electron-builder": "^26.8.1",
     "electron-devtools-installer": "^4.0.0",
     "electron-rebuild": "^3.2.9",
-    "eslint": "^8.57.0",
+    "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-unused-imports": "^4.4.1",

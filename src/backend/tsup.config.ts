@@ -2,7 +2,8 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: ['server.ts'],
-  format: ['cjs'],
+  format: ['esm'],
+  target: 'node16',
   platform: 'node',
   outDir: '../../dist/backend',
   // Native and optional modules must remain as runtime require() calls;
@@ -11,4 +12,5 @@ export default defineConfig({
   bundle: true,
   sourcemap: false,
   clean: true,
+  noExternal: [],
 })

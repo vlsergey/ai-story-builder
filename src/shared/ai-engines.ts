@@ -39,6 +39,9 @@ export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
   NC21: { label: 'NC-21', minAge: 21, bg: '#6b21a8', fg: '#fff' }, // purple-800
 }
 
+export const AI_ENGINES_KEYS = ["grok", "yandex"]
+export type AiEngineKey = typeof AI_ENGINES_KEYS[number]
+
 export interface AiEngineCapabilities {
   /** Upload documents to persistent AI storage. */
   fileUpload: boolean
@@ -61,33 +64,29 @@ export interface AiEngineCapabilities {
   knowledgeBaseAttachment: boolean
 }
 
-export interface AiEngineConfigField {
+export interface AiEngineField {
   key: string
-  type: 'text' | 'password' | 'textarea'
+  type: 'checkbox' | 'number' | 'password' | 'select' | 'input' | 'textarea'
   /** Default value pre-filled in the field when no saved value exists. */
-  defaultValue?: string
+  defaultValue?: string,
+  required?: boolean,
+  options?: string[],
 }
 
 export interface AiEngineDefinition {
-  id: string
+  id: AiEngineKey
   /** Provider proper name (e.g. "xAI", "Yandex"). Not translated — it is a brand name. */
   provider: string
   capabilities: AiEngineCapabilities
   ageRating: AgeRating
-  configFields: AiEngineConfigField[]
+  configFields: AiEngineField[]
+  aiSettingsFields: AiEngineField[],
   /**
    * Maximum number of files that can be attached to a single request, or null if unlimited.
    * When set and the engine supports fileUpload + fileAttachment, the lore tree is collapsed
    * to at most this many files before uploading (level-2 collapse).
    */
   maxFilesPerRequest: number | null
-  /**
-   * Web search support mode for lore generation:
-   * - 'none': not supported — no UI shown
-   * - 'contextSize': dropdown none/low/medium/high (Yandex)
-   * - 'boolean': checkbox on/off (Grok)
-   */
-  webSearch: 'none' | 'contextSize' | 'boolean'
 }
 
 /** Capability keys in display order. Labels and descriptions are in i18n locale files. */
@@ -99,45 +98,53 @@ export const CAPABILITY_KEYS: Array<keyof AiEngineCapabilities> = [
   'knowledgeBaseAttachment',
 ]
 
+export const GROK_ENGINE_DEF : AiEngineDefinition = {
+  id: 'grok',
+  provider: 'xAI',
+  ageRating: 'NC21',
+  capabilities: {
+    fileUpload: true,
+    fileDeletion: false,
+    fileAttachment: true,
+    knowledgeBase: false,
+    knowledgeBaseAttachment: false,
+  },
+  configFields: [
+    { key: 'api_key', type: 'password' },
+    { key: 'management_key', type: 'password' },
+    { key: 'team_id', type: 'input' },
+  ],
+  aiSettingsFields: [
+    { key: 'webSearch', type: 'checkbox'}
+  ],
+  maxFilesPerRequest: 10,
+}
+
+export const YANDEX_ENGINE_DEF : AiEngineDefinition = {
+  id: 'yandex',
+  provider: 'Yandex',
+  ageRating: '12',
+  capabilities: {
+    fileUpload: true,
+    fileDeletion: true,
+    fileAttachment: true,
+    knowledgeBase: true,
+    knowledgeBaseAttachment: true,
+  },
+  configFields: [
+    { key: 'api_key',   type: 'password' },
+    { key: 'folder_id', type: 'input' },
+  ],
+  aiSettingsFields: [
+    { key: 'webSearch', type: 'select', options: ['none', 'low', 'medium', 'high'], defaultValue: 'none' }
+  ],
+  maxFilesPerRequest: null,
+}
+
 /** Built-in AI engine definitions. */
 export const BUILTIN_ENGINES: AiEngineDefinition[] = [
-  {
-    id: 'grok',
-    provider: 'xAI',
-    ageRating: 'NC21',
-    capabilities: {
-      fileUpload: true,
-      fileDeletion: false,
-      fileAttachment: true,
-      knowledgeBase: false,
-      knowledgeBaseAttachment: false,
-    },
-    configFields: [
-      { key: 'api_key', type: 'password' },
-      { key: 'management_key', type: 'password' },
-      { key: 'team_id', type: 'text' },
-    ],
-    maxFilesPerRequest: 10,
-    webSearch: 'boolean',
-  },
-  {
-    id: 'yandex',
-    provider: 'Yandex',
-    ageRating: '12',
-    capabilities: {
-      fileUpload: true,
-      fileDeletion: true,
-      fileAttachment: true,
-      knowledgeBase: true,
-      knowledgeBaseAttachment: true,
-    },
-    configFields: [
-      { key: 'api_key',   type: 'password' },
-      { key: 'folder_id', type: 'text' },
-    ],
-    maxFilesPerRequest: null,
-    webSearch: 'contextSize',
-  },
+  GROK_ENGINE_DEF,
+  YANDEX_ENGINE_DEF,
 ]
 
 /** Returns the capabilities of the given engine, or null if unknown. */

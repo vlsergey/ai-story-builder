@@ -17,6 +17,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 // ── Mock state so the route uses our temp DB ──────────────────────────────
@@ -47,8 +48,6 @@ import { LoreNodeRepository } from './lore-node-repository.js'
 function setupDb(): string {
   const file = path.join(os.tmpdir(), `lore_move_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`)
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
   db.close()

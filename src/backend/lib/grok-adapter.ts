@@ -1,34 +1,45 @@
-import type { AiEngineAdapter, GenerateResponseRequest } from './ai-engine-adapter.js'
-import { grokGenerate } from './grok-client.js'
+import type { AiEngineAdapter, GenerateResponseRequest } from './ai-engine-adapter'
+import type { GrokAiGenerationSettings } from '../../shared/grok-ai-generation-settings'
+import { grokGenerate } from './grok-client'
+import { SettingsRepository } from '../settings/settings-repository';
+import { GROK_ENGINE_DEF as engineDef } from '../../shared/ai-engines';
 
-export class GrokAdapter implements AiEngineAdapter {
+export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
   async generateResponse(
-    req: GenerateResponseRequest,
+    req: GenerateResponseRequest<GrokAiGenerationSettings>,
     onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
   ): Promise<{ response_id?: string; tokensInput?: number; tokensOutput?: number; tokensTotal?: number; cachedTokens?: number; reasoningTokens?: number; costUsdTicks?: number }> {
-    const apiKey = req.config.grok?.api_key?.trim()
+
+    const engineConfig = SettingsRepository.getAiConfig().grok ?? {}
+
+    const apiKey = engineConfig.api_key?.trim()
     if (!apiKey) throw new Error('Grok api_key is required')
 
-    const maxFiles = req.engineDef.maxFilesPerRequest ?? 10
+    const actualAiSettings = {
+      ...engineConfig.defaultAiSettings,
+      ...req.aiGenerationSettings,
+    }
+
+    const maxFiles = engineDef.maxFilesPerRequest ?? 10
     const attachableFileIds = req.engineFileIds.slice(0, maxFiles)
     const userContent: Array<{ type: 'input_text'; text: string } | { type: 'input_file'; file_id: string }> = [
       { type: 'input_text', text: req.prompt },
     ]
-    if (req.includeExistingLore && req.engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
+    if (req.includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
       for (const fileId of attachableFileIds) {
         userContent.push({ type: 'input_file', file_id: fileId })
       }
     }
 
     const requestParams: Record<string, unknown> = {
-      model: req.model || 'grok-3',
+      model: actualAiSettings.model,
       instructions: req.systemPrompt,
       input: [{ role: 'user', content: userContent }],
-      ...(req.maxTokens != null ? { max_output_tokens: req.maxTokens } : {}),
-      ...(req.maxCompletionTokens != null ? { max_completion_tokens: req.maxCompletionTokens } : {}),
+      ...(actualAiSettings.maxTokens != null ? { max_output_tokens: actualAiSettings.maxTokens } : {}),
+      ...(actualAiSettings.maxCompletionTokens != null ? { max_completion_tokens: actualAiSettings.maxCompletionTokens } : {}),
     }
-    if (req.webSearch && req.webSearch !== 'none') {
+    if (actualAiSettings.webSearch === true) {
       requestParams.tools = [{ type: 'web_search' }]
     }
     if (req.responseSchema && req.stringFormat !== false) {

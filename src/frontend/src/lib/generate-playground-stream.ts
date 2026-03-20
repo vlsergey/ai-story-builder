@@ -1,9 +1,9 @@
-import type { AiSettings } from '../../../shared/ai-settings.js'
+import type { AiGenerationSettings } from '../../../shared/ai-generation-settings'
 
 export interface GeneratePlaygroundOptions {
   systemPrompt?: string
   prompt: string
-  settings?: AiSettings
+  aiGenerationSettings?: AiGenerationSettings
   onThinking?: (status: string, detail?: string) => void
   onPartialJson?: (data: Record<string, unknown>) => void
   onDone?: (data: { response_id?: string }) => void
@@ -41,7 +41,7 @@ export async function generatePlaygroundStream(options: GeneratePlaygroundOption
     window.electronAPI.startStream(streamId, 'generate-playground', {
       systemPrompt: options.systemPrompt,
       prompt: options.prompt,
-      settings: options.settings,
+      aiGenerationSettings: options.aiGenerationSettings,
     }).catch(reject)
   })
 }

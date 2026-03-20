@@ -36,8 +36,7 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
   async regenerate(context: NodeContext, nodeData: NodeData, settings: TextSettings): Promise<string | null> {
     // Generate content using AI for text nodes
     console.log(`[TextProcessor] regenerating node ${nodeData.id} (title: ${nodeData.title})`)
-    const aiSettings = context.getAiSettings()
-    const content = await generateNodeContent(nodeData, aiSettings)
+    const content = await generateNodeContent(nodeData)
     console.log(`[TextProcessor] generated content length: ${content?.length ?? 'null'}`)
     return content
   }

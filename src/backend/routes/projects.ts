@@ -13,6 +13,8 @@ import { sanitizeProjectName } from '../lib/project-name.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
+import { shell } from 'electron'
+import { exec } from 'child_process'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -24,7 +26,6 @@ function makeError(message: string, status: number): Error {
 
 // Lazy loader — deferred so that test imports don't trigger the require
 function openProjectDatabase(dbPath: string): import('better-sqlite3').Database {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require('../db/index.js') as {
     openProjectDatabase: (p: string) => import('better-sqlite3').Database
   }
@@ -128,13 +129,9 @@ export function openProjectFolder(): { ok: boolean } {
   fs.mkdirSync(projectsDir, { recursive: true })
   try {
     // In production, the backend runs inside Electron — use shell.openPath()
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { shell } = require('electron') as typeof import('electron')
     shell.openPath(projectsDir)
   } catch {
     // In dev, fall back to a platform-specific CLI command
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { exec } = require('child_process') as typeof import('child_process')
     const cmd =
       process.platform === 'win32'
         ? `explorer "${projectsDir}"`

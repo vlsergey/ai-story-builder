@@ -1,8 +1,8 @@
-import type { AiSettings } from '../../../shared/ai-settings.js'
+import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
 
 export interface GenerateNodeOptions {
   prompt: string
-  settings?: AiSettings
+  aiGenerationSettings?: AiGenerationSettingsDto
   /** 'generate' (default) | 'improve' */
   mode?: 'generate' | 'improve'
   /** The current content to improve; only used when mode='improve' */
@@ -50,13 +50,7 @@ export async function generateNodeStream(
     // endpoint is like '/api/ai/generate-lore' or '/api/ai/generate-plan'
     const ipcEndpoint = endpoint.replace('/api/ai/', '')
 
-    window.electronAPI.startStream(streamId, ipcEndpoint, {
-      prompt: options.prompt,
-      mode: options.mode,
-      baseContent: options.baseContent,
-      settings: options.settings,
-      nodeId: options.nodeId,
-    }).catch(reject)
+    window.electronAPI.startStream(streamId, ipcEndpoint, options).catch(reject)
   })
 }
 

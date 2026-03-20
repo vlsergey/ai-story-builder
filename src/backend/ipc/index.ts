@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import type { WebContents } from 'electron'
+import { Console } from 'node:console'
 import { getLoreTree, getLoreNode, createLoreNode, patchLoreNode, deleteLoreNode, importLoreNode, moveLoreNode, duplicateLoreNode, sortLoreChildren, reorderLoreChildren, restoreLoreNode } from '../lore/lore-routes.js'
 import { getPlanNodes, getPlanNode, createPlanNode, patchPlanNode, deletePlanNode, startPlanNodeReview, acceptPlanNodeReview } from '../plan/plan-routes.js'
 import { getPlanGraph, createGraphEdge, patchGraphEdge, deleteGraphEdge } from '../plan/plan-routes.js'
@@ -13,13 +14,11 @@ import { generatePlan } from '../routes/generate-plan.js'
 import { generatePlayground } from '../routes/generate-playground.js'
 import { generateAll } from '../routes/generate-all.js'
 import { generateSummary } from '../routes/generate-summary.js'
-import { generate, updateGeneratedPart } from '../routes/generation.js'
 import { restoreLastOpenedProject } from '../db/state.js'
 
 // Unify stdout/stderr to avoid log buffering issues
-const nodeConsole = require('console')
 // Create a new console instance where both streams go to stdout
-const unifiedConsole = new nodeConsole.Console(process.stdout, process.stdout)
+const unifiedConsole = new Console(process.stdout, process.stdout)
 console.log = unifiedConsole.log.bind(unifiedConsole)
 console.error = unifiedConsole.error.bind(unifiedConsole)
 console.warn = unifiedConsole.warn.bind(unifiedConsole)
@@ -138,10 +137,6 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:billing', wrap(getAiBilling))
   ipcMain.handle('ai:sync-lore', wrap(syncLore))
   ipcMain.handle('ai:generate-summary', wrap((params: any) => generateSummary(params)))
-
-  // Generation (legacy)
-  ipcMain.handle('generate', wrap((data: any) => generate(data)))
-  ipcMain.handle('generated-part:update', wrap((id: number, data: any) => updateGeneratedPart(id, data)))
 
   // Streaming
   ipcMain.handle('stream:start', (event, { streamId, endpoint, params }) => {

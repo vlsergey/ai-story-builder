@@ -1,5 +1,4 @@
 import type { PlanNodeType, PlanEdgeType, PlanNodeStatus } from '../../../shared/plan-graph.js'
-import type { AiSettings } from '../../../shared/ai-settings'
 
 /**
  * Interface for nodes that can produce a single text output (for 'text' edges).
@@ -26,8 +25,8 @@ export interface NodeData {
   user_prompt: string | null
   system_prompt: string | null
   node_type_settings: string | null
-  status: PlanNodeStatus
-  // other fields as needed
+  status: PlanNodeStatus,
+  ai_settings: string | null,
 }
 
 /**
@@ -37,6 +36,4 @@ export interface NodeContext {
   getNode(id: number): NodeData | undefined
   getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: PlanEdgeType }>
   getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: PlanEdgeType }>
-  // Additional helper methods can be added
-  getAiSettings(): AiSettings
 }

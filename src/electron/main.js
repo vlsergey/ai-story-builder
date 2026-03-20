@@ -1,8 +1,10 @@
-'use strict'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell } from 'electron'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { default as installExtension, REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer'
 
-const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell, session } = require('electron')
-const path = require('path')
-const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 /** Native menu label translations. */
 const MENU_STRINGS = {
@@ -177,7 +179,7 @@ function buildApplicationMenu() {
   }
 
   const template = [
-    // macOS: first entry is always the app menu (app name, About, Quit, etc.)\
+    // macOS: first entry is always the app menu (app name, About, Quit, etc.)
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
 
     {
@@ -206,6 +208,7 @@ function buildApplicationMenu() {
 }
 
 function createWindow() {
+  console.log('createWindow called with serverUrl:', serverUrl)
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -213,11 +216,15 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      sandbox: false,
+      worldSafeExecuteJavaScript: true,
+      preload: path.join(__dirname, 'preload.mjs'),
     },
   })
 
-  win.loadURL(serverUrl)
+  win.loadURL(serverUrl).catch(err => {
+    console.error('Failed to load URL:', err)
+  })
 
   if (isDev) {
     win.webContents.openDevTools()
@@ -228,16 +235,16 @@ function createWindow() {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+  console.log('Window created successfully')
 }
 
 // In production Electron requires better-sqlite3 directly.
 // If it was compiled for a different Node.js ABI, show a clear error
 // instead of crashing with a cryptic native-module message.
-function checkNativeDeps() {
+async function checkNativeDeps() {
   try {
-    require('better-sqlite3')
+    await import('better-sqlite3')
   } catch (e) {
-    const { dialog } = require('electron')
     dialog.showErrorBox(
       'Native module needs rebuild',
       'better-sqlite3 was compiled for a different version of Node.js.\n\n' +
@@ -317,14 +324,20 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
 })
 
 app.whenReady().then(async () => {
-  checkNativeDeps()
+  console.log('Electron app is ready')
+  await checkNativeDeps()
+  console.log('Native deps checked')
   buildApplicationMenu()
+  console.log('Application menu built')
 
-  const { registerIpcHandlers } = require('../../dist/backend/server')
+  const { registerIpcHandlers } = await import('../../dist/backend/server.mjs')
+  console.log('Backend server imported')
   registerIpcHandlers()
+  console.log('IPC handlers registered')
 
   if (isDev) {
     serverUrl = 'http://localhost:3000'
+    console.log('Development mode, serverUrl:', serverUrl)
     // Install React Developer Tools
     try {
       await installExtension(REACT_DEVELOPER_TOOLS, {
@@ -336,8 +349,11 @@ app.whenReady().then(async () => {
     }
   } else {
     serverUrl = `file://${path.join(app.getAppPath(), 'dist', 'index.html')}`
+    console.log('Production mode, serverUrl:', serverUrl)
   }
+  console.log('Creating window...')
   createWindow()
+  console.log('Window created')
 })
 
 // Quit when all windows are closed, except on macOS where the app stays

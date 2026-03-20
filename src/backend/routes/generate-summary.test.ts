@@ -10,6 +10,8 @@ import { migrateDatabase } from '../db/migrations.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 import { setCurrentDbPath } from '../db/state.js'
+import { AiConfigStore } from '../../shared/ai-engine-config.js'
+import Database from 'better-sqlite3'
 
 let testDbPath = ''
 
@@ -60,8 +62,6 @@ function setupDb(opts?: {
     os.tmpdir(),
     `gen_summary_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`
   )
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3')
   const db = new Database(file)
   migrateDatabase(db)
   db.close()
@@ -75,7 +75,7 @@ function setupDb(opts?: {
     SettingsRepository.setCurrentBackend(engine)
   }
 
-  const aiConfig: Record<string, unknown> = {}
+  const aiConfig: AiConfigStore = {}
   if (opts?.yandexApiKey || opts?.folderId) {
     const yandex: Record<string, string> = {}
     if (opts.yandexApiKey) yandex['api_key'] = opts.yandexApiKey

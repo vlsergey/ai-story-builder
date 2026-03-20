@@ -1,6 +1,9 @@
-import React from 'react'
-import { BUILTIN_ENGINES } from '../../../shared/ai-engines.js'
-import type { AiSettings } from '../../../shared/ai-settings.js'
+import React, { useEffect, useState } from 'react'
+import { BUILTIN_ENGINES } from '../../../shared/ai-engines'
+import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
+import EngineAiSettingsField from './EngineAiSettingsField'
+import { ipcClient } from '@/ipcClient'
+import { Input } from './ui/input'
 
 function shortModelName(modelId: string): string {
   return modelId.replace(/^gpt:\/\/[^/]+\//, '')
@@ -8,55 +11,50 @@ function shortModelName(modelId: string): string {
 
 interface AiGenerationSettingsProps {
   engineId: string | null
-  availableModels: string[]
-  settings: AiSettings
-  onSettingsChange: (s: AiSettings) => void
+  value: AiGenerationSettingsDto
+  onChange: (s: AiGenerationSettingsDto) => void
   disabled?: boolean
   className?: string
 }
 
 export default function AiGenerationSettings({
   engineId,
-  availableModels,
-  settings,
-  onSettingsChange,
+  value,
+  onChange,
   disabled,
   className = 'flex items-center gap-3 px-2 py-1.5 border-b border-border shrink-0 flex-wrap',
 }: AiGenerationSettingsProps) {
   const engineDef = BUILTIN_ENGINES.find(e => e.id === engineId)
-  const set = (patch: Partial<AiSettings>) => onSettingsChange({ ...settings, ...patch })
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+
+  const set = (patch: Partial<AiGenerationSettingsDto>) => onChange({ ...value, ...patch })
+
+  const handleEngineFieldChange = (engine: string, fieldKey: string, value: any) => {
+    set({ [fieldKey]: value })
+  }
+
+  // load models
+  useEffect(() => {
+    if (!engineId) {
+      setAvailableModels([])
+      return
+    }
+    ipcClient.ai.getAiConfigStore().then( aiConfigStore => {
+      if (!engineId) {
+        setAvailableModels([])
+        return
+      }
+
+      const currentEngineConfig = aiConfigStore[engineId] ?? {}
+      setAvailableModels(currentEngineConfig.available_models ?? [])
+    } )
+  }, [engineId, setAvailableModels]);
 
   return (
     <div className={className}>
-      {engineDef?.webSearch === 'contextSize' && (
-        <select
-          value={settings.webSearch ?? 'none'}
-          onChange={e => set({ webSearch: e.target.value })}
-          disabled={disabled}
-          className="text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
-          title="Web search"
-        >
-          <option value="none">No web search</option>
-          <option value="low">Web: low</option>
-          <option value="medium">Web: medium</option>
-          <option value="high">Web: high</option>
-        </select>
-      )}
-      {engineDef?.webSearch === 'boolean' && (
-        <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-          <input
-            type="checkbox"
-            checked={(settings.webSearch ?? 'none') !== 'none'}
-            onChange={e => set({ webSearch: e.target.checked ? 'on' : 'none' })}
-            className="accent-primary"
-            disabled={disabled}
-          />
-          Web search
-        </label>
-      )}
       {availableModels.length > 0 && (
         <select
-          value={settings.model ?? ''}
+          value={value.model ?? ''}
           onChange={e => set({ model: e.target.value })}
           disabled={disabled}
           className="text-sm border border-border rounded px-2 py-0.5 bg-background max-w-[200px] disabled:opacity-50"
@@ -67,38 +65,41 @@ export default function AiGenerationSettings({
           ))}
         </select>
       )}
-      <label className="flex items-center gap-1.5 text-sm select-none cursor-pointer shrink-0">
-        <input
-          type="checkbox"
-          checked={settings.includeExistingLore ?? true}
-          onChange={e => set({ includeExistingLore: e.target.checked })}
-          className="accent-primary"
-          disabled={disabled}
-        />
-        Include existing lore
-      </label>
       <label className="flex items-center gap-1.5 text-sm shrink-0">
         <span className="text-muted-foreground">Max tokens</span>
-        <input
+        <Input
           type="number"
           min={1}
-          value={settings.maxTokens ?? 2048}
+          value={value.maxTokens ?? 2048}
           onChange={e => { const v = parseInt(e.target.value, 10); if (v > 0) set({ maxTokens: v }) }}
           disabled={disabled}
-          className="w-28 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+          className="w-28"
         />
       </label>
       <label className="flex items-center gap-1.5 text-sm shrink-0">
         <span className="text-muted-foreground">Max completion tokens</span>
-        <input
+        <Input
           type="number"
           min={0}
-          value={settings.maxCompletionTokens ?? 0}
+          value={value.maxCompletionTokens ?? 0}
           onChange={e => { const v = parseInt(e.target.value, 10) || 0; set({ maxCompletionTokens: v > 0 ? v : undefined }) }}
           disabled={disabled}
-          className="w-28 text-sm border border-border rounded px-2 py-0.5 bg-background disabled:opacity-50"
+          className="w-28"
         />
       </label>
+      {engineDef?.aiSettingsFields.map(field => {
+        const fieldValue = value[field.key] ?? field.defaultValue
+        return (
+          <EngineAiSettingsField
+            key={field.key}
+            disabled={disabled}
+            engine={engineDef}
+            field={field}
+            value={fieldValue}
+            onChange={handleEngineFieldChange}
+          />
+        )
+      })}
     </div>
   )
 }

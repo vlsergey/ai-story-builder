@@ -7,14 +7,7 @@ import { createGrokClient } from '../lib/grok-client.js'
 import { collapseLoreTree } from '../lib/lore-tree.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-
-let Database: typeof import('better-sqlite3') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require('better-sqlite3')
-} catch (_) {
-  Database = null
-}
+import { YandexEngineConfig } from '../../shared/ai-engine-config.js'
 
 // Exported so tests can override without fake timers
 export const POLL_CONFIG = {
@@ -40,22 +33,6 @@ interface AiEngineSyncRecord {
   merged_into_parent?: boolean
 }
 
-interface YandexConfig {
-  api_key?: string
-  folder_id?: string
-  search_index_id?: string
-}
-
-interface GrokConfig {
-  api_key?: string
-}
-
-interface AiConfigStore {
-  yandex?: YandexConfig
-  grok?: GrokConfig
-  [key: string]: unknown
-}
-
 interface LoreNodeRow {
   id: number
   parent_id: number | null
@@ -67,13 +44,6 @@ interface LoreNodeRow {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getDb(dbPath: string, readonly = false) {
-  if (!Database) throw new Error('SQLite lib missing')
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return new (Database)(dbPath, readonly ? { readonly: true } : undefined)
-}
-
 
 function buildPathMap(rows: LoreNodeRow[]): Map<number, string> {
   const idToRow = new Map(rows.map(r => [r.id, r]))
@@ -392,9 +362,10 @@ export async function syncLore(): Promise<{
   if (currentEngine !== 'yandex') {
     throw makeError(`Lore sync is not supported for engine '${currentEngine}'`, 400)
   }
+  const yandexEngineConfig = config.yandex as YandexEngineConfig
 
-  const apiKey = config.yandex?.api_key?.trim()
-  const folderId = config.yandex?.folder_id?.trim()
+  const apiKey = yandexEngineConfig?.api_key?.trim()
+  const folderId = yandexEngineConfig?.folder_id?.trim()
   if (!apiKey || !folderId) {
     throw makeError('Yandex api_key and folder_id are required', 400)
   }
@@ -488,7 +459,7 @@ export async function syncLore(): Promise<{
     }
   }
 
-  const oldSearchIndexId = config.yandex?.search_index_id
+  const oldSearchIndexId = yandexEngineConfig?.search_index_id
   if (oldSearchIndexId) {
     try {
       await client.vectorStores.delete(oldSearchIndexId)

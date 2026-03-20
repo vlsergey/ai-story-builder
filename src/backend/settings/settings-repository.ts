@@ -1,6 +1,8 @@
+import { AiEngineKey } from '../../shared/ai-engines.js';
+import { AiGenerationSettings } from '../../shared/ai-generation-settings.js';
 import { withDbRead, withDbWrite } from '../db/connection.js';
-import type { AiConfigStore } from '../lib/ai-engine-adapter.js';
 import type { Database } from 'better-sqlite3';
+import { AiConfigStore, AiEngineConfig } from '../../shared/ai-engine-config.js'
 
 /**
  * Repository for accessing and modifying the `settings` table.
@@ -85,11 +87,22 @@ export class SettingsRepository {
     return this.getJson<AiConfigStore>('ai_config') ?? {};
   }
 
+  static getAiEngineConfig() : AiEngineConfig<AiGenerationSettings> {
+    const engine = SettingsRepository.getCurrentBackend()
+    const config = SettingsRepository.getAiConfig()
+    if (!engine || !config) return {}
+    return config[engine] ?? {}
+  }
+
+  static getDefaultAiSettings() : AiGenerationSettings {
+    return SettingsRepository.getAiEngineConfig()?.defaultAiSettings ?? {}
+  }
+
   static saveAiConfig(config: AiConfigStore): void {
     this.setJson('ai_config', config);
   }
 
-  static getCurrentBackend(): string | null {
+  static getCurrentBackend(): AiEngineKey | null {
     return this.get('current_backend');
   }
 

@@ -1,5 +1,6 @@
 import { SettingsRepository } from '../settings/settings-repository.js';
-import type { AiConfigStore, GrokEngineConfig, YandexEngineConfig } from '../lib/ai-engine-adapter.js';
+import { BUILTIN_ENGINES } from '../../shared/ai-engines.js';
+import { AiConfigStore, GrokEngineConfig, YandexEngineConfig } from '../../shared/ai-engine-config.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -66,12 +67,15 @@ export function setCurrentEngine(data: { engine: string | null }): { ok: boolean
 
   if (engine != null) {
     const config = readAiConfig();
+    const engineDef = BUILTIN_ENGINES.find( x => x.id == engine )
+    if (!engineDef)
+      throw makeError(`Unknown engine: ${engine}`, 400)
+
     const missing: string[] = [];
-    if (engine === 'grok') {
-      if (!config.grok?.api_key?.trim()) missing.push('api_key');
-    } else if (engine === 'yandex') {
-      if (!config.yandex?.api_key?.trim()) missing.push('api_key');
-      if (!config.yandex?.folder_id?.trim()) missing.push('folder_id');
+    for ( const field of engineDef.configFields ) {
+      if (field.required) {
+        if (!config[field.key]) missing.push( field.key );
+      }
     }
     if (missing.length > 0) {
       throw makeError(`Missing required fields for ${engine}: ${missing.join(', ')}`, 400);
@@ -95,8 +99,9 @@ export async function refreshEngineModels(engine: string): Promise<{ models: str
   let models: string[] = [];
 
   if (engine === 'yandex') {
-    const apiKey = config.yandex?.api_key?.trim();
-    const folderId = config.yandex?.folder_id?.trim();
+    const engineConfig = config['yandex'] as YandexEngineConfig | undefined
+    const apiKey = engineConfig?.api_key?.trim();
+    const folderId = engineConfig?.folder_id?.trim();
     if (!apiKey || !folderId) {
       throw makeError('Yandex api_key and folder_id are required', 400);
     }
@@ -112,10 +117,11 @@ export async function refreshEngineModels(engine: string): Promise<{ models: str
     }
     const data = (await r.json()) as { data?: { id: string }[] };
     models = (data.data ?? []).map((m) => m.id).filter((id) => id.startsWith('gpt://'));
-    config.yandex = { ...config.yandex, available_models: models };
+    config.yandex = { ...engineConfig, available_models: models };
 
   } else if (engine === 'grok') {
-    const apiKey = config.grok?.api_key?.trim();
+    const engineConfig = config['grok'] as GrokEngineConfig | undefined
+    const apiKey = engineConfig?.api_key?.trim();
     if (!apiKey) throw makeError('Grok api_key is required', 400);
     const r = await fetch('https://api.x.ai/v1/models', {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -126,7 +132,7 @@ export async function refreshEngineModels(engine: string): Promise<{ models: str
     }
     const data = (await r.json()) as { data?: { id: string }[] };
     models = (data.data ?? []).map((m) => m.id);
-    config.grok = { ...config.grok, available_models: models };
+    config.grok = { ...engineConfig, available_models: models };
 
   } else {
     throw makeError(`Model refresh not supported for engine '${engine}'`, 400);

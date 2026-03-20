@@ -55,6 +55,8 @@ export default function GenerateAllDialog({ onClose }: GenerateAllDialogProps) {
           } else if (type === 'node_skipped') {
             setSkippedCount(skipped)
             addLog('warning', `Node ${nodeId} skipped`)
+          } else if (type === 'node_error') {
+            addLog('error', `Node ${nodeId} generation error`)
           }
           if (qSize !== undefined) setQueueSize(qSize)
         },

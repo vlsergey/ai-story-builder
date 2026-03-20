@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
@@ -13,9 +13,11 @@ import { preserveScrollOnExternalUpdate } from '../lib/codemirror-preserve-scrol
 import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
 import ResizableTextarea from './ui/resizable-textarea'
-import type { AiSettings } from '../../../shared/ai-settings.js'
+import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
 import type { AiEngineSyncRecord } from '../types/models'
 import { ipcClient } from '../ipcClient'
+import { AiConfigStore } from '@shared/ai-engine-config'
+import { Button } from './ui/button'
 
 export interface NodeSavedPayload {
   nodeId: number
@@ -98,11 +100,10 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [selectedTab, setSelectedTab] = useState<DiffTab>('new')
 
   // ── AI engine config ────────────────────────────────────────────────────────
+  const [aiConfigStore, setAiConfigStore] = useState<AiConfigStore>({})
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
-  const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [aiSettings, setAiSettings] = useState<AiSettings>({ webSearch: 'none', includeExistingLore: true, maxTokens: 2048 })
-  const [nodeAiSettings, setNodeAiSettings] = useState<Record<string, AiSettings> | null>(null)
-  const [useCustomAiSettings, setUseCustomAiSettings] = useState(false)
+  const [nodeAiGenerationSettings, setNodeAiGenerationSettings] = useState<Record<string, AiGenerationSettingsDto>>({})
+  const [useCustomAiGenerationSettings, setUseCustomAiGenerationSettings] = useState(false)
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   // generatePrompt removed, using userPrompt instead
@@ -148,7 +149,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       setSystemPrompt(systemPrompt)
       // parse ai_settings
       const aiSettingsRaw = node.ai_settings as string | undefined
-      let parsed: Record<string, AiSettings> | null = null
+      let parsed: Record<string, AiGenerationSettingsDto> | null = null
       if (aiSettingsRaw && aiSettingsRaw.trim() !== '') {
         try {
           parsed = JSON.parse(aiSettingsRaw)
@@ -156,7 +157,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           // ignore
         }
       }
-      setNodeAiSettings(parsed)
+      setNodeAiGenerationSettings(parsed || {})
       // generatePrompt removed
       if (node.changes_status === 'review') {
         setReviewBaseContent(node.review_base_content as string ?? '')
@@ -181,56 +182,15 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   // ── Load AI config ─────────────────────────────────────────────────────────
   useEffect(() => {
-    ipcClient.ai.getConfig()
-      .then((data: { current_engine?: string | null; [key: string]: unknown }) => {
-        const engine = data.current_engine ?? null
-        setCurrentEngine(engine)
-        if (!engine) return
-        const engineData = data[engine] as {
-          available_models?: string[]; last_model?: string | null
-          settings?: AiSettings
-        } | undefined
-        const models = engineData?.available_models ?? []
-        setAvailableModels(models)
-        const saved = engineData?.settings
-        const savedModel = saved?.model ?? engineData?.last_model
-        const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
-        setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
-      })
-      .catch(() => {})
-  }, [])
-
-  // ── Determine custom AI settings usage and merge settings ──────────────────
+    ipcClient.ai.getAiConfigStore().then( aiConfigStore => {
+      setAiConfigStore(aiConfigStore)
+    })
+  }, [setAiConfigStore])
   useEffect(() => {
-    if (currentEngine && nodeAiSettings) {
-      const hasCustom = nodeAiSettings[currentEngine] !== undefined && Object.keys(nodeAiSettings[currentEngine]).length > 0;
-      setUseCustomAiSettings(hasCustom);
-      if (hasCustom) {
-        // Merge default aiSettings with node-specific settings
-        setAiSettings(prev => ({ ...prev, ...nodeAiSettings[currentEngine] }));
-      }
-    } else {
-      setUseCustomAiSettings(false);
-    }
-  }, [currentEngine, nodeAiSettings]);
-
-  // ── Sync aiSettings to nodeAiSettings when useCustomAiSettings is true ─────
-  useEffect(() => {
-    if (useCustomAiSettings && currentEngine && nodeAiSettings) {
-      // Only update if aiSettings actually changed
-      const current = nodeAiSettings[currentEngine];
-      if (!current || JSON.stringify(current) !== JSON.stringify(aiSettings)) {
-        const updated = { ...nodeAiSettings };
-        updated[currentEngine] = { ...aiSettings };
-        setNodeAiSettings(updated);
-        // Debounce the database update to avoid excessive writes
-        const timer = setTimeout(() => {
-          updateNodeAiSettings(updated);
-        }, 500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [aiSettings, useCustomAiSettings, currentEngine, nodeAiSettings]);
+    ipcClient.settings.get('current_backend').then( loadedCurrentBackend => {
+      setCurrentEngine(loadedCurrentBackend.value)
+    })
+  }, [setCurrentEngine])
 
   // ── Load auto-generate summary setting ─────────────────────────────────────
   useEffect(() => {
@@ -336,42 +296,40 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     await adapter.patchNode(nodeId, { content: currentContent })
   }
 
-  // ── Save last-used model and settings ─────────────────────────────────────
-  function saveAiSettings() {
-    if (currentEngine) {
-      void ipcClient.ai.saveConfig({ engine: currentEngine, fields: { settings: aiSettings } })
-    }
-  }
-
-  // ── Update node AI settings in database ───────────────────────────────────
-  async function updateNodeAiSettings(newSettings: Record<string, AiSettings> | null) {
-    // If null, set to empty object
+  const updateNodeAiGenerationSettings = useCallback(async (newSettings: Record<string, AiGenerationSettingsDto>) => {
     const toStore = newSettings || {};
     await adapter.patchNode(nodeId, { ai_settings: JSON.stringify(toStore) });
-    // No need to call onSaved because ai_settings doesn't affect stats
-  }
+  }, [adapter, nodeId])
 
   // ── Handle checkbox change for custom AI settings ─────────────────────────
-  async function handleUseCustomAiSettingsChange(checked: boolean) {
+  const onUseCustomAiGenerationSettingsChange = useCallback(async (checked: boolean) => {
+    setUseCustomAiGenerationSettings(checked);
     if (!currentEngine) return;
-    setUseCustomAiSettings(checked);
     if (checked) {
-      // Copy current aiSettings into nodeAiSettings for this engine
-      const updated = { ...(nodeAiSettings || {}) };
-      updated[currentEngine] = { ...aiSettings };
-      setNodeAiSettings(updated);
-      await updateNodeAiSettings(updated);
+      // Copy default aiSettings into nodeAiGenerationSettings for this engine
+      const newNodeAiGenerationSettings = {
+        ...nodeAiGenerationSettings,
+        [currentEngine]: aiConfigStore[currentEngine]?.defaultAiGenerationSettings ?? {},
+      }
+      setNodeAiGenerationSettings(newNodeAiGenerationSettings);
+      await updateNodeAiGenerationSettings(newNodeAiGenerationSettings);
     } else {
       // Remove settings for this engine
-      const updated = { ...(nodeAiSettings || {}) };
-      delete updated[currentEngine];
-      // If object becomes empty, we can set to null
-      const final = Object.keys(updated).length === 0 ? null : updated;
-      setNodeAiSettings(final);
-      await updateNodeAiSettings(final);
+      const newNodeAiGenerationSettings = { ...(nodeAiGenerationSettings || {}) };
+      delete newNodeAiGenerationSettings[currentEngine];
+      setNodeAiGenerationSettings(newNodeAiGenerationSettings);
+      await updateNodeAiGenerationSettings(newNodeAiGenerationSettings);
       // Revert aiSettings to global defaults (they will be updated by the effect)
     }
-  }
+  }, [aiConfigStore, currentEngine, nodeAiGenerationSettings, setNodeAiGenerationSettings, setUseCustomAiGenerationSettings, updateNodeAiGenerationSettings])
+
+  const aiGenerationSettings = currentEngine ? nodeAiGenerationSettings[currentEngine] ?? {} : {}
+  const onAiGenerationSettingsChange = useCallback(async (value: AiGenerationSettingsDto) => {
+    if (!currentEngine) return;
+    const newNodeAiGenerationSettings = { ...nodeAiGenerationSettings, [currentEngine]: value}
+    setNodeAiGenerationSettings(newNodeAiGenerationSettings);
+    await updateNodeAiGenerationSettings(newNodeAiGenerationSettings);
+  }, [currentEngine, nodeAiGenerationSettings, setNodeAiGenerationSettings, updateNodeAiGenerationSettings])
 
   // ── Save prompt height to settings ────────────────────────────────────────
   const heightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -411,7 +369,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
     generateNodeStream(adapter.generateEndpoint, {
       prompt: effectivePrompt,
-      settings: aiSettings,
+      aiGenerationSettings,
       mode: 'generate',
       nodeId: nodeId,
       onThinking: (status, detail) => {
@@ -453,7 +411,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           adapter.onAfterGenerate?.()
         }
       }
-      saveAiSettings()
       const { bytes, chars, words } = computeTextMetrics(finalContent);
       dispatchAiCallCompleted({
         costUsdTicks: lastCallData.cost_usd_ticks,
@@ -499,7 +456,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     try {
       await generateNodeStream(adapter.generateEndpoint, {
         prompt: improveInstruction,
-        settings: aiSettings,
+        aiGenerationSettings: aiGenerationSettings,
         mode: 'improve',
         baseContent: baseForStream,
         nodeId: nodeId,
@@ -537,7 +494,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         })
       }
 
-      saveAiSettings()
       const { bytes, chars, words } = computeTextMetrics(finalContent);
       dispatchAiCallCompleted({
         costUsdTicks: improveCallData.cost_usd_ticks,
@@ -659,9 +615,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           <div className="flex items-center justify-between flex-wrap px-2 py-1.5 border-b border-border">
             <AiGenerationSettings
               engineId={currentEngine}
-              availableModels={availableModels}
-              settings={aiSettings}
-              onSettingsChange={setAiSettings}
+              value={aiGenerationSettings}
+              onChange={onAiGenerationSettingsChange}
               disabled={generating}
               className="flex items-center gap-3 flex-wrap"
             />
@@ -669,21 +624,21 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
               <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={useCustomAiSettings}
-                  onChange={(e) => handleUseCustomAiSettingsChange(e.target.checked)}
+                  checked={useCustomAiGenerationSettings}
+                  onChange={(e) => onUseCustomAiGenerationSettingsChange(e.target.checked)}
                   disabled={!currentEngine || generating}
                   className="h-3.5 w-3.5"
                 />
                 <span>Использовать нестандартные настройки AI</span>
               </label>
             </div>
-            <button
+            <Button
               onClick={handleImprove}
+              variant="secondary"
               disabled={isLocked || !improveInstruction.trim()}
-              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLocked ? 'Generating…' : tp('repeat_improve')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -740,9 +695,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           <div className="flex items-center justify-between flex-wrap px-2 py-1.5">
             <AiGenerationSettings
               engineId={currentEngine}
-              availableModels={availableModels}
-              settings={aiSettings}
-              onSettingsChange={setAiSettings}
+              value={aiGenerationSettings}
+              onChange={onAiGenerationSettingsChange}
               disabled={generating}
               className="flex items-center gap-3 flex-wrap"
             />
@@ -750,21 +704,21 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
               <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={useCustomAiSettings}
-                  onChange={(e) => handleUseCustomAiSettingsChange(e.target.checked)}
+                  checked={useCustomAiGenerationSettings}
+                  onChange={(e) => onUseCustomAiGenerationSettingsChange(e.target.checked)}
                   disabled={!currentEngine || generating}
                   className="h-3.5 w-3.5"
                 />
                 <span>Использовать нестандартные настройки AI</span>
               </label>
             </div>
-            <button
+            <Button
+              variant="default"
               onClick={handleGenerate}
               disabled={generating || !effectivePrompt.trim()}
-              className="px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {generating ? 'Generating…' : (hasContent ? tp('regenerate') : tp('generate'))}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -929,9 +883,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           <div className="flex items-center gap-2 flex-wrap">
             <AiGenerationSettings
               engineId={currentEngine}
-              availableModels={availableModels}
-              settings={aiSettings}
-              onSettingsChange={setAiSettings}
+              value={aiGenerationSettings}
+              onChange={onAiGenerationSettingsChange}
               disabled={generating}
               className="flex items-center gap-3 flex-wrap"
             />
@@ -939,8 +892,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
               <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={useCustomAiSettings}
-                  onChange={(e) => handleUseCustomAiSettingsChange(e.target.checked)}
+                  checked={useCustomAiGenerationSettings}
+                  onChange={(e) => onUseCustomAiGenerationSettingsChange(e.target.checked)}
                   disabled={!currentEngine || generating}
                   className="h-3.5 w-3.5"
                 />

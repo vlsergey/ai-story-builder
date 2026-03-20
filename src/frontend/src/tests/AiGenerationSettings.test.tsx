@@ -10,9 +10,8 @@ describe('AiGenerationSettings number inputs', () => {
     const { getByLabelText } = render(
       <AiGenerationSettings
         engineId={null}
-        availableModels={[]}
-        settings={baseSettings}
-        onSettingsChange={() => {}}
+        value={baseSettings}
+        onChange={() => {}}
       />
     )
     const input = getByLabelText(/max tokens/i)
@@ -24,9 +23,8 @@ describe('AiGenerationSettings number inputs', () => {
     const { getByLabelText } = render(
       <AiGenerationSettings
         engineId={null}
-        availableModels={[]}
-        settings={baseSettings}
-        onSettingsChange={() => {}}
+        value={baseSettings}
+        onChange={() => {}}
       />
     )
     const input = getByLabelText(/max completion tokens/i)

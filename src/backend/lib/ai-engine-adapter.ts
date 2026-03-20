@@ -1,6 +1,5 @@
-import type { AiEngineDefinition } from '../../shared/ai-engines.js'
-import type { GrokAiSettings } from '../../shared/grok-ai-settings.js'
-import type { YandexAiSettings } from '../../shared/yandex-ai-settings.js'
+import type { AiEngineKey } from '../../shared/ai-engines.js'
+import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
 
 export interface JsonSchemaSpec {
   /** Identifier used in the API call (no spaces, e.g. "lore_node") */
@@ -10,45 +9,17 @@ export interface JsonSchemaSpec {
   schema: Record<string, unknown>
 }
 
-export interface GrokEngineConfig {
-  api_key?: string
-  management_key?: string
-  team_id?: string
-  available_models?: string[]
-  defaultAiSettings?: GrokAiSettings
-}
-
-export interface YandexEngineConfig {
-  api_key?: string
-  folder_id?: string
-  search_index_id?: string
-  available_models?: string[]
-  defaultAiSettings?: YandexAiSettings
-}
-
-export interface AiConfigStore {
-  yandex?: YandexEngineConfig
-  grok?: GrokEngineConfig
-  [key: string]: unknown
-}
-
-export interface GenerateResponseRequest {
+export interface GenerateResponseRequest<S extends AiGenerationSettings = AiGenerationSettings> {
   prompt: string
   systemPrompt: string
-  /** Requested model ID, or empty string to use the engine default. */
-  model: string
+  /** Whether to include existing lore files as attachments. */
   includeExistingLore: boolean
-  webSearch: string
   /** Uploaded file IDs for the active engine (already filtered by to_be_deleted). */
   engineFileIds: string[]
-  engineDef: AiEngineDefinition
-  config: AiConfigStore
+  /** AI settings specific to the engine (model, webSearch, maxTokens, etc.), including settings from current node or UI */
+  aiGenerationSettings?: S
   /** When provided, adapters request structured JSON output; route emits partial_json SSE events. */
   responseSchema?: JsonSchemaSpec
-  /** Maximum number of output tokens. If undefined the engine uses its default. */
-  maxTokens?: number
-  /** Maximum number of completion (generation) tokens. If undefined the engine uses its default. */
-  maxCompletionTokens?: number
   /**
    * When true (default), adapters apply API-level JSON schema enforcement
    * (text.format for Grok, response_format for Yandex).
@@ -69,9 +40,9 @@ export interface GenerateResponseRequest {
  * The route calls sse('done', {}) + res.end() after this resolves.
  * Throws on unrecoverable errors (the route will emit sse('error', ...)).
  */
-export interface AiEngineAdapter {
+export interface AiEngineAdapter<T extends AiGenerationSettings = AiGenerationSettings> {
   generateResponse(
-    req: GenerateResponseRequest,
+    req: GenerateResponseRequest<T>,
     onThinking: (status: string, detail?: string) => void,
     onDelta: (text: string) => void,
   ): Promise<{ response_id?: string; tokensInput?: number; tokensOutput?: number; tokensTotal?: number; cachedTokens?: number; reasoningTokens?: number; costUsdTicks?: number }>
@@ -80,9 +51,12 @@ export interface AiEngineAdapter {
 import { GrokAdapter } from './grok-adapter.js'
 import { YandexAdapter } from './yandex-adapter.js'
 
+const adapters: Record<AiEngineKey, AiEngineAdapter<AiGenerationSettings>> = {
+  'grok': new GrokAdapter(),
+  'yandex': new YandexAdapter(),
+}
+
 /** Returns the adapter for the given engine ID, or null if unsupported. */
-export function getEngineAdapter(engineId: string): AiEngineAdapter | null {
-  if (engineId === 'grok') return new GrokAdapter()
-  if (engineId === 'yandex') return new YandexAdapter()
-  return null
+export function getEngineAdapter(engineId: AiEngineKey): AiEngineAdapter<AiGenerationSettings> | null {
+  return adapters[engineId] ?? null
 }

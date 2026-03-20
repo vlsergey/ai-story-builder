@@ -2,13 +2,12 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Loader2, CheckCircle2, Clipboard, Trash2 } from 'lucide-react'
 import AiGenerationSettings from './AiGenerationSettings'
 import { generatePlaygroundStream } from '../lib/generate-playground-stream'
-import type { AiSettings } from '../../../shared/ai-settings.js'
+import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
 import { ipcClient } from '../ipcClient'
 
 export default function AiPlayground() {
   const [currentEngine, setCurrentEngine] = useState<string | null>(null)
-  const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [aiSettings, setAiSettings] = useState<AiSettings>({ webSearch: 'none', includeExistingLore: false, maxTokens: 4096 })
+  const [aiGenerationSettings, setAiGenerationSettings] = useState<AiGenerationSettingsDto>({ maxTokens: 4096 })
 
   const [systemPrompt, setSystemPrompt] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -24,21 +23,21 @@ export default function AiPlayground() {
 
   // Load AI config
   useEffect(() => {
-    ipcClient.ai.getConfig()
-      .then((data: { current_engine?: string | null; [key: string]: unknown }) => {
-        const engine = data.current_engine ?? null
+
+    Promise.all([
+      ipcClient.ai.getAiConfigStore(),
+      ipcClient.settings.get('current_backend'),
+    ]).then(([loadedAiConfigStore, loadedCurrentBackend]) => {
+        const engine = loadedCurrentBackend.value
         setCurrentEngine(engine)
         if (!engine) return
-        const engineData = data[engine] as {
-          available_models?: string[]; last_model?: string | null
-          settings?: AiSettings
-        } | undefined
+
+        const engineData = loadedAiConfigStore[engine] ?? {}
         const models = engineData?.available_models ?? []
-        setAvailableModels(models)
         const saved = engineData?.settings
         const savedModel = saved?.model ?? engineData?.last_model
         const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
-        setAiSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
+        setAiGenerationSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
       })
       .catch(() => {})
   }, [])
@@ -64,7 +63,7 @@ export default function AiPlayground() {
       await generatePlaygroundStream({
         systemPrompt: systemPrompt.trim() || undefined,
         prompt: prompt.trim(),
-        settings: aiSettings,
+        aiGenerationSettings: aiGenerationSettings,
         signal: abortRef.current.signal,
         onThinking: (status, detail) => {
           if (status === 'done') setThinkingDone(true)
@@ -76,9 +75,6 @@ export default function AiPlayground() {
         },
         onDone: () => {},
       })
-      if (currentEngine) {
-        void ipcClient.ai.saveConfig({ engine: currentEngine, fields: { settings: aiSettings } })
-      }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         setError(e instanceof Error ? e.message : String(e))
@@ -103,9 +99,8 @@ export default function AiPlayground() {
       {/* Settings bar */}
       <AiGenerationSettings
         engineId={currentEngine}
-        availableModels={availableModels}
-        settings={aiSettings}
-        onSettingsChange={setAiSettings}
+        value={aiGenerationSettings}
+        onChange={setAiGenerationSettings}
         disabled={generating}
       />
 
