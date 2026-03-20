@@ -330,10 +330,11 @@ app.whenReady().then(async () => {
   buildApplicationMenu()
   console.log('Application menu built')
 
-  const { registerIpcHandlers } = await import('../../dist/backend/server.mjs')
-  console.log('Backend server imported')
+  // Import tRPC IPC handlers instead of the old HTTP server
+  const { registerIpcHandlers } = await import('../../src/backend/trpc.js')
+  console.log('tRPC IPC handlers imported')
   registerIpcHandlers()
-  console.log('IPC handlers registered')
+  console.log('tRPC IPC handlers registered')
 
   if (isDev) {
     serverUrl = 'http://localhost:3000'

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+
 contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * Register a callback for native-menu actions sent from the main process.
@@ -24,6 +25,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   /** Generic typed IPC invocation */
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+
+  /** tRPC invocation wrapper */
+  trpc: {
+    /**
+     * Invoke a tRPC procedure via Electron IPC.
+     * @param {string} path - the tRPC path, e.g. 'aiConfig.get' or 'plan.generate'.
+     * @param {any} input - the input payload for the procedure (or undefined for queries without input).
+     */
+    invoke: (path, input) => ipcRenderer.invoke('trpc', { path, input }),
+  },
+
+
 
   /** Start a streaming generation job */
   startStream: (streamId, endpoint, params) =>

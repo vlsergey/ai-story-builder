@@ -1,15 +1,11 @@
 const api = {
   async request<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
-    const opts: RequestInit & { headers: Record<string, string> } = { method, headers: {} }
-    if (body && !(body instanceof FormData)) {
-      opts.headers['Content-Type'] = 'application/json'
-      opts.body = JSON.stringify(body)
-    } else if (body instanceof FormData) {
-      opts.body = body
-    }
-    const res = await fetch('/api' + path, opts)
-    const text = await res.text()
-    try { return JSON.parse(text) as T } catch (_) { return text as unknown as T }
+    // All backend calls are now routed through tRPC over Electron IPC.
+    // The `path` argument should match the tRPC procedure path, e.g. 'aiConfig.get' or 'plan.generate'.
+    // For queries without input (GET), we pass undefined as the second argument.
+    // For mutations (POST/PUT), we pass the payload as the second argument.
+    const result = await (window as any).electronAPI.trpc.invoke(path, body);
+    return result as T;
   },
   get<T = unknown>(path: string): Promise<T> { return api.request<T>('GET', path) },
   post<T = unknown>(path: string, body?: unknown): Promise<T> { return api.request<T>('POST', path, body) },

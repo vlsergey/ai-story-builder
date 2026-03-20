@@ -68,6 +68,7 @@ describe('Layout', () => {
       onStreamEvent: vi.fn().mockReturnValue(vi.fn()),
       alert: vi.fn(),
       confirm: vi.fn(),
+      trpc: { invoke: vi.fn() },
     }
   });
 
