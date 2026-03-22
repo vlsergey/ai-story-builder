@@ -28,6 +28,9 @@
   "settings.testing": "Проверка…",
   "settings.capabilities": "Возможности",
 
+  "aiGenerationSettings.noEngine": "Не выбран AI движок",
+  "aiGenerationSettings.override": "Указать свои настройки генерации AI для данного узла",
+
   "engine.grok.name": "Grok AI",
   "engine.grok.notes": "Максимум 10 файлов на запрос. Без поиска по вектору/коллекции.",
   "engine.grok.field.api_key.label": "API ключ",
@@ -35,6 +38,13 @@
   "engine.grok.field.management_key.hint": "Ключ Management API xAI (отдельный от обычного API ключа). Получить можно в console.x.ai → Settings → Management Keys. Необходим для статистики биллинга в панели AI Billing.",
   "engine.grok.field.team_id.label": "Team ID",
   "engine.grok.field.team_id.hint": "ID вашей команды в xAI. Виден в URL консоли xAI или в настройках команды. Необходим вместе с Management Key для статистики биллинга.",
+  "engine.grok.field.max_output_tokens.label": "Макс. токенов в ответе",
+  "engine.grok.field.max_output_tokens.hint": "Максимальное количество токенов в ответе. Сюда входят как токены самого ответа, так и токены рассуждений (reasoning).",
+  "engine.grok.field.temperature.label": "Температура",
+  "engine.grok.field.temperature.hint": "Температура выборки (от 0 до 2). Высокие значения (например, 0.8) сделают ответ более случайным, а низкие (например, 0.2) — более сфокусированным и детерминированным.",
+  "engine.grok.field.top_p.label": "Top P",
+  "engine.grok.field.top_p.hint": "Альтернатива температуре (ядерная выборка), где модель учитывает токены, суммарная вероятность которых составляет top_p. Значение 0.1 означает выбор из лучших 10%. Обычно рекомендуется изменять либо этот параметр, либо температуру, но не оба сразу.",
+  "engine.grok.field.web_search.label": "Web-поиск",
 
   "engine.yandex.name": "Yandex Cloud AI",
   "engine.yandex.notes": "Регулируется законодательством РФ о контенте. Без ЛГБТК+ или политического контента.",

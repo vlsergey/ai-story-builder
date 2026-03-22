@@ -1,7 +1,7 @@
 import type { NodeData, NodeContext } from '../node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
-import type { LoreSettings } from '../../../../shared/node-settings'
+import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph.js'
+import type { LoreSettings } from '../../../../shared/node-settings.js'
 import { generateNodeContent } from '../../ai-generation.js'
 
 /**

@@ -1,6 +1,7 @@
 import fs from 'fs'
-import type { LoreNodeRow, LoreTreeNode } from '../types/index.js'
+import type { LoreTreeNode } from '../types/index.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
+import { LoreNodeRow } from '../../shared/lore-node.js';
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ export function importLoreNode(data: { name: string; content: string; parentId: 
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-export function createLoreNode(data: { parent_id?: number | null; name: string }): { id: number | bigint } {
+export function createLoreNode(data: { parent_id?: number | null; name: string }): { id: number } {
   const { parent_id, name } = data
   if (!name?.trim()) throw makeError('name required', 400)
   const repo = new LoreNodeRepository()

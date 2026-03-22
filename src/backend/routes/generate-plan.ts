@@ -1,10 +1,10 @@
-import { BUILTIN_ENGINES } from '../../shared/ai-engines'
-import type { AiGenerationSettings } from '../../shared/ai-generation-settings'
-import { getEngineAdapter } from '../lib/ai-engine-adapter'
-import { PlanEdgeRepository } from '../plan/edges/plan-edge-repository'
-import { PlanNodeRepository } from '../plan/nodes/plan-node-repository'
-import { SettingsRepository } from '../settings/settings-repository'
-import { LoreNodeRepository } from '../lore/lore-node-repository'
+import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
+import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
+import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
+import { PlanEdgeRepository } from '../plan/edges/plan-edge-repository.js'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
+import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 

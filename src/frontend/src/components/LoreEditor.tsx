@@ -9,7 +9,7 @@ interface LoreEditorProps {
 }
 
 const loreAdapter: NodeEditorAdapter = {
-  getNode: (id) => ipcClient.lore.get.query(id),
+  getNode: (id) => ipcClient.lore.get.query(id) as Promise<Record<string, any>>,
   patchNode: (id, data) => ipcClient.lore.patch.mutate({id, data}),
   primaryField: 'name',
   i18nPrefix: 'lore',

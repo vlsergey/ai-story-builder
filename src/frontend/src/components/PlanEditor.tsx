@@ -28,7 +28,7 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   }, [nodeId])
 
   const adapter = useMemo<NodeEditorAdapter>(() => ({
-    getNode: (id) => ipcClient.planGraph.getNode.query(id),
+    getNode: (id) => ipcClient.planGraph.getNode.query(id) as Promise<Record<string, any>>,
     patchNode: (id, data) => ipcClient.planGraph.patchNode.mutate({id, data}),
     primaryField: 'title',
     i18nPrefix: 'plan',

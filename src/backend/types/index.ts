@@ -1,31 +1,6 @@
 // Database row types matching the schema defined in db/migrations.ts
-import { PlanNodeRow } from '../../shared/plan-graph'
-
-export interface LoreNodeRow {
-  id: number
-  parent_id: number | null
-  name: string
-  content: string | null
-  word_count: number
-  char_count: number
-  byte_count: number
-  ai_sync_info: string | null
-  ai_settings: string | null
-  position: number
-  status: string
-  to_be_deleted: number
-  created_at: string
-  /** NULL | 'review' — current review workflow state */
-  changes_status: string | null
-  /** Content before the first improvement started; set once when review begins, cleared on accept */
-  review_base_content: string | null
-  /** Last AI improve instruction used; stored for restoring review state on reopen */
-  last_improve_instruction: string | null
-  /** User prompt for generation (mode A) */
-  user_prompt: string | null
-  /** System prompt for generation */
-  system_prompt: string | null
-}
+import { LoreNodeRow } from '../../shared/lore-node.js'
+import { PlanNodeRow } from '../../shared/plan-graph.js'
 
 export interface PlanEdgeRow {
   id: number

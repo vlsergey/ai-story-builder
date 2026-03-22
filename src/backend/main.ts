@@ -1,9 +1,9 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeTheme, shell } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { default as installExtension, REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer'
-import { appRouter } from './router';
-import { createIPCHandler } from 'electron-trpc/main';
+import { createRequire } from 'module';
+import { appRouter } from './router.js';
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -59,30 +59,30 @@ const MENU_STRINGS = {
 let currentWordWrap = true
 let currentLoreStat = 'words'
 let currentTheme = 'auto'
-let currentLocale = 'en'
+let currentLocale: ('ru' | 'en') = 'en'
 
 /** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
-let wordWrapMenuItem = null
+let wordWrapMenuItem: MenuItemConstructorOptions = {}
 
 /** References to the "Show in Lore Tree" radio items, keyed by mode value. */
-let loreStatMenuItems = {}
+let loreStatMenuItems: Record<string, MenuItemConstructorOptions> = {}
 
 /** References to the Theme radio items, keyed by theme value. */
-let themeMenuItems = {}
+let themeMenuItems: Record<string, MenuItemConstructorOptions> = {}
 
 /** References to the Language radio items, keyed by locale code. */
-let localeMenuItems = {}
+let localeMenuItems : Record<string, MenuItemConstructorOptions> = {}
 
 const isDev = process.env.NODE_ENV === 'development'
 
 // Stored once the server (or dev Vite) is ready, reused on macOS re-activate.
-let serverUrl = null
+let serverUrl : string | null = null
 
 /**
  * Sends a menu action string to the focused BrowserWindow's renderer process.
  * The renderer listens via window.electronAPI.onMenuAction().
  */
-function sendMenuAction(action) {
+function sendMenuAction(action: any) {
   BrowserWindow.getFocusedWindow()?.webContents.send('menu-action', action)
 }
 
@@ -110,7 +110,7 @@ function buildApplicationMenu() {
   ]) {
     loreStatMenuItems[mode] = {
       type: 'radio',
-      label: s[key],
+      label: s[key as keyof typeof s],
       checked: mode === currentLoreStat,
       click: () => sendMenuAction(`set-lore-stat:${mode}`),
     }
@@ -124,7 +124,7 @@ function buildApplicationMenu() {
   ]) {
     themeMenuItems[theme] = {
       type: 'radio',
-      label: s[key],
+      label: s[key as keyof typeof s],
       checked: theme === currentTheme,
       click: () => sendMenuAction(`set-theme:${theme}`),
     }
@@ -137,13 +137,13 @@ function buildApplicationMenu() {
   ]) {
     localeMenuItems[locale] = {
       type: 'radio',
-      label: s[key],
+      label: s[key as keyof typeof s],
       checked: locale === currentLocale,
       click: () => sendMenuAction(`set-locale:${locale}`),
     }
   }
 
-  const viewSubmenu = [
+  const viewSubmenu : MenuItemConstructorOptions[] = [
     {
       label: s.settings,
       click: () => sendMenuAction('open-settings'),
@@ -180,9 +180,9 @@ function buildApplicationMenu() {
     viewSubmenu.push({ role: 'toggleDevTools' })
   }
 
-  const template = [
+  const template : MenuItemConstructorOptions[]  = [
     // macOS: first entry is always the app menu (app name, About, Quit, etc.)
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' } as MenuItemConstructorOptions] : ([] as MenuItemConstructorOptions[])),
 
     {
       label: s.file,
@@ -211,6 +211,7 @@ function buildApplicationMenu() {
 
 function createWindow() {
   console.log('createWindow called with serverUrl:', serverUrl)
+  console.log('Попытка загрузить прелоад по пути:', path.join(__dirname, 'preload.js'));
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -219,14 +220,17 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      worldSafeExecuteJavaScript: true,
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload.js'),
     },
   })
 
-  win.loadURL(serverUrl).catch(err => {
-    console.error('Failed to load URL:', err)
-  })
+  if (serverUrl) {
+    win.loadURL(serverUrl).catch(err => {
+      console.error('Failed to load URL:', err)
+    })
+  } else {
+    console.error('No server URL provided')
+  }
 
   if (isDev) {
     win.webContents.openDevTools()
@@ -237,7 +241,9 @@ function createWindow() {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+
   console.log('Window created successfully')
+  return win
 }
 
 // In production Electron requires better-sqlite3 directly.
@@ -246,7 +252,7 @@ function createWindow() {
 async function checkNativeDeps() {
   try {
     await import('better-sqlite3')
-  } catch (e) {
+  } catch (e: any) {
     dialog.showErrorBox(
       'Native module needs rebuild',
       'better-sqlite3 was compiled for a different version of Node.js.\n\n' +
@@ -261,6 +267,11 @@ async function checkNativeDeps() {
 // Show a native error dialog with a "Copy to Clipboard" button.
 ipcMain.handle('show-error-dialog', async (event, { title, message }) => {
   const win = BrowserWindow.fromWebContents(event.sender)
+  if (win === null) {
+    console.error('Failed to get window from webContents')
+    return
+  }
+
   const { response } = await dialog.showMessageBox(win, {
     type: 'error',
     title,
@@ -332,11 +343,6 @@ app.whenReady().then(async () => {
   buildApplicationMenu()
   console.log('Application menu built')
 
-  // Import tRPC IPC handlers instead of the old HTTP server
-  console.log('Creating tRPC IPC handler')
-  createIPCHandler({ router: appRouter, windows: [window] });
-  console.log('tRPC IPC handler created')
-
   if (isDev) {
     serverUrl = 'http://localhost:3000'
     console.log('Development mode, serverUrl:', serverUrl)
@@ -354,8 +360,16 @@ app.whenReady().then(async () => {
     console.log('Production mode, serverUrl:', serverUrl)
   }
   console.log('Creating window...')
-  createWindow()
+  const window = createWindow()
   console.log('Window created')
+
+  // Import tRPC IPC handlers instead of the old HTTP server
+  console.log('Creating tRPC IPC handler')
+  const require = createRequire(import.meta.url);
+  const { createIPCHandler } = require('electron-trpc/main');
+  createIPCHandler({ router: appRouter, windows: [window] });
+  console.log('Проверка роутера:', Object.keys(appRouter));
+  console.log('tRPC IPC handler created')
 })
 
 // Quit when all windows are closed, except on macOS where the app stays

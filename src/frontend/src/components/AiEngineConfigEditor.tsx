@@ -1,23 +1,29 @@
 import { useLocale } from "@/lib/locale";
-import { AiEngineConfig } from "@shared/ai-engine-config";
+import { AiEngineConfig, getAiEngineConfigSchema } from "@shared/ai-engine-config";
 import { AGE_RATING_INFO, AGE_RATING_ORDER, AiEngineDefinition, CAPABILITY_KEYS } from "@shared/ai-engines";
-import { useCallback, useState } from "react";
-import { Button } from "./ui/button";
+import { useCallback, useEffect } from "react";
 import { trpc } from "@/ipcClient";
-import AiGenerationSettings from "./AiGenerationSettings";
-import { AiGenerationSettings as AiGenerationSettingsDto } from "@shared/ai-generation-settings";
+import AiGenerationSettingsFieldGroup from "./AiGenerationSettingsFieldGroup";
+import { FieldGroup, FieldLegend, FieldSet } from "./ui/field";
+import { Button } from "@/components/ui/button"
+import { RefreshCw } from 'lucide-react'
+import { ScrollArea } from "./ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Separator } from "./ui/separator";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import debounce from "lodash/debounce";
+import AiEngineField from "./AiEngineField";
 
-interface AiEngineConfigEditorProps<T extends AiEngineConfig = AiEngineConfig> {
+interface AiEngineConfigEditorProps {
     active: boolean,
     engine: AiEngineDefinition,
-    value: T,
-    onChange: (value: T) => void,
+    value: AiEngineConfig,
+    onChange: (value: AiEngineConfig) => void,
 }
 
-export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngineConfig>({active, engine, value, onChange}: AiEngineConfigEditorProps<T>) {
+export default function AiEngineConfigEditor({active, engine, value, onChange}: AiEngineConfigEditorProps) {
     const { t } = useLocale()
-    const [showField, setShowField] = useState<Record<string, boolean>>({})
-    const [formValues, setFormValues] = useState<Record<string, string>>({})
 
     const maxRatingIdx = AGE_RATING_ORDER.indexOf(engine.ageRating)
     const supportedRatings = AGE_RATING_ORDER.slice(0, maxRatingIdx + 1)
@@ -25,9 +31,22 @@ export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngine
     const engineModels: string[] = value.available_models ?? []
     const engineNotes = t(`engine.${engine.id}.notes`, '')
 
-    const onFieldChange = useCallback((fieldKey: string, fieldValue: any) => {
-        onChange({...value, [fieldKey]: fieldValue})
-    }, [value, onChange])
+    const formSchema = getAiEngineConfigSchema(engine)
+
+    const form = useForm<AiEngineConfig>({
+        resolver: zodResolver(formSchema),
+        defaultValues: value,
+    })
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const debouncedSubmit = useCallback(debounce(() => {
+        form.handleSubmit(onChange)(); 
+    }, 1000), [form, onChange]);
+
+    useEffect(() => {
+        const subscription = form.watch(debouncedSubmit);
+        return () => subscription.unsubscribe();
+    }, [form, debouncedSubmit]);
 
     const utils = trpc.useUtils()
     const { mutate: refreshEngineModels, isPending: isRefreshingModelsPending } = trpc.settings.allAiEnginesConfig.refreshEngineModels.useMutation({
@@ -35,168 +54,120 @@ export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngine
     })
 
     const onRefreshingModels = useCallback(() => refreshEngineModels(engine.id), [engine, refreshEngineModels])
-
-    const onDefaultAiGenerationSettingsChange = useCallback((defaultAiGenerationSettings: AiGenerationSettingsDto) => {
-        onChange( {...value, defaultAiGenerationSettings} )
-    }, [onChange, value])
-
-    const onSummaryAiGenerationSettingsChange = useCallback((summaryAiGenerationSettings: AiGenerationSettingsDto) => {
-        onChange( {...value, summaryAiGenerationSettings} )
-    }, [onChange, value])
-
     const testMutation = trpc.ai.test.useMutation()
 
     return (
-    <section
-        key={engine.id}
-        className={`border rounded-lg p-4 ${active ? 'border-primary' : 'border-border'}`}
-    >
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-4">
-        <h3 className="text-sm font-semibold">{t(`engine.${engine.id}.name`)}</h3>
-        <span className="text-xs text-muted-foreground">{t('settings.aiEngine.by')} {engine.provider}</span>
-        {active && (
-            <span className="text-xs text-primary font-medium">{t('settings.aiEngine.active')}</span>
-        )}
-        <div className="ml-auto flex gap-0.5">
-            {supportedRatings.map(rating => {
-            const info = AGE_RATING_INFO[rating]
-            return (
-                <span
-                key={rating}
-                className="text-[10px] font-bold px-1 py-0.5 rounded"
-                style={{ backgroundColor: info.bg, color: info.fg }}
-                title={t(`ageRating.${rating}.longLabel`)}
-                >
-                {info.label}
-                </span>
-            )
-            })}
-        </div>
-        </div>
-
-        {/* Credential fields */}
-        <div className="flex flex-col gap-2 mb-3">
-        {engine.configFields.map(field => {
-            const value = formValues[field.key] ?? field.defaultValue ?? ''
-            const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label`)
-            const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint`, '')
-            const shown = showField[field.key]
-            const updateValue = (v: string) =>
-            setFormValues(prev => ({ ...prev, [field.key]: v }))
-            return (
-            <div key={field.key} className="flex flex-col gap-0.5">
-                <label className="text-xs text-muted-foreground">{fieldLabel}</label>
-                {field.type === 'textarea' ? (
-                <textarea
-                    value={value}
-                    rows={4}
-                    onChange={e => updateValue(e.target.value)}
-                    onBlur={e => onFieldChange(field.key, e.target.value)}
-                    className="text-sm border border-border rounded px-2 py-1 bg-background font-mono resize-y"
-                    placeholder={field.defaultValue ?? fieldLabel}
-                    spellCheck={false}
-                />
-                ) : (
-                <div className="flex gap-1">
-                    <input
-                    type={field.type === 'password' && !shown ? 'password' : 'text'}
-                    value={value}
-                    onChange={e => updateValue(e.target.value)}
-                    onBlur={e => onFieldChange(field.key, e.target.value)}
-                    onKeyDown={e => {
-                        if (e.key === 'Enter') onFieldChange(field.key, value)
-                    }}
-                    className="flex-1 text-sm border border-border rounded px-2 py-1 bg-background"
-                    placeholder={fieldLabel}
-                    spellCheck={false}
-                    autoComplete="off"
-                    />
-                    {field.type === 'password' && (
-                    <Button
-                        type="button"
-                        onClick={() =>
-                        setShowField(prev => ({ ...prev, [field.key]: !prev[field.key] }))
-                        }
-                        className="text-xs px-2 py-1 border border-border rounded hover:bg-muted shrink-0"
+        <Card
+            key={engine.id}
+            className={`border rounded-lg p-4 ${active ? 'border-primary' : 'border-border'}`}
+        >
+        <CardHeader className="flex items-center gap-2 mb-4">
+            <CardTitle>{t(`engine.${engine.id}.name`)}</CardTitle>
+            <span className="text-xs text-muted-foreground">{t('settings.aiEngine.by')} {engine.provider}</span>
+            {active && (
+                <span className="text-xs text-primary font-medium">{t('settings.aiEngine.active')}</span>
+            )}
+            <div className="ml-auto flex gap-0.5">
+                {supportedRatings.map(rating => {
+                const info = AGE_RATING_INFO[rating]
+                return (
+                    <span
+                    key={rating}
+                    className="text-[10px] font-bold px-1 py-0.5 rounded"
+                    style={{ backgroundColor: info.bg, color: info.fg }}
+                    title={t(`ageRating.${rating}.longLabel`)}
                     >
-                        {shown ? 'Hide' : 'Show'}
-                    </Button>
-                    )}
-                </div>
-                )}
-                {fieldHint && (
-                    <p className="text-xs text-muted-foreground">{fieldHint}</p>
-                )}
+                    {info.label}
+                    </span>
+                )
+                })}
             </div>
-            )
-        })}
-        </div>
+        </CardHeader>
+        <CardContent>
 
-        {/* Models */}
-        <div className="flex items-start gap-2 mb-3">
-        <span className="text-xs text-muted-foreground shrink-0 mt-0.5">
-            {t('settings.models.title')}:
-        </span>
-        <span className="text-xs text-muted-foreground flex-1 leading-relaxed">
-            {engineModels.length > 0
-            ? engineModels.map(m => m.replace(/^gpt:\/\/[^/]+\//, '')).join(', ')
-            : t('settings.models.none')}
-        </span>
-        <Button
-            variant="outline"
-            onClick={onRefreshingModels}
-            disabled={isRefreshingModelsPending}
-        >
-            {isRefreshingModelsPending ? t('settings.models.refreshing') : t('settings.models.refresh')}
-        </Button>
-        </div>
+        <FieldSet>
+            <FieldGroup>
+                {/* Engine Settings Fields */}
+                {engine.configFields.map(field => (<AiEngineField
+                    engine={engine}
+                    field={field}
+                    formControl={form.control}
+                    key={field.key}
+                    orientation="vertical"
+                />))}
 
-        {/* Default generation settings */}
-        <div className="mb-4">
-        <p className="text-xs font-medium text-muted-foreground mb-1.5">
-            {t('settings.defaultAiGenerationSettings.title')}
-        </p>
-        <AiGenerationSettings
-            engineId={engine.id}
-            value={value.defaultAiGenerationSettings ?? {}}
-            onChange={onDefaultAiGenerationSettingsChange}
-            disabled={!active}
-        />
-        </div>
+                {/* Test button + result */}
+                <div className="flex items-center gap-2 mb-4">
+                <Button
+                    variant="outline"
+                    onClick={() => testMutation.mutate({engineId: engine.id, aiEngineConfig: value})}
+                    disabled={testMutation.isPending}
+                >
+                    {testMutation.isPending ? t('settings.testing') : t('settings.testConnection')}
+                </Button>
+                {(testMutation.isError || testMutation.isSuccess) && (
+                    <span
+                    className={`text-xs ${(testMutation.isSuccess && testMutation.data.ok) ? 'text-green-600' : 'text-destructive'}`}
+                    >
+                    {testMutation.isSuccess && testMutation.data.ok
+                        ? `✓ ${testMutation.data.detail}`
+                        : `✗ ${testMutation.data?.detail || testMutation.error?.message || 'unknown error'}`}
+                    </span>
+                )}
+                </div>
+            </FieldGroup>
+        </FieldSet>
 
-        {/* Summary generation settings */}
-        <div className="mb-4">
-        <p className="text-xs font-medium text-muted-foreground mb-1.5">
-            {t('settings.summaryAiGenerationSettings.title')}
-        </p>
-        <AiGenerationSettings
-            engineId={engine.id}
-            value={value.summaryAiGenerationSettings ?? {}}
-            onChange={onSummaryAiGenerationSettingsChange}
-            disabled={!active}
-        />
-        </div>
+        <Separator className="my-4"/>
 
-        {/* Test button + result */}
-        <div className="flex items-center gap-2 mb-4">
-        <Button
-            variant="outline"
-            onClick={() => testMutation.mutate({engineId: engine.id, aiEngineConfig: value})}
-            disabled={testMutation.isPending}
-        >
-            {testMutation.isPending ? t('settings.testing') : t('settings.testConnection')}
-        </Button>
-        {(testMutation.isError || testMutation.isSuccess) && (
-            <span
-            className={`text-xs ${(testMutation.isSuccess && testMutation.data.ok) ? 'text-green-600' : 'text-destructive'}`}
-            >
-            {testMutation.isSuccess && testMutation.data.ok
-                ? `✓ ${testMutation.data.detail}`
-                : `✗ ${testMutation.data?.detail || testMutation.error?.message || 'unknown error'}`}
-            </span>
-        )}
-        </div>
+        <FieldSet>
+            <FieldLegend>
+                <div className="flex items-center justify-between">
+                    <CardTitle>{t('settings.models.title')}</CardTitle>
+                    <Button variant="ghost" size="icon" onClick={onRefreshingModels} disabled={isRefreshingModelsPending}>
+                        <RefreshCw className={isRefreshingModelsPending ? "animate-spin" : ""} />
+                    </Button>
+                </div>
+            </FieldLegend>
+            <FieldGroup>
+                <ScrollArea className="h-28 rounded-md border">
+                    <div className="p-2">
+                        {!engineModels.length ? t('settings.models.none') : <span key="none"/>}
+                        {engineModels.map((model) => (
+                            <div key={model} className="text-sm py-1 truncate">
+                                {model.replace(/^gpt:\/\/[^/]+\//, '')}
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+            </FieldGroup>
+        </FieldSet>
+
+        <Separator className="my-4"/>
+
+        <FieldSet>
+            <FieldLegend>{t('settings.defaultAiGenerationSettings.title')}</FieldLegend>
+            <AiGenerationSettingsFieldGroup
+                formControl={form.control}
+                formFieldNamePrefix="defaultAiGenerationSettings."
+                engineId={engine.id}
+                disabled={!active}
+            />
+        </FieldSet>
+
+        <Separator className="my-4"/>
+
+        <FieldSet>
+            <FieldLegend>{t('settings.summaryAiGenerationSettings.title')}</FieldLegend>
+            <AiGenerationSettingsFieldGroup
+                formControl={form.control}
+                engineId={engine.id}
+                formFieldNamePrefix="summaryAiGenerationSettings."
+                disabled={!active}
+            />
+        </FieldSet>
+
+        <Separator className="my-4"/>
 
         {/* Capabilities */}
         <div>
@@ -234,7 +205,8 @@ export default function AiEngineConfigEditor<T extends AiEngineConfig = AiEngine
         {engineNotes && (
         <p className="text-xs text-muted-foreground mt-3 italic">{engineNotes}</p>
         )}
-    </section>
+        </CardContent>
+    </Card>
     )
 
 }

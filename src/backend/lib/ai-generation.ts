@@ -1,7 +1,7 @@
 import { generatePlan } from '../routes/generate-plan.js';
 import { generateLore } from '../routes/generate-lore.js';
 import type { NodeData } from './node-graph/node-interfaces.js';
-import type { AiGenerationSettings } from '../../shared/ai-generation-settings'
+import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
 import { SettingsRepository } from '../settings/settings-repository.js';
 
 /**

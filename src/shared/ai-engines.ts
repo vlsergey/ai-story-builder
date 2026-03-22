@@ -16,6 +16,7 @@
  * Display strings (name, notes, field labels/hints, capability labels/descriptions, age rating long labels)
  * are intentionally absent — they live in the frontend i18n locale files (src/frontend/src/i18n/).
  */
+import { z, ZodType } from "zod";
 
 export const AGE_RATING_ORDER = ['G', 'PG', '12', '16', '18', 'NC21'] as const
 export type AgeRating = typeof AGE_RATING_ORDER[number]
@@ -64,13 +65,14 @@ export interface AiEngineCapabilities {
   knowledgeBaseAttachment: boolean
 }
 
-export interface AiEngineField {
+export interface AiEngineFieldDef {
   key: string
-  type: 'checkbox' | 'number' | 'password' | 'select' | 'input' | 'textarea'
+  type: 'checkbox' | 'decimal' | 'integer' | 'password' | 'select' | 'input' | 'textarea'
   /** Default value pre-filled in the field when no saved value exists. */
   defaultValue?: string,
   required?: boolean,
   options?: string[],
+  schema?: ZodType,
 }
 
 export interface AiEngineDefinition {
@@ -79,8 +81,8 @@ export interface AiEngineDefinition {
   provider: string
   capabilities: AiEngineCapabilities
   ageRating: AgeRating
-  configFields: AiEngineField[]
-  aiSettingsFields: AiEngineField[],
+  configFields: AiEngineFieldDef[]
+  aiSettingsFields: AiEngineFieldDef[],
   /**
    * Maximum number of files that can be attached to a single request, or null if unlimited.
    * When set and the engine supports fileUpload + fileAttachment, the lore tree is collapsed
@@ -115,7 +117,10 @@ export const GROK_ENGINE_DEF : AiEngineDefinition = {
     { key: 'team_id', type: 'input' },
   ],
   aiSettingsFields: [
-    { key: 'webSearch', type: 'checkbox'}
+    { key: 'max_output_tokens', defaultValue: "0", type: 'integer', schema: z.coerce.number().int().min(0)},
+    { key: 'temperature', defaultValue: "1", type: 'decimal', schema: z.coerce.number().min(0).max(2)},
+    { key: 'top_p', defaultValue: "1", type: 'decimal', schema: z.coerce.number().min(0).max(1)},
+    { key: 'web_search', type: 'checkbox', schema: z.coerce.boolean()}
   ],
   maxFilesPerRequest: 10,
 }
@@ -136,6 +141,7 @@ export const YANDEX_ENGINE_DEF : AiEngineDefinition = {
     { key: 'folder_id', type: 'input' },
   ],
   aiSettingsFields: [
+    { key: 'max_completion_tokens', defaultValue: "0", type: 'integer', schema: z.coerce.number().int().min(0)},
     { key: 'webSearch', type: 'select', options: ['none', 'low', 'medium', 'high'], defaultValue: 'none' }
   ],
   maxFilesPerRequest: null,

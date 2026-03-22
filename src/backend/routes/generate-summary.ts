@@ -1,8 +1,8 @@
-import { BUILTIN_ENGINES } from '../../shared/ai-engines'
-import type { JsonSchemaSpec } from '../lib/ai-engine-adapter'
-import { getEngineAdapter } from '../lib/ai-engine-adapter'
-import { SettingsRepository } from '../settings/settings-repository'
-import { PlanNodeRepository } from '../plan/nodes/plan-node-repository'
+import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
+import type { JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
+import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
+import { SettingsRepository } from '../settings/settings-repository.js'
+import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 

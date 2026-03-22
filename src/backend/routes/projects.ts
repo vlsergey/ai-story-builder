@@ -16,6 +16,7 @@ import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 import electron from 'electron'
 const { shell } = electron
 import { exec } from 'child_process'
+import { openProjectDatabase } from '../db/index.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -23,14 +24,6 @@ function makeError(message: string, status: number): Error {
   const e = new Error(message)
   ;(e as any).status = status
   return e
-}
-
-// Lazy loader — deferred so that test imports don't trigger the require
-function openProjectDatabase(dbPath: string): import('better-sqlite3').Database {
-  const mod = require('../db/index.js') as {
-    openProjectDatabase: (p: string) => import('better-sqlite3').Database
-  }
-  return mod.openProjectDatabase(dbPath)
 }
 
 function getProjectInitialData(dbPath: string): ProjectInitialData {
@@ -94,6 +87,7 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
       planRepo.insert({ title: rootTitle, parent_id: null, position: 0 })
     }
   } catch (e) {
+    console.error(e);
     throw makeError('failed to open database: ' + String(e), 500)
   }
 

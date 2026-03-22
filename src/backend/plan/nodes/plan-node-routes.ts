@@ -1,7 +1,7 @@
-import type { PlanNodeTree } from '../../types/index'
-import type { PlanNodeCreate, PlanNodeRow, PlanNodeUpdate } from '../../../shared/plan-graph'
-import { isValidNodeType, NODE_TYPES } from '../../../shared/node-edge-dictionary'
-import { PlanNodeService } from './plan-node-service'
+import type { PlanNodeTree } from '../../types/index.js'
+import type { PlanNodeCreate, PlanNodeRow, PlanNodeUpdate } from '../../../shared/plan-graph.js'
+import { isValidNodeType, NODE_TYPES } from '../../../shared/node-edge-dictionary.js'
+import { PlanNodeService } from './plan-node-service.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────

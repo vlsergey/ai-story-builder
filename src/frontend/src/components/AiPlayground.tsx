@@ -1,13 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, CheckCircle2, Clipboard, Trash2 } from 'lucide-react'
-import AiGenerationSettings from './AiGenerationSettings'
 import { generatePlaygroundStream } from '../lib/generate-playground-stream'
-import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
-import { ipcClient } from '../ipcClient'
+import type { AiGenerationSettings } from '../../../shared/ai-generation-settings'
+import AiGenerationSettingsForm from './AiGenerationSettingsForm'
 
 export default function AiPlayground() {
-  const [currentEngine, setCurrentEngine] = useState<string | null>(null)
-  const [aiGenerationSettings, setAiGenerationSettings] = useState<AiGenerationSettingsDto>({ maxTokens: 4096 })
+  const [aiGenerationSettings, setAiGenerationSettings] = useState<AiGenerationSettings | null>()
 
   const [systemPrompt, setSystemPrompt] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -20,26 +18,6 @@ export default function AiPlayground() {
 
   const abortRef = useRef<AbortController | null>(null)
   const responseRef = useRef<HTMLPreElement>(null)
-
-  // Load AI config
-  useEffect(() => {
-
-    Promise.all([
-      ipcClient.settings.allAiEnginesConfig.get.query(),
-      ipcClient.settings.allAiEnginesConfig.currentEngine.get.query(),
-    ]).then(([loadedAiConfigStore, engine]) => {
-        setCurrentEngine(engine)
-        if (!engine) return
-
-        const engineData = loadedAiConfigStore[engine] ?? {}
-        const models = engineData?.available_models ?? []
-        const saved = engineData?.settings
-        const savedModel = saved?.model ?? engineData?.last_model
-        const validModel = savedModel && models.includes(savedModel) ? savedModel : (models[0] ?? '')
-        setAiGenerationSettings(prev => ({ ...prev, ...(saved ?? {}), model: validModel }))
-      })
-      .catch(() => {})
-  }, [])
 
   // Auto-scroll response to bottom during streaming
   useEffect(() => {
@@ -62,7 +40,7 @@ export default function AiPlayground() {
       await generatePlaygroundStream({
         systemPrompt: systemPrompt.trim() || undefined,
         prompt: prompt.trim(),
-        aiGenerationSettings: aiGenerationSettings,
+        aiGenerationSettings: aiGenerationSettings || {},
         signal: abortRef.current.signal,
         onThinking: (status, detail) => {
           if (status === 'done') setThinkingDone(true)
@@ -96,11 +74,9 @@ export default function AiPlayground() {
     <div className="flex flex-col h-full overflow-hidden bg-background">
 
       {/* Settings bar */}
-      <AiGenerationSettings
-        engineId={currentEngine}
+      <AiGenerationSettingsForm
         value={aiGenerationSettings}
         onChange={setAiGenerationSettings}
-        disabled={generating}
       />
 
       {/* Main area: split vertically — input top, output bottom */}

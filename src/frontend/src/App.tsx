@@ -8,6 +8,8 @@ import { LocaleProvider } from './lib/locale'
 import { ProjectData } from './types/models'
 import { trpc, ipcClient } from './ipcClient'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import superjson from 'superjson';
+import { ipcLink } from 'electron-trpc/renderer';
 
 const queryClient = new QueryClient();
 
@@ -60,6 +62,15 @@ export default function App() {
     }
   }
 
+  const [trpcClient] = useState(() =>
+    trpc.createClient({
+      transformer: superjson,
+      links: [
+        ipcLink(),
+      ],
+    })
+  );
+
   if (isLoading) {
     return (
       <LocaleProvider>
@@ -71,7 +82,7 @@ export default function App() {
   }
 
   return (
-    <trpc.Provider client={ipcClient} queryClient={queryClient}>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <LocaleProvider>

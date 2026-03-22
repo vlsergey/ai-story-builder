@@ -147,13 +147,13 @@ export default function StartScreen({
                     <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
                     <span className="truncate flex-1">{projectDisplayName(r)}</span>
                     <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 group-hover/item:hidden" />
-                    <button
+                    <span
                       onClick={e => removeRecent(e, r)}
                       title="Remove from list"
                       className="h-4 w-4 shrink-0 hidden group-hover/item:flex items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <X className="h-3 w-3" />
-                    </button>
+                    </span>
                   </button>
                 </li>
               ))}

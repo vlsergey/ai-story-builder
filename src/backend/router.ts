@@ -1,15 +1,16 @@
 import { initTRPC } from '@trpc/server';
-import { SettingsRepository } from './settings/settings-repository';
+import { SettingsRepository } from './settings/settings-repository.js';
+import superjson from 'superjson';
 import { z } from 'zod';
 
-import { getAiBilling } from './routes/ai-billing';
+import { getAiBilling } from './routes/ai-billing.js';
 
 // Project functions
 import {
   refreshEngineModels,
   setCurrentEngine,
   testEngineConnection,
-} from './routes/ai-config';
+} from './routes/ai-config.js';
 
 // Project functions
 import {
@@ -52,20 +53,22 @@ import {
   deleteGraphEdge,
 } from './plan/plan-routes.js';
 
-import { syncLore } from './routes/ai-sync'
-import { generateSummary } from './routes/generate-summary'
-import { AiEngineConfig, AllAiEnginesConfig } from '../shared/ai-engine-config';
+import { syncLore } from './routes/ai-sync.js'
+import { generateSummary } from './routes/generate-summary.js'
+import { AiEngineConfig, AllAiEnginesConfig } from '../shared/ai-engine-config.js';
 
 // Generation placeholder (will be implemented later)
 const generationUpdatePart = async (id: number, data: any) => ({ ok: true });
 
-const t = initTRPC.create();
+const t = initTRPC.create({
+  transformer: superjson
+});
 
 export const appRouter = t.router({
   ai: t.router({
-    billing: {
+    billing: t.router({
       get: t.procedure.query(() => getAiBilling()),
-    },
+    }),
     test: t.procedure
       .input((val: unknown) => val as { engineId: string, aiEngineConfig: AiEngineConfig })
       .mutation(({input}) => testEngineConnection(input.engineId, input.aiEngineConfig)),

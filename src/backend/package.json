@@ -12,13 +12,15 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.4.0",
     "cross-env": "^10.1.0",
+    "electron": "^41.0.3",
+    "electron-devtools-installer": "^4.0.0",
     "nodemon": "^3.0.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@trpc/server": "^11.13.4",
+    "@trpc/server": "^10.45.4",
     "best-effort-json-parser": "^1.4.0",
     "openai": "^6.25.0",
     "tsx": "^4.21.0",

@@ -5,14 +5,14 @@
   "author": "Sergey Vladimirov",
   "private": true,
   "type": "module",
-  "main": "src/electron/main.js",
+  "main": "dist/backend/main.js",
   "workspaces": [
     "src/frontend",
     "src/backend"
   ],
   "scripts": {
     "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "dev": "electron-rebuild -f -w better-sqlite3 && concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/server.mjs tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "dev": "electron-rebuild -f -w better-sqlite3 && concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/main.js tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "build": "npm run build --workspace=src/frontend",
     "build:backend": "npm run build --workspace=src/backend",
     "test": "npm rebuild better-sqlite3 && npm run test --workspace=src/backend && npm run test --workspace=src/frontend",
@@ -29,9 +29,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "electron": "^41.0.2",
     "electron-builder": "^26.8.1",
-    "electron-devtools-installer": "^4.0.0",
     "electron-rebuild": "^3.2.9",
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
@@ -54,7 +52,7 @@
       "**/*.node"
     ],
     "files": [
-      "src/electron/**/*",
+      "src/backend/icons/*",
       "dist/**/*"
     ],
     "win": {
@@ -91,5 +89,8 @@
         }
       ]
     }
+  },
+  "dependencies": {
+    "superjson": "^2.2.6"
   }
 }

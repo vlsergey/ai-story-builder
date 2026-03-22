@@ -2,7 +2,7 @@ import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../s
 
 export interface GenerateNodeOptions {
   prompt: string
-  aiGenerationSettings?: AiGenerationSettingsDto
+  aiGenerationSettings?: AiGenerationSettingsDto | null
   /** 'generate' (default) | 'improve' */
   mode?: 'generate' | 'improve'
   /** The current content to improve; only used when mode='improve' */

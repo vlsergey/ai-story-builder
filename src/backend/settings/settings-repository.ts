@@ -32,6 +32,7 @@ export class SettingsRepository {
         .prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
         .run(key, value);
     });
+    console.info(`Updated setting '${key}' to '${value?.substring(0, 15)}...'`)
   }
 
   /**

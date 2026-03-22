@@ -1,5 +1,5 @@
 import type { NodeData, NodeContext } from '../node-interfaces.js'
-import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph'
+import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph.js'
 
 /**
  * Processor for a specific node type.

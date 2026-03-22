@@ -1,8 +1,8 @@
-import type { AiEngineAdapter, GenerateResponseRequest } from './ai-engine-adapter'
-import type { GrokAiGenerationSettings } from '../../shared/grok-ai-generation-settings'
-import { grokGenerate } from './grok-client'
-import { SettingsRepository } from '../settings/settings-repository';
-import { GROK_ENGINE_DEF as engineDef } from '../../shared/ai-engines';
+import type { AiEngineAdapter, GenerateResponseRequest } from './ai-engine-adapter.js'
+import type { GrokAiGenerationSettings } from '../../shared/grok-ai-generation-settings.js'
+import { grokGenerate } from './grok-client.js'
+import { SettingsRepository } from '../settings/settings-repository.js';
+import { GROK_ENGINE_DEF as engineDef } from '../../shared/ai-engines.js';
 
 export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
   async generateResponse(
@@ -16,8 +16,8 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     const apiKey = engineConfig.api_key?.trim()
     if (!apiKey) throw new Error('Grok api_key is required')
 
-    const actualAiSettings = {
-      ...engineConfig.defaultAiSettings,
+    const actualAiSettings: GrokAiGenerationSettings = {
+      ...engineConfig.defaultAiGenerationSettings,
       ...req.aiGenerationSettings,
     }
 
@@ -36,8 +36,9 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       model: actualAiSettings.model,
       instructions: req.systemPrompt,
       input: [{ role: 'user', content: userContent }],
-      ...(actualAiSettings.maxTokens != null ? { max_output_tokens: actualAiSettings.maxTokens } : {}),
-      ...(actualAiSettings.maxCompletionTokens != null ? { max_completion_tokens: actualAiSettings.maxCompletionTokens } : {}),
+      max_output_tokens: actualAiSettings.max_output_tokens,
+      temperature: actualAiSettings.temperature,
+      top_p: actualAiSettings.top_p,
     }
     if (actualAiSettings.webSearch === true) {
       requestParams.tools = [{ type: 'web_search' }]

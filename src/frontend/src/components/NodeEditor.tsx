@@ -10,13 +10,13 @@ import { generateNodeStream } from '../lib/generate-node-stream'
 import { dispatchAiCallCompleted } from '../lib/billing-events'
 import { dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import { preserveScrollOnExternalUpdate } from '../lib/codemirror-preserve-scroll'
-import AiGenerationSettings from './AiGenerationSettings'
 import DiffViewAndAccept from './DiffViewAndAccept'
-import ResizableTextarea from './ui/resizable-textarea'
-import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
+import type { AiGenerationSettings } from '../../../shared/ai-generation-settings'
 import type { AiEngineSyncRecord } from '../types/models'
 import { ipcClient, trpc } from '../ipcClient'
 import { Button } from './ui/button'
+import AiGenerationSettingsForm from './AiGenerationSettingsForm'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion'
 
 export interface NodeSavedPayload {
   nodeId: number
@@ -78,9 +78,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   // Plan-only extra fields
   const [userPrompt, setUserPrompt] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
-  const [systemPromptExpanded, setSystemPromptExpanded] = useState(false)
-  const [userPromptHeight, setUserPromptHeight] = useState<number>(80) // pixels
-  const [systemPromptHeight, setSystemPromptHeight] = useState<number>(60) // pixels
   const userPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const systemPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -101,10 +98,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   // ── AI engine config ────────────────────────────────────────────────────────
   const currentAiEngine = trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery().data || null
-  const currentAiEngineDefaultAiGenerationSettings =
-    trpc.settings.allAiEnginesConfig.currentEngine.defaultAiGenerationSettings.get.useQuery().data
-  const [nodeAiGenerationSettings, setNodeAiGenerationSettings] = useState<Record<string, AiGenerationSettingsDto>>({})
-  const [useCustomAiGenerationSettings, setUseCustomAiGenerationSettings] = useState(false)
+  const [nodeAiGenerationSettings, setNodeAiGenerationSettings] = useState<Record<string, AiGenerationSettings>>({})
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
   // generatePrompt removed, using userPrompt instead
@@ -150,7 +144,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       setSystemPrompt(systemPrompt)
       // parse ai_settings
       const aiSettingsRaw = node.ai_settings as string | undefined
-      let parsed: Record<string, AiGenerationSettingsDto> | null = null
+      let parsed: Record<string, AiGenerationSettings> | null = null
       if (aiSettingsRaw && aiSettingsRaw.trim() !== '') {
         try {
           parsed = JSON.parse(aiSettingsRaw)
@@ -180,25 +174,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       panelApi.setTitle(primaryValue)
     }
   }, [primaryValue, panelApi])
-
-  // ── Load prompt heights from settings ──────────────────────────────────────
-  useEffect(() => {
-    const loadHeight = (key: string) => {
-      ipcClient.settings.get.query(key)
-        .then((data) => {
-          if (data) {
-            const parsed = parseInt(data, 10)
-            if (!isNaN(parsed) && parsed > 0) {
-              if (key === 'prompt_user_height') setUserPromptHeight(parsed)
-              else if (key === 'prompt_system_height') setSystemPromptHeight(parsed)
-            }
-          }
-        })
-        .catch(() => {})
-    }
-    loadHeight('prompt_user_height')
-    loadHeight('prompt_system_height')
-  }, [])
 
   // ── Trigger summary generation on editor close ─────────────────────────────
   useEffect(() => {
@@ -278,37 +253,20 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     await adapter.patchNode(nodeId, { content: currentContent })
   }
 
-  const updateNodeAiGenerationSettings = useCallback(async (newSettings: Record<string, AiGenerationSettingsDto>) => {
+  const updateNodeAiGenerationSettings = useCallback(async (newSettings: Record<string, AiGenerationSettings>) => {
     const toStore = newSettings || {};
     await adapter.patchNode(nodeId, { ai_settings: JSON.stringify(toStore) });
   }, [adapter, nodeId])
 
-  // ── Handle checkbox change for custom AI settings ─────────────────────────
-  const onUseCustomAiGenerationSettingsChange = useCallback(async (checked: boolean) => {
-    setUseCustomAiGenerationSettings(checked);
+  const aiGenerationSettings : (AiGenerationSettings | null) = currentAiEngine ? nodeAiGenerationSettings[currentAiEngine] ?? null : null
+  const onAiGenerationSettingsChange = useCallback(async (value: AiGenerationSettings | null) => {
     if (!currentAiEngine) return;
-    if (checked) {
-      // Copy default aiSettings into nodeAiGenerationSettings for this engine
-      const newNodeAiGenerationSettings = {
-        ...nodeAiGenerationSettings,
-        [currentAiEngine]: currentAiEngineDefaultAiGenerationSettings ?? {},
-      }
-      setNodeAiGenerationSettings(newNodeAiGenerationSettings);
-      await updateNodeAiGenerationSettings(newNodeAiGenerationSettings);
+    const newNodeAiGenerationSettings = { ...nodeAiGenerationSettings }
+    if ( value == null ) {
+      delete newNodeAiGenerationSettings[currentAiEngine]
     } else {
-      // Remove settings for this engine
-      const newNodeAiGenerationSettings = { ...(nodeAiGenerationSettings || {}) };
-      delete newNodeAiGenerationSettings[currentAiEngine];
-      setNodeAiGenerationSettings(newNodeAiGenerationSettings);
-      await updateNodeAiGenerationSettings(newNodeAiGenerationSettings);
-      // Revert aiSettings to global defaults (they will be updated by the effect)
+      newNodeAiGenerationSettings[currentAiEngine] = value
     }
-  }, [currentAiEngine, currentAiEngineDefaultAiGenerationSettings, nodeAiGenerationSettings, setNodeAiGenerationSettings, setUseCustomAiGenerationSettings, updateNodeAiGenerationSettings])
-
-  const aiGenerationSettings = currentAiEngine ? nodeAiGenerationSettings[currentAiEngine] ?? {} : {}
-  const onAiGenerationSettingsChange = useCallback(async (value: AiGenerationSettingsDto) => {
-    if (!currentAiEngine) return;
-    const newNodeAiGenerationSettings = { ...nodeAiGenerationSettings, [currentAiEngine]: value}
     setNodeAiGenerationSettings(newNodeAiGenerationSettings);
     await updateNodeAiGenerationSettings(newNodeAiGenerationSettings);
   }, [currentAiEngine, nodeAiGenerationSettings, setNodeAiGenerationSettings, updateNodeAiGenerationSettings])
@@ -559,7 +517,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden p-4">
 
       {/* ── [A] GENERATE CONTROLS — mode 'generate' only ──────────────────────── */}
       <div
@@ -594,27 +552,14 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
             rows={2}
             className="w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
           />
-          <div className="flex items-center justify-between flex-wrap px-2 py-1.5 border-b border-border">
-            <AiGenerationSettings
-              engineId={currentAiEngine}
+          <div className='flex item-center w-full shrink-0'>
+            <AiGenerationSettingsForm
+              className="flex-grow"
               value={aiGenerationSettings}
               onChange={onAiGenerationSettingsChange}
-              disabled={generating}
-              className="flex items-center gap-3 flex-wrap"
             />
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useCustomAiGenerationSettings}
-                  onChange={(e) => onUseCustomAiGenerationSettingsChange(e.target.checked)}
-                  disabled={!currentAiEngine || generating}
-                  className="h-3.5 w-3.5"
-                />
-                <span>Использовать нестандартные настройки AI</span>
-              </label>
-            </div>
             <Button
+              className="shrink-0 self-end"
               onClick={handleImprove}
               variant="secondary"
               disabled={isLocked || !improveInstruction.trim()}
@@ -625,83 +570,50 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         </div>
       </div>
 
-
       {/* ── SYSTEM PROMPT + USER PROMPT (for all adapters) ────────────────────── */}
-      <div className="border-b border-border shrink-0">
-        {/* System prompt with expandable toggle */}
-        <div
-          className="flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground select-none"
-          onClick={() => setSystemPromptExpanded(prev => !prev)}
-        >
-          <span>{systemPromptExpanded ? '▾' : '▸'}</span>
-          <span>{tp('systemPrompt')}</span>
-        </div>
-        {systemPromptExpanded && (
-          <div className="px-2 py-1">
-            <ResizableTextarea
+      <Accordion className="shrink-0 w-full" type="multiple" defaultValue={['user-prompt']}>
+        <AccordionItem value="system-prompt">
+          <AccordionTrigger>{tp('systemPrompt')}</AccordionTrigger>
+          <AccordionContent className="flex flex-col h-full">
+            <textarea
+              className="w-full"
               value={systemPrompt}
-              onChange={handleSystemPromptChange}
-              onHeightChange={(height) => {
-                setSystemPromptHeight(height);
-                savePromptHeight('prompt_system_height', height);
-              }}
-              initialHeight={systemPromptHeight}
-              minHeight={40}
-              maxHeight={500}
+              onChange={(e) => handleSystemPromptChange(e.target.value)}
               placeholder={tp('systemPrompt')}
-              className="w-full resize-none border border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              rows={10}
             />
-          </div>
-        )}
-        {/* User prompt */}
-        <div className="px-2 py-1 border-t border-border">
-          <ResizableTextarea
-            value={userPrompt}
-            onChange={handleUserPromptChange}
-            onHeightChange={(height) => {
-              setUserPromptHeight(height);
-              savePromptHeight('prompt_user_height', height);
-            }}
-            initialHeight={userPromptHeight}
-            minHeight={40}
-            maxHeight={500}
-            placeholder={tp('userPrompt')}
-            className="w-full resize-none border border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </div>
-      </div>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="user-prompt">
+          <AccordionTrigger>{tp('userPrompt')}</AccordionTrigger>
+          <AccordionContent className="flex flex-col h-full">
+            <textarea
+              className="w-full"
+              value={userPrompt}
+              onChange={(e) => handleUserPromptChange(e.target.value)}
+              placeholder={tp('userPrompt')}
+              rows={10}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* ── AI CONTROLS & GENERATE BUTTON — after prompts, mode 'generate' only ───── */}
       {editorMode === 'generate' && (
-        <div className="border-b border-border shrink-0">
-          <div className="flex items-center justify-between flex-wrap px-2 py-1.5">
-            <AiGenerationSettings
-              engineId={currentAiEngine}
-              value={aiGenerationSettings}
-              onChange={onAiGenerationSettingsChange}
-              disabled={generating}
-              className="flex items-center gap-3 flex-wrap"
-            />
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useCustomAiGenerationSettings}
-                  onChange={(e) => onUseCustomAiGenerationSettingsChange(e.target.checked)}
-                  disabled={!currentAiEngine || generating}
-                  className="h-3.5 w-3.5"
-                />
-                <span>Использовать нестандартные настройки AI</span>
-              </label>
-            </div>
-            <Button
-              variant="default"
-              onClick={handleGenerate}
-              disabled={generating || !effectivePrompt.trim()}
-            >
-              {generating ? 'Generating…' : (hasContent ? tp('regenerate') : tp('generate'))}
-            </Button>
-          </div>
+        <div className='flex item-center w-full'>
+          <AiGenerationSettingsForm
+            className="flex-grow"
+            value={aiGenerationSettings}
+            onChange={onAiGenerationSettingsChange}
+          />
+          <Button
+            className="shrink-0 self-end m-4"
+            variant="default"
+            onClick={handleGenerate}
+            disabled={generating || !effectivePrompt.trim()}
+          >
+            {generating ? 'Generating…' : (hasContent ? tp('regenerate') : tp('generate'))}
+          </Button>
         </div>
       )}
 
@@ -863,25 +775,10 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         )}
         <div className="flex items-center justify-between flex-wrap px-2 py-1 border-t border-border">
           <div className="flex items-center gap-2 flex-wrap">
-            <AiGenerationSettings
-              engineId={currentAiEngine}
+            <AiGenerationSettingsForm
               value={aiGenerationSettings}
               onChange={onAiGenerationSettingsChange}
-              disabled={generating}
-              className="flex items-center gap-3 flex-wrap"
             />
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-sm text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useCustomAiGenerationSettings}
-                  onChange={(e) => onUseCustomAiGenerationSettingsChange(e.target.checked)}
-                  disabled={!currentAiEngine || generating}
-                  className="h-3.5 w-3.5"
-                />
-                <span>Использовать нестандартные настройки AI</span>
-              </label>
-            </div>
             {!generating && adapter.renderEditModeExtras?.(nodeId)}
           </div>
           <div className="flex items-center gap-2">
