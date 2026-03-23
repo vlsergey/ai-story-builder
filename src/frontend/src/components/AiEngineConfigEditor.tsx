@@ -38,9 +38,14 @@ export default function AiEngineConfigEditor({active, engine, value, onChange}: 
         defaultValues: value,
     })
 
+    // Reset form when value changes (e.g., after data refetch)
+    useEffect(() => {
+        form.reset(value);
+    }, [value, form]);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const debouncedSubmit = useCallback(debounce(() => {
-        form.handleSubmit(onChange)(); 
+        form.handleSubmit(onChange)();
     }, 1000), [form, onChange]);
 
     useEffect(() => {

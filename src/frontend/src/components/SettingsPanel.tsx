@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useId, useState } from 'react'
 import { BUILTIN_ENGINES } from '../lib/ai-engines'
 import { useLocale } from '../lib/locale'
 import { useTheme } from '../lib/theme/theme-provider'
@@ -6,6 +6,21 @@ import AiEngineConfigEditor from './AiEngineConfigEditor'
 import { trpc } from '../ipcClient';
 import { AiEngineConfig } from '@shared/ai-engine-config'
 import { Switch } from './ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
+import {
+  Field,
+  FieldLabel,
+  FieldDescription,
+  FieldGroup,
+  FieldError,
+  FieldContent,
+} from './ui/field'
 
 function setAndInvalidate<T extends { useMutation: any }>(procedure: T) {
   const utils = trpc.useUtils();
@@ -52,12 +67,19 @@ export default function SettingsPanel() {
   const setVerboseAiLogging = setAndInvalidate(trpc.settings.verboseAiLogging.set).mutate
 
   const setAiEngineConfig = useCallback((engineId: string, aiEngineConfig: AiEngineConfig) => {
+    const currentConfig = aiConfigStore ?? {};
     setAllAiEnginesConfig({
-      ...aiConfigStore,
+      ...currentConfig,
       [engineId]: aiEngineConfig,
-    })
-    utils.settings.allAiEnginesConfig.invalidate()
-  }, [aiConfigStore, setAllAiEnginesConfig, utils.settings.allAiEnginesConfig])
+    });
+  }, [aiConfigStore, setAllAiEnginesConfig])
+
+  const htmlIdLanguage = useId()
+  const htmlIdTheme = useId()
+  const htmlIdTextLanguage = useId()
+  const htmlIdAutoSummary = useId()
+  const htmlIdCurrentEngine = useId()
+  const htmlIdVerboseLogging = useId()
 
   if (isAiConfigStoreLoading) {
     return (
@@ -68,94 +90,116 @@ export default function SettingsPanel() {
   }
 
   return (
-    <div className="gap-6 p-4 h-full overflow-auto">
-      {/* ── Interface Language ── */}
-      <section>
-        <h2 className="text-base font-semibold mb-3">{t('settings.uiLanguage.title')}</h2>
-        <select
-          value={locale}
-          onChange={e => setLocale(e.target.value)}
-          className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
-        >
-          <option value="en">{t('settings.uiLanguage.en')}</option>
-          <option value="ru">{t('settings.uiLanguage.ru')}</option>
-        </select>
-      </section>
+    <div className="p-2 h-full overflow-auto">
+      <FieldGroup className="p-2">
+        {/* ── Interface Language ── */}
+        <Field orientation="responsive">
+          <FieldContent>
+            <FieldLabel htmlFor={htmlIdLanguage}>{t('settings.uiLanguage.title')}</FieldLabel>
+          </FieldContent>
+          <Select value={locale} onValueChange={setLocale}>
+            <SelectTrigger id={htmlIdLanguage}>
+              <SelectValue placeholder={t('settings.uiLanguage.select')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">{t('settings.uiLanguage.en')}</SelectItem>
+              <SelectItem value="ru">{t('settings.uiLanguage.ru')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
 
-      {/* ── Theme ── */}
-      <section>
-        <h2 className="text-base font-semibold mb-3">{t('settings.theme.title')}</h2>
-        <select
-          value={themePreference}
-          onChange={e => setThemePreference(e.target.value)}
-          className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
-        >
-          <option value="auto">{t('settings.theme.auto')}</option>
-          <option value="obsidian">{t('settings.theme.obsidian')}</option>
-          <option value="github">{t('settings.theme.github')}</option>
-        </select>
-      </section>
+        {/* ── Theme ── */}
+        <Field orientation="responsive">
+          <FieldContent>
+            <FieldLabel htmlFor={htmlIdTheme}>{t('settings.theme.title')}</FieldLabel>
+          </FieldContent>
+          <Select value={themePreference} onValueChange={setThemePreference}>
+            <SelectTrigger id={htmlIdTheme}>
+              <SelectValue placeholder={t('settings.theme.select')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">{t('settings.theme.auto')}</SelectItem>
+              <SelectItem value="obsidian">{t('settings.theme.obsidian')}</SelectItem>
+              <SelectItem value="github">{t('settings.theme.github')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
 
-      {/* ── Text Language ── */}
-      <section>
-        <h2 className="text-base font-semibold mb-3">{t('settings.textLanguage.title')}</h2>
-        <div className="flex flex-col gap-1.5">
-          <select
+        {/* ── Text Language ── */}
+        <Field orientation="responsive">
+          <FieldContent>
+            <FieldLabel htmlFor={htmlIdTextLanguage}>{t('settings.textLanguage.title')}</FieldLabel>
+            <FieldDescription>{t('settings.textLanguage.description')}</FieldDescription>
+          </FieldContent>
+          <Select
             disabled={isTextLanguageLoading}
             value={textLanguage || ''}
-            onChange={e => setTextLanguage(e.target.value)}
-            className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
+            onValueChange={setTextLanguage}
           >
-            <option value="ru-RU">Русский (ru-RU)</option>
-            <option value="en-US">English (en-US)</option>
-          </select>
-          <p className="text-xs text-muted-foreground max-w-md">
-            {t('settings.textLanguage.description')}
-          </p>
-        </div>
-      </section>
+            <SelectTrigger id={htmlIdTextLanguage} className="w-64">
+              <SelectValue placeholder="Select language" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ru-RU">Русский (ru-RU)</SelectItem>
+              <SelectItem value="en-US">English (en-US)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
 
-      {/* ── Auto-summary generation ── */}
-      <section>
-        <h2 className="text-base font-semibold mb-3">{t('settings.autoSummary.title')}</h2>
-        <label className="flex items-start gap-2 cursor-pointer">
+        {/* ── Auto-summary generation ── */}
+        <Field orientation="responsive">
+          <FieldContent>
+            <FieldLabel htmlFor={htmlIdAutoSummary}>{t('settings.autoSummary.title')}</FieldLabel>
+            <FieldDescription>{t('settings.autoSummary.description')}</FieldDescription>
+          </FieldContent>
           <Switch
+            id={htmlIdAutoSummary}
             disabled={isAutoGenerateSummaryLoading}
             checked={autoGenerateSummary}
             onCheckedChange={setAutoGenerateSummary}
           />
-          <div>
-            <p className="text-sm">{t('settings.autoSummary.title')}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t('settings.autoSummary.description')}
-            </p>
-          </div>
-        </label>
-      </section>
+        </Field>
 
-      {/* ── Current AI Engine ── */}
-      <section>
-        <h2 className="text-base font-semibold mb-3">{t('settings.aiEngine.title')}</h2>
-        <div className="flex flex-col gap-1.5">
-          <select
+        {/* ── Current AI Engine ── */}
+        <Field orientation="responsive">
+          <FieldContent>
+            <FieldLabel htmlFor={htmlIdCurrentEngine}>{t('settings.aiEngine.title')}</FieldLabel>
+            <FieldDescription>{t('settings.aiEngine.description')}</FieldDescription>
+          </FieldContent>
+          <Select
             disabled={isCurrentEngineLoading}
-            value={currentEngine ?? ''}
-            onChange={e => setCurrentEngine(e.target.value || null)}
-            className="border border-border rounded px-2 py-1.5 text-sm bg-background w-64"
+            value={currentEngine ?? 'none'}
+            onValueChange={(value) => setCurrentEngine(value === 'none' ? null : value)}
           >
-            <option value="">{t('settings.aiEngine.none')}</option>
-            {BUILTIN_ENGINES.map(e => (
-              <option key={e.id} value={e.id}>{t(`engine.${e.id}.name`)}</option>
-            ))}
-          </select>
-          {engineError && (
-            <span className="text-destructive text-xs">{engineError}</span>
-          )}
-          <p className="text-xs text-muted-foreground max-w-md">
-            {t('settings.aiEngine.description')}
-          </p>
-        </div>
-      </section>
+            <SelectTrigger id={htmlIdCurrentEngine} className="w-64">
+              <SelectValue placeholder={t('settings.aiEngine.select')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{t('settings.aiEngine.none')}</SelectItem>
+              {BUILTIN_ENGINES.map(e => (
+                <SelectItem key={e.id} value={e.id}>
+                  {t(`engine.${e.id}.name`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {engineError && (<FieldError>{engineError}</FieldError>)}
+        </Field>
+
+        {/* ── Debug ── */}
+        <Field orientation="responsive">
+          <FieldContent>
+            <FieldLabel htmlFor={htmlIdVerboseLogging}>{t('settings.debug.verboseAiLogging')}</FieldLabel>
+            <FieldDescription>{t('settings.debug.verboseAiLoggingDescription')}</FieldDescription>
+          </FieldContent>
+          <Switch
+            id={htmlIdVerboseLogging}
+            disabled={isVerboseAiLoggingLoading}
+            checked={verboseAiLogging}
+            onCheckedChange={setVerboseAiLogging}
+          />
+        </Field>
+      </FieldGroup>
 
       {/* ── Per-engine sections ── */}
       {BUILTIN_ENGINES.map(engine => 
@@ -167,24 +211,6 @@ export default function SettingsPanel() {
           onChange={(value) => setAiEngineConfig(engine.id, value)}
           />
       )}
-
-      {/* ── Debug ── */}
-      <section>
-        <h2 className="text-base font-semibold mb-3">{t('settings.debug.title')}</h2>
-        <label className="flex items-start gap-2 cursor-pointer">
-          <Switch
-            disabled={isVerboseAiLoggingLoading}
-            checked={verboseAiLogging}
-            onCheckedChange={setVerboseAiLogging}
-          />
-          <div>
-            <p className="text-sm">{t('settings.debug.verboseAiLogging')}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t('settings.debug.verboseAiLoggingDescription')}
-            </p>
-          </div>
-        </label>
-      </section>
 
       {/* Spacer at bottom */}
       <div className="h-4" />

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { useLocale } from "@/lib/locale"
 import { AiEngineDefinition, AiEngineFieldDef } from "@shared/ai-engines"
 import { ComponentProps, useId } from "react"
@@ -13,8 +13,10 @@ import {
 } from "./ui/select"
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "./ui/field"
 import { Control, Controller, FieldValues } from "react-hook-form"
-import { TriangleAlert, Info } from "lucide-react"
+import { TriangleAlert, Info, Eye, EyeOff } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
+import { ButtonGroup } from './ui/button-group'
+import { Button } from './ui/button'
 
 interface AiEngineFieldProps {
     className?: string,
@@ -30,7 +32,9 @@ export default function AiEngineField({ className, disabled, formControl, formFi
     const { t } = useLocale()
     const htmlId = useId();
     const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label`)
-    const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint`, undefined)
+    const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint`, null)
+
+    const [showHiddenValue, setShowHiddenValue] = useState<boolean>(false)
 
     const zChecks = field.schema?.def.checks ?? [];
 
@@ -102,7 +106,32 @@ export default function AiEngineField({ className, disabled, formControl, formFi
                     </SelectContent>
                 </Select>)
             case 'input':
-                return (<Input className="w-28" {...field} aria-invalid={invalid} />)
+                return (<Input
+                    className="w-28"
+                    id={htmlId}
+                    name={name}
+                    value={value ?? ''}
+                    onChange={onChange}
+                    onBlur={onBlur}
+                    aria-invalid={invalid} />)
+            case 'password':
+                return (<ButtonGroup>
+                    <Input
+                        autoCorrect='false'
+                        autoCapitalize='none'
+                        autoComplete='off'
+                        className="w-28"
+                        id={htmlId}
+                        name={name}
+                        type={showHiddenValue ? 'text' : 'password'}
+                        value={value ?? ''}
+                        onChange={onChange}
+                        onBlur={onBlur}
+                        aria-invalid={invalid} />
+                    <Button variant="secondary" onClick={() => setShowHiddenValue(v => !v)}>
+                      { showHiddenValue ? <EyeOff /> : <Eye /> }
+                    </Button>
+                </ButtonGroup>)
             default:
                 return <span key={field.key}/>
         }

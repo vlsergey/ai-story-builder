@@ -8,7 +8,7 @@ const LOCALES: Record<string, LocaleStrings> = { en, ru }
 interface LocaleContextValue {
   locale: string
   setLocale: (locale: string) => void
-  t: (key: string, fallback?: string) => string
+  t: (key: string, fallback?: (string | null)) => string
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
@@ -40,7 +40,13 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const strings = useMemo<LocaleStrings>(() => LOCALES[locale] ?? en, [locale])
-  const t = (key: string, fallback?: string): string => strings[key] ?? fallback ?? key
+  const t = (key: string, fallback?: string | null): (null | string) => {
+    const existing = strings[key]
+    if (existing) return existing
+    // we CAN return null here
+    if (fallback !== undefined) return fallback
+    return key
+  }
 
   return (
     <LocaleContext.Provider value={{ locale, setLocale, t }}>
