@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { default as installExtension, REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer'
 import { createRequire } from 'module';
 import { appRouter } from './router.js';
+import { setupStreamHandlers } from './stream-handler.js';
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -362,6 +363,7 @@ app.whenReady().then(async () => {
   console.log('Creating window...')
   const window = createWindow()
   console.log('Window created')
+  setupStreamHandlers();
 
   // Import tRPC IPC handlers instead of the old HTTP server
   console.log('Creating tRPC IPC handler')

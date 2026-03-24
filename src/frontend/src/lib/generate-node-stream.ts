@@ -20,6 +20,7 @@ export async function generateNodeStream(
   options: GenerateNodeOptions
 ): Promise<void> {
   const streamId = crypto.randomUUID()
+  console.debug(`[generateNodeStream] starting stream ${streamId} for endpoint ${endpoint}`)
 
   await new Promise<void>((resolve, reject) => {
     const unsub = window.electronAPI.onStreamEvent((event) => {
@@ -29,10 +30,12 @@ export async function generateNodeStream(
       } else if (event.type === 'partial_json') {
         options.onPartialJson?.(event.data)
       } else if (event.type === 'done') {
+        console.debug(`[generateNodeStream] stream ${streamId} completed`)
         unsub()
         options.onDone?.(event.data as { response_id?: string })
         resolve()
       } else if (event.type === 'error') {
+        console.error(`[generateNodeStream] stream ${streamId} error:`, event.data)
         unsub()
         reject(new Error(event.data.message as string))
       }
@@ -40,6 +43,7 @@ export async function generateNodeStream(
 
     if (options.signal) {
       options.signal.addEventListener('abort', () => {
+        console.debug(`[generateNodeStream] stream ${streamId} aborted by signal`)
         unsub()
         window.electronAPI.abortStream(streamId)
         reject(new DOMException('Aborted', 'AbortError'))
@@ -50,7 +54,19 @@ export async function generateNodeStream(
     // endpoint is like '/api/ai/generate-lore' or '/api/ai/generate-plan'
     const ipcEndpoint = endpoint.replace('/api/ai/', '')
 
-    window.electronAPI.startStream(streamId, ipcEndpoint, options).catch(reject)
+    // Extract only serializable fields for backend
+    const serializableParams = {
+      prompt: options.prompt,
+      aiGenerationSettings: options.aiGenerationSettings,
+      mode: options.mode,
+      baseContent: options.baseContent,
+      nodeId: options.nodeId,
+    }
+
+    window.electronAPI.startStream(streamId, ipcEndpoint, serializableParams).catch((err) => {
+      console.error(`[generateNodeStream] startStream failed for ${streamId}:`, err)
+      reject(err)
+    })
   })
 }
 
@@ -64,6 +80,7 @@ export interface GenerateAllOptions {
 
 export async function generateAllStream(options: GenerateAllOptions): Promise<void> {
   const streamId = crypto.randomUUID()
+  console.debug(`[generateAllStream] starting stream ${streamId}`)
 
   await new Promise<void>((resolve, reject) => {
     const unsub = window.electronAPI.onStreamEvent((event) => {
@@ -73,10 +90,12 @@ export async function generateAllStream(options: GenerateAllOptions): Promise<vo
       } else if (event.type === 'partial_json') {
         options.onPartialJson?.(event.data)
       } else if (event.type === 'done') {
+        console.debug(`[generateAllStream] stream ${streamId} completed`)
         unsub()
         options.onDone?.(event.data as { generated: number; skipped: number })
         resolve()
       } else if (event.type === 'error') {
+        console.error(`[generateAllStream] stream ${streamId} error:`, event.data)
         unsub()
         reject(new Error(event.data.message as string))
       }
@@ -84,6 +103,7 @@ export async function generateAllStream(options: GenerateAllOptions): Promise<vo
 
     if (options.signal) {
       options.signal.addEventListener('abort', () => {
+        console.debug(`[generateAllStream] stream ${streamId} aborted by signal`)
         unsub()
         window.electronAPI.abortStream(streamId)
         reject(new DOMException('Aborted', 'AbortError'))
@@ -93,6 +113,9 @@ export async function generateAllStream(options: GenerateAllOptions): Promise<vo
     const ipcEndpoint = 'generate-all'
     window.electronAPI.startStream(streamId, ipcEndpoint, {
       regenerateManual: options.regenerateManual ?? false,
-    }).catch(reject)
+    }).catch((err) => {
+      console.error(`[generateAllStream] startStream failed for ${streamId}:`, err)
+      reject(err)
+    })
   })
 }

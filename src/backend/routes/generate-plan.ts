@@ -32,21 +32,26 @@ export async function generatePlan(
 
   let finalPrompt = prompt.trim()
   if (nodeId !== undefined) {
-    try {
-      const edgeRepo = new PlanEdgeRepository()
-      const edge = edgeRepo.getFirstByToNodeIdAndType(nodeId, 'text')
-      if (edge) {
-        const nodeRepo = new PlanNodeRepository()
-        const fromNode = nodeRepo.getById(edge.from_node_id)
-        if (fromNode) {
-          const placeholder = `{{${fromNode.title}}}`
-          const content = fromNode.content || ''
-          finalPrompt = finalPrompt.split(placeholder).join(content)
-        }
+    const edgeRepo = new PlanEdgeRepository()
+    const edges = edgeRepo.getByToNodeIdAndType(nodeId, 'text')
+    const nodeRepo = new PlanNodeRepository()
+    for (const edge of edges) {
+      const fromNode = nodeRepo.getById(edge.from_node_id)
+      if (fromNode) {
+        const placeholder = `{{${fromNode.title}}}`
+        const content = fromNode.content || ''
+        finalPrompt = finalPrompt.split(placeholder).join(content)
       }
-    } catch (e) {
-      console.error('Failed to apply template substitution:', e)
     }
+  }
+
+  // Проверка, что после замены не осталось неразрешённых шаблонов
+  const remainingPlaceholders = finalPrompt.match(/\{\{[^}]+?\}\}/g)
+  if (remainingPlaceholders && remainingPlaceholders.length > 0) {
+    throw makeError(
+      `Не удалось разрешить шаблоны: ${remainingPlaceholders.join(', ')}. Убедитесь, что соответствующие узлы существуют.`,
+      400
+    )
   }
 
   let engine: string | undefined

@@ -36,9 +36,9 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       model: actualAiSettings.model,
       instructions: req.systemPrompt,
       input: [{ role: 'user', content: userContent }],
-      max_output_tokens: actualAiSettings.max_output_tokens,
-      temperature: actualAiSettings.temperature,
-      top_p: actualAiSettings.top_p,
+      max_output_tokens: onlyIfPositiveNumber(actualAiSettings.max_output_tokens),
+      temperature: onlyIfPositiveNumber(actualAiSettings.temperature),
+      top_p: onlyIfPositiveNumber(actualAiSettings.top_p),
     }
     if (actualAiSettings.webSearch === true) {
       requestParams.tools = [{ type: 'web_search' }]
@@ -59,5 +59,13 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await grokGenerate(apiKey, requestParams, onThinking, onDelta)
     onThinking('done')
     return { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks }
+  }
+}
+
+function onlyIfPositiveNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && value > 0) {
+    return value
+  } else {
+    return undefined
   }
 }
