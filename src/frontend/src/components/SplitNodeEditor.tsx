@@ -38,7 +38,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Load split settings from node_type_settings
   const loadSettings = useCallback(async () => {
     try {
-      const nodeData = await ipcClient.planGraph.getNode.query(node.id)
+      const nodeData = await ipcClient.plan.nodes.get.query(node.id)
       if (nodeData.node_type_settings) {
         const parsed = JSON.parse(nodeData.node_type_settings)
         setSettings(prev => ({ ...prev, ...parsed }))
@@ -51,13 +51,16 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Load input text from incoming edge
   const loadInput = useCallback(async () => {
     try {
-      const graphData = await ipcClient.planGraph.get.query()
-      const inputEdge = graphData.edges.find(edge => edge.to_node_id === node.id && edge.type === 'text')
+      const [graphNodes, graphEdges] = await Promise.all([
+        ipcClient.plan.nodes.getAll.query(),
+        ipcClient.plan.edges.getAll.query(),
+      ])
+      const inputEdge = graphEdges.find(edge => edge.to_node_id === node.id && edge.type === 'text')
       if (!inputEdge) {
         setInputText(null)
         return
       }
-      const fromNode = graphData.nodes.find(n => n.id === inputEdge.from_node_id)
+      const fromNode = graphNodes.find(n => n.id === inputEdge.from_node_id)
       setInputText(fromNode?.content || null)
     } catch (error) {
       console.error('Failed to load input:', error)
@@ -92,10 +95,10 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Save settings
   const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanGraphNode | null> => {
     try {
-      await ipcClient.planGraph.patchNode.mutate({ id: node.id, data: {
+      await ipcClient.plan.nodes.patch.mutate({ id: node.id, data: {
         node_type_settings: JSON.stringify(newSettings)
       }})
-      const updatedNode = await ipcClient.planGraph.getNode.query(node.id)
+      const updatedNode = await ipcClient.plan.nodes.get.query(node.id)
       onNodeUpdated?.(updatedNode)
       return updatedNode
     } catch (error) {
@@ -136,10 +139,10 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     setParts(newParts)
     // Update node content with JSON array
     const newContent = JSON.stringify(newParts, null, 2)
-    await ipcClient.planGraph.patchNode.mutate({id: node.id, data: { content: newContent }})
+    await ipcClient.plan.nodes.patch.mutate({id: node.id, data: { content: newContent }})
     onUpdate(newContent)
     // Fetch updated node
-    const updatedNode = await ipcClient.planGraph.getNode.query(node.id)
+    const updatedNode = await ipcClient.plan.nodes.get.query(node.id)
     onNodeUpdated?.(updatedNode)
   }, [inputText, settings, node.id, onUpdate, onNodeUpdated])
 
@@ -201,7 +204,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Handle content change via JSON editor
   function handleContentChange(value: string) {
     onUpdate(value)
-    ipcClient.planGraph.patchNode.mutate({id: node.id, data: { content: value }})
+    ipcClient.plan.nodes.patch.mutate({id: node.id, data: { content: value }})
   }
 
   return (

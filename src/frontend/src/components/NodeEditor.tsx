@@ -365,7 +365,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       setReviewBaseContent(content)
       if (contentDirty) await flushContentSave(content)
       // Start review before generation
-      await ipcClient.planGraph.startReview.mutate({id: nodeId, options: { prompt: improveInstruction }})
+      await ipcClient.plan.nodes.startReview.mutate({id: nodeId, options: { prompt: improveInstruction }})
     }
 
     setContent('')
@@ -445,7 +445,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   // ── Mode D→B: Accept changes ───────────────────────────────────────────────
   async function acceptChanges(contentToAccept: string) {
     // Accept review via IPC (plan nodes only)
-    await ipcClient.planGraph.acceptReview.mutate(nodeId)
+    await ipcClient.plan.nodes.acceptReview.mutate(nodeId)
     // Update content via adapter
     const data = await adapter.patchNode(nodeId, { content: contentToAccept })
     if (data.ok) {

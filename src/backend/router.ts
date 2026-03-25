@@ -39,19 +39,22 @@ import {
   restoreLoreNode,
 } from './lore/lore-routes.js';
 
-// Plan‑graph functions
 import {
-  getPlanGraph,
+  getPlanNodes,
   getPlanNode,
   createPlanNode,
   patchPlanNode,
   deletePlanNode,
   startPlanNodeReview,
   acceptPlanNodeReview,
+} from './plan/nodes/plan-node-routes.js';
+
+import {
+  getPlanEdges,
   createGraphEdge,
   patchGraphEdge,
   deleteGraphEdge,
-} from './plan/plan-routes.js';
+} from './plan/edges/plan-edge-routes.js';
 
 import { syncLore } from './routes/ai-sync.js'
 import { generateSummary } from './routes/generate-summary.js'
@@ -113,17 +116,22 @@ export const appRouter = t.router({
     restore: t.procedure.input(z.number()).mutation(({ input }) => restoreLoreNode(input)),
   }),
 
-  planGraph: t.router({
-    get: t.procedure.query(() => getPlanGraph()),
-    getNode: t.procedure.input(z.number()).query(({ input }) => getPlanNode(input)),
-    createNode: t.procedure.input(z.any()).mutation(({ input }) => createPlanNode(input)),
-    patchNode: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => patchPlanNode(input.id, input.data)),
-    deleteNode: t.procedure.input(z.number()).mutation(({ input }) => deletePlanNode(input)),
-    createEdge: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),
-    patchEdge: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => patchGraphEdge(input.id, input.data)),
-    deleteEdge: t.procedure.input(z.number()).mutation(({ input }) => deleteGraphEdge(input)),
-    startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() })).mutation(({ input }) => startPlanNodeReview(input.id, input.options)),
-    acceptReview: t.procedure.input(z.number()).mutation(({ input }) => acceptPlanNodeReview(input)),
+  plan: t.router({
+    nodes: t.router({
+      getAll: t.procedure.query(() => getPlanNodes()),
+      get: t.procedure.input(z.number()).query(({ input }) => getPlanNode(input)),
+      create: t.procedure.input(z.any()).mutation(({ input }) => createPlanNode(input)),
+      patch: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => patchPlanNode(input.id, input.data)),
+      delete: t.procedure.input(z.number()).mutation(({ input }) => deletePlanNode(input)),
+      startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() })).mutation(({ input }) => startPlanNodeReview(input.id, input.options)),
+      acceptReview: t.procedure.input(z.number()).mutation(({ input }) => acceptPlanNodeReview(input)),
+    }),
+    edges: t.router({
+      getAll: t.procedure.query(() => getPlanEdges()),
+      create: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),
+      patch: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => patchGraphEdge(input.id, input.data)),
+      delete: t.procedure.input(z.number()).mutation(({ input }) => deleteGraphEdge(input)),
+    }),
   }),
 
   generation: t.router({

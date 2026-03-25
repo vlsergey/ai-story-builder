@@ -46,12 +46,14 @@ vi.mock('../ipcClient', () => ({
         mutate: vi.fn().mockResolvedValue({}),
       },
     },
-    planGraph: {
-      startReview: {
-        mutate: vi.fn().mockResolvedValue({}),
-      },
-      acceptReview: {
-        mutate: vi.fn().mockResolvedValue({}),
+    plan: {
+      nodes: {
+        startReview: {
+          mutate: vi.fn().mockResolvedValue({}),
+        },
+        acceptReview: {
+          mutate: vi.fn().mockResolvedValue({}),
+        },
       },
     },
   },
@@ -258,8 +260,8 @@ describe('NodeEditor — auto‑summary generation', () => {
     vi.mocked(trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery).mockReturnValue({ data: 'grok' } as any)
     vi.mocked(trpc.settings.allAiEnginesConfig.currentEngine.defaultAiGenerationSettings.get.useQuery).mockReturnValue({ data: {} } as any)
     vi.mocked(ipcClient.ai.generateSummary.mutate).mockClear()
-    vi.mocked(ipcClient.planGraph.startReview.mutate).mockClear()
-    vi.mocked(ipcClient.planGraph.acceptReview.mutate).mockClear()
+    vi.mocked(ipcClient.plan.nodes.startReview.mutate).mockClear()
+    vi.mocked(ipcClient.plan.nodes.acceptReview.mutate).mockClear()
   })
 
   afterEach(() => {

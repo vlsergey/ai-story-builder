@@ -5,7 +5,7 @@ import path from 'path'
 import fs from 'fs'
 import { setCurrentDbPath } from '../../db/state.js'
 import { migrateDatabase } from '../../db/migrations.js'
-import { patchPlanNode, getPlanNode, deletePlanNode, startPlanNodeReview, acceptPlanNodeReview } from '../plan-routes.js'
+import { patchPlanNode, getPlanNode, deletePlanNode, startPlanNodeReview, acceptPlanNodeReview } from './plan-node-routes.js'
 
 // ── In-memory DB setup ────────────────────────────────────────────────────────
 
