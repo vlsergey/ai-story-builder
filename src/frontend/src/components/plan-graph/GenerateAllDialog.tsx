@@ -48,15 +48,18 @@ export default function GenerateAllDialog({ onClose }: GenerateAllDialogProps) {
           }
         },
         onPartialJson: (data) => {
-          const { type, nodeId, generated, skipped, queueSize: qSize } = data as any
+          const { type, nodeId, generated, skipped, queueSize: qSize, reason } = data as any
           if (type === 'node_generated') {
             setGeneratedCount(generated)
-            addLog('success', `Node ${nodeId} generated`)
+            const message = reason ? `Node ${nodeId} generated: ${reason}` : `Node ${nodeId} generated`
+            addLog('success', message)
           } else if (type === 'node_skipped') {
             setSkippedCount(skipped)
-            addLog('warning', `Node ${nodeId} skipped`)
+            const message = reason ? `Node ${nodeId} skipped: ${reason}` : `Node ${nodeId} skipped`
+            addLog('warning', message)
           } else if (type === 'node_error') {
-            addLog('error', `Node ${nodeId} generation error`)
+            const message = reason ? `Node ${nodeId} generation error: ${reason}` : `Node ${nodeId} generation error`
+            addLog('error', message)
           }
           if (qSize !== undefined) setQueueSize(qSize)
         },

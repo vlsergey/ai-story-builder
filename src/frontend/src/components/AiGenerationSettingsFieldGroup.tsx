@@ -66,6 +66,7 @@ export default function AiGenerationSettingsFieldGroup({
       {engineDef?.aiSettingsFields.map(field => <AiEngineField
           className="w-fit !items-center"
           formControl={formControl}
+          formFieldNamePrefix={formFieldNamePrefix}
           orientation="horizontal"
           key={field.key}
           disabled={disabled}

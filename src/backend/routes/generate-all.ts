@@ -18,7 +18,7 @@ export async function generateAll(
 
   await engine.generateAllNodes({
     regenerateManual,
-    onProgress: (nodeId, status, queueSize) => {
+    onProgress: (nodeId, status, queueSize, reason) => {
       if (status === 'processing') {
         onThinking('processing', `Processing node ${nodeId} (${queueSize} nodes left in queue)`)
       } else if (status === 'generated') {
@@ -29,6 +29,7 @@ export async function generateAll(
           generated,
           skipped,
           queueSize,
+          reason: reason ?? null,
         })
       } else if (status === 'skipped') {
         skipped++
@@ -38,6 +39,7 @@ export async function generateAll(
           generated,
           skipped,
           queueSize,
+          reason: reason ?? null,
         })
       } else if (status === 'error') {
         // Node generation failed, status already set to ERROR in graph engine
@@ -49,6 +51,7 @@ export async function generateAll(
           generated,
           skipped,
           queueSize,
+          reason: reason ?? null,
         })
       }
     },

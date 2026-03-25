@@ -196,11 +196,11 @@ export class GraphEngine implements NodeContext {
   /**
    * Generate content for all nodes in topological order, respecting dependencies.
    * @param options.regenerateManual If true, MANUAL nodes will be regenerated; otherwise they are skipped.
-   * @param options.onProgress Optional callback to report progress (nodeId, status, queueSize).
+   * @param options.onProgress Optional callback to report progress (nodeId, status, queueSize, reason?).
    */
   async generateAllNodes(options?: {
     regenerateManual?: boolean
-    onProgress?: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number) => void
+    onProgress?: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number, reason?: string) => void
   }): Promise<void> {
     const regenerateManual = options?.regenerateManual ?? false
     const onProgress = options?.onProgress
@@ -278,7 +278,7 @@ export class GraphEngine implements NodeContext {
             } else {
               // No content generated (e.g., no prompt) – treat as skipped
               console.log(`[GraphEngine] no content generated for node ${nodeId}, skipping`)
-              if (onProgress) onProgress(nodeId, 'skipped', queue.length)
+              if (onProgress) onProgress(nodeId, 'skipped', queue.length, 'no content generated (e.g., missing prompt)')
             }
           } catch (error) {
             console.error(`[GraphEngine] regeneration failed for node ${nodeId}:`, error)
@@ -288,16 +288,26 @@ export class GraphEngine implements NodeContext {
             const updatedNode = this.getNode(nodeId)
             if (updatedNode) nodeMap.set(nodeId, updatedNode)
             console.log(`[GraphEngine] node ${nodeId} status updated to ERROR`)
-            if (onProgress) onProgress(nodeId, 'error', queue.length)
+            const reason = error instanceof Error ? error.message : String(error)
+            if (onProgress) onProgress(nodeId, 'error', queue.length, `regeneration failed: ${reason}`)
           }
         } else {
           console.log(`[GraphEngine] no processor or regenerate method for node ${nodeId}`)
           // Cannot regenerate, treat as skipped
-          if (onProgress) onProgress(nodeId, 'skipped', queue.length)
+          if (onProgress) onProgress(nodeId, 'skipped', queue.length, 'no processor or regenerate method')
         }
       } else {
         console.log(`[GraphEngine] skipping node ${nodeId}`)
-        if (onProgress) onProgress(nodeId, 'skipped', queue.length)
+        // Determine skip reason based on node status and regenerateManual
+        let skipReason = ''
+        if (node.status === 'MANUAL' && !regenerateManual) {
+          skipReason = 'MANUAL node (regenerateManual is false)'
+        } else if (node.status === 'GENERATED') {
+          skipReason = 'already GENERATED'
+        } else {
+          skipReason = `status ${node.status} (no regeneration condition met)`
+        }
+        if (onProgress) onProgress(nodeId, 'skipped', queue.length, skipReason)
       }
 
       // Mark as checked
