@@ -22,7 +22,7 @@ describe('PlanTextNode double-click', () => {
   })
 
   it('double-clicking the node div dispatches open-plan-node-editor', async () => {
-    const { default: PlanTextNode } = await import('../components/plan-graph/PlanTextNode')
+    const { default: PlanTextNode } = await import('../plan/plan-graph/PlanTextNode')
 
     const dispatched: number[] = []
     const originalDispatch = window.dispatchEvent.bind(window)

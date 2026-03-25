@@ -7,10 +7,10 @@ import { ReactNode, useCallback, useEffect, useId, useState } from "react"
 import { useForm } from "react-hook-form"
 import AiGenerationSettingsFieldGroup from "./AiGenerationSettingsFieldGroup"
 import debounce from "lodash/debounce"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion"
-import { Switch } from "./ui/switch"
-import { Label } from "./ui/label"
-import { Field } from "./ui/field"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui-components/accordion"
+import { Switch } from "../ui-components/switch"
+import { Label } from "../ui-components/label"
+import { Field } from "../ui-components/field"
 
 export default function AiGenerationSettingsFormWrapper(props: Omit<AiGenerationSettingsFormProps, 'aiEngineDef' | 'defaultAiGenerationSettings'>  ) {
   const { t } = useLocale()

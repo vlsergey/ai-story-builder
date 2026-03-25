@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import NodeEditor, { type NodeEditorAdapter } from '../components/NodeEditor'
+import NodeEditor, { type NodeEditorAdapter } from '../nodes/NodeEditor'
 import * as streamModule from '../lib/generate-node-stream'
 import * as planGraphEvents from '../lib/plan-graph-events'
 import { ipcClient, trpc } from '../ipcClient'
@@ -31,10 +31,10 @@ vi.mock('../lib/locale', () => ({ useLocale: () => ({ t: (key: string) => key })
 vi.mock('../lib/generate-node-stream')
 vi.mock('../lib/codemirror-preserve-scroll', () => ({ preserveScrollOnExternalUpdate: [] }))
 vi.mock('../lib/plan-graph-events', () => ({ dispatchPlanGraphRefresh: vi.fn() }))
-vi.mock('../components/AiGenerationSettingsForm', () => ({
+vi.mock('../ai/AiGenerationSettingsForm', () => ({
   default: () => <div data-testid="ai-settings" />,
 }))
-vi.mock('../components/DiffViewAndAccept', () => ({
+vi.mock('../nodes/DiffViewAndAccept', () => ({
   default: () => <div data-testid="diff-view" />,
 }))
 

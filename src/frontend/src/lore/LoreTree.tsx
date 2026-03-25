@@ -18,8 +18,8 @@ import {
   CheckCircle2, Circle, Loader2, Wand2,
 } from 'lucide-react'
 import { LoreNode, LoreStatMode } from '../types/models'
-import { useLoreSettings } from '../lib/lore-settings'
-import { LORE_NODE_SAVED_EVENT, LORE_TREE_REFRESH_EVENT, LoreNodeSavedDetail } from '../lib/lore-events'
+import { useLoreSettings } from '../settings/lore-settings'
+import { LORE_NODE_SAVED_EVENT, LORE_TREE_REFRESH_EVENT, LoreNodeSavedDetail } from './lore-events'
 import { engineSupportsFileUpload } from '../lib/ai-engines'
 
 // ── Command system ────────────────────────────────────────────────────────────

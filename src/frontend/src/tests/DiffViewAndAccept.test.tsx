@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import DiffViewAndAccept from '../components/DiffViewAndAccept'
+import DiffViewAndAccept from '../nodes/DiffViewAndAccept'
 import { LocaleProvider } from '../lib/locale'
 
 function renderDiff(props: React.ComponentProps<typeof DiffViewAndAccept>) {

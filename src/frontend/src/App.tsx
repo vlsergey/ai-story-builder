@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import StartScreen from './pages/StartScreen'
-import Layout from './components/Layout'
+import Layout from './Layout'
 import './styles.css'
 import { ThemeProvider } from './lib/theme/theme-provider'
 import { LocaleProvider } from './lib/locale'

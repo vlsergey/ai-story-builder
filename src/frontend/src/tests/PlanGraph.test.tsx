@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, waitFor, act } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@xyflow/react', () => ({
@@ -18,10 +18,28 @@ vi.mock('../lib/locale', () => ({
   useLocale: () => ({ locale: 'en', t: (key: string) => key }),
 }))
 
-vi.mock('../components/plan-graph/PlanTextNode', () => ({ default: () => null }))
-vi.mock('../components/plan-graph/PlanLoreNode', () => ({ default: () => null }))
-vi.mock('../components/plan-graph/PlanEdge', () => ({ default: () => null }))
-vi.mock('../components/plan-graph/GenerateAllDialog', () => ({ default: () => null }))
+vi.mock('../ipcClient', () => ({
+  ipcClient: {
+    plan: {
+      nodes: {
+        getAll: { query: vi.fn(() => Promise.resolve([])) },
+        delete: { mutate: vi.fn(() => Promise.resolve({ ok: true })) },
+        patch: { mutate: vi.fn(() => Promise.resolve({ ok: true })) },
+        create: { mutate: vi.fn(() => Promise.resolve({ id: 1 })) },
+      },
+      edges: {
+        getAll: { query: vi.fn(() => Promise.resolve([])) },
+        delete: { mutate: vi.fn(() => Promise.resolve({ ok: true })) },
+        create: { mutate: vi.fn(() => Promise.resolve({ id: 1 })) },
+      },
+    },
+  },
+}))
+
+vi.mock('../plan/plan-graph/PlanTextNode', () => ({ default: () => null }))
+vi.mock('../plan/plan-graph/PlanLoreNode', () => ({ default: () => null }))
+vi.mock('../plan/plan-graph/PlanEdge', () => ({ default: () => null }))
+vi.mock('../plan/GenerateAllDialog', () => ({ default: () => null }))
 vi.mock('@dagrejs/dagre', () => ({
   default: {
     graphlib: { Graph: class { setGraph() {} setDefaultEdgeLabel() {} setNode() {} setEdge() {} node() { return { x: 0, y: 0 } } } },
@@ -31,29 +49,32 @@ vi.mock('@dagrejs/dagre', () => ({
 
 describe('PlanGraph', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', () =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve({ nodes: [], edges: [] }) } as Response)
+    // Ensure localStorage.getItem returns default
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => 
+      key === 'planGraph.autoLayout' ? 'true' : null
     )
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {})
+    // Ensure electronAPI.confirm returns true
+    vi.spyOn(window.electronAPI, 'confirm').mockReturnValue(true)
   })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it('renders without crashing', async () => {
-    const PlanGraph = (await import('../components/PlanGraph')).default
-    await act(async () => {
-      render(<PlanGraph />);
-    });
+    const PlanGraph = (await import('../plan/PlanGraph')).default
+    const { unmount } = render(<PlanGraph />)
+    // Wait for loading to finish
+    await waitFor(() => {
+      // Expect no error
+    })
+    unmount()
   })
 
   it('renders the ReactFlow component', async () => {
-    const PlanGraph = (await import('../components/PlanGraph')).default
-    let getByTestId: any;
-    await act(async () => {
-      const result = render(<PlanGraph />);
-      getByTestId = result.getByTestId;
-    });
+    const PlanGraph = (await import('../plan/PlanGraph')).default
+    const { getByTestId } = render(<PlanGraph />)
     await waitFor(() => {
       expect(getByTestId('react-flow')).toBeInTheDocument()
     })

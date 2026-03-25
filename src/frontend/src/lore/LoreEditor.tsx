@@ -1,6 +1,6 @@
 import React from 'react'
-import { dispatchLoreNodeSaved } from '../lib/lore-events'
-import NodeEditor, { type NodeEditorAdapter } from './NodeEditor'
+import { dispatchLoreNodeSaved } from './lore-events'
+import NodeEditor, { type NodeEditorAdapter } from '../nodes/NodeEditor'
 import { ipcClient } from '../ipcClient'
 
 interface LoreEditorProps {

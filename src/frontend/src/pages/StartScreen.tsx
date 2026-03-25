@@ -3,8 +3,8 @@ import { ipcClient } from '../ipcClient'
 
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
+import { Button } from '../ui-components/button'
+import { Input } from '../ui-components/input'
 import { ProjectData } from '../types/models'
 import { useLocale } from '../lib/locale'
 

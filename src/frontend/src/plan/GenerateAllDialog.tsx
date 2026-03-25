@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
-import { useLocale } from '../../lib/locale'
-import { generateAllStream } from '../../lib/generate-node-stream'
+import { useLocale } from '../lib/locale'
+import { generateAllStream } from '../lib/generate-node-stream'
 
 interface GenerateAllDialogProps {
   onClose: () => void
@@ -40,14 +40,14 @@ export default function GenerateAllDialog({ onClose }: GenerateAllDialogProps) {
     try {
       await generateAllStream({
         regenerateManual,
-        onThinking: (status, detail) => {
+        onThinking: (status: string, detail?: string) => {
           addLog('info', detail ? `${status}: ${detail}` : status)
           if (status === 'processing') {
             // detail includes nodeId and queueSize? we can parse
             // but we'll rely on partial_json for precise updates
           }
         },
-        onPartialJson: (data) => {
+        onPartialJson: (data: Record<string, unknown>) => {
           const { type, nodeId, generated, skipped, queueSize: qSize, reason } = data as any
           if (type === 'node_generated') {
             setGeneratedCount(generated)
@@ -63,7 +63,7 @@ export default function GenerateAllDialog({ onClose }: GenerateAllDialogProps) {
           }
           if (qSize !== undefined) setQueueSize(qSize)
         },
-        onDone: (data) => {
+        onDone: (data: { generated: number; skipped: number }) => {
           addLog('success', `Generation completed: ${data.generated} generated, ${data.skipped} skipped`)
           setGeneratedCount(data.generated)
           setSkippedCount(data.skipped)

@@ -2,17 +2,17 @@ import React, { useCallback, useId, useState } from 'react'
 import { BUILTIN_ENGINES } from '../lib/ai-engines'
 import { useLocale } from '../lib/locale'
 import { useTheme } from '../lib/theme/theme-provider'
-import AiEngineConfigEditor from './AiEngineConfigEditor'
+import AiEngineConfigEditor from '../ai/AiEngineConfigEditor'
 import { trpc } from '../ipcClient';
 import { AiEngineConfig } from '@shared/ai-engine-config'
-import { Switch } from './ui/switch'
+import { Switch } from '../ui-components/switch'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select'
+} from '../ui-components/select'
 import {
   Field,
   FieldLabel,
@@ -20,7 +20,7 @@ import {
   FieldGroup,
   FieldError,
   FieldContent,
-} from './ui/field'
+} from '../ui-components/field'
 
 function setAndInvalidate<T extends { useMutation: any }>(procedure: T) {
   const utils = trpc.useUtils();

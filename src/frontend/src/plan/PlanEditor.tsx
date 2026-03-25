@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { dispatchPlanNodeSaved } from '../lib/plan-events'
 import { dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
-import NodeEditor, { type NodeEditorAdapter } from './NodeEditor'
+import NodeEditor, { type NodeEditorAdapter } from '../nodes/NodeEditor'
 import { ipcClient } from '../ipcClient'
 import { type PlanGraphNode } from '../types/models'
 import MergeNodeEditor from './MergeNodeEditor'

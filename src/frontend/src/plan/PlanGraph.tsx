@@ -26,7 +26,7 @@ import PlanLoreNode from './plan-graph/PlanLoreNode'
 import PlanMergeNode from './plan-graph/PlanMergeNode'
 import PlanSplitterNode from './plan-graph/PlanSplitterNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
-import GenerateAllDialog from './plan-graph/GenerateAllDialog'
+import GenerateAllDialog from './GenerateAllDialog'
 import { ipcClient } from '../ipcClient'
 
 const nodeTypes = {

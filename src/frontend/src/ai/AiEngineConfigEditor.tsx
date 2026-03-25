@@ -4,17 +4,17 @@ import { AGE_RATING_INFO, AGE_RATING_ORDER, AiEngineDefinition, CAPABILITY_KEYS 
 import { useCallback, useEffect } from "react";
 import { trpc } from "@/ipcClient";
 import AiGenerationSettingsFieldGroup from "./AiGenerationSettingsFieldGroup";
-import { FieldGroup, FieldLegend, FieldSet } from "./ui/field";
-import { Button } from "@/components/ui/button"
+import { FieldGroup, FieldLegend, FieldSet } from "../ui-components/field";
+import { Button } from "../ui-components/button"
 import { RefreshCw } from 'lucide-react'
-import { ScrollArea } from "./ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Separator } from "./ui/separator";
+import { ScrollArea } from "../ui-components/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui-components/card";
+import { Separator } from "../ui-components/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import debounce from "lodash/debounce";
 import AiEngineField from "./AiEngineField";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "../ui-components/textarea";
 
 interface AiEngineConfigEditorProps {
     active: boolean,

@@ -2,21 +2,21 @@ import { ReactNode, useState } from 'react'
 import { useLocale } from "@/lib/locale"
 import { AiEngineDefinition, AiEngineFieldDef } from "@shared/ai-engines"
 import { ComponentProps, useId } from "react"
-import { Input } from "./ui/input"
-import { Switch } from "./ui/switch"
+import { Input } from "../ui-components/input"
+import { Switch } from "../ui-components/switch"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select"
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "./ui/field"
+} from "../ui-components/select"
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "../ui-components/field"
 import { Control, Controller, FieldValues } from "react-hook-form"
 import { TriangleAlert, Info, Eye, EyeOff } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
-import { ButtonGroup } from './ui/button-group'
-import { Button } from './ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-components/tooltip"
+import { ButtonGroup } from '../ui-components/button-group'
+import { Button } from '../ui-components/button'
 
 interface AiEngineFieldProps {
     className?: string,

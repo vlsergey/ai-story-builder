@@ -38,7 +38,7 @@ vi.mock('../components/PlanEditor', () => ({
 }));
 
 // Mock the actual Layout component with a simplified version
-vi.mock('../components/Layout', () => ({
+vi.mock('../Layout', () => ({
   default: function MockLayout({ projectPath, onClose }: { projectPath?: string; localeStrings?: unknown; onClose?: () => void }) {
     return (
       <div>
@@ -50,7 +50,7 @@ vi.mock('../components/Layout', () => ({
   }
 }));
 
-import Layout from '../components/Layout';
+import Layout from '../Layout';
 
 describe('Layout Minimal Test', () => {
   const mockProps = {

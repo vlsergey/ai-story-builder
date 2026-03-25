@@ -1,24 +1,24 @@
 import React, { useRef, useEffect, useCallback } from 'react'
 import { DockviewReact, DockviewDefaultTab } from 'dockview'
-import { useTheme } from '../lib/theme/theme-provider'
-import { ipcClient } from '../ipcClient'
+import { useTheme } from './lib/theme/theme-provider'
+import { ipcClient } from './ipcClient'
 
 // Import the dockview styles
 import 'dockview/dist/styles/dockview.css'
 
 // Local small wrappers to keep import cycles simple
-import LoreSection from './LoreSection'
-import LoreEditor from './LoreEditor'
-import PlanEditor from './PlanEditor'
-import PlanGraph from './PlanGraph'
-import SettingsPanel from './SettingsPanel'
-import AiPlayground from './AiPlayground'
-import AiBillingPanel from './AiBillingPanel'
-import type { LoreNode } from '../types/models'
-import { EditorSettingsProvider } from '../lib/editor-settings'
-import { LoreSettingsProvider } from '../lib/lore-settings'
-import { LORE_TREE_REFRESH_EVENT } from '../lib/lore-events'
-import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from '../lib/plan-graph-events'
+import LoreSection from './lore/LoreSection'
+import LoreEditor from './lore/LoreEditor'
+import PlanEditor from './plan/PlanEditor'
+import PlanGraph from './plan/PlanGraph'
+import SettingsPanel from './settings/SettingsPanel'
+import AiPlayground from './ai/AiPlayground'
+import AiBillingPanel from './ai/AiBillingPanel'
+import type { LoreNode } from './types/models'
+import { EditorSettingsProvider } from './settings/editor-settings'
+import { LoreSettingsProvider } from './settings/lore-settings'
+import { LORE_TREE_REFRESH_EVENT } from './lore/lore-events'
+import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from './lib/plan-graph-events'
 
 /**
  * Shown in any empty group (including the center on startup).
