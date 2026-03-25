@@ -1,4 +1,4 @@
-import type { PlanNodeType, PlanEdgeType, PlanNodeStatus } from '../../../shared/plan-graph.js'
+import type { PlanEdgeType } from '../../../shared/plan-graph.js'
 
 export interface AiEngineSyncRecord {
   /** ISO-8601 UTC timestamp of last successful sync */
@@ -56,32 +56,6 @@ export interface PlanNodeTree {
   children: PlanNodeTree[]
 }
 
-/** Plan graph node (returned by GET /api/plan/graph) */
-export interface PlanGraphNode {
-  id: number
-  type: PlanNodeType
-  title: string
-  content: string | null
-  ai_instructions: string | null
-  summary: string | null
-  auto_summary: number
-  ai_sync_info: string | null
-  node_type_settings: string | null
-  ai_settings: string | null
-  x: number
-  y: number
-  word_count: number
-  char_count: number
-  byte_count: number
-  changes_status: string | null
-  status: PlanNodeStatus
-  review_base_content: string | null
-  last_improve_instruction: string | null
-  created_at: string
-  parent_id: number | null
-  position: number | null
-}
-
 /** Plan graph edge */
 export interface PlanGraphEdge {
   id: number
@@ -91,15 +65,6 @@ export interface PlanGraphEdge {
   position: number
   label: string | null
   template: string | null
-}
-
-export interface StoryPart {
-  id: number
-  plan_node_version_id: number
-  version: number
-  content: string
-  title: string | null
-  created_at: string
 }
 
 export type ThemePreference = 'auto' | 'obsidian' | 'github'

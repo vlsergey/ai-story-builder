@@ -1,9 +1,9 @@
 import React from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import type { PlanGraphNode } from '../../types/models'
 import PlanNodeStatusIcon from './PlanNodeStatusIcon'
+import { PlanNodeRow } from '@shared/plan-graph'
 
-type PlanLoreNodeData = PlanGraphNode & { onDelete: (id: string) => void }
+type PlanLoreNodeData = PlanNodeRow & { onDelete: (id: string) => void }
 
 export default function PlanLoreNode({ data }: NodeProps) {
   const node = data as unknown as PlanLoreNodeData

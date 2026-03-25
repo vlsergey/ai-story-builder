@@ -18,7 +18,7 @@ import dagre from '@dagrejs/dagre'
 import { useLocale } from '../lib/locale'
 import { PLAN_GRAPH_REFRESH_EVENT, dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import { PLAN_NODE_SAVED_EVENT, type PlanNodeSavedDetail } from '../lib/plan-events'
-import type { PlanGraphNode, PlanGraphEdge } from '../types/models'
+import type { PlanGraphEdge } from '../types/models'
 import { type PlanNodeType, NODE_TYPES } from '@shared/plan-graph'
 import { EDGE_TYPES, canCreateEdge } from '@shared/node-edge-dictionary'
 import PlanTextNode from './plan-graph/PlanTextNode'
@@ -28,6 +28,7 @@ import PlanSplitterNode from './plan-graph/PlanSplitterNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './GenerateAllDialog'
 import { ipcClient } from '../ipcClient'
+import { PlanNodeRow } from '@shared/plan-graph'
 
 const nodeTypes = {
   planText: PlanTextNode,
@@ -54,7 +55,7 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   })
 }
 
-function toReactFlowNodes(graphNodes: PlanGraphNode[], onDelete: (id: string) => void): Node[] {
+function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: string) => void): Node[] {
   return graphNodes.map(n => ({
     id: String(n.id),
     type: n.type === 'lore' ? 'planLore' : n.type === 'merge' ? 'planMerge' : n.type === 'split' ? 'planSplitter' : 'planText',

@@ -3,7 +3,7 @@ import { dispatchPlanNodeSaved } from '../lib/plan-events'
 import { dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import NodeEditor, { type NodeEditorAdapter } from '../nodes/NodeEditor'
 import { ipcClient } from '../ipcClient'
-import { type PlanGraphNode } from '../types/models'
+import { PlanNodeRow } from '@shared/plan-graph'
 import MergeNodeEditor from './MergeNodeEditor'
 import SplitNodeEditor from './SplitNodeEditor'
 
@@ -13,7 +13,7 @@ interface PlanEditorProps {
 }
 
 export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
-  const [node, setNode] = useState<PlanGraphNode | null>(null)
+  const [node, setNode] = useState<PlanNodeRow | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

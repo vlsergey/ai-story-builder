@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocale } from '../lib/locale'
 import { ipcClient } from '../ipcClient'
 import { useTheme } from '../lib/theme/theme-provider'
-import type { PlanGraphNode } from '../types/models'
+import { PlanNodeRow } from '@shared/plan-graph'
 import { Button } from '../ui-components/button'
 import { Label } from '../ui-components/label'
 import { Switch } from '../ui-components/switch'
@@ -11,10 +11,10 @@ import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 
 interface SplitNodeSettingsProps {
-  node: PlanGraphNode
+  node: PlanNodeRow
   onUpdate: (content: string) => void
   panelApi?: { setTitle: (title: string) => void }
-  onNodeUpdated?: (node: PlanGraphNode) => void
+  onNodeUpdated?: (node: PlanNodeRow) => void
 }
 
 interface SplitPart {
@@ -93,7 +93,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   }, [node.content])
 
   // Save settings
-  const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanGraphNode | null> => {
+  const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanNodeRow | null> => {
     try {
       await ipcClient.plan.nodes.patch.mutate({ id: node.id, data: {
         node_type_settings: JSON.stringify(newSettings)

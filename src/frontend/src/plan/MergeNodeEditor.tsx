@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocale } from '../lib/locale'
 import { ipcClient } from '../ipcClient'
 import { useTheme } from '../lib/theme/theme-provider'
-import type { PlanGraphNode } from '../types/models'
+import { PlanNodeRow } from '@shared/plan-graph'
 import { Button } from '../ui-components/button'
 import { Label } from '../ui-components/label'
 import { Switch } from '../ui-components/switch'
@@ -13,10 +13,10 @@ import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 
 interface MergeNodeSettingsProps {
-  node: PlanGraphNode
+  node: PlanNodeRow
   onUpdate: (content: string) => void
   panelApi?: { setTitle: (title: string) => void }
-  onNodeUpdated?: (node: PlanGraphNode) => void
+  onNodeUpdated?: (node: PlanNodeRow) => void
 }
 
 interface InputNode {
@@ -86,7 +86,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   }, [node.id, loadInputs, loadSettings])
 
   // Save settings and fetch updated node
-  const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanGraphNode | null> => {
+  const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanNodeRow | null> => {
     try {
       // Update the node with new node_type_settings (triggers regeneration)
       await ipcClient.plan.nodes.patch.mutate({id: node.id, data: {
