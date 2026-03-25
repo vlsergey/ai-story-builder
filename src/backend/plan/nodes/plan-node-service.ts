@@ -1,5 +1,6 @@
 import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus } from '../../../shared/plan-graph.js'
 import { PlanNodeRepository } from './plan-node-repository.js'
+import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
 import { generateMergeContent } from '../../routes/merge-node.js'
 import { isValidNodeType } from '../../../shared/node-edge-dictionary.js'
 
@@ -106,6 +107,7 @@ export class PlanNodeService {
     if (options?.byteCount !== undefined) updatedFields.byte_count = options.byteCount
 
     this.emitNodeUpdated(id, updatedFields)
+    this.markDownstreamNodesAsOutdated(id)
   }
 
   /**
@@ -151,6 +153,10 @@ export class PlanNodeService {
 
     this.repo.update(id, updateFields)
     this.emitNodeUpdated(id, updateFields)
+    // If content changed, mark downstream nodes as OUTDATED
+    if (options?.content !== undefined) {
+      this.markDownstreamNodesAsOutdated(id)
+    }
   }
 
   /**
@@ -167,6 +173,10 @@ export class PlanNodeService {
     }
     this.repo.update(id, updateFields)
     this.emitNodeUpdated(id, updateFields)
+
+
+
+
   }
 
   /**
@@ -297,6 +307,11 @@ export class PlanNodeService {
     // Emit event
     this.emitNodeUpdated(id, updateFields)
 
+    // If content changed, mark downstream nodes as OUTDATED
+    if (hasContent || generatedContent !== null) {
+      this.markDownstreamNodesAsOutdated(id)
+    }
+
     const anyContent = hasContent || generatedContent !== null
     const finalWordCount = hasContent ? wordCount : (generatedContent !== null ? generatedWordCount : null)
     const finalCharCount = hasContent ? charCount : (generatedContent !== null ? generatedCharCount : null)
@@ -364,6 +379,42 @@ export class PlanNodeService {
     })
 
     return { ok: true }
+  }
+
+  /**
+   * Mark all downstream nodes (transitively reachable via outgoing edges) as OUTDATED
+   * if their current status is GENERATED.
+   * This should be called whenever a node's content changes.
+   */
+  private markDownstreamNodesAsOutdated(nodeId: number): void {
+    const edgeRepo = new PlanEdgeRepository()
+    const visited = new Set<number>()
+    const queue: number[] = [nodeId]
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!
+      if (visited.has(currentId)) continue
+      visited.add(currentId)
+
+      // Get outgoing edges
+      const outgoingEdges = edgeRepo.getByFromNodeId(currentId)
+      for (const edge of outgoingEdges) {
+        const downstreamId = edge.to_node_id
+        if (!visited.has(downstreamId)) {
+          queue.push(downstreamId)
+        }
+      }
+    }
+
+    // Now visited contains all downstream nodes (including the original node)
+    // For each downstream node (excluding the original node), update status if GENERATED
+    for (const downstreamId of visited) {
+      if (downstreamId === nodeId) continue
+      const node = this.repo.getById(downstreamId)
+      if (node && node.status === 'GENERATED') {
+        this.updateStatus(downstreamId, 'OUTDATED')
+      }
+    }
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
