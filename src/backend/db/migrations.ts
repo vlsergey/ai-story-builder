@@ -22,6 +22,7 @@ import migration017 from './migrations/017.js'
 import migration018 from './migrations/018.js'
 import migration019 from './migrations/019.js'
 import migration020 from './migrations/020.js'
+import migration021 from './migrations/021.js'
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -66,9 +67,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration019,
   // version 19 → 20: remove system_prompt, rename user_prompt to ai_instructions
   migration020,
+  // version 20 → 21: remove system_prompt, rename user_prompt to ai_instructions for lore_nodes
+  migration021,
 ]
 
-export const CURRENT_VERSION = 20
+export const CURRENT_VERSION = 21
 
 function loadSchemaFromFile(db: Database): void {
   const schemaPath = path.join(__dirname, 'schema.sql')
@@ -80,13 +83,15 @@ function loadSchemaFromFile(db: Database): void {
  * Runs all pending migrations on an open database connection.
  * foreign_keys is disabled during migration and re-enabled after.
  * Each migration step runs in a transaction that also updates user_version.
+ * @param enforceMigrations If true, when fromVersion === 0, apply migrations from 0 to CURRENT_VERSION
+ *                          instead of loading schema.sql. Useful for generating schema.
  */
-export function migrateDatabase(db: Database): void {
+export function migrateDatabase(db: Database, enforceMigrations = false): void {
   db.pragma('foreign_keys = OFF')
   const fromVersion = db.pragma('user_version', { simple: true }) as number
 
   // Fresh database – load schema.sql and set version to CURRENT_VERSION
-  if (fromVersion === 0) {
+  if (fromVersion === 0 && !enforceMigrations) {
     console.log(`[db] creating fresh database from schema.sql (version ${CURRENT_VERSION})`)
     loadSchemaFromFile(db)
     db.pragma(`user_version = ${CURRENT_VERSION}`)
@@ -94,6 +99,7 @@ export function migrateDatabase(db: Database): void {
     return
   }
 
+  // If enforceMigrations is true and fromVersion === 0, we fall through to apply migrations.
   for (let v = fromVersion; v < CURRENT_VERSION; v++) {
     db.transaction(() => {
       MIGRATIONS[v](db)

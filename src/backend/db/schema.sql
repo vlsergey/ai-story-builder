@@ -21,17 +21,25 @@ CREATE TABLE card_values (
       UNIQUE (card_definition_id, story_part_id, version)
     );
 
-CREATE TABLE lore_nodes (
-      id             INTEGER PRIMARY KEY,
-      parent_id      INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
-      name           TEXT NOT NULL,
-      content        TEXT,
-      position       INTEGER DEFAULT 0,
-      status         TEXT NOT NULL DEFAULT 'ACTIVE',
-      to_be_deleted  INTEGER NOT NULL DEFAULT 0,
-      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP, word_count  INTEGER NOT NULL DEFAULT 0, char_count  INTEGER NOT NULL DEFAULT 0, byte_count  INTEGER NOT NULL DEFAULT 0, ai_sync_info TEXT NULL, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, ai_instructions TEXT NULL, ai_settings TEXT,
-      UNIQUE (parent_id, name)
-    );
+CREATE TABLE "lore_nodes" (
+        id             INTEGER PRIMARY KEY,
+        parent_id      INTEGER NULL REFERENCES lore_nodes(id) ON DELETE CASCADE,
+        name           TEXT NOT NULL,
+        content        TEXT,
+        position       INTEGER DEFAULT 0,
+        status         TEXT NOT NULL DEFAULT 'ACTIVE',
+        to_be_deleted  INTEGER NOT NULL DEFAULT 0,
+        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+        word_count     INTEGER NOT NULL DEFAULT 0,
+        char_count     INTEGER NOT NULL DEFAULT 0,
+        byte_count     INTEGER NOT NULL DEFAULT 0,
+        ai_sync_info   TEXT NULL,
+        changes_status TEXT NULL,
+        review_base_content TEXT NULL,
+        last_improve_instruction TEXT NULL,
+        ai_instructions    TEXT NULL,
+        ai_settings    TEXT
+      );
 
 CREATE TABLE "plan_edges" (
       id           INTEGER PRIMARY KEY,
@@ -43,21 +51,30 @@ CREATE TABLE "plan_edges" (
       template     TEXT
     );
 
-CREATE TABLE plan_nodes (
-      id            INTEGER PRIMARY KEY,
-      parent_id     INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
-      title         TEXT NOT NULL,
-      content       TEXT,
-      position      INTEGER DEFAULT 0,
-      created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-      type          TEXT NOT NULL DEFAULT 'text',
-      x             REAL DEFAULT 0,
-      y             REAL DEFAULT 0,
-      ai_instructions TEXT,
-      summary       TEXT,
-      auto_summary  INTEGER DEFAULT 0,
-      ai_sync_info  TEXT
-    , word_count INTEGER NOT NULL DEFAULT 0, char_count INTEGER NOT NULL DEFAULT 0, byte_count INTEGER NOT NULL DEFAULT 0, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, node_type_settings TEXT NULL, status TEXT NOT NULL DEFAULT 'EMPTY', ai_settings TEXT);
+CREATE TABLE "plan_nodes" (
+        id            INTEGER PRIMARY KEY,
+        parent_id     INTEGER NULL REFERENCES plan_nodes(id) ON DELETE CASCADE,
+        title         TEXT NOT NULL,
+        content       TEXT,
+        position      INTEGER DEFAULT 0,
+        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+        type          TEXT NOT NULL DEFAULT 'text',
+        x             REAL DEFAULT 0,
+        y             REAL DEFAULT 0,
+        ai_instructions   TEXT,
+        summary       TEXT,
+        auto_summary  INTEGER DEFAULT 0,
+        ai_sync_info  TEXT,
+        word_count    INTEGER NOT NULL DEFAULT 0,
+        char_count    INTEGER NOT NULL DEFAULT 0,
+        byte_count    INTEGER NOT NULL DEFAULT 0,
+        changes_status TEXT NULL,
+        review_base_content TEXT NULL,
+        last_improve_instruction TEXT NULL,
+        node_type_settings TEXT NULL,
+        status        TEXT NOT NULL DEFAULT 'EMPTY',
+        ai_settings   TEXT
+      );
 
 CREATE TABLE settings (
       key   TEXT PRIMARY KEY,

@@ -20,7 +20,7 @@
     "lint": "eslint . --ext .ts,.tsx --max-warnings=100",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "package": "npm run build:backend && npm run build && node scripts/package.js",
-    "generate-schema": "tsx scripts/generate-schema.ts"
+    "generate-schema": "npm rebuild better-sqlite3 && npm run build:backend && tsx scripts/generate-schema.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
