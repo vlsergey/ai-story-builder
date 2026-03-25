@@ -253,8 +253,7 @@ export class PlanNodeService {
     if (hasType) updateFields.type = data.type! as PlanNodeType
     if (data.x !== undefined) updateFields.x = data.x
     if (data.y !== undefined) updateFields.y = data.y
-    if (data.user_prompt !== undefined) updateFields.user_prompt = data.user_prompt ?? null
-    if (data.system_prompt !== undefined) updateFields.system_prompt = data.system_prompt ?? null
+    if (data.ai_instructions !== undefined) updateFields.ai_instructions = data.ai_instructions ?? null
     if (data.summary !== undefined) updateFields.summary = data.summary ?? null
     if (data.auto_summary !== undefined) updateFields.auto_summary = data.auto_summary ?? 0
     if (hasNodeTypeSettings) updateFields.node_type_settings = data.node_type_settings ?? null

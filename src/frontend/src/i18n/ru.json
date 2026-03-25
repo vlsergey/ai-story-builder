@@ -76,6 +76,8 @@
   "settings.models.refreshing": "Обновление…",
   "settings.models.none": "Нет кэшированных моделей",
   "settings.summaryAiGenerationSettings.title": "Настройки генерации сводки",
+  "settings.generateSummaryInstructions.title": "Инструкции для генерации сводки",
+  "settings.generateSummaryInstructions.description": "Системный промпт, используемый для генерации сводок. Если пусто, генерация сводок будет отключена.",
 
   "mergeNode.title": "Настройки узла объединения",
   "mergeNode.inputs": "Входы",
@@ -113,6 +115,7 @@
   "plan.repeat_improve": "Повторить улучшение",
   "plan.userPrompt": "Инструкция для генерации",
   "plan.systemPrompt": "Системный промпт",
+  "plan.aiInstructions": "AI инструкции",
 
   "planGraph.addTextNode": "Добавить текстовый узел",
   "planGraph.addLoreNode": "Добавить лор-узел",
@@ -160,6 +163,7 @@
   "lore.accept_changes": "Принять изменения",
   "lore.userPrompt": "Инструкция для генерации",
   "lore.systemPrompt": "Системный промпт",
+  "lore.aiInstructions": "AI инструкции",
 
   "thinking.generating": "Генерирую…",
   "thinking.reasoning": "Рассуждаю…",

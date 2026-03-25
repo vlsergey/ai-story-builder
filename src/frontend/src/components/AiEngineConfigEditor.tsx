@@ -14,6 +14,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import debounce from "lodash/debounce";
 import AiEngineField from "./AiEngineField";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AiEngineConfigEditorProps {
     active: boolean,
@@ -156,8 +157,20 @@ export default function AiEngineConfigEditor({active, engine, value, onChange}: 
                 formControl={form.control}
                 formFieldNamePrefix="defaultAiGenerationSettings."
                 engineId={engine.id}
-                disabled={!active}
             />
+        </FieldSet>
+
+        <Separator className="my-4"/>
+
+        <FieldSet>
+          <FieldLegend>{t('settings.generateSummaryInstructions.title')}</FieldLegend>
+          <FieldGroup>
+            <Textarea
+              {...form.register('generateSummaryInstructions')}
+              placeholder={t('settings.generateSummaryInstructions.placeholder')}
+              rows={4}
+            />
+          </FieldGroup>
         </FieldSet>
 
         <Separator className="my-4"/>
@@ -168,7 +181,6 @@ export default function AiEngineConfigEditor({active, engine, value, onChange}: 
                 formControl={form.control}
                 engineId={engine.id}
                 formFieldNamePrefix="summaryAiGenerationSettings."
-                disabled={!active}
             />
         </FieldSet>
 

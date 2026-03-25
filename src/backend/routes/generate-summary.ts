@@ -31,14 +31,12 @@ export async function generateSummary(params: { node_id?: number; content?: stri
   const nodeRepo = new PlanNodeRepository()
 
   let engine: string | undefined
-  let textLanguage: string | undefined
   let nodeContent: string = ''
   const engineFileIds: string[] = []
 
   try {
     engine = SettingsRepository.get('current_backend') || undefined
     if (!engine) throw makeError('no AI engine configured', 400)
-    textLanguage = SettingsRepository.get('text_language') || undefined
 
     nodeContent = content ?? ''
     if (nodeContent === '') {
@@ -61,13 +59,13 @@ export async function generateSummary(params: { node_id?: number; content?: stri
 
   const includeExistingLore = false // summary doesn't need lore attachments
 
-  const systemPrompt = `You are a concise summarization assistant.
-Language: ${textLanguage}.
-Generate a short summary of the provided text, 5–10 words, in the same language as the text.
-Do not include any explanations, introductions, or meta-commentary.
-Output only the summary text.`
+  // Get custom summary instructions from engine config
+  const generateSummaryInstructions = SettingsRepository.getCurrentEngineGenerateSummaryInstructions()?.trim()
+  if (!generateSummaryInstructions) {
+    throw makeError('Summary generation is disabled because generateSummaryInstructions is not configured', 400)
+  }
 
-  const prompt = `Summarize the following text in 5–10 words:\n\n${nodeContent}`
+  const instructions = `${generateSummaryInstructions}\n\n${nodeContent}`
 
   let accumulated = ''
   const onDelta = (chunk: string) => {
@@ -76,8 +74,7 @@ Output only the summary text.`
 
   const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
     {
-      prompt: prompt.trim(),
-      systemPrompt,
+      instructions: instructions.trim(),
       includeExistingLore,
       engineFileIds,
     },

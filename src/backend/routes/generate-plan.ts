@@ -15,7 +15,7 @@ function makeError(message: string, status: number): Error {
 }
 
 export async function generatePlan(
-  params: { prompt?: string; mode?: string; baseContent?: string; aiGenerationSettings?: AiGenerationSettings; includeExistingLore?: boolean; nodeId?: number },
+  params: { instructions?: string; mode?: string; baseContent?: string; aiGenerationSettings?: AiGenerationSettings; includeExistingLore?: boolean; nodeId?: number },
   onThinking: (status: string, detail?: string) => void,
   onPartialJson: (data: Record<string, unknown>) => void,
 ): Promise<{
@@ -27,10 +27,10 @@ export async function generatePlan(
   cached_tokens?: number
   reasoning_tokens?: number
 }> {
-  const { prompt, mode, baseContent, aiGenerationSettings = {}, includeExistingLore = false, nodeId } = params
-  if (!prompt?.trim()) throw makeError('prompt is required', 400)
+  const { instructions, mode, baseContent, aiGenerationSettings = {}, includeExistingLore = false, nodeId } = params
+  if (!instructions?.trim()) throw makeError('instructions is required', 400)
 
-  let finalPrompt = prompt.trim()
+  let finalInstructions = instructions.trim()
   if (nodeId !== undefined) {
     const edgeRepo = new PlanEdgeRepository()
     const edges = edgeRepo.getByToNodeIdAndType(nodeId, 'text')
@@ -40,13 +40,13 @@ export async function generatePlan(
       if (fromNode) {
         const placeholder = `{{${fromNode.title}}}`
         const content = fromNode.content || ''
-        finalPrompt = finalPrompt.split(placeholder).join(content)
+        finalInstructions = finalInstructions.split(placeholder).join(content)
       }
     }
   }
 
   // Проверка, что после замены не осталось неразрешённых шаблонов
-  const remainingPlaceholders = finalPrompt.match(/\{\{[^}]+?\}\}/g)
+  const remainingPlaceholders = finalInstructions.match(/\{\{[^}]+?\}\}/g)
   if (remainingPlaceholders && remainingPlaceholders.length > 0) {
     throw makeError(
       `Не удалось разрешить шаблоны: ${remainingPlaceholders.join(', ')}. Убедитесь, что соответствующие узлы существуют.`,
@@ -87,17 +87,6 @@ export async function generatePlan(
   const adapter = getEngineAdapter(engine)
   if (!adapter) throw makeError(`Plan generation is not supported for engine '${engine}'`, 400)
 
-  const systemPrompt = (mode === 'improve' && baseContent)
-    ? `You are a creative writing assistant.\n` +
-      `Language: ${textLanguage}.\n` +
-      `Write in Markdown format — output the full text, never omit or abbreviate unchanged sections. ` +
-      `No explanations, no preamble.\n\n` +
-      `<current_text>\n${baseContent}\n</current_text>`
-    : `You are a creative writing assistant.\n` +
-      `Language: ${textLanguage}.\n` +
-      `Write in Markdown format. ` +
-      `No explanations, no preamble.`
-
   let accumulated = ''
   let lastEmitted = ''
   const onDelta = (chunk: string) => {
@@ -109,8 +98,7 @@ export async function generatePlan(
 
   const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
     {
-      prompt: finalPrompt,
-      systemPrompt,
+      instructions: finalInstructions,
       includeExistingLore,
       aiGenerationSettings,
       engineFileIds,

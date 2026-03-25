@@ -24,12 +24,12 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
     const model = actualAiSettings.model || `gpt://${folderId}/yandexgpt/latest`
     const client = createYandexClient(apiKey, folderId)
 
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+    messages.push({ role: 'user', content: req.instructions });
+
     const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
       model,
-      messages: [
-        { role: 'system', content: req.systemPrompt },
-        { role: 'user', content: req.prompt },
-      ],
+      messages,
       ...(actualAiSettings.maxTokens != null ? { max_tokens: actualAiSettings.maxTokens } : {}),
       ...(actualAiSettings.maxCompletionTokens != null ? { max_completion_tokens: actualAiSettings.maxCompletionTokens } : {}),
     }

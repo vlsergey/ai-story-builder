@@ -225,8 +225,8 @@ export class LoreNodeRepository {
   insert(data: LoreNodeCreate & { id? : number }): number {
     return withDbWrite(db => {
       const hasId = data.id !== undefined
-      const columns = ['parent_id', 'name', 'content', 'position', 'status', 'to_be_deleted', 'ai_sync_info', 'word_count', 'char_count', 'byte_count', 'user_prompt', 'system_prompt', 'ai_settings']
-      const placeholders = ['?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?']
+      const columns = ['parent_id', 'name', 'content', 'position', 'status', 'to_be_deleted', 'ai_sync_info', 'word_count', 'char_count', 'byte_count', 'ai_instructions', 'ai_settings']
+      const placeholders = ['?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?']
       if (hasId) {
         columns.unshift('id')
         placeholders.unshift('?')
@@ -247,8 +247,7 @@ export class LoreNodeRepository {
         data.word_count ?? 0,
         data.char_count ?? 0,
         data.byte_count ?? 0,
-        data.user_prompt ?? null,
-        data.system_prompt ?? null,
+        data.ai_instructions ?? null,
         data.ai_settings ?? null
       ]
       const info = stmt.run(...params)

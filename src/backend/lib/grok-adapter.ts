@@ -23,9 +23,7 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
 
     const maxFiles = engineDef.maxFilesPerRequest ?? 10
     const attachableFileIds = req.engineFileIds.slice(0, maxFiles)
-    const userContent: Array<{ type: 'input_text'; text: string } | { type: 'input_file'; file_id: string }> = [
-      { type: 'input_text', text: req.prompt },
-    ]
+    const userContent: Array<{ type: 'input_file'; file_id: string }> = []
     if (req.includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
       for (const fileId of attachableFileIds) {
         userContent.push({ type: 'input_file', file_id: fileId })
@@ -34,8 +32,8 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
 
     const requestParams: Record<string, unknown> = {
       model: actualAiSettings.model,
-      instructions: req.systemPrompt,
-      input: [{ role: 'user', content: userContent }],
+      instructions: req.instructions,
+      input: userContent.length > 0 ? [{ role: 'user', content: userContent }] : [],
       max_output_tokens: onlyIfPositiveNumber(actualAiSettings.max_output_tokens),
       temperature: onlyIfPositiveNumber(actualAiSettings.temperature),
       top_p: onlyIfPositiveNumber(actualAiSettings.top_p),

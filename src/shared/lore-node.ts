@@ -14,8 +14,7 @@ export interface LoreNodeRow {
   changes_status: string | null
   review_base_content: string | null
   last_improve_instruction: string | null
-  user_prompt: string | null
-  system_prompt: string | null
+  ai_instructions: string | null
   ai_settings: string | null
 }
 
@@ -26,8 +25,7 @@ export const LoreNodeDefaults : Partial<LoreNodeInsert> = {
   content: null,
   position: 0,
   to_be_deleted: 0,
-  user_prompt: null,
-  system_prompt: null,
+  ai_instructions: null,
   ai_sync_info: null,
   ai_settings: null,
   word_count: 0,

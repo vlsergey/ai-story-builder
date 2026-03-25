@@ -22,8 +22,7 @@ export interface NodeData {
   type: PlanNodeType
   title: string
   content: string | null
-  user_prompt: string | null
-  system_prompt: string | null
+  ai_instructions: string | null
   node_type_settings: string | null
   status: PlanNodeStatus,
   ai_settings: string | null,

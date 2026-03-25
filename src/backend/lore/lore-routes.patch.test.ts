@@ -103,7 +103,7 @@ describe('patchLoreNode', () => {
     const repo = new LoreNodeRepository()
     repo.update(2, { content: 'Original content' })
 
-    const res = patchLoreNode(2, { content: 'AI improved content', prompt: 'Make it better', start_review: true })
+    const res = patchLoreNode(2, { content: 'AI improved content', ai_instructions: 'Make it better', start_review: true })
 
     expect(res.ok).toBe(true)
 
@@ -113,8 +113,8 @@ describe('patchLoreNode', () => {
     expect(node!.review_base_content).toBe('Original content')
   })
 
-  it('start_review saves prompt as last_improve_instruction', () => {
-    patchLoreNode(2, { content: 'New content', prompt: 'Make it epic', start_review: true })
+  it('start_review saves ai_instructions as last_improve_instruction', () => {
+    patchLoreNode(2, { content: 'New content', ai_instructions: 'Make it epic', start_review: true })
 
     const repo = new LoreNodeRepository()
     const node = repo.getById(2)

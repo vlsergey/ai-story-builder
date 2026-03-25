@@ -62,12 +62,12 @@ export interface PlanGraphNode {
   type: PlanNodeType
   title: string
   content: string | null
-  user_prompt: string | null
-  system_prompt: string | null
+  ai_instructions: string | null
   summary: string | null
   auto_summary: number
   ai_sync_info: string | null
   node_type_settings: string | null
+  ai_settings: string | null
   x: number
   y: number
   word_count: number
@@ -78,6 +78,8 @@ export interface PlanGraphNode {
   review_base_content: string | null
   last_improve_instruction: string | null
   created_at: string
+  parent_id: number | null
+  position: number | null
 }
 
 /** Plan graph edge */

@@ -7,8 +7,7 @@ import AiGenerationSettingsForm from './AiGenerationSettingsForm'
 export default function AiPlayground() {
   const [aiGenerationSettings, setAiGenerationSettings] = useState<AiGenerationSettings | null>()
 
-  const [systemPrompt, setSystemPrompt] = useState('')
-  const [prompt, setPrompt] = useState('')
+  const [instructions, setInstructions] = useState('')
   const [response, setResponse] = useState('')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +26,7 @@ export default function AiPlayground() {
   }, [response, generating])
 
   async function handleGenerate() {
-    if (!prompt.trim() || generating) return
+    if (!instructions.trim() || generating) return
     abortRef.current = new AbortController()
     setGenerating(true)
     setError(null)
@@ -38,8 +37,7 @@ export default function AiPlayground() {
 
     try {
       await generatePlaygroundStream({
-        systemPrompt: systemPrompt.trim() || undefined,
-        prompt: prompt.trim(),
+        instructions: instructions.trim(),
         aiGenerationSettings: aiGenerationSettings || {},
         signal: abortRef.current.signal,
         onThinking: (status, detail) => {
@@ -84,24 +82,15 @@ export default function AiPlayground() {
 
         {/* Input section */}
         <div className="flex flex-col shrink-0 max-h-[50%]">
-          {/* System prompt */}
-          <textarea
-            value={systemPrompt}
-            onChange={e => setSystemPrompt(e.target.value)}
-            placeholder="System prompt (optional)"
-            disabled={generating}
-            rows={3}
-            className="w-full resize-none border-b border-border bg-muted/30 p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60 font-mono"
-          />
-          {/* User prompt + send button */}
+          {/* Instructions */}
           <div className="flex gap-2 p-2 border-b border-border items-end">
             <textarea
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
+              value={instructions}
+              onChange={e => setInstructions(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !generating) { e.preventDefault(); void handleGenerate() } }}
-              placeholder="User prompt… (Ctrl+Enter to send)"
+              placeholder="Instructions… (Ctrl+Enter to send)"
               disabled={generating}
-              rows={4}
+              rows={7}
               className="flex-1 resize-none bg-background border border-border rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
             />
             <div className="flex flex-col gap-1 shrink-0">
@@ -115,7 +104,7 @@ export default function AiPlayground() {
               ) : (
                 <button
                   onClick={void handleGenerate}
-                  disabled={!prompt.trim()}
+                  disabled={!instructions.trim()}
                   className="px-3 py-1.5 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Send

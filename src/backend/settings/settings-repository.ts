@@ -106,6 +106,10 @@ export class SettingsRepository {
     return SettingsRepository.getCurrentEngineConfig().summaryAiGenerationSettings ?? {}
   }
 
+  static getCurrentEngineGenerateSummaryInstructions(): string | undefined {
+    return SettingsRepository.getCurrentEngineConfig().generateSummaryInstructions
+  }
+
   static getDefaultAiSettings() : AiGenerationSettings {
     return SettingsRepository.getCurrentEngineConfig()?.defaultAiSettings ?? {}
   }

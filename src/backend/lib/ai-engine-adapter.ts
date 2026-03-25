@@ -10,8 +10,7 @@ export interface JsonSchemaSpec {
 }
 
 export interface GenerateResponseRequest<S extends AiGenerationSettings = AiGenerationSettings> {
-  prompt: string
-  systemPrompt: string
+  instructions: string
   /** Whether to include existing lore files as attachments. */
   includeExistingLore: boolean
   /** Uploaded file IDs for the active engine (already filtered by to_be_deleted). */

@@ -160,26 +160,26 @@ describe('generateLore', () => {
 
   it('throws 400 when no project open', async () => {
     testDbPath = ''
-    await expect(callGenerateLore({ prompt: 'test' })).rejects.toThrow(/no project open/)
-    try { await callGenerateLore({ prompt: 'test' }) } catch (e: any) { expect(e.status).toBe(400) }
+    await expect(callGenerateLore({ instructions: 'test' })).rejects.toThrow(/no project open/)
+    try { await callGenerateLore({ instructions: 'test' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  it('throws 400 when prompt is missing', async () => {
+  it('throws 400 when instructions is missing', async () => {
     testDbPath = setupDb({ grokApiKey: 'key' })
-    await expect(callGenerateLore({})).rejects.toThrow(/prompt is required/)
+    await expect(callGenerateLore({})).rejects.toThrow(/instructions is required/)
     try { await callGenerateLore({}) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   it('throws 400 when no AI engine is configured', async () => {
     testDbPath = setupDb() // no engine
-    await expect(callGenerateLore({ prompt: 'hello' })).rejects.toThrow(/no AI engine configured/)
-    try { await callGenerateLore({ prompt: 'hello' }) } catch (e: any) { expect(e.status).toBe(400) }
+    await expect(callGenerateLore({ instructions: 'hello' })).rejects.toThrow(/no AI engine configured/)
+    try { await callGenerateLore({ instructions: 'hello' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   it('throws 400 for an unknown engine id', async () => {
     testDbPath = setupDb({ currentEngine: 'unknown-engine' })
-    await expect(callGenerateLore({ prompt: 'hello' })).rejects.toThrow(/not supported for engine 'unknown-engine'/)
-    try { await callGenerateLore({ prompt: 'hello' }) } catch (e: any) { expect(e.status).toBe(400) }
+    await expect(callGenerateLore({ instructions: 'hello' })).rejects.toThrow(/not supported for engine 'unknown-engine'/)
+    try { await callGenerateLore({ instructions: 'hello' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   // ─── 2. Grok — basic generation ───────────────────────────────────────────
@@ -188,7 +188,7 @@ describe('generateLore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse(JSON.stringify({ name: 'Arin', content: 'A brave hero named Arin.' }))
 
-    const { partials } = await callGenerateLore({ prompt: 'Describe a hero' })
+    const { partials } = await callGenerateLore({ instructions: 'Describe a hero' })
     const last = partials[partials.length - 1]
     expect(last.name).toBe('Arin')
     expect(last.content).toBe('A brave hero named Arin.')
@@ -196,7 +196,7 @@ describe('generateLore', () => {
 
   it('throws when Grok api_key is missing', async () => {
     testDbPath = setupDb({ currentEngine: 'grok' }) // no grokApiKey in config
-    await expect(callGenerateLore({ prompt: 'test' })).rejects.toThrow(/Grok api_key is required/)
+    await expect(callGenerateLore({ instructions: 'test' })).rejects.toThrow(/Grok api_key is required/)
   })
 
   // ─── 3. Grok file attachment format ───────────────────────────────────────
@@ -218,16 +218,19 @@ describe('generateLore', () => {
     })
     mockGrokResponse('Hero content')
 
-    await callGenerateLore({ prompt: 'Describe a hero', settings: { includeExistingLore: true } })
+    await callGenerateLore({ instructions: 'Describe a hero', includeExistingLore: true })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
     const params = mockGrokGenerate.mock.calls[0][1] as {
       input: Array<{ role: string; content: Array<Record<string, unknown>> }>
     }
-    const userMessage = params.input.find((m) => m.role === 'user')
-    expect(Array.isArray(userMessage!.content)).toBe(true)
+    // input may be empty if no files, but we have a file
+    expect(params.input).toHaveLength(1)
+    const userMessage = params.input[0]
+    expect(userMessage.role).toBe('user')
+    expect(Array.isArray(userMessage.content)).toBe(true)
 
-    const fileAttachment = userMessage!.content.find(c => c.type === 'input_file')
+    const fileAttachment = userMessage.content.find(c => c.type === 'input_file')
     expect(fileAttachment).toBeDefined()
     expect(fileAttachment!.file_id).toBe('file-abc123')
   })
@@ -251,14 +254,17 @@ describe('generateLore', () => {
     })
     mockGrokResponse('Hero lore')
 
-    await callGenerateLore({ prompt: 'Tell me about the hero', settings: { includeExistingLore: true } })
+    await callGenerateLore({ instructions: 'Tell me about the hero', includeExistingLore: true })
 
     expect(mockGrokGenerate).toHaveBeenCalledOnce()
     const params = mockGrokGenerate.mock.calls[0][1] as {
       input: Array<{ role: string; content: Array<Record<string, unknown>> }>
     }
-    const userMessage = params.input.find((m) => m.role === 'user')
-    const fileAttachments = userMessage!.content.filter(c => c.type === 'input_file')
+    // input may be empty if no files, but we have a file
+    expect(params.input).toHaveLength(1)
+    const userMessage = params.input[0]
+    expect(userMessage.role).toBe('user')
+    const fileAttachments = userMessage.content.filter(c => c.type === 'input_file')
 
     expect(fileAttachments.some(f => f.file_id === 'file-leader')).toBe(true)
     expect(fileAttachments).toHaveLength(1)
@@ -281,13 +287,16 @@ describe('generateLore', () => {
     })
     mockGrokResponse('Some lore')
 
-    await callGenerateLore({ prompt: 'test', settings: { includeExistingLore: true } })
+    await callGenerateLore({ instructions: 'test', includeExistingLore: true })
 
     const params = mockGrokGenerate.mock.calls[0][1] as {
       input: Array<{ role: string; content: Array<Record<string, unknown>> }>
     }
-    const userMessage = params.input.find((m) => m.role === 'user')
-    const fileAttachments = userMessage!.content.filter(c => c.type === 'input_file')
+    // input may be empty if no files, but we have a file
+    expect(params.input).toHaveLength(1)
+    const userMessage = params.input[0]
+    expect(userMessage.role).toBe('user')
+    const fileAttachments = userMessage.content.filter(c => c.type === 'input_file')
 
     expect(fileAttachments.some(f => f.file_id === 'file-active')).toBe(true)
     expect(fileAttachments.some(f => f.file_id === 'file-deleted')).toBe(false)
@@ -305,14 +314,13 @@ describe('generateLore', () => {
     })
     mockGrokResponse('Some lore')
 
-    await callGenerateLore({ prompt: 'test', settings: { includeExistingLore: false } })
+    await callGenerateLore({ instructions: 'test', includeExistingLore: false })
 
     const params = mockGrokGenerate.mock.calls[0][1] as {
       input: Array<{ role: string; content: Array<Record<string, unknown>> }>
     }
-    const userMessage = params.input.find((m) => m.role === 'user')
-    const fileAttachments = userMessage!.content.filter(c => c.type === 'input_file')
-    expect(fileAttachments).toHaveLength(0)
+    // input should be empty because includeExistingLore is false
+    expect(params.input).toHaveLength(0)
   })
 
   // ─── 5. Yandex — basic generation ─────────────────────────────────────────
@@ -321,7 +329,7 @@ describe('generateLore', () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
     mockYandexResponse(JSON.stringify({ name: 'World', content: 'Yandex lore result' }))
 
-    const { partials } = await callGenerateLore({ prompt: 'Create a world' })
+    const { partials } = await callGenerateLore({ instructions: 'Create a world' })
     const last = partials[partials.length - 1]
     expect(last.name).toBe('World')
     expect(last.content).toBe('Yandex lore result')
@@ -329,25 +337,15 @@ describe('generateLore', () => {
 
   it('throws when Yandex api_key or folder_id is missing', async () => {
     testDbPath = setupDb({ currentEngine: 'yandex' }) // no credentials
-    await expect(callGenerateLore({ prompt: 'test' })).rejects.toThrow(/Yandex api_key and folder_id are required/)
+    await expect(callGenerateLore({ instructions: 'test' })).rejects.toThrow(/Yandex api_key and folder_id are required/)
   })
 
   // ─── 6. text_language setting ─────────────────────────────────────────────
 
-  it('uses text_language from settings in the system prompt', async () => {
-    testDbPath = setupDb({ grokApiKey: 'grok-key', textLanguage: 'en-US' })
-    mockGrokResponse()
-
-    await callGenerateLore({ prompt: 'Describe a wizard' })
-
-    const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
-    expect(params.instructions).toContain('en-US')
-  })
-
   it('throws 400 when text_language is not configured', async () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key', textLanguage: null })
-    await expect(callGenerateLore({ prompt: 'Describe a hero' })).rejects.toThrow(/text_language is not configured/)
-    try { await callGenerateLore({ prompt: 'Describe a hero' }) } catch (e: any) { expect(e.status).toBe(400) }
+    await expect(callGenerateLore({ instructions: 'Describe a hero' })).rejects.toThrow(/text_language is not configured/)
+    try { await callGenerateLore({ instructions: 'Describe a hero' }) } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   // ─── 7. Grok web search ────────────────────────────────────────────────────
@@ -356,7 +354,7 @@ describe('generateLore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse('Lore with web info')
 
-    await callGenerateLore({ prompt: 'News', settings: { webSearch: 'on' } })
+    await callGenerateLore({ instructions: 'News', aiGenerationSettings: { webSearch: true } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
     expect(params.tools).toEqual([{ type: 'web_search' }])
@@ -366,7 +364,7 @@ describe('generateLore', () => {
     testDbPath = setupDb({ grokApiKey: 'grok-key' })
     mockGrokResponse('Normal lore')
 
-    await callGenerateLore({ prompt: 'Something', settings: { webSearch: 'none' } })
+    await callGenerateLore({ instructions: 'Something', aiGenerationSettings: { webSearch: false } })
 
     const params = mockGrokGenerate.mock.calls[0][1] as { tools?: unknown[] }
     expect(params.tools).toBeUndefined()
@@ -379,7 +377,7 @@ describe('generateLore', () => {
     const jsonResponse = JSON.stringify({ name: 'Arin the Brave', content: '## Hero\nA brave warrior.' })
     mockGrokResponse(jsonResponse)
 
-    const { partials } = await callGenerateLore({ prompt: 'Describe a hero' })
+    const { partials } = await callGenerateLore({ instructions: 'Describe a hero' })
 
     const last = partials[partials.length - 1]
     expect(last.name).toBe('Arin the Brave')
@@ -389,45 +387,14 @@ describe('generateLore', () => {
     expect(params.text?.format?.type).toBe('json_schema')
   })
 
-  // ─── 9. Improve mode ──────────────────────────────────────────────────────
-
-  it('includes baseContent in system prompt when mode=improve', async () => {
-    testDbPath = setupDb({ grokApiKey: 'grok-key' })
-    mockGrokResponse()
-
-    await callGenerateLore({
-      prompt: 'Make it longer',
-      mode: 'improve',
-      baseContent: 'A short hero description.',
-    })
-
-    const params = mockGrokGenerate.mock.calls[0][1] as {
-      instructions: string
-      input: Array<{ role: string; content: Array<{ type: string; text?: string }> }>
-    }
-    expect(params.instructions).toContain('Improve the following lore item')
-    expect(params.instructions).toContain('A short hero description.')
-    const userText = params.input.find(m => m.role === 'user')?.content.find(c => c.type === 'input_text')?.text
-    expect(userText).toContain('Make it longer')
-  })
-
-  it('uses generate system prompt when mode=generate (default)', async () => {
-    testDbPath = setupDb({ grokApiKey: 'grok-key' })
-    mockGrokResponse()
-
-    await callGenerateLore({ prompt: 'Create a wizard' })
-
-    const params = mockGrokGenerate.mock.calls[0][1] as { instructions: string }
-    expect(params.instructions).toContain('Generate a lore item')
-    expect(params.instructions).not.toContain('Improve')
-  })
+  // ─── 9. Yandex JSON output ────────────────────────────────────────────────
 
   it('emits partial_json callbacks for Yandex', async () => {
     testDbPath = setupDb({ yandexApiKey: 'yandex-key', folderId: 'folder-1' })
     const jsonResponse = JSON.stringify({ name: 'Mystic Forest', content: '## Forest\nA place of wonder.' })
     mockYandexResponse(jsonResponse)
 
-    const { partials } = await callGenerateLore({ prompt: 'Describe a location' })
+    const { partials } = await callGenerateLore({ instructions: 'Describe a location' })
 
     const last = partials[partials.length - 1]
     expect(last.name).toBe('Mystic Forest')

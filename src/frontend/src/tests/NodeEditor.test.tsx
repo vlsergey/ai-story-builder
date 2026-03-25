@@ -4,6 +4,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import NodeEditor, { type NodeEditorAdapter } from '../components/NodeEditor'
 import * as streamModule from '../lib/generate-node-stream'
 import * as planGraphEvents from '../lib/plan-graph-events'
+import { ipcClient, trpc } from '../ipcClient'
 
 // ── Dependency mocks ────────────────────────────────────────────────────────
 
@@ -30,11 +31,51 @@ vi.mock('../lib/locale', () => ({ useLocale: () => ({ t: (key: string) => key })
 vi.mock('../lib/generate-node-stream')
 vi.mock('../lib/codemirror-preserve-scroll', () => ({ preserveScrollOnExternalUpdate: [] }))
 vi.mock('../lib/plan-graph-events', () => ({ dispatchPlanGraphRefresh: vi.fn() }))
-vi.mock('../components/AiGenerationSettings', () => ({
+vi.mock('../components/AiGenerationSettingsForm', () => ({
   default: () => <div data-testid="ai-settings" />,
 }))
 vi.mock('../components/DiffViewAndAccept', () => ({
   default: () => <div data-testid="diff-view" />,
+}))
+
+// Mock ipcClient and trpc
+vi.mock('../ipcClient', () => ({
+  ipcClient: {
+    ai: {
+      generateSummary: {
+        mutate: vi.fn().mockResolvedValue({}),
+      },
+    },
+    planGraph: {
+      startReview: {
+        mutate: vi.fn().mockResolvedValue({}),
+      },
+      acceptReview: {
+        mutate: vi.fn().mockResolvedValue({}),
+      },
+    },
+  },
+  trpc: {
+    settings: {
+      autoGenerateSummary: {
+        get: {
+          useQuery: vi.fn(() => ({ data: false })),
+        },
+      },
+      allAiEnginesConfig: {
+        currentEngine: {
+          get: {
+            useQuery: vi.fn(() => ({ data: 'grok' })),
+          },
+          defaultAiGenerationSettings: {
+            get: {
+              useQuery: vi.fn(() => ({ data: {} })),
+            },
+          },
+        },
+      },
+    },
+  },
 }))
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -45,8 +86,7 @@ const emptyNode = {
   changes_status: null,
   review_base_content: null,
   last_improve_instruction: null,
-  user_prompt: null,
-  system_prompt: null,
+  ai_instructions: null,
 }
 
 const nodeWithContent = {
@@ -55,8 +95,7 @@ const nodeWithContent = {
   changes_status: null,
   review_base_content: null,
   last_improve_instruction: null,
-  user_prompt: 'old prompt',
-  system_prompt: null,
+  ai_instructions: 'old prompt',
 }
 
 function makeAdapter(nodeData: Record<string, unknown> = emptyNode, overrides: Partial<NodeEditorAdapter> = {}): NodeEditorAdapter {
@@ -79,6 +118,7 @@ function setupElectronAPI(invokeImpl?: (channel: string, ...args: unknown[]) => 
     alert: vi.fn(),
     confirm: vi.fn().mockReturnValue(true),
     invoke: vi.fn().mockImplementation(invokeImpl ?? ((channel: string) => {
+      // These channels are no longer used by NodeEditor, but keep for compatibility
       if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
       if (channel === 'settings:get') return Promise.resolve({ value: null })
       return Promise.resolve({})
@@ -95,6 +135,10 @@ describe('NodeEditor — generate mode behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setupElectronAPI()
+    // Reset trpc mocks
+    vi.mocked(trpc.settings.autoGenerateSummary.get.useQuery).mockReturnValue({ data: false } as any)
+    vi.mocked(trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery).mockReturnValue({ data: 'grok' } as any)
+    vi.mocked(trpc.settings.allAiEnginesConfig.currentEngine.defaultAiGenerationSettings.get.useQuery).mockReturnValue({ data: {} } as any)
   })
 
   afterEach(() => {
@@ -111,7 +155,7 @@ describe('NodeEditor — generate mode behavior', () => {
     render(<NodeEditor nodeId={1} adapter={makeAdapter()} />)
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
 
-    const promptTextarea = screen.getByPlaceholderText('lore.userPrompt')
+    const promptTextarea = screen.getByPlaceholderText('lore.aiInstructions')
     fireEvent.change(promptTextarea, { target: { value: 'write something' } })
 
     await act(async () => {
@@ -141,7 +185,7 @@ describe('NodeEditor — generate mode behavior', () => {
     // Node has content; confirm dialog not needed — simulate already loaded with content
     // window.electronAPI.confirm is already mocked to return true
 
-    const promptTextarea = screen.getByPlaceholderText('lore.userPrompt')
+    const promptTextarea = screen.getByPlaceholderText('lore.aiInstructions')
     fireEvent.change(promptTextarea, { target: { value: 'regenerate this' } })
 
     // Start generation (don't await — stream is pending)
@@ -182,7 +226,7 @@ describe('NodeEditor — generate mode behavior', () => {
     render(<NodeEditor nodeId={1} adapter={makeAdapter()} />)
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
 
-    const promptTextarea = screen.getByPlaceholderText('lore.userPrompt')
+    const promptTextarea = screen.getByPlaceholderText('lore.aiInstructions')
     fireEvent.change(promptTextarea, { target: { value: 'test prompt' } })
     fireEvent.click(screen.getByRole('button', { name: 'lore.generate' }))
 
@@ -208,6 +252,14 @@ describe('NodeEditor — generate mode behavior', () => {
 describe('NodeEditor — auto‑summary generation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setupElectronAPI()
+    // Default mocks
+    vi.mocked(trpc.settings.autoGenerateSummary.get.useQuery).mockReturnValue({ data: false } as any)
+    vi.mocked(trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery).mockReturnValue({ data: 'grok' } as any)
+    vi.mocked(trpc.settings.allAiEnginesConfig.currentEngine.defaultAiGenerationSettings.get.useQuery).mockReturnValue({ data: {} } as any)
+    vi.mocked(ipcClient.ai.generateSummary.mutate).mockClear()
+    vi.mocked(ipcClient.planGraph.startReview.mutate).mockClear()
+    vi.mocked(ipcClient.planGraph.acceptReview.mutate).mockClear()
   })
 
   afterEach(() => {
@@ -215,13 +267,8 @@ describe('NodeEditor — auto‑summary generation', () => {
   })
 
   it('triggers summary generation when plan node content changes and editor closes', async () => {
-    setupElectronAPI((channel: string, ...args: unknown[]) => {
-      if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
-      if (channel === 'settings:get' && args[0] === 'auto_generate_summary') return Promise.resolve({ value: 'true' })
-      if (channel === 'settings:get') return Promise.resolve({ value: null })
-      if (channel === 'ai:generate-summary') return Promise.resolve({ summary: 'generated summary' })
-      return Promise.resolve({})
-    })
+    // Enable auto‑summary
+    vi.mocked(trpc.settings.autoGenerateSummary.get.useQuery).mockReturnValue({ data: true } as any)
 
     const planNodeData = {
       name: 'Plan Node',
@@ -229,8 +276,7 @@ describe('NodeEditor — auto‑summary generation', () => {
       changes_status: null,
       review_base_content: null,
       last_improve_instruction: null,
-      user_prompt: null,
-      system_prompt: null,
+      ai_instructions: null,
     }
 
     const planAdapter = makeAdapter(planNodeData, {
@@ -249,9 +295,8 @@ describe('NodeEditor — auto‑summary generation', () => {
     // Unmount component (simulate editor close) – this should trigger the cleanup effect
     unmount()
 
-    // Expect invoke to have been called with 'ai:generate-summary'
-    expect(window.electronAPI.invoke).toHaveBeenCalledWith(
-      'ai:generate-summary',
+    // Expect mutate to have been called with correct parameters
+    expect(ipcClient.ai.generateSummary.mutate).toHaveBeenCalledWith(
       { node_id: 42, content: 'updated content' }
     )
 
@@ -260,21 +305,14 @@ describe('NodeEditor — auto‑summary generation', () => {
   })
 
   it('does NOT trigger summary generation when setting is disabled', async () => {
-    setupElectronAPI((channel: string, ...args: unknown[]) => {
-      if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
-      if (channel === 'settings:get' && args[0] === 'auto_generate_summary') return Promise.resolve({ value: 'false' })
-      if (channel === 'settings:get') return Promise.resolve({ value: null })
-      return Promise.resolve({})
-    })
-
+    // auto‑summary disabled (default mock is false)
     const planNodeData = {
       name: 'Plan Node',
       content: 'initial',
       changes_status: null,
       review_base_content: null,
       last_improve_instruction: null,
-      user_prompt: null,
-      system_prompt: null,
+      ai_instructions: null,
     }
 
     const planAdapter = makeAdapter(planNodeData, { i18nPrefix: 'plan', supportsAutoSummary: true })
@@ -286,20 +324,15 @@ describe('NodeEditor — auto‑summary generation', () => {
 
     unmount()
 
-    // No call to 'ai:generate-summary'
-    expect(window.electronAPI.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+    // No call to generateSummary
+    expect(ipcClient.ai.generateSummary.mutate).not.toHaveBeenCalled()
     // dispatchPlanGraphRefresh should not be called either
     expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).not.toHaveBeenCalled()
   })
+
   it('does NOT trigger summary generation during AI streaming (only on unmount)', async () => {
-    // Mock settings: auto_generate_summary = true
-    setupElectronAPI((channel: string, ...args: unknown[]) => {
-      if (channel === 'ai:config:get') return Promise.resolve({ current_engine: null })
-      if (channel === 'settings:get' && args[0] === 'auto_generate_summary') return Promise.resolve({ value: 'true' })
-      if (channel === 'settings:get') return Promise.resolve({ value: null })
-      if (channel === 'ai:generate-summary') return Promise.resolve({ summary: 'generated summary' })
-      return Promise.resolve({})
-    })
+    // Enable auto‑summary
+    vi.mocked(trpc.settings.autoGenerateSummary.get.useQuery).mockReturnValue({ data: true } as any)
 
     const planNodeData = {
       name: 'Plan Node',
@@ -307,8 +340,7 @@ describe('NodeEditor — auto‑summary generation', () => {
       changes_status: null,
       review_base_content: null,
       last_improve_instruction: null,
-      user_prompt: null,
-      system_prompt: null,
+      ai_instructions: null,
     }
 
     const planAdapter = makeAdapter(planNodeData, {
@@ -330,7 +362,7 @@ describe('NodeEditor — auto‑summary generation', () => {
     await screen.findByTestId('codemirror', {}, { timeout: 5000 })
 
     // Start AI generation (simulate user clicking generate)
-    const promptTextarea = screen.getByPlaceholderText('plan.userPrompt')
+    const promptTextarea = screen.getByPlaceholderText('plan.aiInstructions')
     fireEvent.change(promptTextarea, { target: { value: 'generate something' } })
     fireEvent.click(screen.getByRole('button', { name: 'plan.regenerate' }))
 
@@ -345,7 +377,7 @@ describe('NodeEditor — auto‑summary generation', () => {
     // At this point, content has changed due to streaming.
     // With the bug, the summary generation would have been triggered.
     // With the fix, it should NOT be triggered.
-    expect(window.electronAPI.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+    expect(ipcClient.ai.generateSummary.mutate).not.toHaveBeenCalled()
 
     // Send another token
     await act(async () => {
@@ -353,7 +385,7 @@ describe('NodeEditor — auto‑summary generation', () => {
     })
 
     // Still no summary call
-    expect(window.electronAPI.invoke).not.toHaveBeenCalledWith('ai:generate-summary', expect.anything())
+    expect(ipcClient.ai.generateSummary.mutate).not.toHaveBeenCalled()
 
     // Finish streaming
     await act(async () => {
@@ -364,8 +396,7 @@ describe('NodeEditor — auto‑summary generation', () => {
     unmount()
 
     // Now summary generation should be triggered because content changed (final content)
-    expect(window.electronAPI.invoke).toHaveBeenCalledWith(
-      'ai:generate-summary',
+    expect(ipcClient.ai.generateSummary.mutate).toHaveBeenCalledWith(
       { node_id: 42, content: 'more partial content' }
     )
 

@@ -51,6 +51,7 @@ function setupDb(opts?: {
   textLanguage?: string | null
   autoGenerateSummary?: boolean
   summarySettings?: Record<string, unknown>
+  generateSummaryInstructions?: string
   planNode?: {
     id: number
     content?: string | null
@@ -91,6 +92,14 @@ function setupDb(opts?: {
     }
     (aiConfig[engine] as Record<string, unknown>).summary_settings = opts.summarySettings
   }
+  // Add generateSummaryInstructions if provided, otherwise set a default
+  if (engine) {
+    if (!aiConfig[engine]) {
+      aiConfig[engine] = {}
+    }
+    const instructions = opts?.generateSummaryInstructions ?? 'Summarize the following content:'
+    ;(aiConfig[engine] as Record<string, unknown>).generateSummaryInstructions = instructions
+  }
   if (Object.keys(aiConfig).length > 0) {
     SettingsRepository.saveAllAiEnginesConfig(aiConfig)
   }
@@ -115,8 +124,7 @@ function setupDb(opts?: {
       position: 0,
       x: 0,
       y: 0,
-      user_prompt: null,
-      system_prompt: null,
+      ai_instructions: null,
       ai_sync_info: null,
       node_type_settings: null,
       ai_settings: null,
@@ -229,7 +237,7 @@ describe('generateSummary', () => {
     expect(mockGenerateResponse).toHaveBeenCalledOnce()
     const call = mockGenerateResponse.mock.calls[0]
     const params = call[0]
-    expect(params.prompt).toContain('New content for summary')
+    expect(params.instructions).toContain('New content for summary')
   })
 
   it('respects auto_generate_summary setting (false) — still generates when called directly', async () => {

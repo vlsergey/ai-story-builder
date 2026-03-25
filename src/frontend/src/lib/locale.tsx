@@ -40,11 +40,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const strings = useMemo<LocaleStrings>(() => LOCALES[locale] ?? en, [locale])
-  const t = (key: string, fallback?: string | null): (null | string) => {
+  const t = (key: string, fallback?: string | null): string => {
     const existing = strings[key]
     if (existing) return existing
-    // we CAN return null here
-    if (fallback !== undefined) return fallback
+    if (fallback !== undefined) return fallback ?? key
     return key
   }
 

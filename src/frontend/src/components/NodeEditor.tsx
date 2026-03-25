@@ -16,7 +16,9 @@ import type { AiEngineSyncRecord } from '../types/models'
 import { ipcClient, trpc } from '../ipcClient'
 import { Button } from './ui/button'
 import AiGenerationSettingsForm from './AiGenerationSettingsForm'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion'
+
+import { Textarea } from './ui/textarea'
+import { Field, FieldContent, FieldLabel } from './ui/field'
 
 export interface NodeSavedPayload {
   nodeId: number
@@ -75,11 +77,9 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
   const autoGenerateSummary = trpc.settings.autoGenerateSummary.get.useQuery().data || false
 
-  // Plan-only extra fields
-  const [userPrompt, setUserPrompt] = useState('')
-  const [systemPrompt, setSystemPrompt] = useState('')
-  const userPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const systemPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // AI instructions (single field)
+  const [aiInstructions, setAiInstructions] = useState('')
+  const aiInstructionsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const primaryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -101,7 +101,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const [nodeAiGenerationSettings, setNodeAiGenerationSettings] = useState<Record<string, AiGenerationSettings>>({})
 
   // ── Generate mode (A) ──────────────────────────────────────────────────────
-  // generatePrompt removed, using userPrompt instead
+  // generatePrompt removed, using aiInstructions instead
 
   // ── Improve instruction (modes B, C, D) ────────────────────────────────────
   const [improveInstruction, setImproveInstruction] = useState('')
@@ -138,10 +138,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       setInitialPrimary(node[adapter.primaryField] as string ?? '')
       setInitialContent(node.content as string ?? '')
       summaryTriggeredRef.current = false
-      const userPrompt = node.user_prompt as string ?? ''
-      const systemPrompt = node.system_prompt as string ?? ''
-      setUserPrompt(userPrompt)
-      setSystemPrompt(systemPrompt)
+      const aiInstructions = node.ai_instructions as string ?? ''
+      setAiInstructions(aiInstructions)
       // parse ai_settings
       const aiSettingsRaw = node.ai_settings as string | undefined
       let parsed: Record<string, AiGenerationSettings> | null = null
@@ -201,9 +199,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   useEffect(() => () => {
     if (primaryTimerRef.current) clearTimeout(primaryTimerRef.current)
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
-    if (userPromptTimerRef.current) clearTimeout(userPromptTimerRef.current)
-    if (systemPromptTimerRef.current) clearTimeout(systemPromptTimerRef.current)
-    if (heightTimerRef.current) clearTimeout(heightTimerRef.current)
+    if (aiInstructionsTimerRef.current) clearTimeout(aiInstructionsTimerRef.current)
   }, [])
 
   // ── Primary field autosave ─────────────────────────────────────────────────
@@ -271,15 +267,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     await updateNodeAiGenerationSettings(newNodeAiGenerationSettings);
   }, [currentAiEngine, nodeAiGenerationSettings, setNodeAiGenerationSettings, updateNodeAiGenerationSettings])
 
-  // ── Save prompt height to settings ────────────────────────────────────────
-  const heightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  function savePromptHeight(key: 'prompt_user_height' | 'prompt_system_height', height: number) {
-    if (heightTimerRef.current) clearTimeout(heightTimerRef.current)
-    heightTimerRef.current = setTimeout(() => {
-      void ipcClient.settings.set.mutate([key, String(height)])
-    }, 1000)
-  }
-
   function computeTextMetrics(text: string): { bytes: number; chars: number; words: number } {
     const bytes = new TextEncoder().encode(text).length;
     const chars = text.length;
@@ -308,7 +295,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     let lastCallData: { cost_usd_ticks?: number; tokens_input?: number; tokens_output?: number; tokens_total?: number; cached_tokens?: number; reasoning_tokens?: number } = {}
 
     generateNodeStream(adapter.generateEndpoint, {
-      prompt: effectivePrompt,
+      instructions: effectivePrompt,
       aiGenerationSettings,
       mode: 'generate',
       nodeId: nodeId,
@@ -331,13 +318,13 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       },
       onDone: (data) => { lastCallData = data },
     }).then(async () => {
-      if (finalPrimary.trim() || finalContent) {
-        const patchBody: Record<string, unknown> = {
-          content: finalContent,
-          user_prompt: effectivePrompt.trim(),
-        }
-        if (finalPrimary.trim()) patchBody[adapter.primaryField] = finalPrimary.trim()
-        const data = await adapter.patchNode(nodeId, patchBody)
+    if (finalPrimary.trim() || finalContent) {
+      const patchBody: Record<string, unknown> = {
+        content: finalContent,
+        ai_instructions: effectivePrompt.trim(),
+      }
+      if (finalPrimary.trim()) patchBody[adapter.primaryField] = finalPrimary.trim()
+      const data = await adapter.patchNode(nodeId, patchBody)
         if (data.ok) {
           if (finalPrimary.trim()) panelApi?.setTitle(finalPrimary.trim())
           adapter.onSaved({
@@ -395,7 +382,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
 
     try {
       await generateNodeStream(adapter.generateEndpoint, {
-        prompt: improveInstruction,
+        instructions: improveInstruction,
         aiGenerationSettings: aiGenerationSettings,
         mode: 'improve',
         baseContent: baseForStream,
@@ -487,23 +474,14 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
   const hasContent = content.trim().length > 0
   const isReview = editorMode === 'review_locked' || editorMode === 'review_unlocked'
   const isLocked = editorMode === 'review_locked'
-  const effectivePrompt = userPrompt
+  const effectivePrompt = aiInstructions
 
-  // ── user_prompt autosave ──────────────────────────────────────────────────
-  function handleUserPromptChange(value: string) {
-    setUserPrompt(value)
-    if (userPromptTimerRef.current) clearTimeout(userPromptTimerRef.current)
-    userPromptTimerRef.current = setTimeout(() => {
-      void adapter.patchNode(nodeId, { user_prompt: value })
-    }, 1000)
-  }
-
-  // ── system_prompt autosave ────────────────────────────────────────────────
-  function handleSystemPromptChange(value: string) {
-    setSystemPrompt(value)
-    if (systemPromptTimerRef.current) clearTimeout(systemPromptTimerRef.current)
-    systemPromptTimerRef.current = setTimeout(() => {
-      void adapter.patchNode(nodeId, { system_prompt: value })
+  // ── ai_instructions autosave ──────────────────────────────────────────────
+  function handleAiInstructionsChange(value: string) {
+    setAiInstructions(value)
+    if (aiInstructionsTimerRef.current) clearTimeout(aiInstructionsTimerRef.current)
+    aiInstructionsTimerRef.current = setTimeout(() => {
+      void adapter.patchNode(nodeId, { ai_instructions: value })
     }, 1000)
   }
 
@@ -570,33 +548,18 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         </div>
       </div>
 
-      {/* ── SYSTEM PROMPT + USER PROMPT (for all adapters) ────────────────────── */}
-      <Accordion className="shrink-0 w-full" type="multiple" defaultValue={['user-prompt']}>
-        <AccordionItem value="system-prompt">
-          <AccordionTrigger>{tp('systemPrompt')}</AccordionTrigger>
-          <AccordionContent className="flex flex-col h-full">
-            <textarea
-              className="w-full"
-              value={systemPrompt}
-              onChange={(e) => handleSystemPromptChange(e.target.value)}
-              placeholder={tp('systemPrompt')}
-              rows={10}
-            />
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="user-prompt">
-          <AccordionTrigger>{tp('userPrompt')}</AccordionTrigger>
-          <AccordionContent className="flex flex-col h-full">
-            <textarea
-              className="w-full"
-              value={userPrompt}
-              onChange={(e) => handleUserPromptChange(e.target.value)}
-              placeholder={tp('userPrompt')}
-              rows={10}
-            />
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      {/* ── AI INSTRUCTIONS (single field) ────────────────────────────────────── */}
+      <Field className="flex-1 w-full flex flex-col">
+        <FieldContent className="shrink-0 flex-none">
+          <FieldLabel>{tp('aiInstructions')}</FieldLabel>
+        </FieldContent>
+        <Textarea
+          className="flex-1 w-full"
+          value={aiInstructions}
+          onChange={(e) => handleAiInstructionsChange(e.target.value)}
+          placeholder={tp('aiInstructions')}
+        />
+      </Field>
 
       {/* ── AI CONTROLS & GENERATE BUTTON — after prompts, mode 'generate' only ───── */}
       {editorMode === 'generate' && (

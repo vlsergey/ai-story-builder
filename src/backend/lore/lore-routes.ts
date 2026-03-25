@@ -102,11 +102,9 @@ export function patchLoreNode(
   data: {
     name?: string
     content?: string
-    prompt?: string
     start_review?: boolean
     accept_review?: boolean
-    user_prompt?: string | null
-    system_prompt?: string | null
+    ai_instructions?: string | null
     ai_settings?: string | null
   }
 ): {
@@ -116,15 +114,14 @@ export function patchLoreNode(
   byte_count?: number | null
   ai_sync_info?: Record<string, Record<string, unknown>> | null
 } {
-  const { name, content, prompt, start_review, accept_review, user_prompt, system_prompt, ai_settings } = data
+  const { name, content, start_review, accept_review, ai_instructions, ai_settings } = data
   const hasName = typeof name === 'string' && name.trim().length > 0
   const hasContent = content !== undefined
-  const hasUserPrompt = user_prompt !== undefined
-  const hasSystemPrompt = system_prompt !== undefined
+  const hasAiInstructions = ai_instructions !== undefined
   const hasAiSettings = ai_settings !== undefined
   const hasStartReview = start_review === true
   const hasAcceptReview = accept_review === true
-  if (!hasName && !hasContent && !hasUserPrompt && !hasSystemPrompt && !hasAiSettings && prompt === undefined && !hasStartReview && !hasAcceptReview) {
+  if (!hasName && !hasContent && !hasAiInstructions && !hasAiSettings && !hasStartReview && !hasAcceptReview) {
     throw makeError('name or content required', 400)
   }
 
@@ -159,25 +156,21 @@ export function patchLoreNode(
     }
   }
 
-  if (hasUserPrompt) {
-    updates.user_prompt = user_prompt ?? null
-  }
-
-  if (hasSystemPrompt) {
-    updates.system_prompt = system_prompt ?? null
+  if (hasAiInstructions) {
+    updates.ai_instructions = ai_instructions ?? null
   }
 
   if (hasAiSettings) {
     updates.ai_settings = ai_settings ?? null
   }
 
-  if (prompt !== undefined && !start_review) {
-    updates.last_improve_instruction = prompt ?? null
+  if (hasAiInstructions && !start_review) {
+    updates.last_improve_instruction = ai_instructions ?? null
   }
 
   if (start_review && hasContent) {
     updates.changes_status = 'review'
-    updates.last_improve_instruction = prompt ?? null
+    updates.last_improve_instruction = ai_instructions ?? null
     if (node.changes_status !== 'review') {
       updates.review_base_content = node.content ?? ''
     }

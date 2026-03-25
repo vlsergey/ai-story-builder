@@ -29,7 +29,7 @@ CREATE TABLE lore_nodes (
       position       INTEGER DEFAULT 0,
       status         TEXT NOT NULL DEFAULT 'ACTIVE',
       to_be_deleted  INTEGER NOT NULL DEFAULT 0,
-      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP, word_count  INTEGER NOT NULL DEFAULT 0, char_count  INTEGER NOT NULL DEFAULT 0, byte_count  INTEGER NOT NULL DEFAULT 0, ai_sync_info TEXT NULL, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, user_prompt TEXT NULL, system_prompt TEXT NULL, ai_settings TEXT,
+      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP, word_count  INTEGER NOT NULL DEFAULT 0, char_count  INTEGER NOT NULL DEFAULT 0, byte_count  INTEGER NOT NULL DEFAULT 0, ai_sync_info TEXT NULL, changes_status TEXT NULL, review_base_content TEXT NULL, last_improve_instruction TEXT NULL, ai_instructions TEXT NULL, ai_settings TEXT,
       UNIQUE (parent_id, name)
     );
 
@@ -53,8 +53,7 @@ CREATE TABLE plan_nodes (
       type          TEXT NOT NULL DEFAULT 'text',
       x             REAL DEFAULT 0,
       y             REAL DEFAULT 0,
-      user_prompt   TEXT,
-      system_prompt TEXT,
+      ai_instructions TEXT,
       summary       TEXT,
       auto_summary  INTEGER DEFAULT 0,
       ai_sync_info  TEXT

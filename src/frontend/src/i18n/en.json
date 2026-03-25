@@ -76,6 +76,8 @@
   "settings.models.refreshing": "Refreshing…",
   "settings.models.none": "No models cached",
   "settings.summaryAiGenerationSettings.title": "Summary generation settings",
+  "settings.generateSummaryInstructions.title": "Summary generation instructions",
+  "settings.generateSummaryInstructions.description": "System prompt used for generating summaries. If empty, summary generation will be disabled.",
 
   "mergeNode.title": "Merge Node Settings",
   "mergeNode.inputs": "Inputs",
@@ -113,6 +115,7 @@
   "plan.repeat_improve": "Repeat improvement",
   "plan.userPrompt": "Generation instruction",
   "plan.systemPrompt": "System prompt",
+  "plan.aiInstructions": "AI instructions",
 
   "planGraph.addTextNode": "Add text node",
   "planGraph.addLoreNode": "Add lore node",
@@ -160,6 +163,7 @@
   "lore.accept_changes": "Accept changes",
   "lore.userPrompt": "Generation instruction",
   "lore.systemPrompt": "System prompt",
+  "lore.aiInstructions": "AI instructions",
 
   "thinking.generating": "Generating…",
   "thinking.reasoning": "Reasoning…",

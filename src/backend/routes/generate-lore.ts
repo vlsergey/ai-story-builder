@@ -29,7 +29,7 @@ const LORE_RESPONSE_SCHEMA: JsonSchemaSpec = {
 }
 
 export interface GenerateLoreParams {
-  prompt?: string
+  instructions?: string
   mode?: 'generate' | 'improve'
   baseContent?: string
   aiGenerationSettings?: AiGenerationSettings
@@ -49,9 +49,9 @@ export async function generateLore(
   cached_tokens?: number
   reasoning_tokens?: number
 }> {
-  const { prompt, mode, baseContent, aiGenerationSettings = {}, includeExistingLore = false } = params
+  const { instructions, mode, baseContent, aiGenerationSettings = {}, includeExistingLore = false } = params
   const responseSchema = LORE_RESPONSE_SCHEMA
-  if (!prompt?.trim()) throw makeError('prompt is required', 400)
+  if (!instructions?.trim()) throw makeError('instructions is required', 400)
 
   let engine: string | undefined
   let textLanguage: string | null
@@ -91,16 +91,6 @@ export async function generateLore(
     throw makeError(`Lore generation is not supported for engine '${engine}'`, 400)
   }
 
-  const systemPrompt = (mode === 'improve' && baseContent)
-    ? `You are a creative writing assistant. Improve the following lore item according to the user's instructions.\n` +
-      `Language: ${textLanguage}.\n` +
-      `Respond with a JSON object matching the provided schema. Refine the name only if necessary. ` +
-      `Output the full improved text in Markdown format — never omit or abbreviate any part of the text, even unchanged sections. No explanations, no preamble.\n\n` +
-      `Current text:\n<current_text>\n${baseContent}\n</current_text>`
-    : `You are a creative writing assistant. Generate a lore item for a story.\n` +
-      `Language: ${textLanguage}.\n` +
-      `Respond with a JSON object matching the provided schema. No explanations, no preamble.`
-
   let accumulated = ''
   let lastEmittedJson = ''
   const onDelta = (chunk: string) => {
@@ -114,8 +104,7 @@ export async function generateLore(
 
   const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
     {
-      prompt: prompt.trim(),
-      systemPrompt,
+      instructions: instructions!.trim(),
       includeExistingLore,
       aiGenerationSettings,
       engineFileIds,

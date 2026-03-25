@@ -12,13 +12,13 @@ function makeError(message: string, status: number): Error {
 }
 
 export async function generatePlayground(
-  params: { systemPrompt?: string; prompt?: string; settings?: AiGenerationSettings; includeExistingLore?: boolean },
+  params: { instructions?: string; settings?: AiGenerationSettings; includeExistingLore?: boolean },
   onThinking: (status: string, detail?: string) => void,
   onPartialJson: (data: Record<string, unknown>) => void,
 ): Promise<{ response_id?: string }> {
-  const { systemPrompt, prompt, settings = {}, includeExistingLore = false } = params
+  const { instructions, settings = {}, includeExistingLore = false } = params
 
-  if (!prompt?.trim()) throw makeError('prompt is required', 400)
+  if (!instructions?.trim()) throw makeError('instructions is required', 400)
 
   let engine: string | undefined
   const engineFileIds: string[] = []
@@ -57,8 +57,7 @@ export async function generatePlayground(
 
   const { response_id } = await adapter.generateResponse(
     {
-      prompt: prompt.trim(),
-      systemPrompt: systemPrompt?.trim() ?? '',
+      instructions: instructions.trim(),
       includeExistingLore,
       aiGenerationSettings: settings,
       engineFileIds,

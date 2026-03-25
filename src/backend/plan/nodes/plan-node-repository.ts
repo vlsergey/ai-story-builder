@@ -73,8 +73,7 @@ export class PlanNodeRepository {
       const x = data.x ?? 0
       const y = data.y ?? 0
       const content = data.content ?? null
-      const userPrompt = data.user_prompt ?? null
-      const systemPrompt = data.system_prompt ?? null
+      const aiInstructions = data.ai_instructions ?? null
       const summary = data.summary ?? null
       const autoSummary = data.auto_summary ?? 0
       const aiSyncInfo = data.ai_sync_info ?? null
@@ -91,12 +90,12 @@ export class PlanNodeRepository {
       const stmt = db.prepare(`
         INSERT INTO plan_nodes (
           parent_id, title, position, content,
-          type, x, y, user_prompt, system_prompt,
+          type, x, y, ai_instructions,
           summary, auto_summary, ai_sync_info, node_type_settings, ai_settings,
           word_count, char_count, byte_count, status,
           changes_status, review_base_content, last_improve_instruction
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `)
       const info = stmt.run(
@@ -107,8 +106,7 @@ export class PlanNodeRepository {
         type,
         x,
         y,
-        userPrompt,
-        systemPrompt,
+        aiInstructions,
         summary,
         autoSummary,
         aiSyncInfo,

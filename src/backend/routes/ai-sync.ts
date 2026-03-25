@@ -512,6 +512,8 @@ export async function syncLore(): Promise<{
     updatedConfig.yandex = rest
   }
 
+  SettingsRepository.saveAllAiEnginesConfig(updatedConfig)
+
   repo.deleteMarkedForDeletion()
 
   return {

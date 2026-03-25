@@ -11,11 +11,11 @@ import { SettingsRepository } from '../settings/settings-repository.js';
 export async function generateNodeContent(
   node: NodeData,
 ): Promise<string | null> {
-  console.log(`[generateNodeContent] node ${node.id} type ${node.type} prompt: ${node.user_prompt || node.title}`);
-  const prompt = node.user_prompt || node.title;
-  if (!prompt?.trim()) {
-    // No prompt, cannot generate
-    console.log(`[generateNodeContent] no prompt, returning null`);
+  console.log(`[generateNodeContent] node ${node.id} type ${node.type} instructions: ${node.ai_instructions || node.title}`);
+  const instructions = node.ai_instructions;
+  if (!instructions?.trim()) {
+    // No instructions, cannot generate
+    console.log(`[generateNodeContent] no instructions, returning null`);
     return null;
   }
 
@@ -23,10 +23,15 @@ export async function generateNodeContent(
   if (!currentEngine)
     throw Error("No AI engine configured")
 
-  const aiGenerationSettings: AiGenerationSettings = (node.ai_settings ? JSON.parse(node.ai_settings) : {})[currentEngine]
+  const defaultAiGenerationSettings = SettingsRepository.getCurrentEngineDefaultAiGenerationSettings()
+  const nodeAiSettings = node.ai_settings ? JSON.parse(node.ai_settings) : {}
+  const aiGenerationSettings: AiGenerationSettings = {
+    ...defaultAiGenerationSettings,
+    ...(nodeAiSettings[currentEngine] || {})
+  }
 
   const params = {
-    prompt: prompt.trim(),
+    instructions: instructions.trim(),
     mode: 'generate' as const,
     baseContent: node.content || undefined,
     aiGenerationSettings: aiGenerationSettings,

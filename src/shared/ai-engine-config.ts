@@ -15,6 +15,7 @@ export interface AiEngineConfig<EngineAiGenerationSettings extends AiGenerationS
   available_models?: string[]
   defaultAiGenerationSettings?: EngineAiGenerationSettings,
   summaryAiGenerationSettings?: EngineAiGenerationSettings,
+  generateSummaryInstructions?: string,
   [propName: string]: any
 }
 
@@ -23,6 +24,7 @@ export const getAiEngineConfigSchema = (engineDef: AiEngineDefinition) => z.obje
   available_models: z.array(z.string()).optional(),
   defaultAiGenerationSettings: getAiGenerationSettingsSchema(engineDef).optional(),
   summaryAiGenerationSettings: getAiGenerationSettingsSchema(engineDef).optional(),
+  generateSummaryInstructions: z.string().optional(),
   ...Object.fromEntries(
     (engineDef?.configFields || []).map(field => field.schema
       ? [field.key, field.schema.optional()]
