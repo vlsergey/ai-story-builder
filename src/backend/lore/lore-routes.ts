@@ -2,6 +2,7 @@ import fs from 'fs'
 import type { LoreTreeNode } from '../types/index.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 import { LoreNodeRow } from '../../shared/lore-node.js';
+import { loreEventManager } from './lore-event-manager.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ export function importLoreNode(data: { name: string; content: string; parentId: 
     char_count: charCount,
     byte_count: byteCount,
   })
+  loreEventManager.emitUpdate(Number(id))
   return { id }
 }
 
@@ -80,6 +82,7 @@ export function createLoreNode(data: { parent_id?: number | null; name: string }
     name: name.trim(),
     position: maxPos + 1,
   })
+  loreEventManager.emitUpdate(id)
   return { id }
 }
 
@@ -87,6 +90,7 @@ export function reorderLoreChildren(child_ids: number[]): { ok: boolean } {
   if (!Array.isArray(child_ids)) throw makeError('child_ids must be an array', 400)
   const repo = new LoreNodeRepository()
   repo.reorderChildren(child_ids)
+  child_ids.forEach(id => loreEventManager.emitUpdate(id))
   return { ok: true }
 }
 
@@ -184,6 +188,7 @@ export function patchLoreNode(
 
   if (Object.keys(updates).length > 0) {
     repo.update(id, updates)
+    loreEventManager.emitUpdate(id)
   }
 
   return hasContent
@@ -197,18 +202,21 @@ export function deleteLoreNode(id: number): { ok: boolean } {
   if (!node) throw makeError('node not found', 404)
   if (node.parent_id === null) throw makeError('root node cannot be deleted', 403)
   repo.markForDeletionRecursive(id)
+  loreEventManager.emitUpdate(id)
   return { ok: true }
 }
 
 export function restoreLoreNode(id: number): { ok: boolean } {
   const repo = new LoreNodeRepository()
   repo.restoreRecursive(id)
+  loreEventManager.emitUpdate(id)
   return { ok: true }
 }
 
 export function sortLoreChildren(id: number): { ok: boolean; sorted: number } {
   const repo = new LoreNodeRepository()
   const sorted = repo.sortChildrenByName(id)
+  loreEventManager.emitUpdate(id)
   return { ok: true, sorted }
 }
 
@@ -240,12 +248,14 @@ export function moveLoreNode(id: number, data: { parent_id?: number | null }): {
   }
 
   repo.updateParent(nodeId, newParentId)
+  loreEventManager.emitUpdate(nodeId)
   return { ok: true }
 }
 
 export function duplicateLoreNode(id: number): { id: number | bigint } {
   const repo = new LoreNodeRepository()
   const newId = repo.duplicate(id)
+  loreEventManager.emitUpdate(Number(newId))
   return { id: newId }
 }
 

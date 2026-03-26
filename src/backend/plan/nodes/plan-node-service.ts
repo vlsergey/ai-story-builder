@@ -3,6 +3,7 @@ import { PlanNodeRepository } from './plan-node-repository.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
 import { generateMergeContent } from '../../routes/merge-node.js'
 import { isValidNodeType } from '../../../shared/node-edge-dictionary.js'
+import { planNodeEventManager } from './plan-node-event-manager.js'
 
 export type NodeUpdateEvent = {
   nodeId: number
@@ -328,12 +329,12 @@ export class PlanNodeService {
     const oldNode = this.repo.getById(id)
     if (!oldNode) throw this.makeError('node not found', 404)
 
+    // Emit event before deletion so subscribers know the node is being removed
+    planNodeEventManager.emitUpdate(id)
+
     // Delete connected edges first (should be handled by foreign key, but we do it explicitly)
     // This is done by the repository's delete method.
     this.repo.delete(id)
-
-    // Emit event? The node is gone, maybe we need a 'node_deleted' event.
-    // For now, we'll not emit.
 
     return { ok: true }
   }
@@ -423,6 +424,8 @@ export class PlanNodeService {
     if (this.onNodeUpdated) {
       this.onNodeUpdated({ nodeId, updatedFields })
     }
+    // Emit event for tRPC subscriptions
+    planNodeEventManager.emitUpdate(nodeId)
   }
 
   private makeError(message: string, status: number): Error {

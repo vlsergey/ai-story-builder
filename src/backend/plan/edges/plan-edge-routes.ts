@@ -2,6 +2,7 @@ import type { PlanEdgeType, PlanEdgeRow } from '../../../shared/plan-graph.js'
 import { PlanEdgeRepository } from './plan-edge-repository.js'
 import { PlanNodeRepository } from '../nodes/plan-node-repository.js'
 import { isValidEdgeType, canCreateEdge, getEdgeTypeDefinition, EDGE_TYPES } from '../../../shared/node-edge-dictionary.js'
+import { planEdgeEventManager } from './plan-edge-event-manager.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ export function createGraphEdge(data: {
     label: label ?? null,
     template: template ?? null,
   })
+  planEdgeEventManager.emitUpdate(Number(id))
   return { id }
 }
 
@@ -112,6 +114,7 @@ export function patchGraphEdge(
   if (template !== undefined) updateFields.template = template ?? null
 
   edgeRepo.update(id, updateFields)
+  planEdgeEventManager.emitUpdate(id)
   return { ok: true }
 }
 
@@ -122,6 +125,7 @@ export function deleteGraphEdge(id: number): { ok: boolean } {
     throw makeError('edge not found', 404)
   }
   edgeRepo.delete(id)
+  planEdgeEventManager.emitUpdate(id)
   return { ok: true }
 }
 

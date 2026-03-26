@@ -10,6 +10,7 @@ import { trpc, ipcClient } from './ipcClient'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import superjson from 'superjson';
 import { ipcLink } from 'electron-trpc/renderer';
+import EventsListener from './EventsListener'
 
 const queryClient = new QueryClient();
 
@@ -100,6 +101,7 @@ export default function App() {
             </div>
           </LocaleProvider>
         </ThemeProvider>
+        <EventsListener />
       </QueryClientProvider>
     </trpc.Provider>
   )

@@ -4,6 +4,9 @@ import superjson from 'superjson';
 import { z } from 'zod';
 
 import { getAiBilling } from './routes/ai-billing.js';
+import { planNodeEventManager } from './plan/nodes/plan-node-event-manager.js';
+import { planEdgeEventManager } from './plan/edges/plan-edge-event-manager.js';
+import { loreEventManager } from './lore/lore-event-manager.js';
 
 // Project functions
 import {
@@ -115,6 +118,7 @@ export const appRouter = t.router({
     sortChildren: t.procedure.input(z.number()).mutation(({ input }) => sortLoreChildren(input)),
     reorderChildren: t.procedure.input(z.array(z.number())).mutation(({ input }) => reorderLoreChildren(input)),
     restore: t.procedure.input(z.number()).mutation(({ input }) => restoreLoreNode(input)),
+    subscribe: t.procedure.subscription(loreEventManager.asSubscription()),
   }),
 
   plan: t.router({
@@ -132,12 +136,14 @@ export const appRouter = t.router({
         .input((v) => v as ({id: number, data: PlanNodeUpdate}))
         .mutation(({ input }) => patchPlanNode(input.id, input.data)),
       startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() })).mutation(({ input }) => startPlanNodeReview(input.id, input.options)),
+      subscribe: t.procedure.subscription(planNodeEventManager.asSubscription()),
     }),
     edges: t.router({
       getAll: t.procedure.query(() => getPlanEdges()),
       create: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),
       patch: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => patchGraphEdge(input.id, input.data)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => deleteGraphEdge(input)),
+      subscribe: t.procedure.subscription(planEdgeEventManager.asSubscription()),
     }),
   }),
 
@@ -197,3 +203,4 @@ export const appRouter = t.router({
 });
 
 export type AppRouter = typeof appRouter;
+
