@@ -511,7 +511,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
           <FieldLabel>{tp('aiInstructions')}</FieldLabel>
         </FieldContent>
         <Textarea
-          className="flex-1 w-full"
+          className="flex-1 basis-auto min-h-[50px] [field-sizing:fixed]! resize-y! overflow-auto"
           value={aiInstructions}
           onChange={(e) => handleAiInstructionsChange(e.target.value)}
           placeholder={tp('aiInstructions')}
