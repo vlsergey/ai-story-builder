@@ -19,7 +19,6 @@ import {
 } from 'lucide-react'
 import { LoreNode, LoreStatMode } from '../types/models'
 import { useLoreSettings } from '../settings/lore-settings'
-import { LORE_NODE_SAVED_EVENT, LORE_TREE_REFRESH_EVENT, LoreNodeSavedDetail } from './lore-events'
 import { engineSupportsFileUpload } from '../lib/ai-engines'
 
 // ── Command system ────────────────────────────────────────────────────────────
@@ -114,16 +113,6 @@ function uniqueName(base: string, existingNames: string[]): string {
   let n = 2
   while (existingNames.includes(`${base} ${n}`)) n++
   return `${base} ${n}`
-}
-
-function patchNode(
-  nodes: LoreNode[], id: number, patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'ai_sync_info'>>
-): LoreNode[] {
-  return nodes.map(n => {
-    if (n.id === id) return { ...n, ...patch }
-    if (n.children?.length) return { ...n, children: patchNode(n.children, id, patch) }
-    return n
-  })
 }
 
 // ── Stats helpers ──────────────────────────────────────────────────────────────
@@ -243,30 +232,6 @@ export default function LoreTree({
   useEffect(() => { treeDataRef.current = tree }, [tree])
 
   useEffect(() => { fetchTree() }, [])
-
-  // Update a node's stats locally when LoreEditor saves content, without re-fetching the whole tree.
-  useEffect(() => {
-    function onNodeSaved(e: Event) {
-      const { id, name, wordCount, charCount, byteCount, aiSyncInfo } = (e as CustomEvent<LoreNodeSavedDetail>).detail
-      const patch: Partial<Pick<LoreNode, 'name' | 'word_count' | 'char_count' | 'byte_count' | 'ai_sync_info'>> = {}
-      if (name !== undefined) patch.name = name
-      if (wordCount !== undefined) patch.word_count = wordCount
-      if (charCount !== undefined) patch.char_count = charCount
-      if (byteCount !== undefined) patch.byte_count = byteCount
-      if (aiSyncInfo !== undefined) patch.ai_sync_info = aiSyncInfo
-      const next = patchNode(treeDataRef.current, id, patch)
-      setTree(next)
-      setItems(buildItemsMap(next))
-    }
-    window.addEventListener(LORE_NODE_SAVED_EVENT, onNodeSaved)
-    return () => window.removeEventListener(LORE_NODE_SAVED_EVENT, onNodeSaved)
-  }, [])
-
-  // Re-fetch the full tree when LoreWizard saves a new node.
-  useEffect(() => {
-    window.addEventListener(LORE_TREE_REFRESH_EVENT, fetchTree)
-    return () => window.removeEventListener(LORE_TREE_REFRESH_EVENT, fetchTree)
-  }, [])
 
   // Once the pending-rename item appears in `items`, select it and start rename
   useEffect(() => {

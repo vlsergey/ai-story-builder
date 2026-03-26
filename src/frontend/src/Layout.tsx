@@ -17,7 +17,6 @@ import AiBillingPanel from './ai/AiBillingPanel'
 import type { LoreNode } from './types/models'
 import { EditorSettingsProvider } from './settings/editor-settings'
 import { LoreSettingsProvider } from './settings/lore-settings'
-import { LORE_TREE_REFRESH_EVENT } from './lore/lore-events'
 import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from './lib/plan-graph-events'
 
 /**
@@ -134,7 +133,6 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   async function openLoreWizard(node: LoreNode) {
     try {
       const { id } = await ipcClient.lore.create.mutate({ parent_id: node.id, name: 'New lore item' })
-      window.dispatchEvent(new Event(LORE_TREE_REFRESH_EVENT))
       openLoreEditor({ id, name: 'New lore item', parent_id: node.id } as LoreNode)
     } catch { /* ignore */ }
   }

@@ -59,6 +59,7 @@ import {
 import { syncLore } from './routes/ai-sync.js'
 import { generateSummary } from './routes/generate-summary.js'
 import { AiEngineConfig, AllAiEnginesConfig } from '../shared/ai-engine-config.js';
+import { PlanNodeUpdate } from '../shared/plan-graph.js';
 
 // Generation placeholder (will be implemented later)
 const generationUpdatePart = async (id: number, data: any) => ({ ok: true });
@@ -118,13 +119,19 @@ export const appRouter = t.router({
 
   plan: t.router({
     nodes: t.router({
+      acceptReview: t.procedure.input(z.number()).mutation(({ input }) => acceptPlanNodeReview(input)),
+      // TODO: optimize via patchPlanNode vectorization
+      batchPatch: t.procedure
+        .input((v) => v as ({id: number, data: PlanNodeUpdate}[]))
+        .mutation(({ input }) => input.forEach( ({ id, data }) => patchPlanNode(id, data))),
+      create: t.procedure.input(z.any()).mutation(({ input }) => createPlanNode(input)),
+      delete: t.procedure.input(z.number()).mutation(({ input }) => deletePlanNode(input)),
       getAll: t.procedure.query(() => getPlanNodes()),
       get: t.procedure.input(z.number()).query(({ input }) => getPlanNode(input)),
-      create: t.procedure.input(z.any()).mutation(({ input }) => createPlanNode(input)),
-      patch: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => patchPlanNode(input.id, input.data)),
-      delete: t.procedure.input(z.number()).mutation(({ input }) => deletePlanNode(input)),
+      patch: t.procedure
+        .input((v) => v as ({id: number, data: PlanNodeUpdate}))
+        .mutation(({ input }) => patchPlanNode(input.id, input.data)),
       startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() })).mutation(({ input }) => startPlanNodeReview(input.id, input.options)),
-      acceptReview: t.procedure.input(z.number()).mutation(({ input }) => acceptPlanNodeReview(input)),
     }),
     edges: t.router({
       getAll: t.procedure.query(() => getPlanEdges()),

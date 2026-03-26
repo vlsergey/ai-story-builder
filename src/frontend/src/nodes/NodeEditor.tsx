@@ -8,7 +8,6 @@ import { useEditorSettings } from '../settings/editor-settings'
 import { useLocale } from '../lib/locale'
 import { generateNodeStream } from '../lib/generate-node-stream'
 import { dispatchAiCallCompleted } from '../lib/billing-events'
-import { dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import { preserveScrollOnExternalUpdate } from '../lib/codemirror-preserve-scroll'
 import DiffViewAndAccept from './DiffViewAndAccept'
 import type { AiGenerationSettings } from '../../../shared/ai-generation-settings'
@@ -33,17 +32,13 @@ export interface NodeEditorAdapter {
   /** Fetch a single node by id. */
   getNode: (id: number) => Promise<Record<string, unknown>>
   /** Patch a node and return updated stats. */
-  patchNode: (id: number, data: Record<string, unknown>) => Promise<{ ok: boolean; word_count?: number | null; char_count?: number | null; byte_count?: number | null; ai_sync_info?: Record<string, unknown> | null }>
+  patchNode: (id: number, data: Record<string, unknown>) => Promise<{ ok: boolean; ai_sync_info?: Record<string, unknown> | null }>
   /** Primary text field name in the API and partial-JSON stream */
   primaryField: 'name' | 'title'
   /** i18n key prefix: 'lore' or 'plan' */
   i18nPrefix: string
   /** Backend SSE endpoint for AI generation */
   generateEndpoint: string
-  /** Called after any successful node PATCH (content or primary field saved) */
-  onSaved: (payload: NodeSavedPayload) => void
-  /** Called after generate completes (e.g. dispatchPlanTreeRefresh) */
-  onAfterGenerate?: () => void
   /** Extra buttons rendered in the edit-mode footer (e.g. "split into children") */
   renderEditModeExtras?: (nodeId: number) => React.ReactNode
   /** Whether this adapter supports auto‑generation of summary on editor close */
@@ -173,6 +168,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     }
   }, [primaryValue, panelApi])
 
+  const generateSummary = trpc.ai.generateSummary.useMutation().mutate
+
   // ── Trigger summary generation on editor close ─────────────────────────────
   useEffect(() => {
     return () => {
@@ -184,13 +181,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
         dirtyRef.current
       ) {
         summaryTriggeredRef.current = true
-        // Fire and forget, but dispatch a graph refresh after a short delay
-        ipcClient.ai.generateSummary.mutate({ node_id: nodeId, content: contentRef.current || undefined })
-          .then(() => {
-            // Give the backend a moment to update the node, then refresh the graph
-            setTimeout(() => dispatchPlanGraphRefresh(), 2000)
-          })
-          .catch(() => {})
+        // Fire and forget
+        generateSummary({ node_id: nodeId, content: contentRef.current || undefined })
       }
     }
   }, [nodeId])
@@ -214,7 +206,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       adapter.patchNode(nodeId, { [adapter.primaryField]: trimmed }).then(() => {
         panelApi?.setTitle(trimmed)
         setPrimaryDirty(false)
-        adapter.onSaved({ nodeId, primaryValue: trimmed })
       }).catch(() => setPrimaryDirty(false))
     }, 1000)
   }
@@ -226,16 +217,8 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     if (contentTimerRef.current) clearTimeout(contentTimerRef.current)
     contentTimerRef.current = setTimeout(() => {
       adapter.patchNode(nodeId, { content: value })
-        .then((data) => {
-          setContentDirty(false)
-          adapter.onSaved({
-            nodeId,
-            wordCount: data.word_count ?? undefined,
-            charCount: data.char_count ?? undefined,
-            byteCount: data.byte_count ?? undefined,
-            aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
-          })
-        }).catch(() => setContentDirty(false))
+        .then(() => setContentDirty(false))
+        .catch(() => setContentDirty(false))
     }, 1000)
   }
 
@@ -327,15 +310,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       const data = await adapter.patchNode(nodeId, patchBody)
         if (data.ok) {
           if (finalPrimary.trim()) panelApi?.setTitle(finalPrimary.trim())
-          adapter.onSaved({
-            nodeId,
-            primaryValue: finalPrimary.trim() || undefined,
-            wordCount: data.word_count ?? undefined,
-            charCount: data.char_count ?? undefined,
-            byteCount: data.byte_count ?? undefined,
-            aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
-          })
-          adapter.onAfterGenerate?.()
         }
       }
       const { bytes, chars, words } = computeTextMetrics(finalContent);
@@ -411,14 +385,6 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
       const data = await adapter.patchNode(nodeId, patchBody)
       if (data.ok) {
         if (finalPrimary.trim()) panelApi?.setTitle(finalPrimary.trim())
-        adapter.onSaved({
-          nodeId,
-          primaryValue: finalPrimary.trim() || undefined,
-          wordCount: data.word_count ?? undefined,
-          charCount: data.char_count ?? undefined,
-          byteCount: data.byte_count ?? undefined,
-          aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
-        })
       }
 
       const { bytes, chars, words } = computeTextMetrics(finalContent);
@@ -447,16 +413,7 @@ export default function NodeEditor({ nodeId, panelApi, adapter }: NodeEditorProp
     // Accept review via IPC (plan nodes only)
     await ipcClient.plan.nodes.acceptReview.mutate(nodeId)
     // Update content via adapter
-    const data = await adapter.patchNode(nodeId, { content: contentToAccept })
-    if (data.ok) {
-      adapter.onSaved({
-        nodeId,
-        wordCount: data.word_count ?? undefined,
-        charCount: data.char_count ?? undefined,
-        byteCount: data.byte_count ?? undefined,
-        aiSyncInfo: data.ai_sync_info as Record<string, AiEngineSyncRecord> | null ?? null,
-      })
-    }
+    await adapter.patchNode(nodeId, { content: contentToAccept })
     setContent(contentToAccept)
     setEditorMode('edit')
     setReviewBaseContent('')

@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import NodeEditor, { type NodeEditorAdapter } from '../nodes/NodeEditor'
+import NodeEditor, { type NodeEditorAdapter } from './NodeEditor'
 import * as streamModule from '../lib/generate-node-stream'
 import * as planGraphEvents from '../lib/plan-graph-events'
 import { ipcClient, trpc } from '../ipcClient'
@@ -107,7 +107,6 @@ function makeAdapter(nodeData: Record<string, unknown> = emptyNode, overrides: P
     primaryField: 'name',
     i18nPrefix: 'lore',
     generateEndpoint: '/api/ai/generate-lore',
-    onSaved: vi.fn(),
     ...overrides,
   }
 }
@@ -301,9 +300,6 @@ describe('NodeEditor — auto‑summary generation', () => {
     expect(ipcClient.ai.generateSummary.mutate).toHaveBeenCalledWith(
       { node_id: 42, content: 'updated content' }
     )
-
-    // Expect dispatchPlanGraphRefresh to have been called (after a setTimeout of 2000 ms)
-    await waitFor(() => expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).toHaveBeenCalled(), { timeout: 3000 })
   })
 
   it('does NOT trigger summary generation when setting is disabled', async () => {
@@ -328,8 +324,6 @@ describe('NodeEditor — auto‑summary generation', () => {
 
     // No call to generateSummary
     expect(ipcClient.ai.generateSummary.mutate).not.toHaveBeenCalled()
-    // dispatchPlanGraphRefresh should not be called either
-    expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).not.toHaveBeenCalled()
   })
 
   it('does NOT trigger summary generation during AI streaming (only on unmount)', async () => {
@@ -401,8 +395,5 @@ describe('NodeEditor — auto‑summary generation', () => {
     expect(ipcClient.ai.generateSummary.mutate).toHaveBeenCalledWith(
       { node_id: 42, content: 'more partial content' }
     )
-
-    // dispatchPlanGraphRefresh should also be called after a delay
-    await waitFor(() => expect(vi.mocked(planGraphEvents.dispatchPlanGraphRefresh)).toHaveBeenCalled(), { timeout: 3000 })
   })
 })

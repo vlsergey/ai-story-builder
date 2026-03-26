@@ -1,6 +1,4 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { dispatchPlanNodeSaved } from '../lib/plan-events'
-import { dispatchPlanGraphRefresh } from '../lib/plan-graph-events'
 import NodeEditor, { type NodeEditorAdapter } from '../nodes/NodeEditor'
 import { ipcClient } from '../ipcClient'
 import { PlanNodeRow } from '@shared/plan-graph'
@@ -33,10 +31,6 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
     primaryField: 'title',
     i18nPrefix: 'plan',
     generateEndpoint: '/api/ai/generate-plan',
-    onSaved: ({ nodeId: id, primaryValue, wordCount, charCount, byteCount }) => {
-      dispatchPlanNodeSaved({ id, title: primaryValue, wordCount, charCount, byteCount })
-    },
-    onAfterGenerate: dispatchPlanGraphRefresh,
     supportsAutoSummary: true,
   }), [])
 
@@ -64,15 +58,7 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
           node={node}
           onUpdate={(content) => {
             // Update the node content (manual edit)
-            adapter.patchNode(nodeId, { content }).then(() => {
-              // Dispatch saved event
-              adapter.onSaved({
-                nodeId,
-                wordCount: undefined,
-                charCount: undefined,
-                byteCount: undefined
-              })
-            })
+            adapter.patchNode(nodeId, { content })
           }}
           panelApi={panelApi}
           onNodeUpdated={(updatedNode) => setNode(updatedNode)}
@@ -89,15 +75,7 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
           node={node}
           onUpdate={(content) => {
             // Update the node content (manual edit)
-            adapter.patchNode(nodeId, { content }).then(() => {
-              // Dispatch saved event
-              adapter.onSaved({
-                nodeId,
-                wordCount: undefined,
-                charCount: undefined,
-                byteCount: undefined
-              })
-            })
+            adapter.patchNode(nodeId, { content })
           }}
           panelApi={panelApi}
           onNodeUpdated={(updatedNode) => setNode(updatedNode)}
