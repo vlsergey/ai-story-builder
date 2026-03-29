@@ -1,7 +1,8 @@
 import type { AiGenerationSettings as AiGenerationSettingsDto } from '../../../shared/ai-generation-settings'
 
 export interface GenerateNodeOptions {
-  instructions: string
+  userPrompt: string
+  systemPrompt?: string
   aiGenerationSettings?: AiGenerationSettingsDto | null
   /** 'generate' (default) | 'improve' */
   mode?: 'generate' | 'improve'
@@ -56,7 +57,8 @@ export async function generateNodeStream(
 
     // Extract only serializable fields for backend
     const serializableParams = {
-      instructions: options.instructions,
+      userPrompt: options.userPrompt,
+      systemPrompt: options.systemPrompt,
       aiGenerationSettings: options.aiGenerationSettings,
       mode: options.mode,
       baseContent: options.baseContent,

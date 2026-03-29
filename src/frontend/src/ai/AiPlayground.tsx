@@ -37,7 +37,8 @@ export default function AiPlayground() {
 
     try {
       await generatePlaygroundStream({
-        instructions: instructions.trim(),
+        userPrompt: instructions.trim(),
+        systemPrompt: undefined,
         aiGenerationSettings: aiGenerationSettings || {},
         signal: abortRef.current.signal,
         onThinking: (status, detail) => {

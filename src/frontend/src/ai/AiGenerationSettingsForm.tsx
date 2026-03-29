@@ -76,22 +76,24 @@ function AiGenerationSettingsForm({ aiEngineDef, className, defaultAiGenerationS
   const switchId = useId()
 
   return (
-    <Accordion className={className} collapsible type="single" value={ overriden ? 'override' : '' }>
-      <AccordionItem value="override">
-        <AccordionTrigger>
-          <Field orientation="horizontal">
-            <Switch id={switchId} onCheckedChange={changeOverriden} checked={overriden}/>
-            <Label htmlFor={switchId}>{t('aiGenerationSettings.override')}</Label>
-          </Field>
-        </AccordionTrigger>
-        <AccordionContent>
-          <form onSubmit={handleSubmit(onChange)}>
-            <AiGenerationSettingsFieldGroup
-              engineId={aiEngineDef.id}
-              formControl={control} />
-          </form>
-        </AccordionContent>
-      </AccordionItem>
+    <Accordion asChild={true} collapsible value={ overriden ? 'override' : '' } type="single">
+      <div className={className}>
+        <AccordionItem value="override">
+          <AccordionTrigger>
+            <Field orientation="horizontal">
+              <Switch id={switchId} onCheckedChange={changeOverriden} checked={overriden}/>
+              <Label htmlFor={switchId}>{t('aiGenerationSettings.override')}</Label>
+            </Field>
+          </AccordionTrigger>
+          <AccordionContent>
+            <form onSubmit={handleSubmit(onChange)}>
+              <AiGenerationSettingsFieldGroup
+                engineId={aiEngineDef.id}
+                formControl={control} />
+            </form>
+          </AccordionContent>
+        </AccordionItem>
+      </div>
     </Accordion>
   )
 }

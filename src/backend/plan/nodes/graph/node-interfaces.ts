@@ -1,4 +1,4 @@
-import type { PlanNodeType, PlanEdgeType, PlanNodeStatus } from '../../../shared/plan-graph.js'
+import type { PlanEdgeType, PlanNodeRow } from '../../../../shared/plan-graph.js'
 
 /**
  * Interface for nodes that can produce a single text output (for 'text' edges).
@@ -15,24 +15,15 @@ export interface TextArrayOutputNode {
 }
 
 /**
- * Base node data.
- */
-export interface NodeData {
-  id: number
-  type: PlanNodeType
-  title: string
-  content: string | null
-  ai_instructions: string | null
-  node_type_settings: string | null
-  status: PlanNodeStatus,
-  ai_settings: string | null,
-}
-
-/**
  * Context passed to node instances for retrieving related data.
  */
 export interface NodeContext {
-  getNode(id: number): NodeData | undefined
+  getById(id: number): PlanNodeRow | undefined
   getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: PlanEdgeType }>
   getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: PlanEdgeType }>
+  getNodeInputsRaw(nodeId: number): Array<{
+    edgeType: PlanEdgeType
+    sourceNodeId: number
+    output: unknown
+  }>
 }

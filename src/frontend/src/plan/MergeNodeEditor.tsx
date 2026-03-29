@@ -89,11 +89,10 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanNodeRow | null> => {
     try {
       // Update the node with new node_type_settings (triggers regeneration)
-      await ipcClient.plan.nodes.patch.mutate({id: node.id, data: {
+      const updatedNode = await ipcClient.plan.nodes.patch.mutate({id: node.id, manual: false, data: {
         node_type_settings: JSON.stringify(newSettings)
       }});
       // Fetch updated node
-      const updatedNode = await ipcClient.plan.nodes.get.query(node.id);
       onNodeUpdated?.(updatedNode);
       return updatedNode;
     } catch (error) {
@@ -106,11 +105,9 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   const regenerateContent = useCallback(async () => {
     try {
       // Send current settings to trigger regeneration
-      await ipcClient.plan.nodes.patch.mutate({id: node.id, data: {
+      const updatedNode = await ipcClient.plan.nodes.patch.mutate({id: node.id, manual: false, data: {
         node_type_settings: JSON.stringify(settings)
       }});
-      // Fetch updated node
-      const updatedNode = await ipcClient.plan.nodes.get.query(node.id);
       onNodeUpdated?.(updatedNode);
     } catch (error) {
       console.error('Failed to regenerate content:', error);
@@ -381,7 +378,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
         onChange={(value) => {
           onUpdate(value)
           // Also update the node content via IPC
-          ipcClient.plan.nodes.patch.mutate({id: node.id, data: { content: value }})
+          ipcClient.plan.nodes.patch.mutate({id: node.id, manual: true, data: { content: value }})
         }}
       />
     </div>

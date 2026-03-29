@@ -5,6 +5,7 @@ import { migrateDatabase } from '../dist/backend/db/migrations.js'
 import { writeFileSync, copyFileSync, existsSync, mkdirSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { execSync } from 'child_process'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -80,6 +81,22 @@ function main() {
 
 ${schema}`)
     console.log(`Schema written to ${schemaPath}`)
+
+    // Format the SQL file with Prettier
+    try {
+      execSync(`npx prettier --write "${schemaPath}" --plugin prettier-plugin-sql`, { stdio: 'inherit' })
+      console.log('Formatted schema.sql with Prettier')
+    } catch (error) {
+      console.warn('Prettier formatting failed:', error instanceof Error ? error.message : error)
+      // Continue execution - formatting is non-critical
+    }
+
+    // Copy formatted schema to dist locations
+    const distSchemaPath = resolve(__dirname, '../dist/backend/db/schema.sql')
+    const distRootSchemaPath = resolve(__dirname, '../dist/schema.sql')
+    copyFileSync(schemaPath, distSchemaPath)
+    copyFileSync(schemaPath, distRootSchemaPath)
+    console.log(`Copied formatted schema to ${distSchemaPath} and ${distRootSchemaPath}`)
   } finally {
     db.close()
   }

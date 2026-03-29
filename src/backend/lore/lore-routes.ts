@@ -51,15 +51,15 @@ export function getLoreTree(): LoreTreeNode[] {
 
 // ── Import ─────────────────────────────────────────────────────────────────────
 
-export function importLoreNode(data: { name: string; content: string; parentId: number }): { id: number | bigint } {
-  const { name, content, parentId } = data
+export function importLoreNode(data: { title: string; content: string; parentId: number }): { id: number | bigint } {
+  const { title, content, parentId } = data
   const wordCount = countWords(content)
   const charCount = countChars(content)
   const byteCount = countBytes(content)
   const repo = new LoreNodeRepository()
   const id = repo.insert({
     parent_id: parentId,
-    name,
+    title,
     content,
     word_count: wordCount,
     char_count: charCount,
@@ -72,14 +72,14 @@ export function importLoreNode(data: { name: string; content: string; parentId: 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
 export function createLoreNode(data: { parent_id?: number | null; name: string }): { id: number } {
-  const { parent_id, name } = data
-  if (!name?.trim()) throw makeError('name required', 400)
+  const { parent_id, name: title } = data
+  if (!title?.trim()) throw makeError('name required', 400)
   const repo = new LoreNodeRepository()
   const pid = parent_id ?? null
   const maxPos = repo.getMaxPosition(pid)
   const id = repo.insert({
     parent_id: pid,
-    name: name.trim(),
+    title: title.trim(),
     position: maxPos + 1,
   })
   loreEventManager.emitUpdate(id)
@@ -104,11 +104,12 @@ export function getLoreNode(id: number): LoreNodeRow {
 export function patchLoreNode(
   id: number,
   data: {
-    name?: string
+    title?: string
     content?: string
     start_review?: boolean
     accept_review?: boolean
-    ai_instructions?: string | null
+    ai_user_prompt?: string | null
+    ai_system_prompt?: string | null
     ai_settings?: string | null
   }
 ): {
@@ -118,15 +119,16 @@ export function patchLoreNode(
   byte_count?: number | null
   ai_sync_info?: Record<string, Record<string, unknown>> | null
 } {
-  const { name, content, start_review, accept_review, ai_instructions, ai_settings } = data
-  const hasName = typeof name === 'string' && name.trim().length > 0
+  const { title: title, content, start_review, accept_review, ai_user_prompt, ai_system_prompt, ai_settings } = data
+  const hasName = typeof title === 'string' && title.trim().length > 0
   const hasContent = content !== undefined
-  const hasAiInstructions = ai_instructions !== undefined
+  const hasAiUserPrompt = ai_user_prompt !== undefined
+  const hasAiSystemPrompt = ai_system_prompt !== undefined
   const hasAiSettings = ai_settings !== undefined
   const hasStartReview = start_review === true
   const hasAcceptReview = accept_review === true
-  if (!hasName && !hasContent && !hasAiInstructions && !hasAiSettings && !hasStartReview && !hasAcceptReview) {
-    throw makeError('name or content required', 400)
+  if (!hasName && !hasContent && !hasAiUserPrompt && !hasAiSystemPrompt && !hasAiSettings && !hasStartReview && !hasAcceptReview) {
+    throw makeError('title or content required', 400)
   }
 
   const repo = new LoreNodeRepository()
@@ -134,7 +136,7 @@ export function patchLoreNode(
   if (!node) throw makeError('node not found', 404)
 
   const updates: Partial<LoreNodeRow> = {}
-  if (hasName) updates.name = name.trim()
+  if (hasName) updates.title = title.trim()
   let wordCount: number | null = null
   let charCount: number | null = null
   let byteCount: number | null = null
@@ -160,30 +162,34 @@ export function patchLoreNode(
     }
   }
 
-  if (hasAiInstructions) {
-    updates.ai_instructions = ai_instructions ?? null
+  if (hasAiUserPrompt) {
+    updates.ai_user_prompt = ai_user_prompt ?? null
+  }
+
+  if (hasAiSystemPrompt) {
+    updates.ai_system_prompt = ai_system_prompt ?? null
   }
 
   if (hasAiSettings) {
     updates.ai_settings = ai_settings ?? null
   }
 
-  if (hasAiInstructions && !start_review) {
-    updates.last_improve_instruction = ai_instructions ?? null
+  if (hasAiUserPrompt && !start_review) {
+    updates.ai_improve_instruction = ai_user_prompt ?? null
   }
 
   if (start_review && hasContent) {
-    updates.changes_status = 'review'
-    updates.last_improve_instruction = ai_instructions ?? null
-    if (node.changes_status !== 'review') {
+    updates.in_review = 1
+    updates.ai_improve_instruction = ai_user_prompt ?? null
+    if (node.in_review !== 1) {
       updates.review_base_content = node.content ?? ''
     }
   }
 
   if (accept_review) {
-    updates.changes_status = null
+    updates.in_review = 0
     updates.review_base_content = null
-    updates.last_improve_instruction = null
+    updates.ai_improve_instruction = null
   }
 
   if (Object.keys(updates).length > 0) {

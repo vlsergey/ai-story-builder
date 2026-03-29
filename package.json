@@ -36,6 +36,8 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^17.4.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-sql": "^0.20.0",
     "vite": "^8.0.0",
     "vitest": "^4.1.0",
     "wait-on": "^9.0.4"

@@ -42,7 +42,8 @@ function setupDb(opts?: {
     type: 'text' | 'lore' | 'split' | 'merge'
     title?: string
     content?: string | null
-    ai_instructions?: string | null
+    ai_user_prompt?: string | null
+    ai_system_prompt?: string | null
     status?: 'EMPTY' | 'GENERATED' | 'MANUAL' | 'OUTDATED' | 'ERROR'
     node_type_settings?: string | null
   }>
@@ -80,7 +81,8 @@ function setupDb(opts?: {
       title: n.title ?? 'Untitled',
       type: n.type,
       content: n.content ?? null,
-      ai_instructions: n.ai_instructions ?? null,
+      ai_user_prompt: n.ai_user_prompt ?? null,
+      ai_system_prompt: n.ai_system_prompt ?? null,
       status: n.status ?? 'EMPTY',
       node_type_settings: n.node_type_settings ?? null,
       parent_id: null,
@@ -88,15 +90,14 @@ function setupDb(opts?: {
       x: 0,
       y: 0,
       summary: null,
-      auto_summary: 0,
       ai_sync_info: null,
       ai_settings: null,
       word_count: 0,
       char_count: 0,
       byte_count: 0,
-      changes_status: null,
+      in_review: 0,
       review_base_content: null,
-      last_improve_instruction: null,
+      ai_improve_instruction: null,
     })
     // Note: inserted id will be auto-generated, but we cannot set it manually.
     // This may break tests that rely on specific ids.
@@ -154,7 +155,7 @@ describe('generateAll', () => {
   it('generates content for EMPTY text node', async () => {
     testDbPath = setupDb({
       nodes: [
-        { id: 1, type: 'text', title: 'Test', ai_instructions: 'Write about cats', status: 'EMPTY' },
+        { id: 1, type: 'text', title: 'Test', ai_user_prompt: 'Write about cats', status: 'EMPTY' },
       ],
     })
     // Mock AI generation to return some content
@@ -179,7 +180,7 @@ describe('generateAll', () => {
   it('skips MANUAL node when regenerateManual is false', async () => {
     testDbPath = setupDb({
       nodes: [
-        { id: 1, type: 'text', title: 'Manual', ai_instructions: 'Write about dogs', status: 'MANUAL' },
+        { id: 1, type: 'text', title: 'Manual', ai_user_prompt: 'Write about dogs', status: 'MANUAL' },
       ],
     })
     generatePlan.mockImplementation(async () => {})
@@ -194,7 +195,7 @@ describe('generateAll', () => {
   it('regenerates MANUAL node when regenerateManual is true', async () => {
     testDbPath = setupDb({
       nodes: [
-        { id: 1, type: 'text', title: 'Manual', ai_instructions: 'Write about dogs', status: 'MANUAL' },
+        { id: 1, type: 'text', title: 'Manual', ai_user_prompt: 'Write about dogs', status: 'MANUAL' },
       ],
     })
     generatePlan.mockImplementation(async (params, onThinking, onPartialJson) => {
@@ -218,8 +219,8 @@ describe('generateAll', () => {
   it('respects dependencies (topological order)', async () => {
     testDbPath = setupDb({
       nodes: [
-        { id: 1, type: 'text', title: 'A', ai_instructions: 'A', status: 'EMPTY' },
-        { id: 2, type: 'text', title: 'B', ai_instructions: 'B', status: 'EMPTY' },
+        { id: 1, type: 'text', title: 'A', ai_user_prompt: 'A', status: 'EMPTY' },
+        { id: 2, type: 'text', title: 'B', ai_user_prompt: 'B', status: 'EMPTY' },
       ],
       edges: [{ from_node_id: 1, to_node_id: 2 }],
     })
@@ -237,7 +238,7 @@ describe('generateAll', () => {
   it('calls generateSummary when auto_generate_summary is true', async () => {
     testDbPath = setupDb({
       nodes: [
-        { id: 1, type: 'text', title: 'Test', ai_instructions: 'Write about cats', status: 'EMPTY' },
+        { id: 1, type: 'text', title: 'Test', ai_user_prompt: 'Write about cats', status: 'EMPTY' },
       ],
       autoGenerateSummary: true,
     })
@@ -255,7 +256,7 @@ describe('generateAll', () => {
     testDbPath = setupDb({
       currentEngine: 'grok',
       nodes: [
-        { id: 1, type: 'text', title: 'Test', ai_instructions: 'Write about cats', status: 'EMPTY' },
+        { id: 1, type: 'text', title: 'Test', ai_user_prompt: 'Write about cats', status: 'EMPTY' },
       ],
     })
     // Override ai_config to include model using repository
@@ -278,7 +279,7 @@ describe('generateAll', () => {
   it('sets node status to ERROR when AI generation fails', async () => {
     testDbPath = setupDb({
       nodes: [
-        { id: 1, type: 'text', title: 'Test', ai_instructions: 'Write about cats', status: 'EMPTY' },
+        { id: 1, type: 'text', title: 'Test', ai_user_prompt: 'Write about cats', status: 'EMPTY' },
       ],
     })
     // Mock AI generation to throw an error

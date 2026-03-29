@@ -1,6 +1,6 @@
-import type { NodeData, NodeContext } from '../node-interfaces.js'
+import type { NodeContext } from './node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph.js'
+import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { MergeSettings } from '../../../../shared/node-settings.js'
 
 /**
@@ -25,50 +25,42 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     return 'text'
   }
 
-  getOutput(nodeData: NodeData): unknown {
+  getOutput(nodeData: PlanNodeRow): unknown {
     // Return the current content (which should be the merged content).
     return nodeData.content ?? ''
   }
 
-  async onContentChange(context: NodeContext, nodeData: NodeData, oldContent: string | null): Promise<void> {
-    // If merge node's own content changes? Usually merge node's content is generated.
-    // Do nothing.
-  }
-
-  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number, settings: MergeSettings): Promise<NodeData | null> {
+  async onInputContentChange(context: NodeContext, nodeData: PlanNodeRow, changedInputNodeId: number, settings: MergeSettings): Promise<PlanNodeUpdate | null> {
     // Check if auto‑update is enabled
     if (!settings.autoUpdate) {
       return null
     }
 
     // Regenerate merged content
-    const newContent = await this.regenerate(context, nodeData, settings)
-    if (newContent === null || newContent === nodeData.content) {
+    const patch = await this.regenerate(context, nodeData, settings)
+    if (!!patch?.content || patch?.content === nodeData.content) {
       // No change or generation failed
       return null
     }
 
     // Return updated node data
     return {
-      ...nodeData,
-      content: newContent,
+      content: patch?.content,
     }
   }
 
-  async regenerate(context: NodeContext, nodeData: NodeData, settings: MergeSettings): Promise<string | null> {
-    // Generate merged content using the existing logic.
-    return this.generateMergedContent(context, nodeData, settings)
+  onUpdate = async (context: NodeContext, nodeId: number, oldNode: PlanNodeRow | null, newNode: PlanNodeRow | null, settings: MergeSettings): Promise<PlanNodeUpdate | null> => {
+    if (!newNode || !settings.autoUpdate) {
+      return null
+    }
+    return await this.regenerate(context, newNode, settings)
   }
 
-  private async generateMergedContent(
-    context: NodeContext,
-    nodeData: NodeData,
-    settings: MergeSettings
-  ): Promise<string> {
-    const nodeTitle = nodeData.title
+  regenerate = async (context: NodeContext, node: PlanNodeRow, settings: MergeSettings): Promise<PlanNodeUpdate> => {
+    const nodeTitle = node.title
 
     // Fetch inputs (expanded)
-    const inputs = await this.getExpandedInputs(context, nodeData.id)
+    const inputs = await this.getExpandedInputs(context, node.id)
 
     let content = ''
 
@@ -98,7 +90,10 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
 
     // Remove trailing newlines
     content = content.trim()
-    return content
+
+    return {
+      content: content,
+    }
   }
 
   private async getExpandedInputs(context: NodeContext, nodeId: number): Promise<Array<{ title: string; content: string | null }>> {
@@ -107,7 +102,7 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     const inputs: Array<{ title: string; content: string | null }> = []
 
     for (const edge of edges) {
-      const sourceNode = context.getNode(edge.from_node_id)
+      const sourceNode = context.getById(edge.from_node_id)
       if (!sourceNode) continue
 
       if (edge.type === 'text') {

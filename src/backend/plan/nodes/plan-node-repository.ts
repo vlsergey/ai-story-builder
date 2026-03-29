@@ -1,4 +1,4 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow, PlanNodeStatus } from '../../../shared/plan-graph.js'
+import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow } from '../../../shared/plan-graph.js'
 import { withDbWrite, withDbRead } from '../../db/connection.js'
 
 /**
@@ -73,9 +73,9 @@ export class PlanNodeRepository {
       const x = data.x ?? 0
       const y = data.y ?? 0
       const content = data.content ?? null
-      const aiInstructions = data.ai_instructions ?? null
+      const aiUserPrompt = data.ai_user_prompt ?? null
+      const aiSystemPrompt = data.ai_system_prompt ?? null
       const summary = data.summary ?? null
-      const autoSummary = data.auto_summary ?? 0
       const aiSyncInfo = data.ai_sync_info ?? null
       const nodeTypeSettings = data.node_type_settings ?? null
       const aiSettings = data.ai_settings ?? null
@@ -83,19 +83,19 @@ export class PlanNodeRepository {
       const charCount = data.char_count ?? 0
       const byteCount = data.byte_count ?? 0
       const status = data.status ?? 'EMPTY'
-      const changesStatus = data.changes_status ?? null
+      const inReview = data.in_review ?? 0
       const reviewBaseContent = data.review_base_content ?? null
-      const lastImproveInstruction = data.last_improve_instruction ?? null
+      const aiImproveInstruction = data.ai_improve_instruction ?? null
 
       const stmt = db.prepare(`
         INSERT INTO plan_nodes (
           parent_id, title, position, content,
-          type, x, y, ai_instructions,
-          summary, auto_summary, ai_sync_info, node_type_settings, ai_settings,
+          type, x, y, ai_user_prompt, ai_system_prompt,
+          summary, ai_sync_info, node_type_settings, ai_settings,
           word_count, char_count, byte_count, status,
-          changes_status, review_base_content, last_improve_instruction
+          in_review, review_base_content, ai_improve_instruction
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `)
       const info = stmt.run(
@@ -106,9 +106,9 @@ export class PlanNodeRepository {
         type,
         x,
         y,
-        aiInstructions,
+        aiUserPrompt,
+        aiSystemPrompt,
         summary,
-        autoSummary,
         aiSyncInfo,
         nodeTypeSettings,
         aiSettings,
@@ -116,9 +116,9 @@ export class PlanNodeRepository {
         charCount,
         byteCount,
         status,
-        changesStatus,
+        inReview,
         reviewBaseContent,
-        lastImproveInstruction
+        aiImproveInstruction
       )
       return Number(info.lastInsertRowid)
     })
@@ -127,90 +127,21 @@ export class PlanNodeRepository {
   // ─── Update ──────────────────────────────────────────────────────────────────
 
   /**
-   * Update node content and statistics, optionally status.
-   */
-  updateContent(
-    id: number,
-    content: string | null,
-    options?: {
-      wordCount?: number
-      charCount?: number
-      byteCount?: number
-      status?: PlanNodeStatus
-    }
-  ): void {
-    return withDbWrite(db => {
-      const wordCount = options?.wordCount ?? (content ? this.countWords(content) : 0)
-      const charCount = options?.charCount ?? (content ? this.countChars(content) : 0)
-      const byteCount = options?.byteCount ?? (content ? this.countBytes(content) : 0)
-      const status = options?.status
-
-      if (status !== undefined) {
-        db.prepare(
-          `UPDATE plan_nodes SET content = ?, word_count = ?, char_count = ?, byte_count = ?, status = ? WHERE id = ?`
-        ).run(content, wordCount, charCount, byteCount, status, id)
-      } else {
-        db.prepare(`UPDATE plan_nodes SET content = ?, word_count = ?, char_count = ?, byte_count = ? WHERE id = ?`)
-          .run(content, wordCount, charCount, byteCount, id)
-      }
-    })
-  }
-
-  /**
-   * Update node status only.
-   */
-  updateStatus(id: number, status: PlanNodeStatus): void {
-    return withDbWrite(db => {
-      db.prepare('UPDATE plan_nodes SET status = ? WHERE id = ?').run(status, id)
-    })
-  }
-
-  /**
    * Update multiple fields of a node.
    * The fields object can contain any column of plan_nodes.
-   * Returns the number of rows changed.
+   * Returns updated object.
    */
-  update(id: number, fields: PlanNodeUpdate): number {
+  patch(id: number, fields: PlanNodeUpdate): PlanNodeRow | undefined {
     return withDbWrite(db => {
       const keys = Object.keys(fields) as (keyof typeof fields)[]
-      if (keys.length === 0) return 0
+      if (keys.length === 0) throw Error('Need at least one updated field')
+
       const setClause = keys.map(k => `${k} = ?`).join(', ')
       const values = keys.map(k => fields[k])
-      const stmt = db.prepare(`UPDATE plan_nodes SET ${setClause} WHERE id = ?`)
-      const info = stmt.run(...values, id)
-      return info.changes
+      const stmt = db.prepare(`UPDATE plan_nodes SET ${setClause} WHERE id = ? RETURNING *`)
+      return stmt.get(...values, id) as PlanNodeRow | undefined
     })
   }
-
-  /**
-   * Update summary and auto_summary.
-   */
-  updateSummary(id: number, summary: string | null, autoSummary: number): void {
-    return withDbWrite(db => {
-      db.prepare('UPDATE plan_nodes SET summary = ?, auto_summary = ? WHERE id = ?')
-        .run(summary, autoSummary, id)
-    })
-  }
-
-  /**
-   * Update node position.
-   */
-  updatePosition(id: number, position: number): void {
-    return withDbWrite(db => {
-      db.prepare('UPDATE plan_nodes SET position = ? WHERE id = ?').run(position, id)
-    })
-  }
-
-  /**
-   * Update parent_id.
-   */
-  updateParent(id: number, parentId: number | null): void {
-    return withDbWrite(db => {
-      db.prepare('UPDATE plan_nodes SET parent_id = ? WHERE id = ?').run(parentId, id)
-    })
-  }
-
-  // ─── Delete ──────────────────────────────────────────────────────────────────
 
   /**
    * Delete a node by ID (cascades to edges via foreign key, children via parent_id).
@@ -219,20 +150,5 @@ export class PlanNodeRepository {
     return withDbWrite(db => {
       db.prepare('DELETE FROM plan_nodes WHERE id = ?').run(id)
     })
-  }
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-  private countWords(text: string): number {
-    const t = text.trim()
-    return t === '' ? 0 : t.split(/\s+/).length
-  }
-
-  private countChars(text: string): number {
-    return [...text].length
-  }
-
-  private countBytes(text: string): number {
-    return Buffer.byteLength(text, 'utf8')
   }
 }

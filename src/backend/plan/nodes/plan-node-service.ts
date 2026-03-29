@@ -1,9 +1,20 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus } from '../../../shared/plan-graph.js'
+import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus, PlanEdgeType } from '../../../shared/plan-graph.js'
 import { PlanNodeRepository } from './plan-node-repository.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
-import { generateMergeContent } from '../../routes/merge-node.js'
 import { isValidNodeType } from '../../../shared/node-edge-dictionary.js'
 import { planNodeEventManager } from './plan-node-event-manager.js'
+import { NodeProcessor, NodeProcessorRegistry } from './graph/node-processor.js'
+import { TextProcessor } from './graph/text-processor.js'
+import { LoreProcessor } from './graph/lore-processor.js'
+import { SplitProcessor } from './graph/split-processor.js'
+import { MergeProcessor } from './graph/merge-processor.js'
+import type { NodeContext } from './graph/node-interfaces.js'
+import { mergeNodeSettings } from './graph/settings-helper.js'
+import { DataOrEventEvent, toObservable } from '../../lib/event-manager.js'
+import { improvePlanNodeContent } from '../../routes/improve-plan-node-content.js'
+import { ResponseStreamEvent } from 'openai/resources/responses/responses.js'
+import { generatePlanNodeTextContent } from '../../routes/generate-plan-node-text-content.js'
+import { Observable } from '@trpc/server/observable'
 
 export type NodeUpdateEvent = {
   nodeId: number
@@ -14,13 +25,18 @@ export type NodeUpdateEvent = {
  * Service for plan node operations.
  * Encapsulates business logic and emits events on changes.
  */
-export class PlanNodeService {
+export class PlanNodeService implements NodeContext {
   private readonly repo: PlanNodeRepository
+  private readonly processorRegistry: NodeProcessorRegistry
 
-  constructor(
-    private readonly onNodeUpdated?: (event: NodeUpdateEvent) => void
-  ) {
+  constructor() {
     this.repo = new PlanNodeRepository()
+    this.processorRegistry = new NodeProcessorRegistry()
+
+    this.processorRegistry.register(new TextProcessor())
+    this.processorRegistry.register(new LoreProcessor())
+    this.processorRegistry.register(new SplitProcessor())
+    this.processorRegistry.register(new MergeProcessor())
   }
 
   // ─── Basic CRUD ──────────────────────────────────────────────────────────────
@@ -39,6 +55,95 @@ export class PlanNodeService {
 
   count(): number {
     return this.repo.count()
+  }
+
+  getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: PlanEdgeType }> {
+    const edgeRepo = new PlanEdgeRepository()
+    const edges = edgeRepo.getByToNodeId(nodeId)
+    return edges.map(edge => ({ from_node_id: edge.from_node_id, type: edge.type }))
+  }
+
+  getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: PlanEdgeType }> {
+    const edgeRepo = new PlanEdgeRepository()
+    const edges = edgeRepo.getByFromNodeId(nodeId)
+    return edges.map(edge => ({ to_node_id: edge.to_node_id, type: edge.type }))
+  }
+
+  getProcessor(nodeType: PlanNodeType) {
+    return this.processorRegistry.getProcessor(nodeType)
+  }
+
+  getNodeSettings(node: PlanNodeRow): unknown {
+    const processor = this.getProcessor(node.type)
+    if (!processor) {
+      // No processor, return empty object
+      return {}
+    }
+    // processor.defaultSettings is of type unknown, but we know it's a Record<string, any>
+    return mergeNodeSettings(processor.defaultSettings as Record<string, any>, node.node_type_settings)
+  }
+
+  getNodeInputsRaw(nodeId: number): Array<{
+    edgeType: PlanEdgeType
+    sourceNodeId: number
+    output: unknown
+  }> {
+    const edges = this.getIncomingEdges(nodeId)
+    const inputs = []
+    for (const edge of edges) {
+      const sourceNode = this.getById(edge.from_node_id)
+      if (!sourceNode) continue
+      const processor = this.getProcessor(sourceNode.type)
+      if (!processor) continue
+      const output = processor.getOutput(sourceNode)
+      // Verify that the edge type matches the processor's output edge type
+      if (processor.getOutputEdgeType() !== edge.type) {
+        // This edge is not the output type of the source node, skip
+        continue
+      }
+      inputs.push({
+        edgeType: edge.type,
+        sourceNodeId: edge.from_node_id,
+        output,
+      })
+    }
+    // Sort by edge position? (not implemented)
+    return inputs
+  }
+
+  getNodeOutput(nodeId: number, edgeType: PlanEdgeType): unknown {
+    const node = this.getById(nodeId)
+    if (!node) throw new Error(`Node ${nodeId} not found`)
+    const processor = this.getProcessor(node.type)
+    if (!processor) throw new Error(`No processor for node type ${node.type}`)
+    const output = processor.getOutput(node)
+    // Verify that the requested edge type matches the processor's output edge type
+    if (processor.getOutputEdgeType() !== edgeType) {
+      throw new Error(`Node ${nodeId} does not produce edge type ${edgeType}`)
+    }
+    return output
+  }
+
+  /**
+   * Notify all downstream nodes that a node's content has changed.
+   * This calls each downstream node's onInputContentChange method (if defined).
+   * If the processor returns updated PlanNodeRow, the node will be updated (if content changed)
+   * and downstream notifications will propagate further.
+   */
+  async notifyDownstreamNodes(changedNodeId: number): Promise<void> {
+    const outgoingEdges = this.getOutgoingEdges(changedNodeId)
+    for (const edge of outgoingEdges) {
+      const downstreamNode = this.getById(edge.to_node_id)
+      if (!downstreamNode) continue
+      const processor = this.getProcessor(downstreamNode.type)
+      if (processor?.onInputContentChange) {
+        const settings = this.getNodeSettings(downstreamNode)
+        const planNodeUpdate = await processor.onInputContentChange(this, downstreamNode, changedNodeId, settings)
+        if (planNodeUpdate) {
+          await this.patch( downstreamNode.id, false, planNodeUpdate )
+        }
+      }
+    }
   }
 
   // ─── Create ──────────────────────────────────────────────────────────────────
@@ -69,265 +174,145 @@ export class PlanNodeService {
       byte_count: byteCount,
     })
 
-    this.emitNodeUpdated(id, {
-      id,
-      parent_id: data.parent_id ?? null,
-      title: data.title,
-      type: type,
-      status,
-    })
-
+    planNodeEventManager.emitUpdate(id)
     return { id }
   }
 
   // ─── Update ──────────────────────────────────────────────────────────────────
 
   /**
-   * Update node content and optionally status.
-   * If content is provided, word/char/byte counts are recalculated.
-   */
-  updateContent(
-    id: number,
-    content: string | null,
-    options?: {
-      status?: PlanNodeStatus
-      wordCount?: number
-      charCount?: number
-      byteCount?: number
-    }
-  ): void {
-    const oldNode = this.repo.getById(id)
-    if (!oldNode) throw this.makeError('node not found', 404)
-
-    this.repo.updateContent(id, content, options)
-
-    const updatedFields: Partial<PlanNodeRow> = { content }
-    if (options?.status) updatedFields.status = options.status
-    if (options?.wordCount !== undefined) updatedFields.word_count = options.wordCount
-    if (options?.charCount !== undefined) updatedFields.char_count = options.charCount
-    if (options?.byteCount !== undefined) updatedFields.byte_count = options.byteCount
-
-    this.emitNodeUpdated(id, updatedFields)
-    this.markDownstreamNodesAsOutdated(id)
-  }
-
-  /**
-   * Update node status only.
-   */
-  updateStatus(id: number, status: PlanNodeStatus): void {
-    const oldNode = this.repo.getById(id)
-    if (!oldNode) throw this.makeError('node not found', 404)
-
-    this.repo.updateStatus(id, status)
-    this.emitNodeUpdated(id, { status })
-  }
-
-  /**
    * Start a review for a node, optionally updating content and setting the improve instruction.
    * If content is provided, it will replace the current content.
    * Sets changes_status = 'review' and stores review_base_content if not already in review.
    */
-  startReview(
+  async startReview(
     id: number,
-    options?: {
-      prompt?: string
-      content?: string
-    }
-  ): void {
+    patch?: PlanNodeUpdate
+  ) : Promise<PlanNodeRow> {
     const oldNode = this.repo.getById(id)
     if (!oldNode) throw this.makeError('node not found', 404)
 
-    const updateFields: PlanNodeUpdate = {}
-    if (options?.prompt !== undefined) {
-      updateFields.last_improve_instruction = options.prompt ?? null
-    }
-    if (options?.content !== undefined) {
-      updateFields.content = options.content
-      updateFields.word_count = this.countWords(options.content)
-      updateFields.char_count = this.countChars(options.content)
-      updateFields.byte_count = this.countBytes(options.content)
-    }
-    updateFields.changes_status = 'review'
-    if (oldNode.changes_status !== 'review') {
-      updateFields.review_base_content = oldNode.content ?? ''
+    const updateFields: PlanNodeUpdate = {
+      ...patch,
+      in_review: 1,
     }
 
-    this.repo.update(id, updateFields)
-    this.emitNodeUpdated(id, updateFields)
-    // If content changed, mark downstream nodes as OUTDATED
-    if (options?.content !== undefined) {
-      this.markDownstreamNodesAsOutdated(id)
-    }
+    return await this.patch(id, true, updateFields)
   }
 
   /**
    * Accept the current review, clearing review state.
    */
-  acceptReview(id: number): void {
+  async acceptReview(id: number): Promise<PlanNodeRow> {
     const oldNode = this.repo.getById(id)
     if (!oldNode) throw this.makeError('node not found', 404)
 
-    const updateFields: Partial<PlanNodeRow> = {
-      changes_status: null,
+    return await this.patch(id, true, {
+      in_review: 0,
       review_base_content: null,
-      last_improve_instruction: null,
-    }
-    this.repo.update(id, updateFields)
-    this.emitNodeUpdated(id, updateFields)
-
-
-
-
+    })
   }
 
   /**
    * Update multiple fields of a node (generic patch).
    * Handles merge node regeneration if needed.
    */
-  patch(
-    id: number,
-    data: PlanNodeUpdate
-  ): { ok: boolean; word_count?: number | null; char_count?: number | null; byte_count?: number | null } {
-    const oldNode = this.repo.getById(id)
+  async patch(nodeId: number, manual: boolean, data: PlanNodeUpdate): Promise<PlanNodeRow> {
+    let oldNode = this.repo.getById(nodeId)
     if (!oldNode) throw this.makeError('node not found', 404)
 
-    const hasTitle = typeof data.title === 'string' && data.title.trim().length > 0
-    const hasContent = data.content !== undefined
-    const hasType = data.type !== undefined
-    const hasNodeTypeSettings = data.node_type_settings !== undefined
-    const willBeMerge = (hasType && data.type === 'merge') || (!hasType && oldNode.type === 'merge')
+    let update = {...data}
 
-    // Validate type if provided
-    if (hasType && !isValidNodeType(data.type!)) {
-      const valid = ['text', 'lore', 'merge', 'split'].join(', ')
-      throw this.makeError(`Invalid node type "${data.type}". Valid types: ${valid}`, 400)
-    }
-
-    // Determine if we should regenerate merge content
-    let generatedContent: string | null = null
-    let generatedWordCount: number | null = null
-    let generatedCharCount: number | null = null
-    let generatedByteCount: number | null = null
-
-    if (willBeMerge && !hasContent && (hasNodeTypeSettings || (hasType && data.type === 'merge'))) {
-      const defaultSettings = {
-        includeNodeTitle: false,
-        includeInputTitles: false,
-        fixHeaders: false,
-        autoUpdate: false,
-      }
-      let settings = defaultSettings
-      if (hasNodeTypeSettings) {
-        try {
-          settings = { ...defaultSettings, ...JSON.parse(data.node_type_settings!) }
-        } catch (_) {
-          // keep defaults
-        }
-      } else if (oldNode.node_type_settings) {
-        try {
-          settings = { ...defaultSettings, ...JSON.parse(oldNode.node_type_settings) }
-        } catch (_) {
-          // keep defaults
+    if (data.status !== undefined) {
+      console.log("In patch there is a requirement to change status to " + data.status + "")
+    } else {
+      if (update.content !== undefined) {
+        if (!update.content) {
+          console.log("Status will be changed to EMPTY because content is empty")
+          update.status = 'EMPTY'
+        } else {
+          if (manual) {
+            console.log("Status will be changed to MANUAL because content is not empty and manual is true")
+            update.status = 'MANUAL'
+          } else {
+            console.log("Status will be changed to GENERATED because content is not empty and manual is false")
+            update.status = 'GENERATED'
+          }
         }
       }
-      const nodeTitle = hasTitle ? data.title!.trim() : oldNode.title
-      try {
-        generatedContent = generateMergeContent(id, settings, nodeTitle)
-        generatedWordCount = this.countWords(generatedContent)
-        generatedCharCount = this.countChars(generatedContent)
-        generatedByteCount = this.countBytes(generatedContent)
-      } catch (_) {
-        // If generation fails (e.g., no inputs), leave content empty
-        generatedContent = ''
-        generatedWordCount = 0
-        generatedCharCount = 0
-        generatedByteCount = 0
-      }
     }
 
-    // Determine new status
-    let newStatus = oldNode.status
-    if (generatedContent !== null) {
-      newStatus = 'GENERATED'
-    } else if (hasContent) {
-      const content = data.content!
-      if (content === null || content.trim() === '') {
-        newStatus = 'EMPTY'
-      } else {
-        newStatus = 'MANUAL'
-      }
+    update = {
+      ...update,
+      ...(await this.mayBeInvokeOnUpdate(nodeId, oldNode, {...oldNode, ...update}))
     }
 
-    // Build update fields
-    const updateFields: Partial<PlanNodeRow> = {}
-    if (hasTitle) updateFields.title = data.title!.trim()
-    if (hasType) updateFields.type = data.type! as PlanNodeType
-    if (data.x !== undefined) updateFields.x = data.x
-    if (data.y !== undefined) updateFields.y = data.y
-    if (data.ai_instructions !== undefined) updateFields.ai_instructions = data.ai_instructions ?? null
-    if (data.summary !== undefined) updateFields.summary = data.summary ?? null
-    if (data.auto_summary !== undefined) updateFields.auto_summary = data.auto_summary ?? 0
-    if (hasNodeTypeSettings) updateFields.node_type_settings = data.node_type_settings ?? null
-    if (newStatus !== oldNode.status) updateFields.status = newStatus
+    const updated = Object.keys(update).length != 0
+      ? this.repo.patch(nodeId, update)
+      : oldNode
+    if (!updated) throw this.makeError('node not found', 404)
 
-    // Add generated merge content if any
-    if (generatedContent !== null) {
-      updateFields.content = generatedContent
-      updateFields.word_count = generatedWordCount!
-      updateFields.char_count = generatedCharCount!
-      updateFields.byte_count = generatedByteCount!
+    // Emit event to frontend
+    planNodeEventManager.emitUpdate(nodeId, 'patched keys: ' + Object.keys(data).join(', ') + '')
+
+    // If content changed, notify downstream nodes
+    if (update.content !== undefined) {
+      await this.notifyDownstreamNodes(nodeId)
     }
 
-    // Handle content update (user-provided)
-    let wordCount: number | null = null
-    let charCount: number | null = null
-    let byteCount: number | null = null
-    if (hasContent) {
-      updateFields.content = data.content!
-      wordCount = this.countWords(data.content!)
-      charCount = this.countChars(data.content!)
-      byteCount = this.countBytes(data.content!)
-      updateFields.word_count = wordCount
-      updateFields.char_count = charCount
-      updateFields.byte_count = byteCount
+    return updated
+  }
+
+  private async mayBeInvokeOnUpdate<
+    N extends (PlanNodeRow | null) = PlanNodeRow,
+    T extends Record<string, any> = Record<string, any>
+  >(
+    nodeId: number,
+    oldNode: PlanNodeRow | null,
+    newNode: N,
+  ): Promise<PlanNodeUpdate | null> {
+    const type = oldNode?.type ?? newNode?.type
+    if (!type) return null
+
+    const nodeProcessor = this.processorRegistry.getProcessor(type) as NodeProcessor<T>
+    const {defaultSettings, onUpdate} = nodeProcessor
+
+    const settings = newNode?.node_type_settings
+      ? mergeNodeSettings(defaultSettings, newNode.node_type_settings)
+      : defaultSettings
+
+    if (onUpdate) {
+      return await onUpdate(this, nodeId, oldNode, newNode, settings)
     }
+    return null
+  }
 
-    // Handle fields that are part of PlanNodeInsert
-    if (data.ai_settings !== undefined) updateFields.ai_settings = data.ai_settings ?? null
-    if (data.last_improve_instruction !== undefined) updateFields.last_improve_instruction = data.last_improve_instruction ?? null
-    if (data.changes_status !== undefined) updateFields.changes_status = data.changes_status ?? null
-    if (data.review_base_content !== undefined) updateFields.review_base_content = data.review_base_content ?? null
+  async regenerate<T extends Record<string, any> = Record<string, any>>(nodeId: number): Promise<PlanNodeRow> {
+    const node = this.repo.getById(nodeId)
+    if (!node) throw this.makeError('node not found', 404)
 
-    // Apply update
-    const changes = this.repo.update(id, updateFields)
-    if (changes === 0) {
-      // No fields changed (should not happen)
-      return { ok: true }
-    }
+    const nodeProcessor = this.processorRegistry.getProcessor(node.type) as NodeProcessor<T>
+    const {defaultSettings, regenerate} = nodeProcessor
+    if (!regenerate)
+      throw this.makeError('regenerate not supported by node type ' + node.type, 400)
 
-    // Emit event
-    this.emitNodeUpdated(id, updateFields)
+    const settings = node.node_type_settings
+      ? mergeNodeSettings(defaultSettings, node.node_type_settings)
+      : defaultSettings    
 
-    // If content changed, mark downstream nodes as OUTDATED
-    if (hasContent || generatedContent !== null) {
-      this.markDownstreamNodesAsOutdated(id)
-    }
-
-    const anyContent = hasContent || generatedContent !== null
-    const finalWordCount = hasContent ? wordCount : (generatedContent !== null ? generatedWordCount : null)
-    const finalCharCount = hasContent ? charCount : (generatedContent !== null ? generatedCharCount : null)
-    const finalByteCount = hasContent ? byteCount : (generatedContent !== null ? generatedByteCount : null)
-
-    return anyContent
-      ? { ok: true, word_count: finalWordCount, char_count: finalCharCount, byte_count: finalByteCount }
-      : { ok: true }
+    const patch = await regenerate(this, node, settings)
+    if (!patch) return node
+    return await this.patch(nodeId, false, patch)
   }
 
   // ─── Delete ──────────────────────────────────────────────────────────────────
 
-  delete(id: number): { ok: boolean } {
+  delete(id: number) {
     const oldNode = this.repo.getById(id)
     if (!oldNode) throw this.makeError('node not found', 404)
+
+    // Delete connected edges first
+    new PlanEdgeRepository().deleteByNodeId(id)
 
     // Emit event before deletion so subscribers know the node is being removed
     planNodeEventManager.emitUpdate(id)
@@ -339,9 +324,7 @@ export class PlanNodeService {
     return { ok: true }
   }
 
-  // ─── Move & Reorder ──────────────────────────────────────────────────────────
-
-  move(id: number, parentId: number | null): { ok: boolean } {
+  async move(id: number, parentId: number | null) {
     const oldNode = this.repo.getById(id)
     if (!oldNode) throw this.makeError('node not found', 404)
     if (oldNode.parent_id === null) throw this.makeError('root node cannot be moved', 403)
@@ -360,72 +343,15 @@ export class PlanNodeService {
       }
     }
 
-    this.repo.updateParent(id, parentId)
-    this.emitNodeUpdated(id, { parent_id: parentId })
-    return { ok: true }
+    this.patch(id, true, { parent_id: parentId })
   }
 
-  reorderChildren(childIds: number[]): { ok: boolean } {
+  async reorderChildren(childIds: number[]) {
     if (!Array.isArray(childIds)) throw this.makeError('child_ids must be an array', 400)
 
-    // Update positions in transaction (repository doesn't support transaction yet)
-    // For simplicity, we'll call updatePosition for each.
     childIds.forEach((id, index) => {
-      this.repo.updatePosition(id, index)
+      this.patch(id, true, { position: index })
     })
-
-    // Emit events for each node? Could batch.
-    childIds.forEach(id => {
-      this.emitNodeUpdated(id, { position: childIds.indexOf(id) })
-    })
-
-    return { ok: true }
-  }
-
-  /**
-   * Mark all downstream nodes (transitively reachable via outgoing edges) as OUTDATED
-   * if their current status is GENERATED.
-   * This should be called whenever a node's content changes.
-   */
-  private markDownstreamNodesAsOutdated(nodeId: number): void {
-    const edgeRepo = new PlanEdgeRepository()
-    const visited = new Set<number>()
-    const queue: number[] = [nodeId]
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()!
-      if (visited.has(currentId)) continue
-      visited.add(currentId)
-
-      // Get outgoing edges
-      const outgoingEdges = edgeRepo.getByFromNodeId(currentId)
-      for (const edge of outgoingEdges) {
-        const downstreamId = edge.to_node_id
-        if (!visited.has(downstreamId)) {
-          queue.push(downstreamId)
-        }
-      }
-    }
-
-    // Now visited contains all downstream nodes (including the original node)
-    // For each downstream node (excluding the original node), update status if GENERATED
-    for (const downstreamId of visited) {
-      if (downstreamId === nodeId) continue
-      const node = this.repo.getById(downstreamId)
-      if (node && node.status === 'GENERATED') {
-        this.updateStatus(downstreamId, 'OUTDATED')
-      }
-    }
-  }
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-  private emitNodeUpdated(nodeId: number, updatedFields: Partial<PlanNodeRow>): void {
-    if (this.onNodeUpdated) {
-      this.onNodeUpdated({ nodeId, updatedFields })
-    }
-    // Emit event for tRPC subscriptions
-    planNodeEventManager.emitUpdate(nodeId)
   }
 
   private makeError(message: string, status: number): Error {
@@ -446,4 +372,52 @@ export class PlanNodeService {
   private countBytes(text: string): number {
     return Buffer.byteLength(text, 'utf8')
   }
+
+  aiGenerate(nodeId: number): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
+    const node = this.getById(nodeId);
+    if (!node) throw this.makeError(`node ${nodeId} not found`, 404);
+
+    return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
+      const newContent = await generatePlanNodeTextContent(node, (event) => {
+        emit.next({ type: 'event', event });
+      });
+
+      const newNode = await this.patch(nodeId, false, {
+        status: 'GENERATED',
+        content: newContent,
+        in_review: (newContent?.trim()?.length || 0) > 0 ? 1 : 0,
+        review_base_content: node.content,
+      });
+
+      emit.next({ type: 'data', data: newNode });      
+      emit.next({ type: 'completed' });
+    });
+  }
+
+  aiImprove(nodeId: number): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
+    const node = this.getById(nodeId);
+    if (!node) throw this.makeError(`node ${nodeId} not found`, 404);
+
+    return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
+      const { oldNode, newContent } = await improvePlanNodeContent(nodeId, (event) => {
+        emit.next({ type: 'event', event });
+      });
+
+      const newNode = await this.patch(nodeId, true, {
+        status: 'MANUAL',
+        content: newContent,
+        in_review: ((oldNode.content?.trim?.()?.length || 0) > 0) ? 1 : 0,
+        review_base_content: oldNode.content,
+      });
+
+      emit.next({ type: 'data', data: newNode });      
+      emit.next({ type: 'completed' });
+    });
+  }
+}
+
+export interface PlanNodeSubscriptionEvent {
+  
+  event: ResponseStreamEvent,
+
 }

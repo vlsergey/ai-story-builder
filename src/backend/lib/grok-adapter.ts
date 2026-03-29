@@ -3,14 +3,14 @@ import type { GrokAiGenerationSettings } from '../../shared/grok-ai-generation-s
 import { grokGenerate } from './grok-client.js'
 import { SettingsRepository } from '../settings/settings-repository.js';
 import { GROK_ENGINE_DEF as engineDef } from '../../shared/ai-engines.js';
+import OpenAI from 'openai';
+import { ResponseCreateParamsStreaming, ResponseInputMessageContentList } from 'openai/resources/responses/responses.js';
 
 export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
   async generateResponse(
     req: GenerateResponseRequest<GrokAiGenerationSettings>,
-    onThinking: (status: string, detail?: string) => void,
-    onDelta: (text: string) => void,
-  ): Promise<{ response_id?: string; tokensInput?: number; tokensOutput?: number; tokensTotal?: number; cachedTokens?: number; reasoningTokens?: number; costUsdTicks?: number }> {
-
+    onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
+  ): Promise<string> {
     const engineConfig = SettingsRepository.getAllAiEnginesConfig().grok ?? {}
 
     const apiKey = engineConfig.api_key?.trim()
@@ -21,19 +21,22 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       ...req.aiGenerationSettings,
     }
 
-    const maxFiles = engineDef.maxFilesPerRequest ?? 10
-    const attachableFileIds = req.engineFileIds.slice(0, maxFiles)
-    const userContent: Array<{ type: 'input_file'; file_id: string }> = []
-    if (req.includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
-      for (const fileId of attachableFileIds) {
-        userContent.push({ type: 'input_file', file_id: fileId })
-      }
-    }
+    // const maxFiles = engineDef.maxFilesPerRequest ?? 10
+    // const attachableFileIds = req.engineFileIds.slice(0, maxFiles)
+    // const userContent: ResponseInputMessageContentList = []
+    // if (req.includeExistingLore && engineDef.capabilities.fileAttachment && attachableFileIds.length > 0) {
+    //   for (const fileId of attachableFileIds) {
+    //     userContent.push({ type: 'input_file', file_id: fileId })
+    //   }
+    // }
+    // if (req.userPrompt) {
+    //   // userContent.push({ type: 'input_text', text: req.userPrompt })
+    // }
 
-    const requestParams: Record<string, unknown> = {
+    const requestParams : Omit<ResponseCreateParamsStreaming, 'stream'> = {
       model: actualAiSettings.model,
-      instructions: req.instructions,
-      input: userContent.length > 0 ? [{ role: 'user', content: userContent }] : [],
+      instructions: req.systemPrompt ?? '',
+      input: req.userPrompt || '',
       max_output_tokens: onlyIfPositiveNumber(actualAiSettings.max_output_tokens),
       temperature: onlyIfPositiveNumber(actualAiSettings.temperature),
       top_p: onlyIfPositiveNumber(actualAiSettings.top_p),
@@ -53,10 +56,7 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       }
     }
 
-    onThinking('generating')
-    const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await grokGenerate(apiKey, requestParams, onThinking, onDelta)
-    onThinking('done')
-    return { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks }
+    return await grokGenerate(apiKey, requestParams, onEvent)
   }
 }
 

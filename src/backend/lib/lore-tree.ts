@@ -9,7 +9,7 @@
 export interface LoreNodeForCollapse {
   id: number
   parent_id: number | null
-  name: string
+  title: string
   content: string | null
   word_count: number
   to_be_deleted: number
@@ -19,7 +19,7 @@ export interface CollapsedGroup {
   /** The level-2 node ID (direct child of root), or the root ID for the root group. */
   level2NodeId: number
   /** The level-2 node name, or the root name for the root group. */
-  level2NodeName: string
+  level2NodeTitle: string
   /**
    * Concatenated markdown content for the group.
    * Each included node is separated by a horizontal rule and preceded by a heading.
@@ -96,8 +96,8 @@ export function collapseLoreTree(
   if (rootHasContent) {
     groups.push({
       level2NodeId: rootRow.id,
-      level2NodeName: rootRow.name,
-      content: `# ${rootRow.name}\n\n${rootRow.content!}`,
+      level2NodeTitle: rootRow.title,
+      content: `# ${rootRow.title}\n\n${rootRow.content!}`,
       allNodeIds: [rootRow.id],
       hasContent: true,
     })
@@ -113,12 +113,12 @@ export function collapseLoreTree(
   ): void {
     const row = idToRow.get(nodeId)!
     allNodeIds.push(nodeId)
-    const currentPath = [...ancestorPath, row.name]
+    const currentPath = [...ancestorPath, row.title]
 
     if (row.to_be_deleted === 0 && row.word_count > 0 && row.content) {
       const heading = '#'.repeat(depth)
       // From depth 2 onwards include ancestor breadcrumbs in the heading
-      const headingText = depth >= 2 ? currentPath.join(' / ') : row.name
+      const headingText = depth >= 2 ? currentPath.join(' / ') : row.title
       contentParts.push(`${heading} ${headingText}\n\n${row.content}`)
     }
 
@@ -137,7 +137,7 @@ export function collapseLoreTree(
     const content = contentParts.join('\n\n---\n\n')
     groups.push({
       level2NodeId: l2Id,
-      level2NodeName: l2Row.name,
+      level2NodeTitle: l2Row.title,
       content,
       allNodeIds,
       hasContent: content.length > 0,

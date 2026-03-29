@@ -95,10 +95,9 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Save settings
   const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanNodeRow | null> => {
     try {
-      await ipcClient.plan.nodes.patch.mutate({ id: node.id, data: {
+      const updatedNode = await ipcClient.plan.nodes.patch.mutate({ id: node.id, manual: true, data: {
         node_type_settings: JSON.stringify(newSettings)
       }})
-      const updatedNode = await ipcClient.plan.nodes.get.query(node.id)
       onNodeUpdated?.(updatedNode)
       return updatedNode
     } catch (error) {
@@ -109,42 +108,9 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
 
   // Regenerate split parts based on input text and settings
   const regenerateParts = useCallback(async () => {
-    if (!inputText) return
-    let splitParts: string[] = []
-    if (settings.strategy === 'separator') {
-      splitParts = inputText.split(settings.separator)
-    } else {
-      // regexp strategy
-      try {
-        const regex = new RegExp(settings.separator, 'g')
-        splitParts = inputText.split(regex)
-      } catch (_error) {
-        // fallback to literal split
-        splitParts = inputText.split(settings.separator)
-      }
-    }
-    // Apply dropFirst and dropLast
-    let filteredParts = splitParts
-    if (settings.dropFirst > 0) {
-      filteredParts = filteredParts.slice(settings.dropFirst)
-    }
-    if (settings.dropLast > 0) {
-      filteredParts = filteredParts.slice(0, -settings.dropLast)
-    }
-    // Convert to SplitPart objects with default titles
-    const newParts: SplitPart[] = filteredParts.map((content, index) => ({
-      title: `Part ${index + 1}`,
-      content: content.trim()
-    }))
-    setParts(newParts)
-    // Update node content with JSON array
-    const newContent = JSON.stringify(newParts, null, 2)
-    await ipcClient.plan.nodes.patch.mutate({id: node.id, data: { content: newContent }})
-    onUpdate(newContent)
-    // Fetch updated node
-    const updatedNode = await ipcClient.plan.nodes.get.query(node.id)
+    const updatedNode = await ipcClient.plan.nodes.regenerate.mutate(node.id)
     onNodeUpdated?.(updatedNode)
-  }, [inputText, settings, node.id, onUpdate, onNodeUpdated])
+  }, [node.id, onNodeUpdated])
 
   // Debounced save settings
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -204,7 +170,7 @@ export default function SplitNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
   // Handle content change via JSON editor
   function handleContentChange(value: string) {
     onUpdate(value)
-    ipcClient.plan.nodes.patch.mutate({id: node.id, data: { content: value }})
+    ipcClient.plan.nodes.patch.mutate({id: node.id, manual: true, data: { content: value }})
   }
 
   return (

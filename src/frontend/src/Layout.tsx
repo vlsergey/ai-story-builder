@@ -105,7 +105,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       id: panelId,
       component: 'lore-editor',
       tabComponent: 'loreEditorTab',
-      title: node.name,
+      title: node.title,
       params: { nodeId: node.id },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
@@ -133,7 +133,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   async function openLoreWizard(node: LoreNode) {
     try {
       const { id } = await ipcClient.lore.create.mutate({ parent_id: node.id, name: 'New lore item' })
-      openLoreEditor({ id, name: 'New lore item', parent_id: node.id } as LoreNode)
+      openLoreEditor({ id, title: 'New lore item', parent_id: node.id } as LoreNode)
     } catch { /* ignore */ }
   }
 

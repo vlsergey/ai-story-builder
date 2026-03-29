@@ -56,7 +56,7 @@ function setupDb(opts?: {
   nodes?: Array<{
     id?: number
     parent_id?: number | null
-    name: string
+    title: string
     content?: string | null
     word_count?: number
     to_be_deleted?: number
@@ -101,7 +101,7 @@ function setupDb(opts?: {
     repo.insert({
       id: n.id ?? autoId++,
       parent_id: n.parent_id ?? null,
-      name: n.name,
+      title: n.title,
       content: n.content ?? null,
       word_count: n.word_count ?? 0,
       to_be_deleted: n.to_be_deleted ?? 0,
@@ -169,14 +169,14 @@ describe('syncLore', () => {
       folderId: 'b1g123',
       nodes: [
         {
-          name: 'Chapter 1',
+          title: 'Chapter 1',
           content: 'Some content here',
           word_count: 3,
           to_be_deleted: 0,
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: syncedAt, file_id: 'f1', content_updated_at: syncedAt } }),
         },
         {
-          name: 'Chapter 2',
+          title: 'Chapter 2',
           content: 'More content here',
           word_count: 3,
           to_be_deleted: 0,
@@ -205,7 +205,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 42,
-          name: 'Dragon Lore',
+          title: 'Dragon Lore',
           content: 'Dragons are ancient creatures',
           word_count: 4,
           to_be_deleted: 0,
@@ -255,7 +255,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 10,
-          name: 'World History',
+          title: 'World History',
           content: 'Long history text',
           word_count: 3,
           to_be_deleted: 0,
@@ -281,7 +281,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 20,
-          name: 'Magic System',
+          title: 'Magic System',
           content: 'Updated magic rules',
           word_count: 3,
           to_be_deleted: 0,
@@ -315,7 +315,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 30,
-          name: 'Deleted Chapter',
+          title: 'Deleted Chapter',
           content: 'Old content',
           word_count: 2,
           to_be_deleted: 1,
@@ -347,7 +347,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 31,
-          name: 'Never Synced Node',
+          title: 'Never Synced Node',
           content: '',
           word_count: 0,
           to_be_deleted: 1,
@@ -376,7 +376,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 40,
-          name: 'Empty Node',
+          title: 'Empty Node',
           content: '',
           word_count: 0,
           to_be_deleted: 0,
@@ -410,7 +410,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 50,
-          name: 'World Building',
+          title: 'World Building',
           content: 'The world is vast',
           word_count: 4,
           to_be_deleted: 0,
@@ -447,7 +447,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 60,
-          name: 'Removed Chapter',
+          title: 'Removed Chapter',
           content: 'Content',
           word_count: 1,
           to_be_deleted: 1,
@@ -478,8 +478,8 @@ describe('syncLore', () => {
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
-        { id: 1, name: 'Characters', content: 'Hero is brave', word_count: 3, to_be_deleted: 0, ai_sync_info: null },
-        { id: 2, name: 'Locations', content: 'Dark forest', word_count: 2, to_be_deleted: 0, ai_sync_info: null },
+        { id: 1, title: 'Characters', content: 'Hero is brave', word_count: 3, to_be_deleted: 0, ai_sync_info: null },
+        { id: 2, title: 'Locations', content: 'Dark forest', word_count: 2, to_be_deleted: 0, ai_sync_info: null },
       ],
     })
 
@@ -525,7 +525,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 70,
-          name: 'New Node',
+          title: 'New Node',
           content: 'Some content',
           word_count: 2,
           to_be_deleted: 0,
@@ -548,7 +548,7 @@ describe('syncLore', () => {
       nodes: [
         {
           id: 80,
-          name: 'Long Node',
+          title: 'Long Node',
           content: 'Some content',
           word_count: 2,
           to_be_deleted: 0,
@@ -581,14 +581,14 @@ describe('syncLore', () => {
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
       nodes: [
-        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
+        { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
         {
-          id: 2, parent_id: 1, name: 'Deleted Category', content: 'some text', word_count: 2,
+          id: 2, parent_id: 1, title: 'Deleted Category', content: 'some text', word_count: 2,
           to_be_deleted: 1,
           ai_sync_info: JSON.stringify({ grok: { file_id: 'grok-del-file', last_synced_at: '2025-01-01T00:00:00.000Z', content_updated_at: '2025-01-01T00:00:00.000Z' } }),
         },
         {
-          id: 3, parent_id: 1, name: 'Never Synced Deleted', content: '', word_count: 0,
+          id: 3, parent_id: 1, title: 'Never Synced Deleted', content: '', word_count: 0,
           to_be_deleted: 1,
           ai_sync_info: null,
         },
@@ -607,9 +607,9 @@ describe('syncLore', () => {
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
       nodes: [
-        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
-        { id: 2, parent_id: 1,    name: 'Characters', content: 'General info', word_count: 2 },
-        { id: 3, parent_id: 2,    name: 'Hero',       content: 'A brave hero',  word_count: 3 },
+        { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
+        { id: 2, parent_id: 1,    title: 'Characters', content: 'General info', word_count: 2 },
+        { id: 3, parent_id: 2,    title: 'Hero',       content: 'A brave hero',  word_count: 3 },
       ],
     })
 
@@ -641,13 +641,13 @@ describe('syncLore', () => {
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
       nodes: [
-        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
+        { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
         {
-          id: 2, parent_id: 1, name: 'Characters', content: 'Info', word_count: 1,
+          id: 2, parent_id: 1, title: 'Characters', content: 'Info', word_count: 1,
           ai_sync_info: JSON.stringify({ grok: { file_id: 'grok-f1', last_synced_at: syncedAt, content_updated_at: syncedAt } }),
         },
         {
-          id: 3, parent_id: 2, name: 'Hero', content: 'Hero text', word_count: 2,
+          id: 3, parent_id: 2, title: 'Hero', content: 'Hero text', word_count: 2,
           ai_sync_info: JSON.stringify({ grok: { merged_into_parent: true, last_synced_at: syncedAt, content_updated_at: syncedAt } }),
         },
       ],
@@ -665,13 +665,13 @@ describe('syncLore', () => {
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
       nodes: [
-        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
+        { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
         {
-          id: 2, parent_id: 1, name: 'Characters', content: 'Info', word_count: 1,
+          id: 2, parent_id: 1, title: 'Characters', content: 'Info', word_count: 1,
           ai_sync_info: JSON.stringify({ grok: { file_id: 'old-file', last_synced_at: syncedAt, content_updated_at: syncedAt } }),
         },
         {
-          id: 3, parent_id: 2, name: 'Hero', content: 'Updated hero text', word_count: 3,
+          id: 3, parent_id: 2, title: 'Hero', content: 'Updated hero text', word_count: 3,
           ai_sync_info: JSON.stringify({ grok: { merged_into_parent: true, last_synced_at: syncedAt, content_updated_at: updatedAt } }),
         },
       ],
@@ -698,13 +698,13 @@ describe('syncLore', () => {
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
       nodes: [
-        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
+        { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
         {
-          id: 2, parent_id: 1, name: 'Characters', content: 'Info', word_count: 1,
+          id: 2, parent_id: 1, title: 'Characters', content: 'Info', word_count: 1,
           ai_sync_info: JSON.stringify({ grok: { file_id: 'existing-file', last_synced_at: syncedAt, content_updated_at: syncedAt } }),
         },
         // New child added after the last sync — no grok entry
-        { id: 3, parent_id: 2, name: 'Villain', content: 'Newly added villain', word_count: 3, ai_sync_info: null },
+        { id: 3, parent_id: 2, title: 'Villain', content: 'Newly added villain', word_count: 3, ai_sync_info: null },
       ],
     })
 
@@ -721,9 +721,9 @@ describe('syncLore', () => {
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
       nodes: [
-        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
+        { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
         {
-          id: 2, parent_id: 1, name: 'EmptyCategory', content: '', word_count: 0,
+          id: 2, parent_id: 1, title: 'EmptyCategory', content: '', word_count: 0,
           ai_sync_info: JSON.stringify({ grok: { file_id: 'old-empty-file', last_synced_at: syncedAt } }),
         },
       ],
@@ -738,11 +738,11 @@ describe('syncLore', () => {
 
   it('Grok: throws 400 when too many top-level categories', async () => {
     // 11 level-2 nodes (> maxFilesPerRequest=10)
-    const nodes: Array<{ id: number; parent_id: number | null; name: string; content: string | null; word_count: number }> = [
-      { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
+    const nodes: Array<{ id: number; parent_id: number | null; title: string; content: string | null; word_count: number }> = [
+      { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
     ]
     for (let i = 2; i <= 12; i++) {
-      nodes.push({ id: i, parent_id: 1, name: `Cat${i}`, content: `Content ${i}`, word_count: 2 })
+      nodes.push({ id: i, parent_id: 1, title: `Cat${i}`, content: `Content ${i}`, word_count: 2 })
     }
     testDbPath = setupDb({ grokApiKey: 'xai-key', nodes })
 
@@ -755,10 +755,10 @@ describe('syncLore', () => {
     testDbPath = setupDb({
       grokApiKey: 'xai-key',
       nodes: [
-        { id: 1, parent_id: null, name: 'Root', content: null, word_count: 0 },
-        { id: 2, parent_id: 1,    name: 'World',    content: 'World overview', word_count: 2 },
-        { id: 3, parent_id: 2,    name: 'Continent', content: 'Continent details', word_count: 2 },
-        { id: 4, parent_id: 3,    name: 'City',      content: 'City info',       word_count: 2 },
+        { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
+        { id: 2, parent_id: 1,    title: 'World',    content: 'World overview', word_count: 2 },
+        { id: 3, parent_id: 2,    title: 'Continent', content: 'Continent details', word_count: 2 },
+        { id: 4, parent_id: 3,    title: 'City',      content: 'City info',       word_count: 2 },
       ],
     })
 
@@ -785,7 +785,7 @@ describe('syncLore', () => {
       apiKey: 'yandex-key',
       folderId: 'folder-1',
       nodes: [
-        { id: 1, parent_id: null, name: 'EmptyNode', content: null, word_count: 0,
+        { id: 1, parent_id: null, title: 'EmptyNode', content: null, word_count: 0,
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2024-01-01T00:00:00.000Z', file_id: 'old-405-file' } }) },
       ],
     })
@@ -805,7 +805,7 @@ describe('syncLore', () => {
       apiKey: 'yandex-key',
       folderId: 'folder-1',
       nodes: [
-        { id: 1, parent_id: null, name: 'EmptyNode', content: null, word_count: 0,
+        { id: 1, parent_id: null, title: 'EmptyNode', content: null, word_count: 0,
           ai_sync_info: JSON.stringify({ yandex: { last_synced_at: '2024-01-01T00:00:00.000Z', file_id: 'still-there' } }) },
       ],
     })

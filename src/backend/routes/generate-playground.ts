@@ -2,8 +2,7 @@ import type { AiGenerationSettings } from '../../shared/ai-generation-settings.j
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-
-// ── Error helper ──────────────────────────────────────────────────────────────
+import OpenAI from 'openai';
 
 function makeError(message: string, status: number): Error {
   const e = new Error(message)
@@ -13,8 +12,7 @@ function makeError(message: string, status: number): Error {
 
 export async function generatePlayground(
   params: { instructions?: string; settings?: AiGenerationSettings; includeExistingLore?: boolean },
-  onThinking: (status: string, detail?: string) => void,
-  onPartialJson: (data: Record<string, unknown>) => void,
+  onError: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<{ response_id?: string }> {
   const { instructions, settings = {}, includeExistingLore = false } = params
 
@@ -24,7 +22,7 @@ export async function generatePlayground(
   const engineFileIds: string[] = []
 
   try {
-    engine = SettingsRepository.get('current_backend') || undefined
+    engine = SettingsRepository.getCurrentBackend() || undefined
     if (!engine) throw makeError('no AI engine configured', 400)
 
     if (includeExistingLore && engine) {
@@ -46,25 +44,16 @@ export async function generatePlayground(
   const adapter = getEngineAdapter(engine)
   if (!adapter) throw makeError(`Playground is not supported for engine '${engine}'`, 400)
 
-  let accumulated = ''
-  let lastEmitted = ''
-  const onDelta = (chunk: string) => {
-    accumulated += chunk
-    if (accumulated === lastEmitted) return
-    lastEmitted = accumulated
-    onPartialJson({ content: accumulated })
-  }
-
-  const { response_id } = await adapter.generateResponse(
+  await adapter.generateResponse(
     {
-      instructions: instructions.trim(),
+      userPrompt: instructions.trim(),
+      systemPrompt: undefined,
       includeExistingLore,
       aiGenerationSettings: settings,
       engineFileIds,
     },
-    (status, detail) => onThinking(status, detail),
-    onDelta,
+    onError,
   )
 
-  return response_id ? { response_id } : {}
+  return {}
 }

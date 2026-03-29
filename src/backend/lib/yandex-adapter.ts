@@ -7,9 +7,8 @@ import { SettingsRepository } from '../settings/settings-repository.js'
 export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings> {
   async generateResponse(
     req: GenerateResponseRequest<YandexAiGenerationSettings>,
-    onThinking: (status: string, detail?: string) => void,
-    onDelta: (text: string) => void,
-  ): Promise<{ response_id?: string }> {
+    onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
+  ): Promise<string> {
     const engineConfig = SettingsRepository.getAllAiEnginesConfig().yandex ?? {}
 
     const apiKey = engineConfig?.api_key?.trim()
@@ -25,7 +24,12 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
     const client = createYandexClient(apiKey, folderId)
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
-    messages.push({ role: 'user', content: req.instructions });
+    if (req.systemPrompt) {
+      messages.push({ role: 'system', content: req.systemPrompt });
+    }
+    if (req.userPrompt) {
+      messages.push({ role: 'user', content: req.userPrompt });
+    }
 
     const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
       model,
@@ -57,10 +61,7 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
       (requestParams as unknown as Record<string, unknown>)['tools'] = tools
     }
 
-    onThinking('generating')
     const completion = await client.chat.completions.create(requestParams)
-    onDelta(completion.choices[0]?.message?.content ?? '')
-    onThinking('done')
-    return {}
+    return completion.choices[0]?.message?.content ?? ''
   }
 }

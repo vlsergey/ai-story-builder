@@ -1,10 +1,9 @@
-import { parse as parsePartialJson } from 'best-effort-json-parser'
-import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
 import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
 import type { JsonSchemaSpec } from '../lib/ai-engine-adapter.js'
 import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
+import OpenAI from 'openai'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -37,99 +36,65 @@ export interface GenerateLoreParams {
 }
 
 export async function generateLore(
-  params: GenerateLoreParams,
-  onThinking: (status: string, detail?: string) => void,
-  onPartialJson: (data: Record<string, unknown>) => void,
-): Promise<{
-  response_id?: string
-  cost_usd_ticks?: number
-  tokens_input?: number
-  tokens_output?: number
-  tokens_total?: number
-  cached_tokens?: number
-  reasoning_tokens?: number
-}> {
-  const { instructions, mode, baseContent, aiGenerationSettings = {}, includeExistingLore = false } = params
+  nodeId: number,
+  onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
+): Promise<string> {
+  const loreRepo = new LoreNodeRepository()
+  const node = loreRepo.getById(nodeId)
+  if (!node) throw makeError('node not found', 404)
+
+  const {
+    ai_user_prompt: aiUserPrompt,
+    ai_system_prompt: aiSystemPrompt,
+    ai_settings: nodeAiSettings,
+  } = node
+
   const responseSchema = LORE_RESPONSE_SCHEMA
-  if (!instructions?.trim()) throw makeError('instructions is required', 400)
+  if (!aiUserPrompt?.trim()) throw makeError('user prompt is required', 400)
 
-  let engine: string | undefined
-  let textLanguage: string | null
-  const engineFileIds: string[] = []
+  // let engine: string | undefined
+  // let textLanguage: string | null
+  // const engineFileIds: string[] = []
 
-  try {
-    engine = SettingsRepository.get('current_backend') || undefined
-    if (!engine) throw makeError('no AI engine configured', 400)
+  // try {
+    // if (includeExistingLore && engine) {
+    //   const nodes = loreRepo.getAllWithAiSyncInfo()
+    //   for (const node of nodes) {
+    //     try {
+    //       const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
+    //       const fileId = info[engine]?.file_id
+    //       if (fileId) engineFileIds.push(fileId)
+    //     } catch { /* ignore */ }
+    //   }
+    // }
+  // } catch (e: any) {
+  //   if (e.status) throw e
+  //   throw makeError('failed to read project settings: ' + String(e), 500)
+  // }
 
-    textLanguage = SettingsRepository.getTextLanguage()
+  const engineId = SettingsRepository.getCurrentBackend()
+  if (!engineId) throw makeError('no AI engine configured', 400)
 
-    if (includeExistingLore && engine) {
-      const loreRepo = new LoreNodeRepository()
-      const nodes = loreRepo.getAllWithAiSyncInfo()
-      for (const node of nodes) {
-        try {
-          const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
-          const fileId = info[engine]?.file_id
-          if (fileId) engineFileIds.push(fileId)
-        } catch { /* ignore */ }
-      }
-    }
+  const adapter = getEngineAdapter(engineId)
+  if (!adapter) throw makeError(`Engine ${engineId} not found`, 400)
 
-    if (!textLanguage) throw makeError('text_language is not configured', 400)
-  } catch (e: any) {
-    if (e.status) throw e
-    throw makeError('failed to read project settings: ' + String(e), 500)
+  const nodeEngineAiSettings = (JSON.parse(nodeAiSettings || '{}') as Record<string, AiGenerationSettings>)[engineId] || {}
+  const aiGenerationSettings = {
+    ...SettingsRepository.getCurrentEngineDefaultAiGenerationSettings(),
+    ...nodeEngineAiSettings
   }
 
-  const engineDef = BUILTIN_ENGINES.find(e => e.id === engine)
-  if (!engineDef) {
-    throw makeError(`Lore generation is not supported for engine '${engine}'`, 400)
-  }
-
-  const adapter = getEngineAdapter(engine)
-  if (!adapter) {
-    throw makeError(`Lore generation is not supported for engine '${engine}'`, 400)
-  }
-
-  let accumulated = ''
-  let lastEmittedJson = ''
-  const onDelta = (chunk: string) => {
-    accumulated += chunk
-    const partial = parsePartialJson(accumulated) as Record<string, unknown>
-    const json = JSON.stringify(partial)
-    if (json === lastEmittedJson) return
-    lastEmittedJson = json
-    onPartialJson(partial)
-  }
-
-  const { response_id, tokensInput, tokensOutput, tokensTotal, cachedTokens, reasoningTokens, costUsdTicks } = await adapter.generateResponse(
+  return await adapter.generateResponse(
     {
-      instructions: instructions!.trim(),
-      includeExistingLore,
+      userPrompt: aiUserPrompt!.trim(),
+      systemPrompt: aiSystemPrompt?.trim() || undefined,
+      // TODO: fix and implement it it
+      includeExistingLore: false,
       aiGenerationSettings,
-      engineFileIds,
+      // TODO: fix and implement it it
+      engineFileIds: [],
       responseSchema,
     },
-    (status, detail) => onThinking(status, detail),
-    onDelta,
+    onEvent
   )
-
-  const donePayload: Record<string, unknown> = {}
-  if (response_id) donePayload.response_id = response_id
-  if (costUsdTicks != null) donePayload.cost_usd_ticks = costUsdTicks
-  if (tokensInput != null) donePayload.tokens_input = tokensInput
-  if (tokensOutput != null) donePayload.tokens_output = tokensOutput
-  if (tokensTotal != null) donePayload.tokens_total = tokensTotal
-  if (cachedTokens != null) donePayload.cached_tokens = cachedTokens
-  if (reasoningTokens != null) donePayload.reasoning_tokens = reasoningTokens
-
-  return donePayload as {
-    response_id?: string
-    cost_usd_ticks?: number
-    tokens_input?: number
-    tokens_output?: number
-    tokens_total?: number
-    cached_tokens?: number
-    reasoning_tokens?: number
-  }
 }

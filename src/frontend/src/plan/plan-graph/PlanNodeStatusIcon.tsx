@@ -40,6 +40,15 @@ export default function PlanNodeStatusIcon({
   const Icon = STATUS_ICONS[status]
   const colorClass = STATUS_COLORS[status]
 
+  if (!Icon) {
+    return <div
+      className={`p-1 rounded shrink-0 ${colorClass} ${className}`}
+      title={showTooltip ? status : undefined}
+    >
+      <span />
+    </div>
+  }
+
   return (
     <div
       className={`p-1 rounded shrink-0 ${colorClass} ${className}`}

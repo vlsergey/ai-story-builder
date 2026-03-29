@@ -1,9 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react'
-import NodeEditor, { type NodeEditorAdapter } from '../nodes/NodeEditor'
-import { ipcClient } from '../ipcClient'
-import { PlanNodeRow } from '@shared/plan-graph'
-import MergeNodeEditor from './MergeNodeEditor'
-import SplitNodeEditor from './SplitNodeEditor'
+import React, { useEffect } from 'react'
+import { trpc } from '../ipcClient'
+import PlanNodeTextEditor from './PlanTextNodeEditor'
 
 interface PlanEditorProps {
   nodeId: number
@@ -11,30 +8,17 @@ interface PlanEditorProps {
 }
 
 export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
-  const [node, setNode] = useState<PlanNodeRow | null>(null)
-  const [loading, setLoading] = useState(true)
+  const planNodeQuery = trpc.plan.nodes.get.useQuery(nodeId)
+
+  const node = planNodeQuery.data
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true)
-    ipcClient.plan.nodes.get.query(nodeId).then(data => {
-      setNode(data)
-      setLoading(false)
-    }).catch(() => {
-      setLoading(false)
-    })
-  }, [nodeId])
+    if (panelApi && node) {
+      panelApi.setTitle(node.title)
+    }
+  }, [panelApi, node])
 
-  const adapter = useMemo<NodeEditorAdapter>(() => ({
-    getNode: (id) => ipcClient.plan.nodes.get.query(id) as Promise<Record<string, any>>,
-    patchNode: (id, data) => ipcClient.plan.nodes.patch.mutate({id, data}),
-    primaryField: 'title',
-    i18nPrefix: 'plan',
-    generateEndpoint: '/api/ai/generate-plan',
-    supportsAutoSummary: true,
-  }), [])
-
-  if (loading) {
+  if (planNodeQuery.isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <span className="text-muted-foreground text-sm">Loading...</span>
@@ -54,15 +38,15 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   if (node.type === 'merge') {
     return (
       <div className="h-full overflow-auto">
-        <MergeNodeEditor
+        {/* <MergeNodeEditor
           node={node}
           onUpdate={(content) => {
             // Update the node content (manual edit)
-            adapter.patchNode(nodeId, { content })
+            adapter.patchNode(nodeId, true, { content })
           }}
           panelApi={panelApi}
           onNodeUpdated={(updatedNode) => setNode(updatedNode)}
-        />
+        /> */}
       </div>
     )
   }
@@ -71,18 +55,23 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
   if (node.type === 'split') {
     return (
       <div className="h-full overflow-auto">
-        <SplitNodeEditor
+        {/* <SplitNodeEditor
           node={node}
           onUpdate={(content) => {
             // Update the node content (manual edit)
-            adapter.patchNode(nodeId, { content })
+            adapter.patchNode(nodeId, true, { content })
           }}
           panelApi={panelApi}
           onNodeUpdated={(updatedNode) => setNode(updatedNode)}
-        />
+        /> */}
       </div>
     )
   }
 
-  return <NodeEditor nodeId={nodeId} panelApi={panelApi} adapter={adapter} />
+  return <div className="h-full overflow-auto">
+    <PlanNodeTextEditor
+      nodeId={nodeId}
+      initialValue={node}
+      />
+  </div>
 }

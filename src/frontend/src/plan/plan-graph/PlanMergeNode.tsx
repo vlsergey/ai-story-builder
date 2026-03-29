@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { PlanNodeRow } from '@shared/plan-graph'
 import { dispatchOpenPlanNodeEditor } from '../../lib/plan-graph-events'
 import PlanNodeStatusIcon from './PlanNodeStatusIcon'
+import DeleteNodeButton from './DeleteNodeButton'
 
 type PlanMergeNodeData = PlanNodeRow & { onDelete: (id: string) => void }
 
@@ -28,13 +29,7 @@ export default function PlanMergeNode({ data }: NodeProps) {
           </div>
           <div className="flex items-center gap-1">
             <PlanNodeStatusIcon status={node.status} />
-            <button
-              onClick={handleDelete}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-destructive bg-background border border-border rounded w-4 h-4 flex items-center justify-center"
-              title="Delete node"
-            >
-              ×
-            </button>
+            <DeleteNodeButton onDelete={handleDelete} />
           </div>
         </div>
         <div className="text-[10px] text-muted-foreground mt-0.5">Merge</div>

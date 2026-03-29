@@ -46,10 +46,6 @@ import {
   getPlanNodes,
   getPlanNode,
   createPlanNode,
-  patchPlanNode,
-  deletePlanNode,
-  startPlanNodeReview,
-  acceptPlanNodeReview,
 } from './plan/nodes/plan-node-routes.js';
 
 import {
@@ -60,12 +56,11 @@ import {
 } from './plan/edges/plan-edge-routes.js';
 
 import { syncLore } from './routes/ai-sync.js'
-import { generateSummary } from './routes/generate-summary.js'
+import { updateSummary } from './routes/generate-summary.js'
 import { AiEngineConfig, AllAiEnginesConfig } from '../shared/ai-engine-config.js';
 import { PlanNodeUpdate } from '../shared/plan-graph.js';
-
-// Generation placeholder (will be implemented later)
-const generationUpdatePart = async (id: number, data: any) => ({ ok: true });
+import { PlanNodeService } from './plan/nodes/plan-node-service.js';
+import lastAiGenerationEventManager from './ai/last-ai-generation-event-manager.js';
 
 const t = initTRPC.create({
   transformer: superjson
@@ -73,6 +68,10 @@ const t = initTRPC.create({
 
 export const appRouter = t.router({
   ai: t.router({
+    lastGenerationEvent: t.router({
+      get: t.procedure.query(() => lastAiGenerationEventManager.getLastAiGenerationEvent()),
+      subscribe: t.procedure.subscription(lastAiGenerationEventManager.onGenerationEventAsSubscription()),
+    }),
     billing: t.router({
       get: t.procedure.query(() => getAiBilling()),
     }),
@@ -80,8 +79,8 @@ export const appRouter = t.router({
       .input((val: unknown) => val as { engineId: string, aiEngineConfig: AiEngineConfig })
       .mutation(({input}) => testEngineConnection(input.engineId, input.aiEngineConfig)),
     generateSummary: t.procedure
-      .input(z.object({ node_id: z.number(), content: z.string().optional() }))
-      .mutation(({ input }) => generateSummary(input)),
+      .input(z.int())
+      .mutation(({ input }) => updateSummary(input)),
     syncLore: t.procedure.mutation(() => syncLore()),
   }),
 
@@ -109,7 +108,7 @@ export const appRouter = t.router({
       .mutation(({ input }) => patchLoreNode(input.id, input.data)),
     delete: t.procedure.input(z.number()).mutation(({ input }) => deleteLoreNode(input)),
     import: t.procedure
-      .input(z.object({ name: z.string(), content: z.string(), parentId: z.number() }))
+      .input(z.object({ title: z.string(), content: z.string(), parentId: z.number() }))
       .mutation(({ input }) => importLoreNode(input)),
     move: t.procedure
       .input(z.object({ id: z.number(), parent_id: z.number().nullable().optional() }))
@@ -123,32 +122,41 @@ export const appRouter = t.router({
 
   plan: t.router({
     nodes: t.router({
-      acceptReview: t.procedure.input(z.number()).mutation(({ input }) => acceptPlanNodeReview(input)),
+      acceptReview: t.procedure
+        .input(z.int())
+        .mutation(({ input }) => new PlanNodeService().acceptReview(input)),
+      aiGenerate: t.procedure
+        .input(z.int())
+        .subscription(({ input }) => new PlanNodeService().aiGenerate(input)),
+      aiImprove: t.procedure
+        .input(z.int())
+        .subscription(({ input }) => new PlanNodeService().aiImprove(input)),
       // TODO: optimize via patchPlanNode vectorization
       batchPatch: t.procedure
         .input((v) => v as ({id: number, data: PlanNodeUpdate}[]))
-        .mutation(({ input }) => input.forEach( ({ id, data }) => patchPlanNode(id, data))),
+        .mutation(({ input }) => input.forEach( ({ id, data }) => new PlanNodeService().patch(id, false, data))),
       create: t.procedure.input(z.any()).mutation(({ input }) => createPlanNode(input)),
-      delete: t.procedure.input(z.number()).mutation(({ input }) => deletePlanNode(input)),
+      delete: t.procedure.input(z.number()).mutation(({ input }) => new PlanNodeService().delete(input)),
       getAll: t.procedure.query(() => getPlanNodes()),
       get: t.procedure.input(z.number()).query(({ input }) => getPlanNode(input)),
       patch: t.procedure
-        .input((v) => v as ({id: number, data: PlanNodeUpdate}))
-        .mutation(({ input }) => patchPlanNode(input.id, input.data)),
-      startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() })).mutation(({ input }) => startPlanNodeReview(input.id, input.options)),
+        .input((v) => v as ({id: number, manual: boolean, data: PlanNodeUpdate}))
+        .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
+      regenerate: t.procedure
+        .input(z.int())
+        .mutation(({ input }) => new PlanNodeService().regenerate(input)),
+      startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() }))
+        .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
       subscribe: t.procedure.subscription(planNodeEventManager.asSubscription()),
     }),
     edges: t.router({
       getAll: t.procedure.query(() => getPlanEdges()),
       create: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),
-      patch: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => patchGraphEdge(input.id, input.data)),
+      patch: t.procedure.input(z.object({ id: z.number(), data: z.any() }))
+        .mutation(({ input }) => patchGraphEdge(input.id, input.data)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => deleteGraphEdge(input)),
       subscribe: t.procedure.subscription(planEdgeEventManager.asSubscription()),
     }),
-  }),
-
-  generation: t.router({
-    updatePart: t.procedure.input(z.object({ id: z.number(), data: z.any() })).mutation(({ input }) => generationUpdatePart(input.id, input.data)),
   }),
 
   settings: t.router({

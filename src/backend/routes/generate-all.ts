@@ -1,14 +1,10 @@
-import { GraphEngine } from '../lib/node-graph/engine/graph-engine.js'
-import { PlanNodeService } from '../plan/nodes/plan-node-service.js'
+import { generateAllNodes } from '../plan/nodes/generate-all.js';
 
 export async function generateAll(
   params: { regenerateManual?: boolean },
   onThinking: (status: string, detail?: string) => void,
   onPartialJson: (data: Record<string, unknown>) => void,
 ): Promise<{ generated: number; skipped: number }> {
-  const nodeService = new PlanNodeService()
-  const engine = new GraphEngine(nodeService)
-
   const regenerateManual = params.regenerateManual ?? false
 
   let generated = 0
@@ -16,9 +12,9 @@ export async function generateAll(
 
   onThinking('start', `Starting generation of all nodes (regenerateManual: ${regenerateManual})`)
 
-  await engine.generateAllNodes({
+  await generateAllNodes({
     regenerateManual,
-    onProgress: (nodeId, status, queueSize, reason) => {
+    onProgress: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number, reason?: string) => {
       if (status === 'processing') {
         onThinking('processing', `Processing node ${nodeId} (${queueSize} nodes left in queue)`)
       } else if (status === 'generated') {

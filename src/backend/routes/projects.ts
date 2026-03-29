@@ -162,9 +162,9 @@ export function createProject(data: { name?: string; text_language?: string }): 
       const loreRepo = new LoreNodeRepository()
       const rootNodes = loreRepo.getAll().filter(n => n.parent_id === null)
       if (rootNodes.length === 0) {
-        const rootId = loreRepo.insert({ parent_id: null, name: defaultNodes.root })
-        for (const childName of defaultNodes.children) {
-          loreRepo.insert({ parent_id: rootId, name: childName })
+        const rootId = loreRepo.insert({ parent_id: null, title: defaultNodes.root })
+        for (const childTitle of defaultNodes.children) {
+          loreRepo.insert({ parent_id: rootId, title: childTitle })
         }
       }
     } catch (e) {
@@ -181,9 +181,9 @@ export function createProject(data: { name?: string; text_language?: string }): 
     // Create default lore nodes using repository
     setCurrentDbPath(dbPath) // temporary for repositories
     const loreRepo = new LoreNodeRepository()
-    const root = loreRepo.insert({ parent_id: null, name: defaultNodes.root })
-    for (const childName of defaultNodes.children) {
-      loreRepo.insert({ parent_id: root, name: childName })
+    const root = loreRepo.insert({ parent_id: null, title: defaultNodes.root })
+    for (const childTitle of defaultNodes.children) {
+      loreRepo.insert({ parent_id: root, title: childTitle })
     }
 
     SettingsRepository.setProjectTitle(name)

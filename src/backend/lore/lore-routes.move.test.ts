@@ -56,10 +56,10 @@ function setupDb(): string {
   const prev = testDbPath
   testDbPath = file
   const repo = new LoreNodeRepository()
-  repo.insert({ id: 1, parent_id: null, name: 'root' })
-  repo.insert({ id: 2, parent_id: 1, name: 'child-a' })
-  repo.insert({ id: 3, parent_id: 1, name: 'child-b' })
-  repo.insert({ id: 4, parent_id: 2, name: 'grandchild' })
+  repo.insert({ id: 1, parent_id: null, title: 'root' })
+  repo.insert({ id: 2, parent_id: 1, title: 'child-a' })
+  repo.insert({ id: 3, parent_id: 1, title: 'child-b' })
+  repo.insert({ id: 4, parent_id: 2, title: 'grandchild' })
   testDbPath = prev
   return file
 }
@@ -107,7 +107,7 @@ describe('moveLoreNode — invalid cases', () => {
 
   it('throws 400 when moving a node to a deeper descendant (indirect cycle)', async () => {
     const repo = new LoreNodeRepository()
-    repo.insert({ id: 5, parent_id: 4, name: 'great-grandchild' })
+    repo.insert({ id: 5, parent_id: 4, title: 'great-grandchild' })
 
     await expect(() => moveLoreNode(2, { parent_id: 5 })).toThrow(/descendant/)
     try { moveLoreNode(2, { parent_id: 5 }) } catch (e: any) { expect(e.status).toBe(400) }

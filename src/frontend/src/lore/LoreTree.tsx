@@ -353,7 +353,7 @@ export default function LoreTree({
     if (selectedNodeIds.size !== 1) return
     const [parentId] = selectedNodeIds
     const siblings = findNode(parentId, tree)?.children ?? []
-    const name = uniqueName('New node', siblings.map(s => s.name))
+    const name = uniqueName('New node', siblings.map(s => s.title))
     const { id: newId } = await ipcClient.lore.create.mutate({ parent_id: parentId, name })
     setPendingRenameId(newId)
     fetchTree()
@@ -366,7 +366,7 @@ export default function LoreTree({
   }
 
   async function handleInlineRename(item: TreeItem<ItemData>, newName: string) {
-    if (!item.data?.id || !newName.trim() || newName.trim() === item.data.name) return
+    if (!item.data?.id || !newName.trim() || newName.trim() === item.data.title) return
     await ipcClient.lore.patch.mutate({id: item.data.id, data: { name: newName.trim() }})
     fetchTree()
   }
@@ -392,7 +392,7 @@ export default function LoreTree({
       reader.onerror = reject
       reader.readAsText(f)
     })
-    await ipcClient.lore.import.mutate({ name: f.name, content, parentId: Number(parentId) })
+    await ipcClient.lore.import.mutate({ title: f.name, content, parentId: Number(parentId) })
     fetchTree()
   }
 
@@ -403,7 +403,7 @@ export default function LoreTree({
       const blob = new Blob([node.content], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `${node.name}.txt`; a.click()
+      a.href = url; a.download = `${node.title}.txt`; a.click()
       URL.revokeObjectURL(url)
     }
   }
@@ -588,7 +588,7 @@ export default function LoreTree({
       <div className="flex-1 min-h-0 overflow-auto">
         <ControlledTreeEnvironment<ItemData>
           items={items}
-          getItemTitle={item => item.data?.name ?? ''}
+          getItemTitle={item => item.data?.title ?? ''}
           viewState={viewState}
           canDragAndDrop
           canDropOnFolder

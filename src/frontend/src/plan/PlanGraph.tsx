@@ -158,7 +158,7 @@ export default function PlanGraph() {
 
   const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
     if (autoLayout) return
-    patchNode({id: Number(node.id), data: { x: node.position.x, y: node.position.y }})
+    patchNode({id: Number(node.id), manual: true, data: { x: node.position.x, y: node.position.y }})
   }, [autoLayout, patchNode])
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {

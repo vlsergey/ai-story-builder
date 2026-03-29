@@ -10,7 +10,7 @@ function node(
   word_count = 0,
   to_be_deleted = 0,
 ): LoreNodeForCollapse {
-  return { id, parent_id, name, content, word_count, to_be_deleted }
+  return { id, parent_id, title: name, content, word_count, to_be_deleted }
 }
 
 describe('collapseLoreTree', () => {

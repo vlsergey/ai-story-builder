@@ -1,6 +1,6 @@
-import type { NodeData, NodeContext } from '../node-interfaces.js'
+import type { NodeContext } from './node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeType, PlanEdgeType } from '../../../../shared/plan-graph.js'
+import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { SplitSettings } from '../../../../shared/node-settings.js'
 
 /**
@@ -23,11 +23,24 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     return 'textArray'
   }
 
-  getOutput(nodeData: NodeData): unknown {
+  onUpdate = async (
+    context: NodeContext,
+    nodeId: number,
+    oldNode: PlanNodeRow | null,
+    newNode: PlanNodeRow | null,
+    settings: SplitSettings,
+  ): Promise<PlanNodeUpdate | null> => {
+    if (!newNode || !settings.autoUpdate) {
+      return null
+    }
+    return await this.regenerate(context, newNode, settings)
+  }
+
+  getOutput(nodeData: PlanNodeRow): unknown {
     return this.parseContentAsJsonArray(nodeData)
   }
 
-  private parseContentAsJsonArray(nodeData: NodeData): string[] {
+  private parseContentAsJsonArray(nodeData: PlanNodeRow): string[] {
     // Try to parse content as JSON array of split parts
     if (nodeData.content) {
       try {
@@ -43,7 +56,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     return []
   }
 
-  private splitInput(context: NodeContext, nodeData: NodeData, settings: SplitSettings): string[] {
+  private splitInput(context: NodeContext, nodeData: PlanNodeRow, settings: SplitSettings): string[] {
     const inputText = this.getInputText(context, nodeData.id)
     if (inputText === null) {
       return []
@@ -65,7 +78,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     if (!textEdge) {
       return null
     }
-    const sourceNode = context.getNode(textEdge.from_node_id)
+    const sourceNode = context.getById(textEdge.from_node_id)
     if (!sourceNode) {
       return null
     }
@@ -85,12 +98,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     }
   }
 
-  async onContentChange(context: NodeContext, nodeData: NodeData, oldContent: string | null): Promise<void> {
-    // If split node's content changes (e.g., separator), downstream nodes may need update
-    // For now, do nothing (auto‑update could be added later)
-  }
-
-  async onInputContentChange(context: NodeContext, nodeData: NodeData, changedInputNodeId: number, settings: SplitSettings): Promise<NodeData | null> {
+  async onInputContentChange(context: NodeContext, nodeData: PlanNodeRow, changedInputNodeId: number, settings: SplitSettings): Promise<PlanNodeUpdate | null> {
     // Check if the changed input is the one we depend on
     const incoming = context.getIncomingEdges(nodeData.id)
     const depends = incoming.some(edge => edge.from_node_id === changedInputNodeId && edge.type === 'text')
@@ -104,21 +112,26 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     }
 
     // Regenerate split content
-    const newContent = await this.regenerate(context, nodeData, settings)
-    if (newContent === null || newContent === nodeData.content) {
+    const newContentPatch = await this.regenerate(context, nodeData, settings)
+    if (newContentPatch?.content === null || newContentPatch?.content === nodeData.content) {
       // No change or generation failed
       return null
     }
 
     // Return updated node data
     return {
-      ...nodeData,
-      content: newContent,
+      content: newContentPatch?.content,
     }
   }
 
-  async regenerate(context: NodeContext, nodeData: NodeData, settings: SplitSettings): Promise<string | null> {
+  regenerate = async (
+    context: NodeContext,
+    nodeData: PlanNodeRow,
+    settings: SplitSettings,
+  ): Promise<PlanNodeUpdate | null> => {
     const parts = this.splitInput(context, nodeData, settings)
-    return JSON.stringify(parts)
+    return {
+      content: JSON.stringify(parts)
+    }
   }
 }

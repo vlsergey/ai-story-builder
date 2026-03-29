@@ -23,7 +23,7 @@ export type LoreStatMode = 'none' | 'words' | 'chars' | 'bytes'
 export interface LoreNode {
   id: number
   parent_id: number | null
-  name: string
+  title: string
   content: string | null
   word_count: number
   char_count: number

@@ -8,6 +8,7 @@ import { collapseLoreTree } from '../lib/lore-tree.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 import { YandexEngineConfig } from '../../shared/ai-engine-config.js'
+import { LoreNodeRow } from '../../shared/lore-node.js'
 
 // Exported so tests can override without fake timers
 export const POLL_CONFIG = {
@@ -33,16 +34,6 @@ interface AiEngineSyncRecord {
   merged_into_parent?: boolean
 }
 
-interface LoreNodeRow {
-  id: number
-  parent_id: number | null
-  name: string
-  content: string | null
-  word_count: number
-  to_be_deleted: number
-  ai_sync_info: string | null
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildPathMap(rows: LoreNodeRow[]): Map<number, string> {
@@ -53,11 +44,11 @@ function buildPathMap(rows: LoreNodeRow[]): Map<number, string> {
     if (paths.has(id)) return paths.get(id)!
     const row = idToRow.get(id)!
     if (!row.parent_id) {
-      const p = `/${row.name}`
+      const p = `/${row.title}`
       paths.set(id, p)
       return p
     }
-    const p = `${getPath(row.parent_id)}/${row.name}`
+    const p = `${getPath(row.parent_id)}/${row.title}`
     paths.set(id, p)
     return p
   }
@@ -72,8 +63,8 @@ function buildFileContent(
   pathMap: Map<number, string>,
   idToRow: Map<number, LoreNodeRow>,
 ): string {
-  const nodePath = pathMap.get(row.id) ?? `/${row.name}`
-  const parentName = row.parent_id ? (idToRow.get(row.parent_id)?.name ?? '') : ''
+  const nodePath = pathMap.get(row.id) ?? `/${row.title}`
+  const parentName = row.parent_id ? (idToRow.get(row.parent_id)?.title ?? '') : ''
 
   const frontmatter = [
     '---',
@@ -88,7 +79,7 @@ function buildFileContent(
   const depth = segments.length - 1
   const headingLevel = Math.max(1, depth)
   const hashes = '#'.repeat(headingLevel)
-  const headingText = depth >= 2 ? segments.slice(1).join(' / ') : row.name
+  const headingText = depth >= 2 ? segments.slice(1).join(' / ') : row.title
 
   return frontmatter + `${hashes} ${headingText}\n\n` + (row.content ?? '')
 }
@@ -300,11 +291,11 @@ export async function syncLore(): Promise<{
 
       if (result.action === 'delete') {
         if (oldFileId && engineDef.capabilities.fileDeletion) {
-          await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}"`)
+          await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeTitle}"`)
         }
       } else if (result.action === 'upload') {
         if (oldFileId && engineDef.capabilities.fileDeletion) {
-          await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeName}" (pre-upload cleanup)`)
+          await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeTitle}" (pre-upload cleanup)`)
         }
         try {
           const uploaded = await client.files.create({
@@ -317,7 +308,7 @@ export async function syncLore(): Promise<{
           })
           result.newFileId = uploaded.id
         } catch (e) {
-          throw new Error(`Upload failed for Grok group "${group.level2NodeName}" (id=${group.level2NodeId}):\n${formatApiError(e)}`)
+          throw new Error(`Upload failed for Grok group "${group.level2NodeTitle}" (id=${group.level2NodeId}):\n${formatApiError(e)}`)
         }
       }
     }
@@ -376,29 +367,13 @@ export async function syncLore(): Promise<{
   const idToRow = new Map(rows.map(r => [r.id, r]))
   const pathMap = buildPathMap(rows)
 
-  interface NodeInfo {
-    id: number
-    name: string
-    content: string
-    word_count: number
-    to_be_deleted: number
-    yandexSync: AiEngineSyncRecord | undefined
-  }
-
-  const toUpload: NodeInfo[] = []
-  const toDelete: NodeInfo[] = []
-  const unchanged: NodeInfo[] = []
+  const toUpload: LoreNodeRow[] = []
+  const toDelete: LoreNodeRow[] = []
+  const unchanged: LoreNodeRow[] = []
 
   for (const row of rows) {
     const yandexSync = parseYandexSync(row.ai_sync_info)
-    const info: NodeInfo = {
-      id: row.id,
-      name: row.name,
-      content: row.content ?? '',
-      word_count: row.word_count,
-      to_be_deleted: row.to_be_deleted,
-      yandexSync,
-    }
+    const info: LoreNodeRow = row
 
     const needsDelete = !!(yandexSync?.file_id && (row.to_be_deleted === 1 || row.word_count === 0))
     const needsUpload = row.to_be_deleted === 0 && row.word_count > 0 && (
@@ -418,9 +393,10 @@ export async function syncLore(): Promise<{
   const newFileIds = new Map<number, string>()
   for (const node of toUpload) {
     const row = idToRow.get(node.id)!
+    const yandexSync = parseYandexSync(node.ai_sync_info)
 
-    if (node.yandexSync?.file_id) {
-      await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id}, pre-upload cleanup)`)
+    if (yandexSync?.file_id) {
+      await deleteFileIfExists(client, yandexSync.file_id, `Yandex node "${node.title}" (id=${node.id}, pre-upload cleanup)`)
     }
 
     try {
@@ -431,13 +407,14 @@ export async function syncLore(): Promise<{
       })
       newFileIds.set(node.id, uploaded.id)
     } catch (e) {
-      throw new Error(`Upload failed for node "${node.name}" (id=${node.id}):\n${formatApiError(e)}`)
+      throw new Error(`Upload failed for node "${node.title}" (id=${node.id}):\n${formatApiError(e)}`)
     }
   }
 
   for (const node of toDelete) {
-    if (node.yandexSync?.file_id) {
-      await deleteFileIfExists(client, node.yandexSync.file_id, `Yandex node "${node.name}" (id=${node.id})`)
+    const yandexSync = parseYandexSync(node.ai_sync_info)
+    if (yandexSync?.file_id) {
+      await deleteFileIfExists(client, yandexSync.file_id, `Yandex node "${node.title}" (id=${node.id})`)
     }
   }
 

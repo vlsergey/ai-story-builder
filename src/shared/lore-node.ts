@@ -1,7 +1,7 @@
 export interface LoreNodeRow {
   id: number
   parent_id: number | null
-  name: string
+  title: string
   content: string | null
   position: number
   status: string
@@ -11,11 +11,12 @@ export interface LoreNodeRow {
   char_count: number
   byte_count: number
   ai_sync_info: string | null
-  changes_status: string | null
+  in_review: number
   review_base_content: string | null
-  last_improve_instruction: string | null
-  ai_instructions: string | null
+  ai_user_prompt: string | null
+  ai_system_prompt: string | null
   ai_settings: string | null
+  ai_improve_instruction: string | null
 }
 
 type LoreNodeInsert = Omit<LoreNodeRow, 'id' | 'created_at'>
@@ -25,15 +26,16 @@ export const LoreNodeDefaults : Partial<LoreNodeInsert> = {
   content: null,
   position: 0,
   to_be_deleted: 0,
-  ai_instructions: null,
+  ai_user_prompt: null,
+  ai_system_prompt: null,
   ai_sync_info: null,
   ai_settings: null,
   word_count: 0,
   char_count: 0,
   byte_count: 0,
-  changes_status: null,
+  in_review: 0,
   review_base_content: null,
-  last_improve_instruction: null,
+  ai_improve_instruction: null,
 }
 
 type DefaultLoreNodeKeys = keyof typeof LoreNodeDefaults;

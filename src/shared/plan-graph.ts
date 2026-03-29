@@ -14,9 +14,9 @@ export interface PlanNodeRow {
   parent_id: number | null
   position: number | null
   content: string | null
-  ai_instructions: string | null
+  ai_user_prompt: string | null
+  ai_system_prompt: string | null
   summary: string | null
-  auto_summary: number
   ai_sync_info: string | null
   node_type_settings: string | null
   ai_settings: string | null
@@ -25,10 +25,10 @@ export interface PlanNodeRow {
   word_count: number
   char_count: number
   byte_count: number
-  changes_status: string | null
   status: PlanNodeStatus
+  in_review: 0 | 1
   review_base_content: string | null
-  last_improve_instruction: string | null
+  ai_improve_instruction: string | null
   created_at: string
 }
 
@@ -37,7 +37,8 @@ type PlanNodeInsert = Omit<PlanNodeRow, 'id' | 'created_at'>
 export const PlanNodeRowDefaults : Partial<PlanNodeInsert> = {
   parent_id: null,
   position: null,
-  ai_instructions: null,
+  ai_user_prompt: null,
+  ai_system_prompt: null,
   summary: null,
   ai_sync_info: null,
   node_type_settings: null,
@@ -45,14 +46,14 @@ export const PlanNodeRowDefaults : Partial<PlanNodeInsert> = {
   word_count: 0,
   char_count: 0,
   byte_count: 0,
-  changes_status: null,
+  in_review: 0,
   review_base_content: null,
-  last_improve_instruction: null,
+  ai_improve_instruction: null,
 }
 
 type DefaultPlanNodeKeys = keyof typeof PlanNodeRowDefaults;
 export type PlanNodeCreate = Omit<PlanNodeInsert, DefaultPlanNodeKeys> & Partial<Pick<PlanNodeInsert, DefaultPlanNodeKeys>>;
-export type PlanNodeUpdate = Partial<Omit<PlanNodeRow, 'id' | 'created_at'>>
+export type PlanNodeUpdate = Partial<Omit<PlanNodeRow, 'id' | 'created_at' | 'type'>>
 
 export interface PlanEdgeRow {
   id: number

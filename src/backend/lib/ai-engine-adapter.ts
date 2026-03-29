@@ -1,3 +1,4 @@
+import OpenAI from 'openai'
 import type { AiEngineKey } from '../../shared/ai-engines.js'
 import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
 
@@ -10,7 +11,8 @@ export interface JsonSchemaSpec {
 }
 
 export interface GenerateResponseRequest<S extends AiGenerationSettings = AiGenerationSettings> {
-  instructions: string
+  userPrompt: string | null
+  systemPrompt: string | null
   /** Whether to include existing lore files as attachments. */
   includeExistingLore: boolean
   /** Uploaded file IDs for the active engine (already filtered by to_be_deleted). */
@@ -42,9 +44,8 @@ export interface GenerateResponseRequest<S extends AiGenerationSettings = AiGene
 export interface AiEngineAdapter<T extends AiGenerationSettings = AiGenerationSettings> {
   generateResponse(
     req: GenerateResponseRequest<T>,
-    onThinking: (status: string, detail?: string) => void,
-    onDelta: (text: string) => void,
-  ): Promise<{ response_id?: string; tokensInput?: number; tokensOutput?: number; tokensTotal?: number; cachedTokens?: number; reasoningTokens?: number; costUsdTicks?: number }>
+    onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
+  ): Promise<string>
 }
 
 import { GrokAdapter } from './grok-adapter.js'
