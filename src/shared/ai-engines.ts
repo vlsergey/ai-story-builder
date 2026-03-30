@@ -120,6 +120,7 @@ export const GROK_ENGINE_DEF : AiEngineDefinition = {
     { key: 'max_output_tokens', defaultValue: "0", type: 'integer', schema: z.coerce.number().int().min(0)},
     { key: 'temperature', defaultValue: "1", type: 'decimal', schema: z.coerce.number().min(0).max(2)},
     { key: 'top_p', defaultValue: "1", type: 'decimal', schema: z.coerce.number().min(0).max(1)},
+    { key: 'x_search', type: 'checkbox', schema: z.coerce.boolean()},
     { key: 'web_search', type: 'checkbox', schema: z.coerce.boolean()}
   ],
   maxFilesPerRequest: 10,

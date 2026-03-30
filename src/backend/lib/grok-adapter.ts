@@ -2,9 +2,8 @@ import type { AiEngineAdapter, GenerateResponseRequest } from './ai-engine-adapt
 import type { GrokAiGenerationSettings } from '../../shared/grok-ai-generation-settings.js'
 import { grokGenerate } from './grok-client.js'
 import { SettingsRepository } from '../settings/settings-repository.js';
-import { GROK_ENGINE_DEF as engineDef } from '../../shared/ai-engines.js';
 import OpenAI from 'openai';
-import { ResponseCreateParamsStreaming, ResponseInputMessageContentList } from 'openai/resources/responses/responses.js';
+import { ResponseCreateParamsStreaming, Tool } from 'openai/resources/responses/responses.js';
 
 export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
   async generateResponse(
@@ -20,6 +19,8 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       ...engineConfig.defaultAiGenerationSettings,
       ...req.aiGenerationSettings,
     }
+    console.info('defaultAiGenerationSettings', engineConfig.defaultAiGenerationSettings)
+    console.info('actualAiSettings', actualAiSettings)
 
     // const maxFiles = engineDef.maxFilesPerRequest ?? 10
     // const attachableFileIds = req.engineFileIds.slice(0, maxFiles)
@@ -41,9 +42,18 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       temperature: onlyIfPositiveNumber(actualAiSettings.temperature),
       top_p: onlyIfPositiveNumber(actualAiSettings.top_p),
     }
-    if (actualAiSettings.webSearch === true) {
-      requestParams.tools = [{ type: 'web_search' }]
+
+    const tools: Array<Tool> = []
+    if (actualAiSettings.x_search) {
+      tools.push({ type: 'x_search' } as unknown as Tool)
     }
+    if (actualAiSettings.web_search) {
+      tools.push({ type: 'web_search' })
+    }
+    if (tools) {
+      requestParams.tools = tools
+    }
+
     if (req.responseSchema && req.stringFormat !== false) {
       requestParams['text'] = {
         format: {

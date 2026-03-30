@@ -6,14 +6,14 @@ import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 import DeleteNodeButton from './DeleteNodeButton'
 import { FileTextIcon } from 'lucide-react'
 
-type PlanTextNodeData = PlanNodeRow & { onDelete: (id: string) => void }
+type PlanTextNodeData = PlanNodeRow & { onDelete: (id: number) => void }
 
 export default function PlanTextNode({ data }: NodeProps) {
   const node = data as unknown as PlanTextNodeData
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    node.onDelete(String(node.id))
+    node.onDelete(node.id)
   }
 
   return (

@@ -6,14 +6,14 @@ import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 import DeleteNodeButton from './DeleteNodeButton'
 import { SplitIcon } from 'lucide-react'
 
-type PlanSplitterNodeData = PlanNodeRow & { onDelete: (id: string) => void }
+type PlanSplitterNodeData = PlanNodeRow & { onDelete: (id: number) => void }
 
 export default function PlanSplitterNode({ data }: NodeProps) {
   const node = data as unknown as PlanSplitterNodeData
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    node.onDelete(String(node.id))
+    node.onDelete(node.id)
   }
 
   return (

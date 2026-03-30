@@ -186,7 +186,9 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     }
   }, [])
 
-  const layoutFromSettings = trpc.settings.layout.get.useQuery().data
+  const layoutFromSettings = trpc.settings.layout.get.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  }).data
 
   const setupDefaultLayout = useCallback(() => {
     if (!dockviewRef.current) return

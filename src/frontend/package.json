@@ -35,6 +35,7 @@
     "@fontsource-variable/geist": "^5.2.8",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^5.2.2",
+    "@icons-pack/react-simple-icons": "^13.13.0",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.4",

@@ -34,7 +34,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuPortal,
 } from '@/ui-components/context-menu'
 
 const nodeTypes = {
@@ -86,8 +85,16 @@ export default function PlanGraph() {
   const [nodes, setNodes, onNodesChangeImpl] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  const { data: serverNodes, isLoading: areNodesLoading } = trpc.plan.nodes.getAll.useQuery()
-  const { data: serverEdges, isLoading: areEdgesLoading } = trpc.plan.edges.getAll.useQuery()
+  const { data: serverNodes, isLoading: areNodesLoading } = trpc.plan.nodes.getAll.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true,
+  })
+  const { data: serverEdges, isLoading: areEdgesLoading } = trpc.plan.edges.getAll.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true,
+  })
   const loading = areNodesLoading || areEdgesLoading
   const deleteEdge = trpc.plan.edges.delete.useMutation().mutate
   const deleteNodeMutation = trpc.plan.nodes.delete.useMutation().mutate

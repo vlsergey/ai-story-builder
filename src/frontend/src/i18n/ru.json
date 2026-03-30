@@ -9,6 +9,11 @@
   "start.projects_folder": "Папка проектов",
   "start.no_files": "Файлы проектов не найдены",
 
+  "aiThinking.custom_tool_call": "Вызов инструмента",
+  "aiThinking.web_search_call.find_in_page": "Поиск по web-странице",
+  "aiThinking.web_search_call.open_page": "Чтение web-страницы",
+  "aiThinking.web_search_call.search": "Web-поиск",
+
   "settings.loading": "Загрузка настроек…",
   "settings.uiLanguage.title": "Язык интерфейса",
   "settings.uiLanguage.en": "English",
@@ -47,6 +52,7 @@
   "engine.grok.field.temperature.hint": "Температура выборки (от 0 до 2). Высокие значения (например, 0.8) сделают ответ более случайным, а низкие (например, 0.2) — более сфокусированным и детерминированным.",
   "engine.grok.field.top_p.label": "Top P",
   "engine.grok.field.top_p.hint": "Альтернатива температуре (ядерная выборка), где модель учитывает токены, суммарная вероятность которых составляет top_p. Значение 0.1 означает выбор из лучших 10%. Обычно рекомендуется изменять либо этот параметр, либо температуру, но не оба сразу.",
+  "engine.grok.field.x_search.label": "X-поиск",
   "engine.grok.field.web_search.label": "Web-поиск",
 
   "engine.yandex.name": "Yandex Cloud AI",

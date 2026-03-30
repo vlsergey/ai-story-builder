@@ -174,6 +174,7 @@ export class PlanNodeService implements NodeContext {
       char_count: charCount,
       byte_count: byteCount,
     })
+    console.info(`Created node ${id} of type ${type}`)
 
     planNodeEventManager.emitUpdate(id)
     return { id }
@@ -309,20 +310,19 @@ export class PlanNodeService implements NodeContext {
   // ─── Delete ──────────────────────────────────────────────────────────────────
 
   delete(id: number) {
+    console.log(`Deleting node with id ${id}`)
+
     const oldNode = this.repo.getById(id)
     if (!oldNode) throw this.makeError('node not found', 404)
 
     // Delete connected edges first
     new PlanEdgeRepository().deleteByNodeId(id)
 
-    // Emit event before deletion so subscribers know the node is being removed
-    planNodeEventManager.emitUpdate(id)
-
     // Delete connected edges first (should be handled by foreign key, but we do it explicitly)
     // This is done by the repository's delete method.
     this.repo.delete(id)
 
-    return { ok: true }
+    planNodeEventManager.emitUpdate(id)
   }
 
   async move(id: number, parentId: number | null) {

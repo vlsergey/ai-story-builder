@@ -1,8 +1,9 @@
+import AiThinkingPanel, { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel";
 import { trpc } from "@/ipcClient";
 import getDifference from "@/lib/getDifference";
 import NodeEditor, { EditorMode, NodeEditorState } from "@/nodes/NodeEditor"
 import { PlanNodeRow } from "@shared/plan-graph"
-import { useCallback, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { useDebouncedCallback } from 'use-debounce';
 
 interface PlanNodeTextEditorProps {
@@ -62,6 +63,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
     debounceSave(true, value)
   }, [setValue, setStatus, debounceSave])
 
+  const aiThinkinPanelRef = useRef<AiThinkingPanelHandle>(null)
   const [tempContent, setTempContent] = useState<string|null>(null)
 
   const [generationStarted, setGenerationStarted] = useState(false)
@@ -77,6 +79,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
               break
             default:
               console.log( JSON.stringify(event.event) )
+              aiThinkinPanelRef?.current?.onEvent(event.event)
           }
           break
         case 'data':
@@ -85,6 +88,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
           setTempContent(null)
           break
         case 'completed':
+          aiThinkinPanelRef?.current?.onComplete()
           setGenerationStarted(false)
           setTempContent(null)
           setStatus('SAVED')
@@ -94,6 +98,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
     },
     onError: (err) => {
       console.error(err);
+      aiThinkinPanelRef?.current?.onComplete()
       setTempContent(null)
       setGenerationStarted(false);
       setEditorMode('generate')
@@ -118,6 +123,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
               break
             default:
               console.log( JSON.stringify(event.event) )
+              aiThinkinPanelRef?.current?.onEvent(event.event)
           }
           break
         case 'data':
@@ -125,7 +131,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
           setValue(event.data)
           break
         case 'completed':
-          console.log('COMPLETED')
+          aiThinkinPanelRef?.current?.onComplete()
           setImprovingStarted(false)
           setEditorMode('review_after_improve')
           break
@@ -133,6 +139,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
     },
     onError: (err) => {
       console.error(err);
+      aiThinkinPanelRef?.current?.onComplete()
       setImprovingStarted(false);
     }
   })
@@ -143,6 +150,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
   }, [setImprovingStarted])
 
   return <NodeEditor<PlanNodeRow>
+    aiThinkinPanelRef={aiThinkinPanelRef}
     editorMode={editorMode}
     onEditorModeChange={setEditorMode}
     onGenerate={handleGenerate}

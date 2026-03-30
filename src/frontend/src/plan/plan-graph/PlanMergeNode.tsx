@@ -6,14 +6,14 @@ import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 import DeleteNodeButton from './DeleteNodeButton'
 import { MergeIcon } from 'lucide-react'
 
-type PlanMergeNodeData = PlanNodeRow & { onDelete: (id: string) => void }
+type PlanMergeNodeData = PlanNodeRow & { onDelete: (id: number) => void }
 
 export default function PlanMergeNode({ data }: NodeProps) {
   const node = data as unknown as PlanMergeNodeData
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    node.onDelete(String(node.id))
+    node.onDelete(node.id)
   }
 
   return (

@@ -14,6 +14,7 @@ import AiGenerationSettingsForm from '../ai/AiGenerationSettingsForm'
 import { Textarea } from '../ui-components/textarea'
 import { Input } from '@/ui-components/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui-components/tabs'
+import AiThinkingPanel, { AiThinkingPanelHandle } from '@/ai/AiThinkingPanel'
 
 export interface NodeSavedPayload {
   nodeId: number
@@ -38,6 +39,7 @@ export type NodeEditorState = 'DEBOUNCE' | 'ERROR' | 'LOADING' | 'SAVING' | 'SAV
 export type EditorMode = 'generate' | 'review_after_generate' | 'improve' | 'review_after_improve'
 
 interface NodeEditorProps<N extends Node> {
+  aiThinkinPanelRef?: React.RefObject<AiThinkingPanelHandle | null>,
   editorMode: EditorMode
   onEditorModeChange: (mode: EditorMode) => void
   i18nPrefix: string
@@ -52,7 +54,7 @@ interface NodeEditorProps<N extends Node> {
 type DiffTab = 'new' | 'sidebyside' | 'perlines'
 
 export default function NodeEditor<N extends Node>({
-  editorMode, i18nPrefix, value: node, status,
+  aiThinkinPanelRef, editorMode, i18nPrefix, value: node, status,
   onAcceptChanges, onChange, onEditorModeChange, onGenerate, onImprove
 }: NodeEditorProps<N>) {
   const { resolvedTheme } = useTheme()
@@ -243,6 +245,8 @@ export default function NodeEditor<N extends Node>({
           </Button>
         </div>
       )}
+
+      <AiThinkingPanel ref={aiThinkinPanelRef} />
 
       {/* ── PRIMARY FIELD — always visible ───────────────────────────────────── */}
       <div className="flex flex-row items-center gap-2 py-1.5 shrink-0">

@@ -5,14 +5,14 @@ import { PlanNodeRow } from '@shared/plan-graph'
 import DeleteNodeButton from './DeleteNodeButton'
 import { BookOpenCheckIcon } from 'lucide-react'
 
-type PlanLoreNodeData = PlanNodeRow & { onDelete: (id: string) => void }
+type PlanLoreNodeData = PlanNodeRow & { onDelete: (id: number) => void }
 
 export default function PlanLoreNode({ data }: NodeProps) {
   const node = data as unknown as PlanLoreNodeData
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    node.onDelete(String(node.id))
+    node.onDelete(node.id)
   }
 
   return (
