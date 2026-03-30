@@ -18,7 +18,7 @@ export default function PlanTextNode({ data }: NodeProps) {
 
   return (
     <div
-      className="bg-background border border-border rounded shadow-sm w-[200px] cursor-pointer select-none hover:border-primary/60 transition-colors group"
+      className="bg-background border-2 border-blue-400 rounded shadow-sm w-[200px] cursor-pointer select-none group"
       onDoubleClick={(e) => { e.stopPropagation(); dispatchOpenPlanNodeEditor(node.id) }}
     >
       <Handle type="target" position={Position.Left} />

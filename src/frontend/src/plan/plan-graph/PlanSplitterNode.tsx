@@ -18,25 +18,22 @@ export default function PlanSplitterNode({ data }: NodeProps) {
 
   return (
     <div
-      className="bg-background border border-border rounded shadow-sm w-[200px] cursor-pointer select-none hover:border-primary/60 transition-colors group"
+      className="bg-background border-2 border-blue-400 rounded shadow-sm w-[200px] cursor-pointer select-none group"
       onDoubleClick={(e) => { e.stopPropagation(); dispatchOpenPlanNodeEditor(node.id) }}
     >
       <Handle type="target" position={Position.Left} />
       <div className="p-2">
         <div className="flex items-center justify-between gap-1 mb-1">
-          <SplitIcon className='shrink-0 w-4 h-4 text-muted-foreground/70'/>
-          <span className="text-sm font-medium leading-tight truncate flex-1">{node.title}</span>
+          <div className="flex items-center gap-1.5">
+            <SplitIcon className='shrink-0 w-4 h-4 text-muted-foreground/70'/>
+            <span className="text-sm font-medium leading-tight truncate flex-1">{node.title}</span>
+          </div>
           <div className="flex items-center gap-1">
             <PlanNodeStatusIcon status={node.status} />
             <DeleteNodeButton onDelete={handleDelete} />
           </div>
         </div>
         <div className="text-[11px] text-muted-foreground">
-          {node.content && (
-            <div className="truncate mt-0.5 text-muted-foreground/70">
-              Regex: {node.content}
-            </div>
-          )}
           {node.word_count > 0 ? `${node.word_count}w` : null}
           {node.summary && (
             <div

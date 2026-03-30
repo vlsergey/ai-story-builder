@@ -33,12 +33,14 @@ export default function PlanMergeNode({ data }: NodeProps) {
             <DeleteNodeButton onDelete={handleDelete} />
           </div>
         </div>
-        {node.word_count > 0 ? `${node.word_count}w` : null}
-        {node.summary && (
-          <div
-            className="truncate mt-0.5 text-muted-foreground/70"
-            title={node.summary}>{node.summary}</div>
-        )}
+        <div className="text-[11px] text-muted-foreground">
+          {node.word_count > 0 ? `${node.word_count}w` : null}
+          {node.summary && (
+            <div
+              className="truncate mt-0.5 text-muted-foreground/70"
+              title={node.summary}>{node.summary}</div>
+          )}
+        </div>
       </div>
       <Handle type="source" position={Position.Right} />
     </div>

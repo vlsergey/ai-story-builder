@@ -49,7 +49,7 @@ const edgeTypes = {
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120 })
+  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120, edgesep: 120 })
   g.setDefaultEdgeLabel(() => ({}))
   nodes.forEach(n => g.setNode(n.id, { width: 200, height: 80 }))
   edges.forEach(e => g.setEdge(e.source, e.target))
