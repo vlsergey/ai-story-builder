@@ -4,6 +4,7 @@ import { PlanNodeRow } from '@shared/plan-graph'
 import { dispatchOpenPlanNodeEditor } from '../../lib/plan-graph-events'
 import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 import DeleteNodeButton from './DeleteNodeButton'
+import { FileTextIcon } from 'lucide-react'
 
 type PlanTextNodeData = PlanNodeRow & { onDelete: (id: string) => void }
 
@@ -22,7 +23,8 @@ export default function PlanTextNode({ data }: NodeProps) {
     >
       <Handle type="target" position={Position.Left} />
       <div className="p-2">
-        <div className="flex items-start justify-between gap-1 mb-1">
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <FileTextIcon className='shrink-0 w-4 h-4 text-muted-foreground/70'/>
           <span className="text-sm font-medium leading-tight truncate flex-1">{node.title}</span>
           <div className="flex items-center gap-1">
             <PlanNodeStatusIcon status={node.status} />
@@ -32,7 +34,9 @@ export default function PlanTextNode({ data }: NodeProps) {
         <div className="text-[11px] text-muted-foreground">
           {node.word_count > 0 ? `${node.word_count}w` : null}
           {node.summary && (
-            <div className="truncate mt-0.5 text-muted-foreground/70">{node.summary}</div>
+            <div
+              className="truncate mt-0.5 text-muted-foreground/70"
+              title={node.summary}>{node.summary}</div>
           )}
         </div>
       </div>

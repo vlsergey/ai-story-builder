@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 import { PlanNodeRow } from '@shared/plan-graph'
 import DeleteNodeButton from './DeleteNodeButton'
+import { BookOpenCheckIcon } from 'lucide-react'
 
 type PlanLoreNodeData = PlanNodeRow & { onDelete: (id: string) => void }
 
@@ -20,7 +21,7 @@ export default function PlanLoreNode({ data }: NodeProps) {
       <div className="p-2">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-purple-500 text-sm">⬡</span>
+            <BookOpenCheckIcon className='shrink-0 w-4 h-4 text-muted-foreground/70'/>
             <span className="text-sm font-medium truncate">{node.title}</span>
           </div>
           <div className="flex items-center gap-1">

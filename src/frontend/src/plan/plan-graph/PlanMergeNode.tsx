@@ -4,6 +4,7 @@ import { PlanNodeRow } from '@shared/plan-graph'
 import { dispatchOpenPlanNodeEditor } from '../../lib/plan-graph-events'
 import PlanNodeStatusIcon from './PlanNodeStatusIcon'
 import DeleteNodeButton from './DeleteNodeButton'
+import { MergeIcon } from 'lucide-react'
 
 type PlanMergeNodeData = PlanNodeRow & { onDelete: (id: string) => void }
 
@@ -24,7 +25,7 @@ export default function PlanMergeNode({ data }: NodeProps) {
       <div className="p-2">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-blue-500 text-sm">⊞</span>
+            <MergeIcon className='w-4 h-4 text-muted-foreground/70'/>
             <span className="text-sm font-medium truncate">{node.title}</span>
           </div>
           <div className="flex items-center gap-1">
@@ -32,7 +33,12 @@ export default function PlanMergeNode({ data }: NodeProps) {
             <DeleteNodeButton onDelete={handleDelete} />
           </div>
         </div>
-        <div className="text-[10px] text-muted-foreground mt-0.5">Merge</div>
+        {node.word_count > 0 ? `${node.word_count}w` : null}
+        {node.summary && (
+          <div
+            className="truncate mt-0.5 text-muted-foreground/70"
+            title={node.summary}>{node.summary}</div>
+        )}
       </div>
       <Handle type="source" position={Position.Right} />
     </div>
