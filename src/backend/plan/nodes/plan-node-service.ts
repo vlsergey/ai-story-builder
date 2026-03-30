@@ -15,6 +15,7 @@ import { improvePlanNodeContent } from '../../routes/improve-plan-node-content.j
 import { ResponseStreamEvent } from 'openai/resources/responses/responses.js'
 import { generatePlanNodeTextContent } from '../../routes/generate-plan-node-text-content.js'
 import { Observable } from '@trpc/server/observable'
+import { generateSummary } from '../../routes/generate-summary.js'
 
 export type NodeUpdateEvent = {
   nodeId: number
@@ -391,6 +392,17 @@ export class PlanNodeService implements NodeContext {
 
       emit.next({ type: 'data', data: newNode });      
       emit.next({ type: 'completed' });
+    });
+  }
+
+  async aiGenerateSummary(nodeId: number): Promise<PlanNodeRow> {
+    const node = this.getById(nodeId);
+    if (!node) throw this.makeError(`node ${nodeId} not found`, 404);
+
+    return await this.patch(nodeId, false, {
+      summary: node.content
+        ? await generateSummary(node.content)
+        : '',
     });
   }
 

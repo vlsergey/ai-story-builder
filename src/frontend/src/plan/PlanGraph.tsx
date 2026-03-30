@@ -28,6 +28,14 @@ import GenerateAllDialog from './GenerateAllDialog'
 import { trpc } from '../ipcClient'
 import { PlanNodeRow } from '@shared/plan-graph'
 import debounce from "lodash/debounce";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuPortal,
+} from '@/ui-components/context-menu'
 
 const nodeTypes = {
   planText: PlanTextNode,
@@ -83,6 +91,7 @@ export default function PlanGraph() {
   const loading = areNodesLoading || areEdgesLoading
   const deleteEdge = trpc.plan.edges.delete.useMutation().mutate
   const deleteNodeMutation = trpc.plan.nodes.delete.useMutation().mutate
+  const aiGenerateSummary = trpc.plan.nodes.aiGenerateSummary.useMutation().mutate
 
   const deleteNode = useCallback(async (nodeId: number) => {
     const message = t('planGraph.deleteConfirmation')
@@ -123,7 +132,6 @@ export default function PlanGraph() {
   const addTitleInputRef = useRef<HTMLInputElement>(null)
   const reactFlowInstance = useRef<any>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
-  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null)
   const hasFitted = useRef(false)
 
   // Fit view after nodes are loaded and when layout changes
@@ -161,14 +169,23 @@ export default function PlanGraph() {
     patchNode({id: Number(node.id), manual: true, data: { x: node.position.x, y: node.position.y }})
   }, [autoLayout, patchNode])
 
+  const contextMenuTriggerRef = useRef<HTMLSpanElement>(null)
+  const [contextMenuNodeId, setContextMenuNodeId] = useState<number | null>(null)
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault()
-    setContextMenu({
-      nodeId: node.id,
-      x: event.clientX,
-      y: event.clientY,
-    })
-  }, [])
+    if (contextMenuTriggerRef.current) {
+      setContextMenuNodeId(Number(node.id))
+      const fakeEvent = new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      })
+      // Генерируем событие на элементе-триггере
+      contextMenuTriggerRef.current.dispatchEvent(fakeEvent)
+    }
+  }, [contextMenuTriggerRef, setContextMenuNodeId])
 
   const scheduleLayout = useCallback(() => {
     if (autoLayout) {
@@ -398,29 +415,29 @@ export default function PlanGraph() {
         </div>
       )}
 
-      {/* Context menu for nodes */}
-      {contextMenu && (
-        <div
-          className="fixed z-50 bg-background border border-border rounded shadow-lg w-40"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-        >
-          <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-t"
-            onClick={() => {
-              deleteNode(Number(contextMenu.nodeId))
-              setContextMenu(null)
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <span ref={contextMenuTriggerRef} className="hidden" /> 
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            onSelect={() => {
+              if (contextMenuNodeId) {
+                aiGenerateSummary(contextMenuNodeId)
+              }
             }}
           >
-            {t('planGraph.deleteNode')}
-          </button>
-          <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-b border-t border-border"
-            onClick={() => setContextMenu(null)}
+            {t('planGraph.aiGenerateSummary')}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            variant="destructive"
+            onSelect={() => { if (contextMenuNodeId) deleteNode(contextMenuNodeId) }}
           >
-            {t('common.cancel')}
-          </button>
-        </div>
-      )}
+            {t('planGraph.deleteNode')}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     </div>
   )
 }

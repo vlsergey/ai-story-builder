@@ -4,13 +4,13 @@ import { AGE_RATING_INFO, AGE_RATING_ORDER, AiEngineDefinition, CAPABILITY_KEYS 
 import { useCallback, useEffect } from "react";
 import { trpc } from "@/ipcClient";
 import AiGenerationSettingsFieldGroup from "./AiGenerationSettingsFieldGroup";
-import { FieldGroup, FieldLegend, FieldSet } from "../ui-components/field";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "../ui-components/field";
 import { Button } from "../ui-components/button"
 import { RefreshCw } from 'lucide-react'
 import { ScrollArea } from "../ui-components/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui-components/card";
 import { Separator } from "../ui-components/separator";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import debounce from "lodash/debounce";
 import AiEngineField from "./AiEngineField";
@@ -163,14 +163,22 @@ export default function AiEngineConfigEditor({active, engine, value, onChange}: 
         <Separator className="my-4"/>
 
         <FieldSet>
-          <FieldLegend>{t('settings.generateSummaryInstructions.title')}</FieldLegend>
-          <FieldGroup>
-            <Textarea
-              {...form.register('generateSummaryInstructions')}
-              placeholder={t('settings.generateSummaryInstructions.placeholder')}
-              rows={4}
-            />
-          </FieldGroup>
+            <Controller
+                control={form.control}
+                name={'generateSummaryInstructions'}
+                render={({ field, fieldState: {error, invalid} }) => (
+                    <Field data-invalid={invalid}>
+                        <FieldContent>
+                            <FieldLabel>{t('settings.generateSummaryInstructions.label')}</FieldLabel>
+                            <FieldDescription>{t('settings.generateSummaryInstructions.description')}</FieldDescription>
+                        </FieldContent>
+                        <Textarea
+                            {...field}
+                            placeholder={t('settings.generateSummaryInstructions.placeholder')}
+                            rows={4}
+                        />
+                        {invalid && <FieldError errors={[error]} />}
+                    </Field>)} />
         </FieldSet>
 
         <Separator className="my-4"/>

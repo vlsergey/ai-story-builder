@@ -128,6 +128,9 @@ export const appRouter = t.router({
       aiGenerate: t.procedure
         .input(z.int())
         .subscription(({ input }) => new PlanNodeService().aiGenerate(input)),
+      aiGenerateSummary: t.procedure
+        .input(z.int())
+        .mutation(({ input }) => new PlanNodeService().aiGenerateSummary(input)),
       aiImprove: t.procedure
         .input(z.int())
         .subscription(({ input }) => new PlanNodeService().aiImprove(input)),
