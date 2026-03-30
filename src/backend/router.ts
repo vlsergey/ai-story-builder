@@ -117,7 +117,7 @@ export const appRouter = t.router({
     sortChildren: t.procedure.input(z.number()).mutation(({ input }) => sortLoreChildren(input)),
     reorderChildren: t.procedure.input(z.array(z.number())).mutation(({ input }) => reorderLoreChildren(input)),
     restore: t.procedure.input(z.number()).mutation(({ input }) => restoreLoreNode(input)),
-    subscribe: t.procedure.subscription(loreEventManager.asSubscription()),
+    subscribe: t.procedure.subscription(() => loreEventManager.asSubscription()),
   }),
 
   plan: t.router({
@@ -150,7 +150,7 @@ export const appRouter = t.router({
         .mutation(({ input }) => new PlanNodeService().regenerate(input)),
       startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() }))
         .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
-      subscribe: t.procedure.subscription(planNodeEventManager.asSubscription()),
+      subscribe: t.procedure.subscription(() => planNodeEventManager.asSubscription()),
     }),
     edges: t.router({
       getAll: t.procedure.query(() => getPlanEdges()),
@@ -158,7 +158,7 @@ export const appRouter = t.router({
       patch: t.procedure.input(z.object({ id: z.number(), data: z.any() }))
         .mutation(({ input }) => patchGraphEdge(input.id, input.data)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => deleteGraphEdge(input)),
-      subscribe: t.procedure.subscription(planEdgeEventManager.asSubscription()),
+      subscribe: t.procedure.subscription(() => planEdgeEventManager.asSubscription()),
     }),
   }),
 

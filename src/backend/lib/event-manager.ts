@@ -1,4 +1,4 @@
-import { observable, Observer } from '@trpc/server/observable';
+import { Observable, observable, Observer } from '@trpc/server/observable';
 import { EventEmitter } from 'node:events';
 import { on } from 'node:events'; // Встроенная функция Node.js
 
@@ -17,14 +17,14 @@ export class EventManager extends EventEmitter<PlanEvents> {
     this.path = path;
   }
 
-  asSubscription() {
+  asSubscription(): Observable<number, unknown> {
     const events = this.events;
-    return async function* () {
+    return toObservable<number>(async (emit) => {
       const iterable = on(events, 'update');
       for await (const [id] of iterable) {
-        yield id as number;
+        emit.next(id);
       }
-    };
+    })
   }
 
   /**
