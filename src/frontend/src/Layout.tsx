@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react'
 import { DockviewReact, DockviewDefaultTab } from 'dockview'
 import { useTheme } from './lib/theme/theme-provider'
-import { ipcClient } from './ipcClient'
+import { ipcClient, trpc } from './ipcClient'
 
 // Import the dockview styles
 import 'dockview/dist/styles/dockview.css'
@@ -186,15 +186,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     }
   }, [])
 
-  // Load layout from database
-  const loadLayoutFromDatabase = useCallback(async () => {
-    try {
-      return await ipcClient.settings.layout.get.query
-    } catch (e) {
-      console.error('Failed to load layout from database:', e)
-      return null
-    }
-  }, [])
+  const layoutFromSettings = trpc.settings.layout.get.useQuery().data
 
   const setupDefaultLayout = useCallback(() => {
     if (!dockviewRef.current) return
@@ -245,7 +237,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   // helper used after ready or when project is loaded
   const restoreLayout = useCallback(async () => {
     if (!dockviewRef.current) return
-    const savedLayout = initialLayout != null ? initialLayout : await loadLayoutFromDatabase()
+    const savedLayout = initialLayout != null ? initialLayout : layoutFromSettings
     if (savedLayout) {
       try {
         dockviewRef.current.fromJSON(normalizeLayout(savedLayout))
@@ -257,7 +249,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       setupDefaultLayout()
     }
     lockWatermarkGroups()
-  }, [initialLayout, loadLayoutFromDatabase, setupDefaultLayout, lockWatermarkGroups])
+  }, [initialLayout, layoutFromSettings, setupDefaultLayout, lockWatermarkGroups])
 
   // Load layout only once when component mounts (project is already open in server)
   useEffect(() => {
