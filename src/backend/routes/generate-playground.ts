@@ -47,7 +47,7 @@ export async function generatePlayground(
   await adapter.generateResponse(
     {
       userPrompt: instructions.trim(),
-      systemPrompt: undefined,
+      systemPrompt: null,
       includeExistingLore,
       aiGenerationSettings: settings,
       engineFileIds,

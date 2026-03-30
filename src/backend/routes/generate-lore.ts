@@ -87,7 +87,7 @@ export async function generateLore(
   return await adapter.generateResponse(
     {
       userPrompt: aiUserPrompt!.trim(),
-      systemPrompt: aiSystemPrompt?.trim() || undefined,
+      systemPrompt: aiSystemPrompt?.trim() ?? null,
       // TODO: fix and implement it it
       includeExistingLore: false,
       aiGenerationSettings,
