@@ -1,11 +1,11 @@
 import React from 'react'
 import LoreTree from './LoreTree'
-import type { LoreNode } from '../types/models'
+import type { LoreNodeRow } from '../../../shared/lore-node.js'
 
 interface LoreSectionProps {
-  onSelectLoreNode: (node: LoreNode) => void
-  onOpenLoreNode?: (node: LoreNode) => void
-  onOpenLoreWizard?: (node: LoreNode) => void
+  onSelectLoreNode: (node: LoreNodeRow) => void
+  onOpenLoreNode?: (node: LoreNodeRow) => void
+  onOpenLoreWizard?: (node: LoreNodeRow) => void
 }
 
 export default function LoreSection({ onSelectLoreNode, onOpenLoreNode, onOpenLoreWizard }: LoreSectionProps) {

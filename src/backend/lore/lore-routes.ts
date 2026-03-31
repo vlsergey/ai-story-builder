@@ -1,7 +1,6 @@
 import fs from 'fs'
-import type { LoreTreeNode } from '../types/index.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-import { LoreNodeRow } from '../../shared/lore-node.js';
+import { LoreNodeCreate, LoreNodeRow } from '../../shared/lore-node.js';
 import { loreEventManager } from './lore-event-manager.js'
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -29,24 +28,8 @@ function countBytes(text: string): number {
 
 // ── Tree ──────────────────────────────────────────────────────────────────────
 
-export function getLoreTree(): LoreTreeNode[] {
-  const repo = new LoreNodeRepository()
-  const rows = repo.getAll()
-  const map = new Map<number, LoreTreeNode>()
-  rows.forEach(r => map.set(r.id, {
-    ...r,
-    ai_sync_info: r.ai_sync_info ? JSON.parse(r.ai_sync_info) : null,
-    children: [],
-  }))
-  const roots: LoreTreeNode[] = []
-  for (const node of map.values()) {
-    if (node.parent_id != null && map.has(node.parent_id)) {
-      map.get(node.parent_id)!.children.push(node)
-    } else {
-      roots.push(node)
-    }
-  }
-  return roots
+export function findAll(): LoreNodeRow[] {
+  return new LoreNodeRepository().findAll()
 }
 
 // ── Import ─────────────────────────────────────────────────────────────────────
@@ -71,15 +54,14 @@ export function importLoreNode(data: { title: string; content: string; parentId:
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-export function createLoreNode(data: { parent_id?: number | null; name: string }): { id: number } {
-  const { parent_id, name: title } = data
-  if (!title?.trim()) throw makeError('name required', 400)
+export function create(data: LoreNodeCreate): { id: number } {
+  if (!data.title?.trim()) throw makeError('name required', 400)
   const repo = new LoreNodeRepository()
-  const pid = parent_id ?? null
+  const pid = data.parent_id ?? null
   const maxPos = repo.getMaxPosition(pid)
   const id = repo.insert({
-    parent_id: pid,
-    title: title.trim(),
+    ...data,
+    title: data.title.trim(),
     position: maxPos + 1,
   })
   loreEventManager.emitUpdate(id)

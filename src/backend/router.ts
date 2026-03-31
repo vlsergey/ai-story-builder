@@ -29,9 +29,9 @@ import {
 
 // Lore functions
 import {
-  getLoreTree,
+  findAll,
   getLoreNode,
-  createLoreNode,
+  create,
   patchLoreNode,
   deleteLoreNode,
   importLoreNode,
@@ -98,11 +98,11 @@ export const appRouter = t.router({
   }),
 
   lore: t.router({
-    tree: t.procedure.query(() => getLoreTree()),
     get: t.procedure.input(z.number()).query(({ input }) => getLoreNode(input)),
     create: t.procedure
       .input(z.object({ parent_id: z.number().nullable().optional(), name: z.string() }))
-      .mutation(({ input }) => createLoreNode(input)),
+      .mutation(({ input }) => create(input)),
+    findAll: t.procedure.query(() => findAll()),
     patch: t.procedure
       .input(z.object({ id: z.number(), data: z.any() }))
       .mutation(({ input }) => patchLoreNode(input.id, input.data)),

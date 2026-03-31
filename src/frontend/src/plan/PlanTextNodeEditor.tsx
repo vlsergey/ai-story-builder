@@ -1,4 +1,4 @@
-import AiThinkingPanel, { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel";
+import { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel";
 import { trpc } from "@/ipcClient";
 import getDifference from "@/lib/getDifference";
 import NodeEditor, { EditorMode, NodeEditorState } from "@/nodes/NodeEditor"
@@ -12,7 +12,7 @@ interface PlanNodeTextEditorProps {
 }
 
 export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTextEditorProps) {
-  const [firstInitialValue, _] = useState<PlanNodeRow>(initialValue)
+  const [firstInitialValue] = useState<PlanNodeRow>(initialValue)
   const [lastSaved, setLastSaved] = useState<PlanNodeRow>(initialValue)
   const [value, setValue] = useState<PlanNodeRow>(initialValue)
   const [status, setStatus] = useState<NodeEditorState>('SAVED')

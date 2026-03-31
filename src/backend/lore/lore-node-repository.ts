@@ -9,7 +9,7 @@ export class LoreNodeRepository {
   /**
    * Get all lore nodes (full rows) ordered by parent_id, position, id.
    */
-  getAll(): LoreNodeRow[] {
+  findAll(): LoreNodeRow[] {
     return withDbRead(db =>
       db.prepare('SELECT * FROM lore_nodes ORDER BY parent_id, position, id').all() as LoreNodeRow[]
     )

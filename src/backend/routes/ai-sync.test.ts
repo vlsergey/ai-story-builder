@@ -598,7 +598,7 @@ describe('syncLore', () => {
     await syncLore()
 
     const repo = new LoreNodeRepository()
-    const deletedNodes = repo.getAll().filter(n => n.to_be_deleted === 1)
+    const deletedNodes = repo.findAll().filter(n => n.to_be_deleted === 1)
     expect(deletedNodes).toHaveLength(0)
   })
 

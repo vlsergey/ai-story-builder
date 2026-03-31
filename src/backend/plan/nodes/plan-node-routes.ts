@@ -1,4 +1,3 @@
-import type { PlanNodeTree } from '../../types/index.js'
 import type { PlanNodeCreate, PlanNodeRow } from '../../../shared/plan-graph.js'
 import { isValidNodeType, NODE_TYPES } from '../../../shared/node-edge-dictionary.js'
 import { PlanNodeService } from './plan-node-service.js'
@@ -13,20 +12,10 @@ function makeError(message: string, status: number): Error {
 
 // ── Plan node functions ──────────────────────────────────────────────────────
 
-export function getPlanNodes(): PlanNodeTree[] {
+export function getPlanNodes(): PlanNodeRow[] {
   const nodes = new PlanNodeService().getAll()
-
-  const map = new Map<number, PlanNodeTree>()
-  nodes.forEach((n) => map.set(n.id, { ...n, children: [] }))
-  const roots: PlanNodeTree[] = []
-  for (const n of map.values()) {
-    if (n.parent_id != null && map.has(n.parent_id)) {
-      map.get(n.parent_id)!.children.push(n)
-    } else {
-      roots.push(n)
-    }
-  }
-  return roots
+  // Возвращаем плоский список узлов без children
+  return nodes
 }
 
 export function getPlanNode(id: number): PlanNodeRow {
@@ -46,3 +35,4 @@ export function createPlanNode(data: PlanNodeCreate): { id: number | bigint } {
   const result = new PlanNodeService().create(data)
   return { id: result.id }
 }
+

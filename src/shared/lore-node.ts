@@ -24,7 +24,6 @@ type LoreNodeInsert = Omit<LoreNodeRow, 'id' | 'created_at'>
 export const LoreNodeDefaults : Partial<LoreNodeInsert> = {
   parent_id: null,
   content: null,
-  position: 0,
   to_be_deleted: 0,
   ai_user_prompt: null,
   ai_system_prompt: null,
@@ -39,5 +38,5 @@ export const LoreNodeDefaults : Partial<LoreNodeInsert> = {
 }
 
 type DefaultLoreNodeKeys = keyof typeof LoreNodeDefaults;
-export type LoreNodeCreate = Omit<LoreNodeInsert, DefaultLoreNodeKeys> & Partial<Pick<LoreNodeInsert, DefaultLoreNodeKeys>>;
+export type LoreNodeCreate = Omit<Omit<LoreNodeInsert, 'position'>, DefaultLoreNodeKeys> & Partial<Pick<LoreNodeInsert, DefaultLoreNodeKeys>>;
 export type LoreNodeUpdate = Partial<Omit<LoreNodeRow, 'id' | 'created_at'>>

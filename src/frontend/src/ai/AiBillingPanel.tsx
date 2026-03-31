@@ -207,7 +207,6 @@ export default function AiBillingPanel() {
         ) : !billing.configured ? (
           <p
             className="text-muted-foreground text-xs"
-            // eslint-disable-next-line react/no-danger
             dangerouslySetInnerHTML={{ __html: t('billing.configure_hint') }}
           />
         ) : billing.error ? (

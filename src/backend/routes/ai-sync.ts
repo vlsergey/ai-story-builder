@@ -224,7 +224,7 @@ export async function syncLore(): Promise<{
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
   const repo = new LoreNodeRepository()
-  const rows = repo.getAll()
+  const rows = repo.findAll()
 
   if (!currentEngine) {
     throw makeError('no AI engine configured', 400)

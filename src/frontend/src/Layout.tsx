@@ -14,7 +14,7 @@ import PlanGraph from './plan/PlanGraph'
 import SettingsPanel from './settings/SettingsPanel'
 import AiPlayground from './ai/AiPlayground'
 import AiBillingPanel from './ai/AiBillingPanel'
-import type { LoreNode } from './types/models'
+import type { LoreNodeRow } from '@shared/lore-node'
 import { EditorSettingsProvider } from './settings/editor-settings'
 import { LoreSettingsProvider } from './settings/lore-settings'
 import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from './lib/plan-graph-events'
@@ -93,7 +93,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   }
 
   /** Opens (or activates) a lore-editor tab for the given node in the center group. */
-  function openLoreEditor(node: LoreNode) {
+  function openLoreEditor(node: LoreNodeRow) {
     const api = dockviewRef.current
     if (!api) return
     const panelId = `lore-editor-${node.id}`
@@ -130,10 +130,10 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   }
 
   /** Creates a new blank child node under the given parent, then opens it in LoreEditor. */
-  async function openLoreWizard(node: LoreNode) {
+  async function openLoreWizard(node: LoreNodeRow) {
     try {
       const { id } = await ipcClient.lore.create.mutate({ parent_id: node.id, name: 'New lore item' })
-      openLoreEditor({ id, title: 'New lore item', parent_id: node.id } as LoreNode)
+      openLoreEditor({ id, title: 'New lore item', parent_id: node.id } as LoreNodeRow)
     } catch { /* ignore */ }
   }
 

@@ -16,8 +16,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { useLocale } from '../lib/locale'
-import type { PlanGraphEdge } from '../types/models'
-import { type PlanNodeType, NODE_TYPES, PlanNodeUpdate } from '@shared/plan-graph'
+import { type PlanNodeType, NODE_TYPES, PlanNodeUpdate, type PlanEdgeRow } from '@shared/plan-graph'
 import { EDGE_TYPES, canCreateEdge } from '@shared/node-edge-dictionary'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
@@ -70,7 +69,7 @@ function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => v
   }))
 }
 
-function toReactFlowEdges(graphEdges: PlanGraphEdge[], onDeleteEdge: (id: number) => void): Edge[] {
+function toReactFlowEdges(graphEdges: PlanEdgeRow[], onDeleteEdge: (id: number) => void): Edge[] {
   return graphEdges.map(e => ({
     id: String(e.id),
     source: String(e.from_node_id),

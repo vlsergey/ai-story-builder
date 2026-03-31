@@ -1,5 +1,3 @@
-import type { PlanEdgeType } from '../../../shared/plan-graph.js'
-
 export interface AiEngineSyncRecord {
   /** ISO-8601 UTC timestamp of last successful sync */
   last_synced_at: string
@@ -13,59 +11,6 @@ export interface AiEngineSyncRecord {
 
 /** Which statistic to show per node in the lore tree */
 export type LoreStatMode = 'none' | 'words' | 'chars' | 'bytes'
-
-/**
- * Unified lore tree node.
- * - A node with children acts as a folder/section.
- * - A node with content !== null and content.trim().length > 0 has content (acts as an item).
- * - A node can be both (section with its own overview text).
- */
-export interface LoreNode {
-  id: number
-  parent_id: number | null
-  title: string
-  content: string | null
-  word_count: number
-  char_count: number
-  byte_count: number
-  ai_sync_info: Record<string, AiEngineSyncRecord> | null
-  position: number
-  status: string
-  /** 1 = marked for deletion, 0 = active */
-  to_be_deleted: number
-  created_at: string
-  children: LoreNode[]
-}
-
-export interface PlanNodeTree {
-  id: number
-  parent_id: number | null
-  title: string
-  content: string | null
-  position: number
-  created_at: string
-  word_count: number
-  char_count: number
-  byte_count: number
-  /** NULL | 'review' — current review workflow state */
-  changes_status: string | null
-  /** Content before the first improvement started */
-  review_base_content: string | null
-  /** Last AI improve instruction used */
-  last_improve_instruction: string | null
-  children: PlanNodeTree[]
-}
-
-/** Plan graph edge */
-export interface PlanGraphEdge {
-  id: number
-  from_node_id: number
-  to_node_id: number
-  type: PlanEdgeType
-  position: number
-  label: string | null
-  template: string | null
-}
 
 export type ThemePreference = 'auto' | 'obsidian' | 'github'
 export type ResolvedTheme = 'obsidian' | 'github'

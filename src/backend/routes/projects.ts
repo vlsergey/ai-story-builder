@@ -160,7 +160,7 @@ export function createProject(data: { name?: string; text_language?: string }): 
       // Ensure the project is set as current for repositories
       setCurrentDbPath(dbPath)
       const loreRepo = new LoreNodeRepository()
-      const rootNodes = loreRepo.getAll().filter(n => n.parent_id === null)
+      const rootNodes = loreRepo.findAll().filter(n => n.parent_id === null)
       if (rootNodes.length === 0) {
         const rootId = loreRepo.insert({ parent_id: null, title: defaultNodes.root })
         for (const childTitle of defaultNodes.children) {

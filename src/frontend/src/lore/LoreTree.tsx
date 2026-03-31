@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
 import {
   ControlledTreeEnvironment,
   Tree,
@@ -17,7 +17,8 @@ import {
   Plus, CopyPlus, Pencil, SquarePen, Upload, Download, Trash2, RotateCcw, CloudUpload, ArrowUpAZ,
   CheckCircle2, Circle, Loader2, Wand2,
 } from 'lucide-react'
-import { LoreNode, LoreStatMode } from '../types/models'
+import { LoreStatMode } from '../types/models'
+import type { LoreNodeRow } from '../../../shared/lore-node.js'
 import { useLoreSettings } from '../settings/lore-settings'
 import { engineSupportsFileUpload } from '../lib/ai-engines'
 
@@ -37,33 +38,60 @@ type ToolbarItem = LoreCommand | 'separator' | 'spacer'
 
 // ── Tree helpers ──────────────────────────────────────────────────────────────
 
-function collectAllIds(nodes: LoreNode[]): number[] {
-  const ids: number[] = []
-  function walk(list: LoreNode[]) {
-    list.forEach(n => { ids.push(n.id); if (n.children?.length) walk(n.children) })
-  }
-  walk(nodes)
-  return ids
+function buildTreeData(nodes: LoreNodeRow[]): {
+  roots: number[]
+  nodesById: Map<number, LoreNodeRow>
+  childrenByParentId: Map<number | null, number[]>
+} {
+  const nodesById = new Map<number, LoreNodeRow>()
+  const childrenByParentId = new Map<number | null, number[]>()
+
+  nodes.forEach(node => {
+    nodesById.set(node.id, node)
+    const parentKey = node.parent_id
+    if (!childrenByParentId.has(parentKey)) {
+      childrenByParentId.set(parentKey, [])
+    }
+    childrenByParentId.get(parentKey)!.push(node.id)
+  })
+
+  const roots = childrenByParentId.get(null) || []
+  return { roots, nodesById, childrenByParentId }
 }
 
-function collectSyncableIds(nodes: LoreNode[], engine: string): Set<number> {
-  const ids = new Set<number>()
-  function walk(list: LoreNode[]) {
-    list.forEach(n => {
-      if (nodeSyncState(n, engine) !== 'none') ids.add(n.id)
-      if (n.children?.length) walk(n.children)
+function collectAllIds(
+  roots: number[],
+  childrenByParentId: Map<number | null, number[]>
+): number[] {
+  const ids: number[] = []
+  function walk(parentId: number | null) {
+    const children = childrenByParentId.get(parentId) || []
+    children.forEach(childId => {
+      ids.push(childId)
+      walk(childId)
     })
   }
-  walk(nodes)
+  walk(null)
   return ids
 }
 
-function findNode(id: number, nodes: LoreNode[]): LoreNode | null {
-  for (const n of nodes) {
-    if (n.id === id) return n
-    if (n.children?.length) { const f = findNode(id, n.children); if (f) return f }
+function collectSyncableIds(
+  roots: number[],
+  nodesById: Map<number, LoreNodeRow>,
+  childrenByParentId: Map<number | null, number[]>,
+  engine: string
+): Set<number> {
+  const ids = new Set<number>()
+  function walk(parentId: number | null) {
+    const children = childrenByParentId.get(parentId) || []
+    children.forEach(childId => {
+      const node = nodesById.get(childId)
+      if (node && nodeSyncState(node, engine) !== 'none') ids.add(childId)
+      walk(childId)
+    })
   }
-  return null
+  walk(null)
+  return ids
 }
 
 /**
@@ -72,36 +100,51 @@ function findNode(id: number, nodes: LoreNode[]): LoreNode | null {
  *   - All children are leaves  → BookOpen    (a book containing scrolls)
  *   - Some children have kids  → Library     (a bookshelf / collection)
  */
-function nodeIcon(node: LoreNode): typeof Library {
-  const children = node.children ?? []
+function nodeIcon(
+  nodeId: number,
+  childrenByParentId: Map<number | null, number[]>,
+  nodesById: Map<number, LoreNodeRow>
+): typeof Library {
+  const children = childrenByParentId.get(nodeId) || []
   if (children.length === 0) return ScrollText
-  const allLeaves = children.every(c => (c.children?.length ?? 0) === 0)
+  // Check if all children are leaves (have no children themselves)
+  const allLeaves = children.every(childId => {
+    const childChildren = childrenByParentId.get(childId) || []
+    return childChildren.length === 0
+  })
   return allLeaves ? BookOpen : Library
 }
 
-type ItemData = LoreNode | null
+type ItemData = LoreNodeRow | null
 
-function buildItemsMap(roots: LoreNode[]): Record<TreeItemIndex, TreeItem<ItemData>> {
+function buildItemsMap(
+  roots: number[],
+  nodesById: Map<number, LoreNodeRow>,
+  childrenByParentId: Map<number | null, number[]>
+): Record<TreeItemIndex, TreeItem<ItemData>> {
   const items: Record<TreeItemIndex, TreeItem<ItemData>> = {}
   items['root'] = {
     index: 'root',
     isFolder: true,
-    children: roots.map(r => r.id),
+    children: roots,
     canMove: false,
     canRename: false,
     data: null,
   }
-  function walk(nodes: LoreNode[]) {
-    for (const n of nodes) {
-      items[n.id] = {
-        index: n.id,
-        isFolder: (n.children?.length ?? 0) > 0,
-        children: n.children?.map(c => c.id) ?? [],
-        canMove: n.parent_id !== null,
+  function walk(nodeIds: number[]) {
+    for (const nodeId of nodeIds) {
+      const node = nodesById.get(nodeId)
+      if (!node) continue
+      const children = childrenByParentId.get(nodeId) || []
+      items[nodeId] = {
+        index: nodeId,
+        isFolder: children.length > 0,
+        children,
+        canMove: node.parent_id !== null,
         canRename: true,
-        data: n,
+        data: node,
       }
-      if (n.children?.length) walk(n.children)
+      if (children.length > 0) walk(children)
     }
   }
   walk(roots)
@@ -117,9 +160,19 @@ function uniqueName(base: string, existingNames: string[]): string {
 
 // ── Stats helpers ──────────────────────────────────────────────────────────────
 
-function subtreeStat(node: LoreNode, mode: LoreStatMode): number {
+function subtreeStat(
+  nodeId: number,
+  nodesById: Map<number, LoreNodeRow>,
+  childrenByParentId: Map<number | null, number[]>,
+  mode: LoreStatMode
+): number {
+  const node = nodesById.get(nodeId)
+  if (!node) return 0
   const own = (mode === 'words' ? node.word_count : mode === 'chars' ? node.char_count : node.byte_count) ?? 0
-  return own + (node.children ?? []).reduce((sum, c) => sum + subtreeStat(c, mode), 0)
+  const children = childrenByParentId.get(nodeId) || []
+  const childSum = children.reduce((sum, childId) =>
+    sum + subtreeStat(childId, nodesById, childrenByParentId, mode), 0)
+  return own + childSum
 }
 
 function formatStat(count: number, mode: LoreStatMode): string {
@@ -143,36 +196,10 @@ function formatStat(count: number, mode: LoreStatMode): string {
  *  - non-empty, synced, content changed since last sync → needs-sync
  *  - non-empty, synced, up-to-date      → synced
  */
-function nodeSyncState(node: LoreNode, engine: string): 'none' | 'needs-sync' | 'synced' {
-  const syncRecord = node.ai_sync_info?.[engine]
-
-  if (node.to_be_deleted) {
-    return syncRecord ? 'needs-sync' : 'none'
-  }
-
-  const wordCount = node.word_count ?? 0
-  if (wordCount === 0) {
-    // No own content — only needs attention if a remote file exists for this node
-    // (e.g. Yandex: content was cleared after upload; needs remote cleanup).
-    // A node with no file_id (never uploaded, or already cleaned up) requires nothing.
-    // A Grok group-leader with word_count=0 but file_id (file covers entire subtree) is
-    // treated as synced if content hasn't changed since the last sync.
-    if (!syncRecord?.file_id) return 'none'
-    if (syncRecord.content_updated_at && syncRecord.content_updated_at > syncRecord.last_synced_at) {
-      return 'needs-sync'
-    }
-    return 'synced'
-  }
-
-  // Non-empty, active node
-  if (!syncRecord) return 'needs-sync'
-
-  // Dirty check: content changed after last sync
-  if (syncRecord.content_updated_at && syncRecord.content_updated_at > syncRecord.last_synced_at) {
-    return 'needs-sync'
-  }
-
-  return 'synced'
+function nodeSyncState(node: LoreNodeRow, engine: string): 'none' | 'needs-sync' | 'synced' {
+  // TODO: parse ai_sync_info from string to object
+  // For now, treat as none
+  return 'none'
 }
 
 /**
@@ -181,18 +208,33 @@ function nodeSyncState(node: LoreNode, engine: string): 'none' | 'needs-sync' | 
  *   all none       → none
  *   otherwise      → synced
  */
-function subtreeSyncState(node: LoreNode, engine: string): 'none' | 'needs-sync' | 'synced' {
+function subtreeSyncState(
+  nodeId: number,
+  nodesById: Map<number, LoreNodeRow>,
+  childrenByParentId: Map<number | null, number[]>,
+  engine: string
+): 'none' | 'needs-sync' | 'synced' {
+  const node = nodesById.get(nodeId)
+  if (!node) return 'none'
   const own = nodeSyncState(node, engine)
-  const childStates = (node.children ?? []).map(c => subtreeSyncState(c, engine))
+  const children = childrenByParentId.get(nodeId) || []
+  const childStates = children.map(childId =>
+    subtreeSyncState(childId, nodesById, childrenByParentId, engine))
   const all = [own, ...childStates]
   if (all.some(s => s === 'needs-sync')) return 'needs-sync'
   if (all.every(s => s === 'none')) return 'none'
   return 'synced'
 }
 
-function subtreeIsInProgress(node: LoreNode, syncingNodeIds: ReadonlySet<number>): boolean {
-  if (syncingNodeIds.has(node.id)) return true
-  return (node.children ?? []).some(c => subtreeIsInProgress(c, syncingNodeIds))
+function subtreeIsInProgress(
+  nodeId: number,
+  childrenByParentId: Map<number | null, number[]>,
+  syncingNodeIds: ReadonlySet<number>
+): boolean {
+  if (syncingNodeIds.has(nodeId)) return true
+  const children = childrenByParentId.get(nodeId) || []
+  return children.some(childId =>
+    subtreeIsInProgress(childId, childrenByParentId, syncingNodeIds))
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -203,14 +245,16 @@ export default function LoreTree({
   onOpenLoreWizard,
   syncingNodeIds,
 }: {
-  onSelectLoreNode: (node: LoreNode) => void
-  onOpenLoreNode?: (node: LoreNode) => void
-  onOpenLoreWizard?: (node: LoreNode) => void
+  onSelectLoreNode: (node: LoreNodeRow) => void
+  onOpenLoreNode?: (node: LoreNodeRow) => void
+  onOpenLoreWizard?: (node: LoreNodeRow) => void
   syncingNodeIds?: ReadonlySet<number>
 }) {
   const { statMode } = useLoreSettings()
 
-  const [tree, setTree] = useState<LoreNode[]>([])
+  const [tree, setTree] = useState<LoreNodeRow[]>([])
+  const { roots, nodesById, childrenByParentId } = useMemo(() =>
+    buildTreeData(tree), [tree])
   const [syncingIds, setSyncingIds] = useState<Set<number>>(new Set())
   const [items, setItems] = useState<Record<TreeItemIndex, TreeItem<ItemData>>>({
     root: { index: 'root', isFolder: true, children: [], canMove: false, data: null },
@@ -225,7 +269,7 @@ export default function LoreTree({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const treeRef = useRef<TreeRef<ItemData>>(null)
   // Ref so the lore-node-saved handler always sees the latest tree without re-registration.
-  const treeDataRef = useRef<LoreNode[]>(tree)
+  const treeDataRef = useRef<LoreNodeRow[]>(tree)
   // Expand all nodes only on the very first load; subsequent fetches preserve user's collapse state.
   const isFirstLoad = useRef(true)
 
@@ -255,18 +299,19 @@ export default function LoreTree({
   }, [pendingRenameId, items])
 
   function fetchTree() {
-    ipcClient.lore.tree.query()
-      .then((data: LoreNode[]) => {
+    ipcClient.lore.findAll.query()
+      .then((data: LoreNodeRow[]) => {
         if (!Array.isArray(data)) return
         setTree(data)
-        setItems(buildItemsMap(data))
+        const { roots, nodesById, childrenByParentId } = buildTreeData(data)
+        setItems(buildItemsMap(roots, nodesById, childrenByParentId))
         if (isFirstLoad.current) {
           isFirstLoad.current = false
           setViewState(prev => ({
             ...prev,
             'lore-tree': {
               ...prev['lore-tree'],
-              expandedItems: collectAllIds(data),
+              expandedItems: collectAllIds(roots, childrenByParentId),
             },
           }))
         }
@@ -291,7 +336,7 @@ export default function LoreTree({
       },
     }))
     if (ids.length === 1) {
-      const node = findNode(Number(ids[0]), tree)
+      const node = nodesById.get(Number(ids[0]))
       if (node) onSelectLoreNode(node)
     }
   }
@@ -352,8 +397,9 @@ export default function LoreTree({
   async function handleCreate() {
     if (selectedNodeIds.size !== 1) return
     const [parentId] = selectedNodeIds
-    const siblings = findNode(parentId, tree)?.children ?? []
-    const name = uniqueName('New node', siblings.map(s => s.title))
+    const siblingIds = childrenByParentId.get(parentId) ?? []
+    const siblingTitles = siblingIds.map(id => nodesById.get(id)?.title).filter((t): t is string => !!t)
+    const name = uniqueName('New node', siblingTitles)
     const { id: newId } = await ipcClient.lore.create.mutate({ parent_id: parentId, name })
     setPendingRenameId(newId)
     fetchTree()
@@ -398,7 +444,7 @@ export default function LoreTree({
 
   async function handleExport() {
     for (const nodeId of selectedNodeIds) {
-      const node = findNode(nodeId, tree)
+      const node = nodesById.get(nodeId)
       if (!node?.content?.trim()) continue
       const blob = new Blob([node.content], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
@@ -411,7 +457,7 @@ export default function LoreTree({
   async function handleSortChildren() {
     await Promise.all(
       [...selectedNodeIds]
-        .filter(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
+        .filter(id => (childrenByParentId.get(id)?.length ?? 0) > 1)
         .map(id => ipcClient.lore.sortChildren.mutate(id))
     )
     fetchTree()
@@ -419,7 +465,7 @@ export default function LoreTree({
 
   async function handleDelete() {
     const toDelete = [...selectedNodeIds].filter(id => {
-      const n = findNode(id, tree)
+      const n = nodesById.get(id)
       return n?.parent_id !== null && !n?.to_be_deleted
     })
     if (toDelete.length === 0) return
@@ -432,7 +478,7 @@ export default function LoreTree({
   }
 
   async function handleRestore() {
-    const toRestore = [...selectedNodeIds].filter(id => findNode(id, tree)?.to_be_deleted)
+    const toRestore = [...selectedNodeIds].filter(id => nodesById.get(id)?.to_be_deleted)
     await Promise.all(toRestore.map(id => ipcClient.lore.restore.mutate(id)))
     fetchTree()
   }
@@ -440,14 +486,14 @@ export default function LoreTree({
   function handleOpen() {
     if (selectedNodeIds.size !== 1) return
     const [nodeId] = selectedNodeIds
-    const node = findNode(nodeId, tree)
+    const node = nodesById.get(nodeId)
     if (node) onOpenLoreNode?.(node)
   }
 
   function handleOpenWizard() {
     if (selectedNodeIds.size !== 1) return
     const [nodeId] = selectedNodeIds
-    const node = findNode(nodeId, tree)
+    const node = nodesById.get(nodeId)
     if (node) onOpenLoreWizard?.(node)
   }
 
@@ -459,8 +505,8 @@ export default function LoreTree({
 
   async function handleSyncLore() {
     if (!currentAiEngine) return
-    const toSync = collectSyncableIds(tree, currentAiEngine)
-    setSyncingIds(toSync.size > 0 ? toSync : new Set(collectAllIds(tree).map(id => id)))
+    const toSync = collectSyncableIds(roots, nodesById, childrenByParentId, currentAiEngine)
+    setSyncingIds(toSync.size > 0 ? toSync : new Set(collectAllIds(roots, childrenByParentId).map(id => id)))
     try {
       const data = await ipcClient.ai.syncLore.mutate()
       if (!data.ok) {
@@ -478,20 +524,25 @@ export default function LoreTree({
 
   const treeSyncNeeded = currentAiEngine != null &&
     engineSupportsFileUpload(currentAiEngine) &&
-    tree.some(n => subtreeSyncState(n, currentAiEngine) === 'needs-sync')
+    Array.from(nodesById.keys()).some(nodeId =>
+      subtreeSyncState(nodeId, nodesById, childrenByParentId, currentAiEngine) === 'needs-sync'
+    )
 
   const oneSelected = selectedNodeIds.size === 1
   const anySelected = selectedNodeIds.size >= 1
-  const canSort = [...selectedNodeIds].some(id => (findNode(id, tree)?.children?.length ?? 0) > 1)
-  const hasContent = anySelected && [...selectedNodeIds].some(id => { const n = findNode(id, tree); return !!(n?.content?.trim()) })
+  const canSort = [...selectedNodeIds].some(id => (childrenByParentId.get(id)?.length ?? 0) > 1)
+  const hasContent = anySelected && [...selectedNodeIds].some(id => {
+    const n = nodesById.get(id)
+    return !!(n?.content?.trim())
+  })
   const deletableCount = [...selectedNodeIds].filter(id => {
-    const n = findNode(id, tree)
+    const n = nodesById.get(id)
     return n?.parent_id !== null && !n?.to_be_deleted
   }).length
   const canDelete = deletableCount > 0
   const onlyRootSelected = anySelected && !canDelete
   // All selected nodes are marked for deletion → show Restore instead of Delete
-  const allSelectedToBeDeleted = anySelected && [...selectedNodeIds].every(id => findNode(id, tree)?.to_be_deleted)
+  const allSelectedToBeDeleted = anySelected && [...selectedNodeIds].every(id => nodesById.get(id)?.to_be_deleted)
 
   // ── Command registry ──────────────────────────────────────────────────────
 
@@ -543,7 +594,7 @@ export default function LoreTree({
       if (e.key === 'Enter') {
         const focusedId = viewState['lore-tree']?.focusedItem
         if (focusedId != null && focusedId !== 'root') {
-          const node = findNode(Number(focusedId), tree)
+          const node = nodesById.get(Number(focusedId))
           if (node) { e.preventDefault(); onOpenLoreNode?.(node) }
         }
         return
@@ -553,7 +604,7 @@ export default function LoreTree({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [viewState, tree, onOpenLoreNode])
+  }, [nodesById, viewState, tree, onOpenLoreNode])
 
   // ── Toolbar rendering ─────────────────────────────────────────────────────
 
@@ -651,12 +702,12 @@ export default function LoreTree({
             if (!node) return <>{children}</>
             const isDeleted = !!node.to_be_deleted
             const hasVersions = !!(node.content?.trim())
-            const Icon = node.parent_id === null ? Library : nodeIcon(node)
+            const Icon = node.parent_id === null ? Library : nodeIcon(node.id, childrenByParentId, nodesById)
 
-            const statText = statMode !== 'none' ? formatStat(subtreeStat(node, statMode), statMode) : ''
-            const syncState = engineSupportsFileUpload(currentAiEngine) ? subtreeSyncState(node, currentAiEngine!) : 'none'
+            const statText = statMode !== 'none' ? formatStat(subtreeStat(node.id, nodesById, childrenByParentId, statMode), statMode) : ''
+            const syncState = engineSupportsFileUpload(currentAiEngine) ? subtreeSyncState(node.id, nodesById, childrenByParentId, currentAiEngine!) : 'none'
             const effectiveSyncingIds = syncingIds.size > 0 ? syncingIds : (syncingNodeIds ?? new Set<number>())
-            const inProgress = syncState !== 'none' && subtreeIsInProgress(node, effectiveSyncingIds)
+            const inProgress = syncState !== 'none' && subtreeIsInProgress(node.id, childrenByParentId, effectiveSyncingIds)
             const showSync = syncState !== 'none'
             const synced = syncState === 'synced'
 
