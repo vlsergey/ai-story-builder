@@ -36,16 +36,23 @@ import {
   ContextMenuSeparator,
 } from '@/ui-components/context-menu'
 import { sortByHierarchy } from '@/lib/sortByHierarchy'
+import PlanForEachInputNode from './plan-graph/PlanForEachInputNode'
+import PlanForEachOutputNode from './plan-graph/PlanForEachOutputNode'
 
-const nodeTypes = {
+const nodeTypes: Record<PlanNodeType | 'group', React.ComponentType<any> & {
+  defaultWidth?: number,
+  defaultHeight?: number,
+  fixedWidth?: number,
+  fixedHeight?: number,
+}> = {
   'text': PlanTextNode,
   'lore': PlanLoreNode,
   'merge': PlanMergeNode,
   'split': PlanSplitterNode,
   'for-each': PlanForEachNode,
   'group': PlanForEachNode,
-  'for-each-output': PlanTextNode,
-  'for-each-input': PlanTextNode,
+  'for-each-input': PlanForEachInputNode,
+  'for-each-output': PlanForEachOutputNode,
 }
 
 const edgeTypes = {
@@ -60,6 +67,9 @@ function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => v
     const isGroup = nodeDef?.isGroup ?? false;
     const isConfined = nodeDef?.confined ?? false;
     const reactFlowType = isGroup ? 'group' : n.type;
+    const Component = nodeTypes[reactFlowType];
+    const width = Component.fixedWidth ?? n.width ?? Component.defaultWidth ?? 200;
+    const height = Component.fixedHeight ?? n.height ?? Component.defaultHeight ?? 200;
     const extent = isConfined ? 'parent' : undefined;
     return {
       id: String(n.id),
@@ -67,8 +77,8 @@ function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => v
       position: { x: n.x ?? 0, y: n.y ?? 0 },
       parentId: n.parent_id ? String(n.parent_id) : undefined,
       data: { ...n, onDelete, childCount },
-      width: n.width ?? 200,
-      height: n.height ?? 100,
+      width: width,
+      height: height,
       extent,
     };
   });
