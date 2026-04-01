@@ -35,9 +35,12 @@ CREATE TABLE lore_nodes (
   ai_sync_info TEXT NULL,
   review_base_content TEXT NULL,
   ai_improve_instruction TEXT NULL,
-  ai_instructions TEXT NULL,
+  ai_user_prompt TEXT NULL,
   ai_settings TEXT,
   in_review INTEGER NOT NULL DEFAULT 0,
+  ai_system_prompt TEXT NULL,
+  width INTEGER NULL,
+  height INTEGER NULL,
   UNIQUE (parent_id, title)
 );
 
@@ -61,7 +64,7 @@ CREATE TABLE plan_nodes (
   type TEXT NOT NULL DEFAULT 'text',
   x REAL DEFAULT 0,
   y REAL DEFAULT 0,
-  ai_instructions TEXT,
+  ai_user_prompt TEXT,
   summary TEXT,
   ai_sync_info TEXT,
   word_count INTEGER NOT NULL DEFAULT 0,
@@ -72,7 +75,10 @@ CREATE TABLE plan_nodes (
   node_type_settings TEXT NULL,
   status TEXT NOT NULL DEFAULT 'EMPTY',
   ai_settings TEXT,
-  in_review INTEGER NOT NULL DEFAULT 0
+  in_review INTEGER NOT NULL DEFAULT 0,
+  ai_system_prompt TEXT NULL,
+  width INTEGER NULL,
+  height INTEGER NULL
 );
 
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);

@@ -28,11 +28,26 @@ export interface LoreSettings {
   // No specific settings for lore nodes (AI generation settings are elsewhere)
 }
 
+export interface ForEachSettings {
+  // No settings needed for for-each nodes
+}
+
+export interface ForEachInputSettings {
+  // No settings
+}
+
+export interface ForEachOutputSettings {
+  // No settings
+}
+
 export type NodeTypeSettingsMap = {
   split: SplitSettings
   merge: MergeSettings
   text: TextSettings
   lore: LoreSettings
+  'for-each': ForEachSettings
+  'for-each-input': ForEachInputSettings
+  'for-each-output': ForEachOutputSettings
 }
 
 export type NodeTypeSettings<T extends keyof NodeTypeSettingsMap = keyof NodeTypeSettingsMap> =
@@ -43,12 +58,18 @@ export type SplitSettingsPartial = Partial<SplitSettings>
 export type MergeSettingsPartial = Partial<MergeSettings>
 export type TextSettingsPartial = Partial<TextSettings>
 export type LoreSettingsPartial = Partial<LoreSettings>
+export type ForEachSettingsPartial = Partial<ForEachSettings>
+export type ForEachInputSettingsPartial = Partial<ForEachInputSettings>
+export type ForEachOutputSettingsPartial = Partial<ForEachOutputSettings>
 
 export type NodeTypeSettingsPartialMap = {
   split: SplitSettingsPartial
   merge: MergeSettingsPartial
   text: TextSettingsPartial
   lore: LoreSettingsPartial
+  'for-each': ForEachSettingsPartial
+  'for-each-input': ForEachInputSettingsPartial
+  'for-each-output': ForEachOutputSettingsPartial
 }
 
 export type NodeTypeSettingsPartial<T extends keyof NodeTypeSettingsPartialMap = keyof NodeTypeSettingsPartialMap> =
@@ -75,6 +96,11 @@ export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(
       } as NodeTypeSettingsMap[T]
     case 'text':
     case 'lore':
+      return {} as NodeTypeSettingsMap[T]
+    case 'for-each':
+      return {} as NodeTypeSettingsMap[T]
+    case 'for-each-input':
+    case 'for-each-output':
       return {} as NodeTypeSettingsMap[T]
     default: {
       const exhaustiveCheck: never = nodeType

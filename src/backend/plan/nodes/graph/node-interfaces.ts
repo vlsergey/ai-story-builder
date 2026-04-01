@@ -26,4 +26,6 @@ export interface NodeContext {
     sourceNodeId: number
     output: unknown
   }>
+  getByParentId(parentId: number | null): PlanNodeRow[]
+  getProcessor(nodeType: import('../../../../shared/plan-graph.js').PlanNodeType): import('./node-processor.js').NodeProcessor | undefined
 }

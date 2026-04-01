@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react'
 import { trpc } from '../ipcClient'
 import PlanNodeTextEditor from './PlanTextNodeEditor'
+import ForEachNodeEditor from './ForEachNodeEditor'
+import { PlanNodeRow } from '@shared/plan-graph'
 
 interface PlanEditorProps {
   nodeId: number
@@ -64,6 +66,23 @@ export default function PlanEditor({ nodeId, panelApi }: PlanEditorProps) {
           panelApi={panelApi}
           onNodeUpdated={(updatedNode) => setNode(updatedNode)}
         /> */}
+      </div>
+    )
+  }
+
+  // For for-each nodes, show the ForEachNodeEditor
+  if (node.type === 'for-each') {
+    const patchMutation = trpc.plan.nodes.patch.useMutation()
+    const handleUpdate = (data: Partial<PlanNodeRow>) => {
+      patchMutation.mutate({ id: nodeId, manual: true, data })
+    }
+    return (
+      <div className="h-full overflow-auto">
+        <ForEachNodeEditor
+          node={node}
+          onUpdate={handleUpdate}
+          panelApi={panelApi}
+        />
       </div>
     )
   }

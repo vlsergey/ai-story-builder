@@ -11,6 +11,14 @@ export interface NodeTypeDefinition {
   allowedOutgoingEdgeTypes: PlanEdgeType[]
   /** Edge types that can target this node */
   allowedIncomingEdgeTypes: PlanEdgeType[]
+  /** Whether this node type can be created manually by user (default true) */
+  canCreate?: boolean
+  /** Whether this node type can be deleted manually by user (default true) */
+  canDelete?: boolean
+  /** Whether this node type is a group node (rendered as React Flow group) */
+  isGroup?: boolean
+  /** Whether this node is confined to its parent (cannot be moved outside parent bounds) */
+  confined?: boolean
 }
 
 export interface EdgeTypeDefinition {
@@ -27,21 +35,53 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     id: 'text',
     allowedOutgoingEdgeTypes: ['text'],
     allowedIncomingEdgeTypes: ['text'],
+    canCreate: true,
+    canDelete: true,
   },
   {
     id: 'lore',
     allowedOutgoingEdgeTypes: ['text'],
     allowedIncomingEdgeTypes: ['text'],
+    canCreate: true,
+    canDelete: true,
   },
   {
     id: 'merge',
     allowedOutgoingEdgeTypes: ['text'],
     allowedIncomingEdgeTypes: ['text', 'textArray'],
+    canCreate: true,
+    canDelete: true,
   },
   {
     id: 'split',
     allowedOutgoingEdgeTypes: ['textArray'],
     allowedIncomingEdgeTypes: ['text'],
+    canCreate: true,
+    canDelete: true,
+  },
+  {
+    id: 'for-each',
+    allowedOutgoingEdgeTypes: ['textArray'],
+    allowedIncomingEdgeTypes: ['textArray'],
+    canCreate: true,
+    canDelete: true,
+    isGroup: true,
+  },
+  {
+    id: 'for-each-input',
+    allowedOutgoingEdgeTypes: ['text'],
+    allowedIncomingEdgeTypes: [],
+    canCreate: false,
+    canDelete: false,
+    confined: true,
+  },
+  {
+    id: 'for-each-output',
+    allowedOutgoingEdgeTypes: [],
+    allowedIncomingEdgeTypes: ['text'],
+    canCreate: false,
+    canDelete: false,
+    confined: true,
   },
 ]
 
@@ -54,8 +94,8 @@ export const EDGE_TYPES: EdgeTypeDefinition[] = [
   },
   {
     id: 'textArray',
-    allowedSourceNodeTypes: ['split'],
-    allowedTargetNodeTypes: ['merge'],
+    allowedSourceNodeTypes: ['split', 'for-each'],
+    allowedTargetNodeTypes: ['merge', 'for-each'],
   },
 ]
 
@@ -86,4 +126,8 @@ export function getNodeTypeDefinition(type: PlanNodeType): NodeTypeDefinition | 
 
 export function getEdgeTypeDefinition(type: PlanEdgeType): EdgeTypeDefinition | undefined {
   return EDGE_TYPES.find(et => et.id === type)
+}
+
+export function getCreatableNodeTypes(): PlanNodeType[] {
+  return NODE_TYPES.filter(def => def.canCreate !== false).map(def => def.id)
 }

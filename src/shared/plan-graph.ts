@@ -1,4 +1,4 @@
-export const NODE_TYPES = ['text', 'lore', 'merge', 'split'] as const
+export const NODE_TYPES = ['text', 'lore', 'merge', 'split', 'for-each', 'for-each-input', 'for-each-output'] as const
 export type PlanNodeType = typeof NODE_TYPES[number]
 
 export const PLAN_NODE_STATUSES = ['EMPTY', 'GENERATED', 'MANUAL', 'OUTDATED', 'ERROR'] as const
@@ -22,6 +22,8 @@ export interface PlanNodeRow {
   ai_settings: string | null
   x: number
   y: number
+  width: number | null
+  height: number | null
   word_count: number
   char_count: number
   byte_count: number
@@ -43,6 +45,8 @@ export const PlanNodeRowDefaults : Partial<PlanNodeInsert> = {
   ai_sync_info: null,
   node_type_settings: null,
   ai_settings: null,
+  width: null,
+  height: null,
   word_count: 0,
   char_count: 0,
   byte_count: 0,

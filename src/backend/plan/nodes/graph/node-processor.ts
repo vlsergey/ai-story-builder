@@ -1,5 +1,6 @@
 import type { NodeContext } from './node-interfaces.js'
 import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
+import { makeErrorWithStatus } from '../../../lib/make-errors.js'
 
 /**
  * Processor for a specific node type.
@@ -61,7 +62,15 @@ export class NodeProcessorRegistry {
     }
   }
 
-  getProcessor(nodeType: PlanNodeType): NodeProcessor | undefined {
+  getProcessor(nodeType: PlanNodeType): NodeProcessor {
+    const processor = this.findProcessor(nodeType)
+    if (processor == null) {
+      throw makeErrorWithStatus(`No processor for node type ${nodeType}`, 400)
+    }
+    return processor
+  }
+
+  findProcessor(nodeType: PlanNodeType): NodeProcessor | undefined {
     return this.processors.get(nodeType)
   }
 

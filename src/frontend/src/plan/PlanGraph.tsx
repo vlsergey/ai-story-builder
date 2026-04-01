@@ -14,19 +14,20 @@ import {
   NodeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import dagre from '@dagrejs/dagre'
 import { useLocale } from '../lib/locale'
-import { type PlanNodeType, NODE_TYPES, PlanNodeUpdate, type PlanEdgeRow } from '@shared/plan-graph'
-import { EDGE_TYPES, canCreateEdge } from '@shared/node-edge-dictionary'
+import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow } from '@shared/plan-graph'
+import { EDGE_TYPES, canCreateEdge, getCreatableNodeTypes, getNodeTypeDefinition } from '@shared/node-edge-dictionary'
+import { applyHierarchicalLayout } from './layout/hierarchical-layout'
 import PlanTextNode from './plan-graph/PlanTextNode'
 import PlanLoreNode from './plan-graph/PlanLoreNode'
 import PlanMergeNode from './plan-graph/PlanMergeNode'
 import PlanSplitterNode from './plan-graph/PlanSplitterNode'
+import PlanForEachNode from './plan-graph/PlanForEachNode'
 import PlanEdgeComponent from './plan-graph/PlanEdge'
 import GenerateAllDialog from './GenerateAllDialog'
 import { trpc } from '../ipcClient'
 import { PlanNodeRow } from '@shared/plan-graph'
-import debounce from "lodash/debounce";
+import { useDebouncedCallback } from 'use-debounce';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -34,39 +35,43 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/ui-components/context-menu'
+import { sortByHierarchy } from '@/lib/sortByHierarchy'
 
 const nodeTypes = {
-  planText: PlanTextNode,
-  planLore: PlanLoreNode,
-  planMerge: PlanMergeNode,
-  planSplitter: PlanSplitterNode,
+  'text': PlanTextNode,
+  'lore': PlanLoreNode,
+  'merge': PlanMergeNode,
+  'split': PlanSplitterNode,
+  'for-each': PlanForEachNode,
+  'group': PlanForEachNode,
+  'for-each-output': PlanTextNode,
+  'for-each-input': PlanTextNode,
 }
 
 const edgeTypes = {
   planEdge: PlanEdgeComponent,
 }
 
-function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
-  const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120, edgesep: 120 })
-  g.setDefaultEdgeLabel(() => ({}))
-  nodes.forEach(n => g.setNode(n.id, { width: 200, height: 80 }))
-  edges.forEach(e => g.setEdge(e.source, e.target))
-  dagre.layout(g)
-  return nodes.map(n => {
-    const pos = g.node(n.id)
-    if (!pos) return n
-    return { ...n, position: { x: pos.x - 100, y: pos.y - 40 } }
-  })
-}
-
 function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => void): Node[] {
-  return graphNodes.map(n => ({
-    id: String(n.id),
-    type: n.type === 'lore' ? 'planLore' : n.type === 'merge' ? 'planMerge' : n.type === 'split' ? 'planSplitter' : 'planText',
-    position: { x: n.x ?? 0, y: n.y ?? 0 },
-    data: { ...n, onDelete },
-  }))
+  const sortedByHierarchy = sortByHierarchy(graphNodes, n => n.id, n => n.parent_id)
+  return sortedByHierarchy.map(n => {
+    const childCount = graphNodes.filter(child => child.parent_id === n.id).length;
+    const nodeDef = getNodeTypeDefinition(n.type);
+    const isGroup = nodeDef?.isGroup ?? false;
+    const isConfined = nodeDef?.confined ?? false;
+    const reactFlowType = isGroup ? 'group' : n.type;
+    const extent = isConfined ? 'parent' : undefined;
+    return {
+      id: String(n.id),
+      type: reactFlowType,
+      position: { x: n.x ?? 0, y: n.y ?? 0 },
+      parentId: n.parent_id ? String(n.parent_id) : undefined,
+      data: { ...n, onDelete, childCount },
+      width: n.width ?? 200,
+      height: n.height ?? 100,
+      extent,
+    };
+  });
 }
 
 function toReactFlowEdges(graphEdges: PlanEdgeRow[], onDeleteEdge: (id: number) => void): Edge[] {
@@ -88,11 +93,13 @@ export default function PlanGraph() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchOnMount: true,
+    onSuccess: () => { console.log("Reloaded nodes from server") },
   })
   const { data: serverEdges, isLoading: areEdgesLoading } = trpc.plan.edges.getAll.useQuery(undefined, {
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchOnMount: true,
+    onSuccess: () => { console.log("Reloaded edges from server") },
   })
   const loading = areNodesLoading || areEdgesLoading
   const deleteEdge = trpc.plan.edges.delete.useMutation().mutate
@@ -114,12 +121,26 @@ export default function PlanGraph() {
 
   const patchNodes = trpc.plan.nodes.batchPatch.useMutation().mutate
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedSaveNodes = useCallback(debounce(() => {
-    const toPatch: { id: number, data: PlanNodeUpdate }[] = nodes
-      .map(n => ({ id: Number(n.id), data: { x: n.position.x, y: n.position.y } }))
-    patchNodes(toPatch)
-  }, 1000), [nodes, patchNodes]);
+  const debouncedSaveNodes = useDebouncedCallback(() => {
+    const toPatch = nodes.map(n => {
+      const data: PlanNodeUpdate = excludeDuplicates({
+        x: n.position.x,
+        y: n.position.y,
+        width: n.width,
+        height: n.height,
+      }, n.data);
+
+      if (Object.keys(data).length > 0) {
+        console.log(`[PlanGraph] Patching node ${n.id}`, data);
+        return { id: Number(n.id), data };
+      }
+      return null;
+    }).filter(n => n !== null);
+
+    if (toPatch.length > 0) {
+      patchNodes(toPatch);
+    }
+  }, 1000);
 
   // update
   const onNodesChange = useCallback((nodeChanges: NodeChange[]) => {
@@ -172,8 +193,47 @@ export default function PlanGraph() {
 
   const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
     if (autoLayout) return
-    patchNode({id: Number(node.id), manual: true, data: { x: node.position.x, y: node.position.y }})
-  }, [autoLayout, patchNode])
+
+    // Find containing group (nodes with isGroup flag)
+    const groups = nodes.filter(n => {
+      const def = getNodeTypeDefinition(n.type as PlanNodeType)
+      return def?.isGroup === true
+    })
+    let newParentId: number | null = null
+    for (const g of groups) {
+      const gWidth = g.width ?? 200
+      const gHeight = g.height ?? 100
+      const left = g.position.x
+      const top = g.position.y
+      const right = left + gWidth
+      const bottom = top + gHeight
+      const nodeX = node.position.x
+      const nodeY = node.position.y
+      // simple point-in-rect check (node position is i
+      // ts top-left corner)
+      if (nodeX >= left && nodeX <= right && nodeY >= top && nodeY <= bottom) {
+        newParentId = Number(g.id)
+        break
+      }
+    }
+
+    // Validate: cannot be parent of itself
+    if (newParentId === Number(node.id)) {
+      newParentId = null
+    }
+
+    // Determine current parent from server data
+    const currentNode = serverNodes?.find(n => n.id === Number(node.id))
+    const currentParentId = currentNode?.parent_id ?? null
+
+    // Prepare update data
+    const updateData: any = { x: node.position.x, y: node.position.y }
+    if (newParentId !== currentParentId) {
+      updateData.parent_id = newParentId
+    }
+
+    patchNode({ id: Number(node.id), manual: true, data: updateData })
+  }, [autoLayout, patchNode, nodes, serverNodes])
 
   const contextMenuTriggerRef = useRef<HTMLSpanElement>(null)
   const [contextMenuNodeId, setContextMenuNodeId] = useState<number | null>(null)
@@ -263,13 +323,16 @@ export default function PlanGraph() {
 
   function applyLayout() {
     if (!nodes?.length) return
-    const laidNodes = applyDagreLayout([...nodes], [...edges])
+    const laidNodes = applyHierarchicalLayout([...nodes], [...edges])
     setNodes(laidNodes)
     // Fit view after layout change
     setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
     // Push changes to server
     debouncedSaveNodes()
   }
+
+  // Filter node types that can be created manually
+  const creatableNodeTypes = getCreatableNodeTypes()
 
   if (loading) {
     return (
@@ -283,7 +346,7 @@ export default function PlanGraph() {
     <div className="relative h-full w-full">
       {/* Toolbar */}
       <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-background border border-border rounded shadow px-2 py-1.5 flex-wrap">
-        {NODE_TYPES.map((nodeType) => (
+        {creatableNodeTypes.map((nodeType) => (
           <button
             key={nodeType}
             onClick={() => openAddDialog(nodeType)}
@@ -447,3 +510,9 @@ export default function PlanGraph() {
     </div>
   )
 }
+
+function excludeDuplicates<T extends {}>(objA: T, objB: any) : Partial<T> {
+  return Object.fromEntries(
+    Object.entries(objA).filter(([key, value]) => objB[key] !== value && value != undefined)
+  ) as Partial<T>
+};

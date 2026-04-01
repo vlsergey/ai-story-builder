@@ -8,10 +8,12 @@ import { PlanNodeService } from './plan-node-service.js'
  * Generate content for all nodes in topological order, respecting dependencies.
  * @param options.regenerateManual If true, MANUAL nodes will be regenerated; otherwise they are skipped.
  * @param options.onProgress Optional callback to report progress (nodeId, status, queueSize, reason?).
+ * @param options.parentId If provided, only nodes with this parent_id (or null for root) are processed; recursively processes child subgraphs.
  */
 export async function generateAllNodes(options?: {
   regenerateManual?: boolean
   onProgress?: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number, reason?: string) => void
+  parentId?: number | null
 }): Promise<void> {
   const planEdgeRepository = new PlanEdgeRepository()
   const planNodeService = new PlanNodeService()
@@ -20,8 +22,10 @@ export async function generateAllNodes(options?: {
   const regenerateSummary = SettingsRepository.getAutoGenerateSummary()
   const onProgress = options?.onProgress
 
-  // Get all nodes and build adjacency
-  const nodes = planNodeService.getAll()
+  const parentId = options?.parentId ?? null
+
+  // Get nodes with specific parent_id
+  const nodes = planNodeService.getByParentId(parentId)
   const nodeIds = nodes.map(n => n.id)
   const incomingEdges = new Map<number, number[]>()
   const outgoingEdges = new Map<number, number[]>()
@@ -31,11 +35,13 @@ export async function generateAllNodes(options?: {
     outgoingEdges.set(nodeId, [])
   }
 
-  // Fill adjacency from edges
+  // Fill adjacency from edges, but only edges where both nodes are in our node set
   const edgeRows = planEdgeRepository.getAll()
   for (const edge of edgeRows) {
-    incomingEdges.get(edge.to_node_id)!.push(edge.from_node_id)
-    outgoingEdges.get(edge.from_node_id)!.push(edge.to_node_id)
+    if (nodeIds.includes(edge.from_node_id) && nodeIds.includes(edge.to_node_id)) {
+      incomingEdges.get(edge.to_node_id)!.push(edge.from_node_id)
+      outgoingEdges.get(edge.from_node_id)!.push(edge.to_node_id)
+    }
   }
 
   // Set of nodes that have been checked (processed)
@@ -129,6 +135,11 @@ export async function generateAllNodes(options?: {
 
     // Mark as checked
     checked.add(nodeId)
+
+    // If this is a for-each node, recursively generate its child subgraph
+    if (node.type === 'for-each') {
+      await generateAllNodes({ ...options, parentId: node.id })
+    }
 
     // Add outgoing nodes to queue if not already in queue and not checked
     const outgoing = outgoingEdges.get(nodeId)!

@@ -1,13 +1,14 @@
 import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus, PlanEdgeType } from '../../../shared/plan-graph.js'
 import { PlanNodeRepository } from './plan-node-repository.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
-import { isValidNodeType } from '../../../shared/node-edge-dictionary.js'
+import { isValidNodeType, NODE_TYPES, getNodeTypeDefinition } from '../../../shared/node-edge-dictionary.js'
 import { planNodeEventManager } from './plan-node-event-manager.js'
 import { NodeProcessor, NodeProcessorRegistry } from './graph/node-processor.js'
 import { TextProcessor } from './graph/text-processor.js'
 import { LoreProcessor } from './graph/lore-processor.js'
 import { SplitProcessor } from './graph/split-processor.js'
 import { MergeProcessor } from './graph/merge-processor.js'
+import { ForEachProcessor } from './graph/for-each-processor.js'
 import type { NodeContext } from './graph/node-interfaces.js'
 import { mergeNodeSettings } from './graph/settings-helper.js'
 import { DataOrEventEvent, toObservable } from '../../lib/event-manager.js'
@@ -16,6 +17,7 @@ import { ResponseStreamEvent } from 'openai/resources/responses/responses.js'
 import { generatePlanNodeTextContent } from '../../routes/generate-plan-node-text-content.js'
 import { Observable } from '@trpc/server/observable'
 import { generateSummary } from '../../routes/generate-summary.js'
+import { makeErrorWithStatus } from '../../lib/make-errors.js'
 
 export type NodeUpdateEvent = {
   nodeId: number
@@ -38,6 +40,7 @@ export class PlanNodeService implements NodeContext {
     this.processorRegistry.register(new LoreProcessor())
     this.processorRegistry.register(new SplitProcessor())
     this.processorRegistry.register(new MergeProcessor())
+    this.processorRegistry.register(new ForEachProcessor())
   }
 
   // ─── Basic CRUD ──────────────────────────────────────────────────────────────
@@ -153,8 +156,14 @@ export class PlanNodeService implements NodeContext {
     // Validate node type
     const type = data.type ?? 'text'
     if (!isValidNodeType(type)) {
-      const valid = ['text', 'lore', 'merge', 'split'].join(', ')
-      throw this.makeError(`Invalid node type "${type}". Valid types: ${valid}`, 400)
+      const valid = NODE_TYPES.map(nt => nt.id).join(', ')
+      throw makeErrorWithStatus(`Invalid node type "${type}". Valid types: ${valid}`, 400)
+    }
+
+    // Check if node type can be created manually
+    const nodeDef = NODE_TYPES.find(nt => nt.id === type)
+    if (nodeDef && nodeDef.canCreate === false) {
+      throw makeErrorWithStatus(`Node type "${type}" cannot be created manually.`, 400)
     }
 
     // Determine status based on content
@@ -176,8 +185,63 @@ export class PlanNodeService implements NodeContext {
     })
     console.info(`Created node ${id} of type ${type}`)
 
+    // If this is a for-each node, automatically create its internal input/output nodes
+    if (type === 'for-each') {
+      this.createForEachInternalNodes(id, data.x ?? 0, data.y ?? 0)
+    }
+
     planNodeEventManager.emitUpdate(id)
     return { id }
+  }
+
+  /**
+   * Create internal input and output nodes for a for-each node.
+   * These nodes are placed inside the for-each node (as children) and cannot be deleted.
+   */
+  private createForEachInternalNodes(parentId: number, parentX: number, parentY: number): void {
+    // Create for-each-input node
+    const inputId = this.repo.insert({
+      type: 'for-each-input',
+      title: 'Input',
+      parent_id: parentId,
+      x: parentX - 50,
+      y: parentY + 50,
+      content: null,
+      ai_user_prompt: null,
+      ai_system_prompt: null,
+      summary: null,
+      ai_sync_info: null,
+      node_type_settings: JSON.stringify({}),
+      ai_settings: null,
+      status: 'EMPTY',
+      in_review: 0,
+      review_base_content: null,
+      word_count: 0,
+      char_count: 0,
+      byte_count: 0,
+    })
+    // Create for-each-output node
+    const outputId = this.repo.insert({
+      type: 'for-each-output',
+      title: 'Output',
+      parent_id: parentId,
+      x: parentX + 50,
+      y: parentY + 50,
+      content: null,
+      ai_user_prompt: null,
+      ai_system_prompt: null,
+      summary: null,
+      ai_sync_info: null,
+      node_type_settings: JSON.stringify({}),
+      ai_settings: null,
+      status: 'EMPTY',
+      in_review: 0,
+      review_base_content: null,
+      word_count: 0,
+      char_count: 0,
+      byte_count: 0,
+    })
+    console.info(`Created internal nodes for for-each ${parentId}: input ${inputId}, output ${outputId}`)
   }
 
   // ─── Update ──────────────────────────────────────────────────────────────────
@@ -192,7 +256,7 @@ export class PlanNodeService implements NodeContext {
     patch?: PlanNodeUpdate
   ) : Promise<PlanNodeRow> {
     const oldNode = this.repo.getById(id)
-    if (!oldNode) throw this.makeError('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
 
     const updateFields: PlanNodeUpdate = {
       ...patch,
@@ -207,7 +271,7 @@ export class PlanNodeService implements NodeContext {
    */
   async acceptReview(id: number): Promise<PlanNodeRow> {
     const oldNode = this.repo.getById(id)
-    if (!oldNode) throw this.makeError('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
 
     return await this.patch(id, true, {
       in_review: 0,
@@ -221,7 +285,37 @@ export class PlanNodeService implements NodeContext {
    */
   async patch(nodeId: number, manual: boolean, data: PlanNodeUpdate): Promise<PlanNodeRow> {
     let oldNode = this.repo.getById(nodeId)
-    if (!oldNode) throw this.makeError('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
+
+    // Validate parent_id if present
+    if (data.parent_id !== undefined) {
+      const newParentId = data.parent_id
+      
+      // Check if node type is confined (cannot be moved)
+      const nodeDef = getNodeTypeDefinition(oldNode.type)
+      if (nodeDef?.confined) {
+        throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
+      }
+      
+      // Cannot set parent to itself
+      if (newParentId === nodeId) {
+        throw makeErrorWithStatus('cannot set parent to itself', 400)
+      }
+      
+      // If parent is not null, ensure it exists and check for cycles
+      if (newParentId !== null) {
+        const target = this.repo.getById(newParentId)
+        if (!target) throw makeErrorWithStatus('target parent does not exist', 400)
+        
+        // Check for cycles
+        let cur: number | null = newParentId
+        while (cur !== null) {
+          if (cur === nodeId) throw makeErrorWithStatus('cannot move node into its own descendant', 400)
+          const parent = this.repo.getById(cur)
+          cur = parent?.parent_id ?? null
+        }
+      }
+    }
 
     let update = {...data}
 
@@ -252,7 +346,7 @@ export class PlanNodeService implements NodeContext {
     const updated = Object.keys(update).length != 0
       ? this.repo.patch(nodeId, update)
       : oldNode
-    if (!updated) throw this.makeError('node not found', 404)
+    if (!updated) throw makeErrorWithStatus('node not found', 404)
 
     // Emit event to frontend
     planNodeEventManager.emitUpdate(nodeId, 'patched keys: ' + Object.keys(data).join(', ') + '')
@@ -276,7 +370,11 @@ export class PlanNodeService implements NodeContext {
     const type = oldNode?.type ?? newNode?.type
     if (!type) return null
 
-    const nodeProcessor = this.processorRegistry.getProcessor(type) as NodeProcessor<T>
+    const nodeProcessor = this.processorRegistry.findProcessor(type) as NodeProcessor<T>
+    if (!nodeProcessor) {
+      return null
+    }
+
     const {defaultSettings, onUpdate} = nodeProcessor
 
     const settings = newNode?.node_type_settings
@@ -291,12 +389,12 @@ export class PlanNodeService implements NodeContext {
 
   async regenerate<T extends Record<string, any> = Record<string, any>>(nodeId: number): Promise<PlanNodeRow> {
     const node = this.repo.getById(nodeId)
-    if (!node) throw this.makeError('node not found', 404)
+    if (!node) throw makeErrorWithStatus('node not found', 404)
 
     const nodeProcessor = this.processorRegistry.getProcessor(node.type) as NodeProcessor<T>
     const {defaultSettings, regenerate} = nodeProcessor
     if (!regenerate)
-      throw this.makeError('regenerate not supported by node type ' + node.type, 400)
+      throw makeErrorWithStatus('regenerate not supported by node type ' + node.type, 400)
 
     const settings = node.node_type_settings
       ? mergeNodeSettings(defaultSettings, node.node_type_settings)
@@ -313,7 +411,7 @@ export class PlanNodeService implements NodeContext {
     console.log(`Deleting node with id ${id}`)
 
     const oldNode = this.repo.getById(id)
-    if (!oldNode) throw this.makeError('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
 
     // Delete connected edges first
     new PlanEdgeRepository().deleteByNodeId(id)
@@ -327,18 +425,25 @@ export class PlanNodeService implements NodeContext {
 
   async move(id: number, parentId: number | null) {
     const oldNode = this.repo.getById(id)
-    if (!oldNode) throw this.makeError('node not found', 404)
-    if (oldNode.parent_id === null) throw this.makeError('root node cannot be moved', 403)
-    if (parentId === id) throw this.makeError('cannot move node to itself', 400)
+    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
+    
+    // Check if node type is confined (cannot be moved)
+    const nodeDef = getNodeTypeDefinition(oldNode.type)
+    if (nodeDef?.confined) {
+      throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
+    }
+    
+    if (oldNode.parent_id === null) throw makeErrorWithStatus('root node cannot be moved', 403)
+    if (parentId === id) throw makeErrorWithStatus('cannot move node to itself', 400)
 
     if (parentId !== null) {
       const target = this.repo.getById(parentId)
-      if (!target) throw this.makeError('target parent does not exist', 400)
+      if (!target) throw makeErrorWithStatus('target parent does not exist', 400)
 
       // Check for cycles
       let cur: number | null = parentId
       while (cur !== null) {
-        if (cur === id) throw this.makeError('cannot move node into its own descendant', 400)
+        if (cur === id) throw makeErrorWithStatus('cannot move node into its own descendant', 400)
         const parent = this.repo.getById(cur)
         cur = parent?.parent_id ?? null
       }
@@ -348,17 +453,11 @@ export class PlanNodeService implements NodeContext {
   }
 
   async reorderChildren(childIds: number[]) {
-    if (!Array.isArray(childIds)) throw this.makeError('child_ids must be an array', 400)
+    if (!Array.isArray(childIds)) throw makeErrorWithStatus('child_ids must be an array', 400)
 
     childIds.forEach((id, index) => {
       this.patch(id, true, { position: index })
     })
-  }
-
-  private makeError(message: string, status: number): Error {
-    const e = new Error(message)
-    ;(e as any).status = status
-    return e
   }
 
   private countWords(text: string): number {
@@ -376,7 +475,7 @@ export class PlanNodeService implements NodeContext {
 
   aiGenerate(nodeId: number): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
     const node = this.getById(nodeId);
-    if (!node) throw this.makeError(`node ${nodeId} not found`, 404);
+    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404);
 
     return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
       const newContent = await generatePlanNodeTextContent(node, (event) => {
@@ -397,7 +496,7 @@ export class PlanNodeService implements NodeContext {
 
   async aiGenerateSummary(nodeId: number): Promise<PlanNodeRow> {
     const node = this.getById(nodeId);
-    if (!node) throw this.makeError(`node ${nodeId} not found`, 404);
+    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404);
 
     return await this.patch(nodeId, false, {
       summary: node.content
@@ -408,7 +507,7 @@ export class PlanNodeService implements NodeContext {
 
   aiImprove(nodeId: number): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
     const node = this.getById(nodeId);
-    if (!node) throw this.makeError(`node ${nodeId} not found`, 404);
+    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404);
 
     return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
       const { oldNode, newContent } = await improvePlanNodeContent(nodeId, (event) => {

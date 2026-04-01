@@ -26,6 +26,7 @@ import migration021 from './migrations/021.js'
 import migration022 from './migrations/022.js'
 import migration023 from './migrations/023.js'
 import migration024 from './migrations/024.js'
+import migration025 from './migrations/025.js'
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -78,9 +79,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration023,
   // version 23 → 24: rename ai_instructions to ai_user_prompt and add ai_system_prompt
   migration024,
+  // version 24 → 25: add width and height columns to plan_nodes and lore_nodes
+  migration025,
 ]
 
-export const CURRENT_VERSION = 24
+export const CURRENT_VERSION = 25
 
 function loadSchemaFromFile(db: Database): void {
   const schemaPath = path.join(__dirname, 'schema.sql')
