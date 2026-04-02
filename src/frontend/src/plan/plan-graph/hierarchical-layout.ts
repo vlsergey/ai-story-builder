@@ -17,7 +17,7 @@ export const defaultOptions: Required<HierarchicalLayoutOptions> = {
   nodesep: 60,
   ranksep: 120,
   edgesep: 120,
-  groupPadding: 20,
+  groupPadding: 40,
   groupTopPadding: 80,
   defaultNodeWidth: 200,
   defaultNodeHeight: 80,
@@ -40,19 +40,19 @@ export const defaultOptions: Required<HierarchicalLayoutOptions> = {
  * - Nested groups are processed recursively.
  * - Group dimensions are computed dynamically based on content.
  */
-export function applyHierarchicalLayout(
-  nodes: Node[],
+export function applyHierarchicalLayout<N extends Node>(
+  nodes: N[],
   edges: Edge[],
   options: HierarchicalLayoutOptions = {}
-): Node[] {
+): N[] {
   const opts = { ...defaultOptions, ...options }
   
   // Create copies of nodes for modification
-  const nodeMap = new Map<string, Node>(nodes.map(n => [n.id, { ...n }]))
+  const nodeMap = new Map<string, N>(nodes.map(n => [n.id, { ...n }]))
   const edgeList = [...edges]
   
   // Helper function to get children of a group
-  function getChildren(parentId: string | null): Node[] {
+  function getChildren(parentId: string | null): N[] {
     return Array.from(nodeMap.values()).filter(n =>
       (parentId === null && !n.parentId) ||
       (parentId !== null && n.parentId === parentId)
@@ -60,7 +60,7 @@ export function applyHierarchicalLayout(
   }
 
   // Build map of parent to children for quick lookup
-  const parentToChildren = new Map<string, Node[]>()
+  const parentToChildren = new Map<string, N[]>()
   for (const node of Array.from(nodeMap.values())) {
     if (node.parentId) {
       if (!parentToChildren.has(node.parentId)) {
@@ -87,7 +87,7 @@ export function applyHierarchicalLayout(
   }
 
   // Helper to extract node dimensions (width/height) from node properties
-  function getNodeSize(node: Node): { width: number, height: number } {
+  function getNodeSize(node: N): { width: number, height: number } {
     // Prefer explicit width/height properties
     if (node.width !== undefined && node.height !== undefined) {
       return { width: node.width, height: node.height }

@@ -12,75 +12,59 @@ import {
   useNodesState,
   useEdgesState,
   NodeChange,
+  ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useLocale } from '../lib/locale'
+import { useLocale } from '../../lib/locale'
 import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow } from '@shared/plan-graph'
 import { EDGE_TYPES, canCreateEdge, getCreatableNodeTypes, getNodeTypeDefinition } from '@shared/node-edge-dictionary'
-import { applyHierarchicalLayout } from './layout/hierarchical-layout'
-import PlanTextNode from './plan-graph/PlanTextNode'
-import PlanLoreNode from './plan-graph/PlanLoreNode'
-import PlanMergeNode from './plan-graph/PlanMergeNode'
-import PlanSplitterNode from './plan-graph/PlanSplitterNode'
-import PlanForEachNode from './plan-graph/PlanForEachNode'
-import PlanEdgeComponent from './plan-graph/PlanEdge'
-import GenerateAllDialog from './GenerateAllDialog'
-import { trpc } from '../ipcClient'
+import { applyHierarchicalLayout } from './hierarchical-layout'
+import PlanEdgeComponent from './PlanEdge'
+import GenerateAllDialog from '../GenerateAllDialog'
+import { trpc } from '../../ipcClient'
 import { PlanNodeRow } from '@shared/plan-graph'
 import { useDebouncedCallback } from 'use-debounce';
 import {
   ContextMenu,
   ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
 } from '@/ui-components/context-menu'
 import { sortByHierarchy } from '@/lib/sortByHierarchy'
-import PlanForEachInputNode from './plan-graph/PlanForEachInputNode'
-import PlanForEachOutputNode from './plan-graph/PlanForEachOutputNode'
+import Toolbar from './Toolbar'
+import ContextMenuContent from './ContextMenuContent'
+import EdgeTypeSelectionDialog from './EdgeTypeSelectionDialog'
+import AddNodeDialog from './AddNodeDialog'
+import SimpleNode from './SimpleNode'
+import GroupNode from './GroupNode'
 
-const nodeTypes: Record<PlanNodeType | 'group', React.ComponentType<any> & {
-  defaultWidth?: number,
-  defaultHeight?: number,
-  fixedWidth?: number,
-  fixedHeight?: number,
-}> = {
-  'text': PlanTextNode,
-  'lore': PlanLoreNode,
-  'merge': PlanMergeNode,
-  'split': PlanSplitterNode,
-  'for-each': PlanForEachNode,
-  'group': PlanForEachNode,
-  'for-each-input': PlanForEachInputNode,
-  'for-each-output': PlanForEachOutputNode,
+const nodeTypes = {
+  'simple': SimpleNode,
+  'group': GroupNode,
 }
 
 const edgeTypes = {
   planEdge: PlanEdgeComponent,
 }
 
-function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => void): Node[] {
+function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => void): NodeImpl[] {
   const sortedByHierarchy = sortByHierarchy(graphNodes, n => n.id, n => n.parent_id)
   return sortedByHierarchy.map(n => {
     const childCount = graphNodes.filter(child => child.parent_id === n.id).length;
     const nodeDef = getNodeTypeDefinition(n.type);
     const isGroup = nodeDef?.isGroup ?? false;
     const isConfined = nodeDef?.confined ?? false;
-    const reactFlowType = isGroup ? 'group' : n.type;
-    const Component = nodeTypes[reactFlowType];
-    const width = Component.fixedWidth ?? n.width ?? Component.defaultWidth ?? 200;
-    const height = Component.fixedHeight ?? n.height ?? Component.defaultHeight ?? 200;
+    const width = n.width ?? 200;
+    const height = n.height ?? 100;
     const extent = isConfined ? 'parent' : undefined;
     return {
       id: String(n.id),
-      type: reactFlowType,
+      type: isGroup ? 'group' : 'simple',
       position: { x: n.x ?? 0, y: n.y ?? 0 },
       parentId: n.parent_id ? String(n.parent_id) : undefined,
       data: { ...n, onDelete, childCount },
       width: width,
       height: height,
       extent,
-    };
+    } as NodeImpl;
   });
 }
 
@@ -94,9 +78,11 @@ function toReactFlowEdges(graphEdges: PlanEdgeRow[], onDeleteEdge: (id: number) 
   }))
 }
 
+type NodeImpl = Node<PlanNodeRow & Record<string, unknown>, 'simple' | 'group'>
+
 export default function PlanGraph() {
   const { t } = useLocale()
-  const [nodes, setNodes, onNodesChangeImpl] = useNodesState<Node>([])
+  const [nodes, setNodes, onNodesChangeImpl] = useNodesState<NodeImpl>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const { data: serverNodes, isLoading: areNodesLoading } = trpc.plan.nodes.getAll.useQuery(undefined, {
@@ -153,7 +139,7 @@ export default function PlanGraph() {
   }, 1000);
 
   // update
-  const onNodesChange = useCallback((nodeChanges: NodeChange[]) => {
+  const onNodesChange = useCallback((nodeChanges: NodeChange<NodeImpl>[]) => {
     onNodesChangeImpl(nodeChanges)
     debouncedSaveNodes()
   }, [debouncedSaveNodes, onNodesChangeImpl])
@@ -165,9 +151,7 @@ export default function PlanGraph() {
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
   const [showGenerateAll, setShowGenerateAll] = useState(false)
   const [addDialog, setAddDialog] = useState<{ type: PlanNodeType } | null>(null)
-  const [addTitle, setAddTitle] = useState('')
-  const addTitleInputRef = useRef<HTMLInputElement>(null)
-  const reactFlowInstance = useRef<any>(null)
+  const reactFlowInstance = useRef<ReactFlowInstance<NodeImpl, Edge>>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
   const hasFitted = useRef(false)
 
@@ -180,20 +164,15 @@ export default function PlanGraph() {
   }, [nodes])
 
   function openAddDialog(type: PlanNodeType) {
-    setAddTitle('')
     setAddDialog({ type })
-    // focus the input on next paint
-    setTimeout(() => addTitleInputRef.current?.focus(), 0)
   }
 
   const addNode = trpc.plan.nodes.create.useMutation().mutate
 
-  async function confirmAddNode() {
-    if (!addTitle.trim() || !addDialog) return
-    const title = addTitle.trim()
+  async function confirmAddNode(title: string) {
+    if (!addDialog) return
     const type = addDialog.type
     setAddDialog(null)
-    setAddTitle('')
     const centerX = 100 + Math.random() * 200
     const centerY = 100 + Math.random() * 200
     addNode({ type, title, x: centerX, y: centerY })
@@ -204,25 +183,14 @@ export default function PlanGraph() {
   const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
     if (autoLayout) return
 
-    // Find containing group (nodes with isGroup flag)
-    const groups = nodes.filter(n => {
-      const def = getNodeTypeDefinition(n.type as PlanNodeType)
-      return def?.isGroup === true
-    })
+    // Find containing group (nodes with isGroup flag) using getIntersectingNodes
     let newParentId: number | null = null
-    for (const g of groups) {
-      const gWidth = g.width ?? 200
-      const gHeight = g.height ?? 100
-      const left = g.position.x
-      const top = g.position.y
-      const right = left + gWidth
-      const bottom = top + gHeight
-      const nodeX = node.position.x
-      const nodeY = node.position.y
-      // simple point-in-rect check (node position is i
-      // ts top-left corner)
-      if (nodeX >= left && nodeX <= right && nodeY >= top && nodeY <= bottom) {
-        newParentId = Number(g.id)
+    const intersecting = reactFlowInstance.current?.getIntersectingNodes(node, true) || []
+    for (const n of intersecting) {
+      if (n.id === node.id) continue // skip self
+      const def = getNodeTypeDefinition(n.data.type)
+      if (def?.isGroup === true) {
+        newParentId = Number(n.id)
         break
       }
     }
@@ -233,17 +201,14 @@ export default function PlanGraph() {
     }
 
     // Determine current parent from server data
-    const currentNode = serverNodes?.find(n => n.id === Number(node.id))
-    const currentParentId = currentNode?.parent_id ?? null
+    const currentParentId = node.parentId ? Number(node.parentId) : null
 
     // Prepare update data
-    const updateData: any = { x: node.position.x, y: node.position.y }
-    if (newParentId !== currentParentId) {
-      updateData.parent_id = newParentId
+    if (newParentId !== currentParentId && !getNodeTypeDefinition(node.data.type as PlanNodeType)?.confined) {
+      return patchNode({ id: Number(node.id), manual: true, data: {parent_id: newParentId} })
     }
 
-    patchNode({ id: Number(node.id), manual: true, data: updateData })
-  }, [autoLayout, patchNode, nodes, serverNodes])
+  }, [autoLayout, patchNode, reactFlowInstance])
 
   const contextMenuTriggerRef = useRef<HTMLSpanElement>(null)
   const [contextMenuNodeId, setContextMenuNodeId] = useState<number | null>(null)
@@ -274,23 +239,25 @@ export default function PlanGraph() {
   }).mutate
 
   const onConnect = useCallback((connection: Connection) => {
+    console.info(`[PlannGraph] Attempting to connect ${connection.source} to ${connection.target}`)
     if (!connection.source || !connection.target) {
       return
     }
     const sourceNode = (nodes || []).find(n => n.id === connection.source)
     const targetNode = (nodes || []).find(n => n.id === connection.target)
-    const sourceType = sourceNode?.type as PlanNodeType | undefined
-    const targetType = targetNode?.type as PlanNodeType | undefined
+    const sourceType = sourceNode?.data?.type ?? sourceNode?.type as PlanNodeType | undefined
+    const targetType = targetNode?.data?.type ?? targetNode?.type as PlanNodeType | undefined
 
     if (!sourceType || !targetType) {
       return
     }
 
     const allowedEdgeTypes = EDGE_TYPES.filter(edgeDef =>
-      canCreateEdge(sourceType, targetType, edgeDef.id)
+      canCreateEdge(sourceType as PlanNodeType, targetType as PlanNodeType, edgeDef.id)
     ).map(edgeDef => edgeDef.id)
 
     if (allowedEdgeTypes.length === 0) {
+      console.info(`[PlannGraph] Ignore connection try because no compatible edge types between ${sourceType} and ${targetType}`)
       // No allowed edge types, maybe show error? For now just ignore.
       return
     }
@@ -344,6 +311,17 @@ export default function PlanGraph() {
   // Filter node types that can be created manually
   const creatableNodeTypes = getCreatableNodeTypes()
 
+  // Compute allowed edge types for the dialog
+  const allowedEdgeTypes = showConnectDialog ? (() => {
+    const sourceNode = nodes.find(n => n.id === showConnectDialog.source)
+    const targetNode = nodes.find(n => n.id === showConnectDialog.target)
+    const sourceType = sourceNode?.data.type as PlanNodeType | undefined
+    const targetType = targetNode?.data.type as PlanNodeType | undefined
+    return EDGE_TYPES.filter(edgeDef =>
+      sourceType && targetType && canCreateEdge(sourceType as PlanNodeType, targetType as PlanNodeType, edgeDef.id)
+    ).map(edgeDef => edgeDef.id)
+  })() : []
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -354,44 +332,15 @@ export default function PlanGraph() {
 
   return (
     <div className="relative h-full w-full">
-      {/* Toolbar */}
-      <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-background border border-border rounded shadow px-2 py-1.5 flex-wrap">
-        {creatableNodeTypes.map((nodeType) => (
-          <button
-            key={nodeType}
-            onClick={() => openAddDialog(nodeType)}
-            title={t(`planGraph.add${nodeType.charAt(0).toUpperCase() + nodeType.slice(1)}Node`)}
-            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
-          >
-            {t(`planGraph.add${nodeType.charAt(0).toUpperCase() + nodeType.slice(1)}Node`)}
-          </button>
-        ))}
-        <div className="w-px h-4 bg-border mx-0.5" />
-        <label className="flex items-center gap-1 text-xs cursor-pointer">
-          <input
-            type="checkbox"
-            checked={autoLayout}
-            onChange={toggleAutoLayout}
-            className="w-3 h-3"
-          />
-          {t('planGraph.autoLayout')}
-        </label>
-        {!autoLayout && (
-          <button
-            onClick={applyLayout}
-            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
-          >
-            {t('planGraph.applyLayout')}
-          </button>
-        )}
-        <div className="w-px h-4 bg-border mx-0.5" />
-        <button
-          onClick={() => setShowGenerateAll(true)}
-          className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          ▶ {t('planGraph.generateAll')}
-        </button>
-      </div>
+      <Toolbar
+        creatableNodeTypes={creatableNodeTypes}
+        openAddDialog={openAddDialog}
+        autoLayout={autoLayout}
+        toggleAutoLayout={toggleAutoLayout}
+        applyLayout={applyLayout}
+        setShowGenerateAll={setShowGenerateAll}
+        t={t}
+      />
 
       <ReactFlow
         nodes={nodes}
@@ -406,7 +355,9 @@ export default function PlanGraph() {
         viewport={viewport}
         onViewportChange={setViewport}
         nodesDraggable={!autoLayout}
+        minZoom={0.125}
         zoomOnDoubleClick={false}
+        proOptions={{hideAttribution: true}}
         onInit={(instance) => { reactFlowInstance.current = instance }}
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
@@ -414,108 +365,38 @@ export default function PlanGraph() {
         <MiniMap nodeStrokeWidth={2} zoomable pannable />
       </ReactFlow>
 
-      {/* Edge type selection dialog */}
-      {showConnectDialog && (() => {
-        const sourceNode = nodes.find(n => n.id === showConnectDialog.source)
-        const targetNode = nodes.find(n => n.id === showConnectDialog.target)
-        const sourceType = sourceNode?.data.type as PlanNodeType | undefined
-        const targetType = targetNode?.data.type as PlanNodeType | undefined
-
-        const allowedEdgeTypes = EDGE_TYPES.filter(edgeDef =>
-          sourceType && targetType && canCreateEdge(sourceType, targetType, edgeDef.id)
-        ).map(edgeDef => edgeDef.id)
-
-        return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-64">
-              <h3 className="text-sm font-semibold mb-3">{t('planGraph.selectEdgeType')}</h3>
-              <div className="flex flex-col gap-2">
-                {allowedEdgeTypes.map(type => (
-                  <button
-                    key={type}
-                    onClick={() => void confirmConnect(type)}
-                    className="px-3 py-1.5 text-sm rounded border border-border hover:bg-muted text-left"
-                  >
-                    {t(`planGraph.edge.${type}`)}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setShowConnectDialog(null)}
-                className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground"
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
-          </div>
-        )
-      })()}
+      <EdgeTypeSelectionDialog
+        showConnectDialog={showConnectDialog}
+        allowedEdgeTypes={allowedEdgeTypes}
+        confirmConnect={confirmConnect}
+        setShowConnectDialog={setShowConnectDialog}
+        t={t}
+      />
 
       {/* Generate All dialog */}
       {showGenerateAll && (
         <GenerateAllDialog onClose={() => setShowGenerateAll(false)} />
       )}
 
-      {/* Add node dialog */}
-      {addDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-72">
-            <h3 className="text-sm font-semibold mb-3">
-              {t(`planGraph.add${addDialog.type.charAt(0).toUpperCase() + addDialog.type.slice(1)}Node`)}
-            </h3>
-            <input
-              ref={addTitleInputRef}
-              type="text"
-              value={addTitle}
-              onChange={e => setAddTitle(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') void confirmAddNode()
-                if (e.key === 'Escape') { setAddDialog(null); setAddTitle('') }
-              }}
-              placeholder={t('planGraph.nodeTitle')}
-              className="w-full px-3 py-1.5 text-sm border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-ring mb-3"
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setAddDialog(null); setAddTitle('') }}
-                className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                onClick={() => void confirmAddNode()}
-                disabled={!addTitle.trim()}
-                className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                {t('common.add')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddNodeDialog
+        addDialog={addDialog}
+        confirmAddNode={confirmAddNode}
+        setAddDialog={setAddDialog}
+      />
 
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <span ref={contextMenuTriggerRef} className="hidden" /> 
         </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem
-            onSelect={() => {
-              if (contextMenuNodeId) {
-                aiGenerateSummary(contextMenuNodeId)
-              }
-            }}
-          >
-            {t('planGraph.aiGenerateSummary')}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            onSelect={() => { if (contextMenuNodeId) deleteNode(contextMenuNodeId) }}
-          >
-            {t('planGraph.deleteNode')}
-          </ContextMenuItem>
-        </ContextMenuContent>
+        { contextMenuNodeId && 
+          <ContextMenuContent
+            contextMenuNodeId={contextMenuNodeId}
+            serverNodes={serverNodes}
+            aiGenerateSummary={aiGenerateSummary}
+            deleteNode={deleteNode}
+            moveNode={(nodeId, newParentId) => patchNode({id: nodeId, manual: true, data: {parent_id: newParentId}})}
+          />
+        }
       </ContextMenu>
     </div>
   )
@@ -525,4 +406,4 @@ function excludeDuplicates<T extends {}>(objA: T, objB: any) : Partial<T> {
   return Object.fromEntries(
     Object.entries(objA).filter(([key, value]) => objB[key] !== value && value != undefined)
   ) as Partial<T>
-};
+}

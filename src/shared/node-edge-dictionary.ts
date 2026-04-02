@@ -86,18 +86,11 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
 ]
 
 // Edge type definitions
-export const EDGE_TYPES: EdgeTypeDefinition[] = [
-  {
-    id: 'text',
-    allowedSourceNodeTypes: ['text', 'lore', 'merge'],
-    allowedTargetNodeTypes: ['text', 'lore', 'merge', 'split'],
-  },
-  {
-    id: 'textArray',
-    allowedSourceNodeTypes: ['split', 'for-each'],
-    allowedTargetNodeTypes: ['merge', 'for-each'],
-  },
-]
+export const EDGE_TYPES = (['text', 'textArray'] as PlanEdgeType[]).map( edgeType => ({
+  id: edgeType,
+  allowedSourceNodeTypes: NODE_TYPES.filter(t => t.allowedOutgoingEdgeTypes.includes(edgeType)).map(t => t.id),
+  allowedTargetNodeTypes: NODE_TYPES.filter(t => t.allowedIncomingEdgeTypes.includes(edgeType)).map(t => t.id),
+}))
 
 // Helper functions
 export function isValidNodeType(type: string): type is PlanNodeType {

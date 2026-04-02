@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyHierarchicalLayout, defaultOptions } from '../../../plan/layout/hierarchical-layout'
+import { applyHierarchicalLayout, defaultOptions } from '../../../plan/plan-graph/hierarchical-layout'
 import type { Node, Edge } from '@xyflow/react'
 import { writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join } from 'path'

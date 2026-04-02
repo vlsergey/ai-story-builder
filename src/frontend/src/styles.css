@@ -297,3 +297,11 @@ html, body {
   /* При этом сохраняем минимальную высоту для плавности анимации */
   min-height: var(--radix-accordion-content-height);
 }
+
+.react-flow__node .react-flow__resize-control {
+  display: none;
+}
+
+.react-flow__node:hover .react-flow__resize-control {
+  display: block;
+}

@@ -136,6 +136,11 @@
   "plan.forEach.rawContentPlaceholder": "Enter a JSON array of strings, e.g., [\"text1\", \"text2\"]",
   "plan.forEach.rawContentDescription": "The array that will be processed in the loop. Each element becomes an iteration.",
 
+  "common.cancel": "Cancel",
+  "common.add": "Add",
+  "common.refresh": "Refresh",
+  "common.update": "Update",
+
   "planGraph.addTextNode": "Add text node",
   "planGraph.addLoreNode": "Add lore node",
   "planGraph.addMergeNode": "Add merge node",
@@ -144,13 +149,13 @@
   "planGraph.addForEachInputNode": "Add for‑each input node",
   "planGraph.addForEachOutputNode": "Add for‑each output node",
   "planGraph.nodeTitle": "Node title",
-  "common.cancel": "Cancel",
-  "common.add": "Add",
-  "common.refresh": "Refresh",
-  "common.update": "Update",
   "planGraph.autoLayout": "Auto layout",
   "planGraph.applyLayout": "Apply layout",
   "planGraph.generateAll": "Generate all",
+
+  "planGraph.contextMenu.delete": "Delete node",
+  "planGraph.contextMenu.moveTo": "Move to…",
+  "planGraph.contextMenu.moveToRoot": "Move to Root",
 
   "planGraph.edge.text": "Text",
   "planGraph.edge.textArray": "Text array",

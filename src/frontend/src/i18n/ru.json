@@ -137,6 +137,11 @@
   "plan.forEach.rawContentPlaceholder": "Введите JSON массив строк, например, [\"текст1\", \"текст2\"]",
   "plan.forEach.rawContentDescription": "Массив, который будет обработан в цикле. Каждый элемент становится итерацией.",
 
+  "common.cancel": "Отмена",
+  "common.add": "Добавить",
+  "common.refresh": "Обновить",
+  "common.update": "Обновить",
+
   "planGraph.addTextNode": "Добавить текстовый узел",
   "planGraph.addLoreNode": "Добавить лор-узел",
   "planGraph.addMergeNode": "Добавить узел объединения",
@@ -145,13 +150,13 @@
   "planGraph.addForEachInputNode": "Добавить входной узел for‑each",
   "planGraph.addForEachOutputNode": "Добавить выходной узел for‑each",
   "planGraph.nodeTitle": "Название узла",
-  "common.cancel": "Отмена",
-  "common.add": "Добавить",
-  "common.refresh": "Обновить",
-  "common.update": "Обновить",
   "planGraph.autoLayout": "Авторазмещение",
   "planGraph.applyLayout": "Применить раскладку",
   "planGraph.generateAll": "Генерировать всё",
+
+  "planGraph.contextMenu.delete": "Удалить узел",
+  "planGraph.contextMenu.moveTo": "Переместить в…",
+  "planGraph.contextMenu.moveToRoot": "Переместить в корень",
 
   "planGraph.edge.text": "Текст",
   "planGraph.edge.textArray": "Массив текстов",

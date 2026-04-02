@@ -63,7 +63,7 @@ describe('PlanGraph', () => {
   })
 
   it('renders without crashing', async () => {
-    const PlanGraph = (await import('../plan/PlanGraph')).default
+    const PlanGraph = (await import('../plan/plan-graph/PlanGraph')).default
     const { unmount } = render(<PlanGraph />)
     // Wait for loading to finish
     await waitFor(() => {
@@ -73,7 +73,7 @@ describe('PlanGraph', () => {
   })
 
   it('renders the ReactFlow component', async () => {
-    const PlanGraph = (await import('../plan/PlanGraph')).default
+    const PlanGraph = (await import('../plan/plan-graph/PlanGraph')).default
     const { getByTestId } = render(<PlanGraph />)
     await waitFor(() => {
       expect(getByTestId('react-flow')).toBeInTheDocument()
