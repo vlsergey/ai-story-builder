@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useState } from 'react'
+import { FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { trpc } from '../../ipcClient'
 import {NodeTypeEditors} from './NodeTypeEditors'
 import { PlanNodeRow } from '@shared/plan-graph'
@@ -101,11 +101,21 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue } : PlanNodeEditorWrapperP
     debounceSave.cancel()
     await saveImpl(true, value)
     setStatus('SAVED')
-}, [debounceSave, saveImpl])
+  }, [debounceSave, saveImpl])
+
+  const nodeTypeSettings = useMemo(() => {
+    return JSON.parse(value.node_type_settings || '{}') || {}
+  }, [value])
+
+  const handleNodeTypeSettingsChange = useCallback((nodeTypeSettings: any) => {
+    handleChange({...value, node_type_settings: JSON.stringify(nodeTypeSettings)})
+  }, [value, handleChange])
 
   return <Editor
     initialValue={firstInitialValue}
     value={value}
+    nodeTypeSettings={nodeTypeSettings}
+    onNodeTypeSettingsChange={handleNodeTypeSettingsChange}
     onChange={handleChange}
     onExternalUpdate={handleExternalUpdate}
     save={handleSave}

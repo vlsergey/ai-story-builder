@@ -7,7 +7,7 @@ import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps";
 
 type StatusOverride = null | 'GENERATING' | 'IMPROVING'
 
-export default function PlanNodeTextEditor({ initialValue, value, save, onChange, onExternalUpdate, status }: TypedPlanNodeEditorProps) {
+export default function TextNodeEditor({ initialValue, value, save, onChange, onExternalUpdate, status }: TypedPlanNodeEditorProps) {
   const nodeId = initialValue.id
   const [statusOverride, setStatusOverride] = useState<StatusOverride>(null)
 
