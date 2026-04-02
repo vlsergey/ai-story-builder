@@ -51,8 +51,8 @@ export function createGraphEdge(data: {
   }
 
   const nodeRepo = new PlanNodeRepository()
-  const sourceNode = nodeRepo.getById(from_node_id)
-  const targetNode = nodeRepo.getById(to_node_id)
+  const sourceNode = nodeRepo.findById(from_node_id)
+  const targetNode = nodeRepo.findById(to_node_id)
   if (!sourceNode || !targetNode) {
     throw makeError('source or target node not found', 404)
   }
@@ -93,8 +93,8 @@ export function patchGraphEdge(
       throw makeEdgeTypeError(type)
     }
     const nodeRepo = new PlanNodeRepository()
-    const sourceNode = nodeRepo.getById(currentEdge.from_node_id)
-    const targetNode = nodeRepo.getById(currentEdge.to_node_id)
+    const sourceNode = nodeRepo.findById(currentEdge.from_node_id)
+    const targetNode = nodeRepo.findById(currentEdge.to_node_id)
     if (!sourceNode || !targetNode) {
       throw makeError('source or target node not found', 404)
     }
@@ -127,8 +127,4 @@ export function deleteGraphEdge(id: number): { ok: boolean } {
   edgeRepo.delete(id)
   planEdgeEventManager.emitUpdate(id)
   return { ok: true }
-}
-
-export function getPlanEdges(): PlanEdgeRow[] {
-  return new PlanEdgeRepository().getAll()
 }

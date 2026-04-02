@@ -50,9 +50,10 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
   }
 
   onUpdate = async (context: NodeContext, nodeId: number, oldNode: PlanNodeRow | null, newNode: PlanNodeRow | null, settings: MergeSettings): Promise<PlanNodeUpdate | null> => {
-    if (!newNode || !settings.autoUpdate) {
+    if (newNode === null || !settings.autoUpdate) {
       return null
     }
+    console.log(`Regenerating auto-updatable merge node ${nodeId}`)
     return await this.regenerate(context, newNode, settings)
   }
 
@@ -98,34 +99,28 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
 
   private async getExpandedInputs(context: NodeContext, nodeId: number): Promise<Array<{ title: string; content: string | null }>> {
     // Get incoming edges
-    const edges = context.getIncomingEdges(nodeId)
+    const nodeInputs = context.getNodeInputs(nodeId)
     const inputs: Array<{ title: string; content: string | null }> = []
 
-    for (const edge of edges) {
-      const sourceNode = context.getById(edge.from_node_id)
-      if (!sourceNode) continue
-
-      if (edge.type === 'text') {
-        inputs.push({
-          title: sourceNode.title,
-          content: sourceNode.content,
-        })
-      } else if (edge.type === 'textArray') {
-        // Get splitter output
-        const splitProcessor = new (await import('./split-processor.js')).SplitProcessor()
-        const parts = splitProcessor.getOutput(sourceNode)
-        if (Array.isArray(parts)) {
+    for (const nodeInput of nodeInputs) {
+      switch (nodeInput.edge.type) {
+        case 'text':
+          inputs.push({
+            title: nodeInput.sourceNode.title,
+            content: nodeInput.input as string,
+          })
+          break;
+        case 'textArray':
+          const parts = nodeInput.input as string[]
           parts.forEach((part, index) => {
             inputs.push({
-              title: `${sourceNode.title} [${index + 1}]`,
+              title: `${nodeInput.sourceNode.title} [${index + 1}]`,
               content: typeof part === 'string' ? part : String(part),
             })
           })
-        }
+          break
       }
     }
-
-    // TODO: sort by edge position
     return inputs
   }
 

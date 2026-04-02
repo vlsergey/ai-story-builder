@@ -24,7 +24,7 @@ export async function improvePlanNodeContent(
 ): Promise<ImproveResult> {
   const nodeRepo = new PlanNodeRepository()
 
-  const planNode = nodeRepo.getById(nodeId)
+  const planNode = nodeRepo.findById(nodeId)
   if (!planNode) throw makeError('node not found', 404)
 
   const {

@@ -1,4 +1,4 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus, PlanEdgeType } from '../../../shared/plan-graph.js'
+import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus, PlanEdgeType, PlanEdgeRow } from '../../../shared/plan-graph.js'
 import { PlanNodeRepository } from './plan-node-repository.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
 import { isValidNodeType, NODE_TYPES, getNodeTypeDefinition } from '../../../shared/node-edge-dictionary.js'
@@ -43,14 +43,21 @@ export class PlanNodeService implements NodeContext {
     this.processorRegistry.register(new ForEachProcessor())
   }
 
-  // ─── Basic CRUD ──────────────────────────────────────────────────────────────
-
-  getAll(): PlanNodeRow[] {
-    return this.repo.getAll()
+  getById(id: number): PlanNodeRow | undefined {
+    const result =  this.repo.findById(id)
+    if (!result) {
+      throw makeErrorWithStatus(`Plan node ${id} not found`, 404)
+    }
+    return result
   }
 
-  getById(id: number): PlanNodeRow | undefined {
-    return this.repo.getById(id)
+  getByIds(ids: number[]): PlanNodeRow[] {
+    return this.repo.findByIds(ids).map((result) => {
+      if (!result) {
+        throw makeErrorWithStatus(`Plan node not found`, 404)
+      }
+      return result
+    })
   }
 
   getByParentId(parentId: number | null): PlanNodeRow[] {
@@ -59,18 +66,6 @@ export class PlanNodeService implements NodeContext {
 
   count(): number {
     return this.repo.count()
-  }
-
-  getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: PlanEdgeType }> {
-    const edgeRepo = new PlanEdgeRepository()
-    const edges = edgeRepo.getByToNodeId(nodeId)
-    return edges.map(edge => ({ from_node_id: edge.from_node_id, type: edge.type }))
-  }
-
-  getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: PlanEdgeType }> {
-    const edgeRepo = new PlanEdgeRepository()
-    const edges = edgeRepo.getByFromNodeId(nodeId)
-    return edges.map(edge => ({ to_node_id: edge.to_node_id, type: edge.type }))
   }
 
   getProcessor(nodeType: PlanNodeType) {
@@ -87,32 +82,32 @@ export class PlanNodeService implements NodeContext {
     return mergeNodeSettings(processor.defaultSettings as Record<string, any>, node.node_type_settings)
   }
 
-  getNodeInputsRaw(nodeId: number): Array<{
-    edgeType: PlanEdgeType
-    sourceNodeId: number
-    output: unknown
+  getNodeInputs(nodeId: number): Array<{
+    edge: PlanEdgeRow,
+    sourceNode: PlanNodeRow,
+    input: unknown,
   }> {
-    const edges = this.getIncomingEdges(nodeId)
+    const incomingEdges = (new PlanEdgeRepository()).findByToNodeId(nodeId)
     const inputs = []
-    for (const edge of edges) {
+
+    for (const edge of incomingEdges) {
       const sourceNode = this.getById(edge.from_node_id)
       if (!sourceNode) continue
       const processor = this.getProcessor(sourceNode.type)
       if (!processor) continue
-      const output = processor.getOutput(sourceNode)
+      const input = processor.getOutput(sourceNode)
       // Verify that the edge type matches the processor's output edge type
       if (processor.getOutputEdgeType() !== edge.type) {
-        // This edge is not the output type of the source node, skip
-        continue
+        throw new Error(`Edge type ${edge.type} does not match processor output type ${processor.getOutputEdgeType()}`)
       }
       inputs.push({
-        edgeType: edge.type,
-        sourceNodeId: edge.from_node_id,
-        output,
+        edge,
+        sourceNode,
+        input,
       })
     }
-    // Sort by edge position? (not implemented)
-    return inputs
+
+    return inputs.sort((a, b) => a.edge.position - b.edge.position)
   }
 
   getNodeOutput(nodeId: number, edgeType: PlanEdgeType): unknown {
@@ -135,12 +130,13 @@ export class PlanNodeService implements NodeContext {
    * and downstream notifications will propagate further.
    */
   async notifyDownstreamNodes(changedNodeId: number): Promise<void> {
-    const outgoingEdges = this.getOutgoingEdges(changedNodeId)
+    const outgoingEdges = (new PlanEdgeRepository()).findByFromNodeId(changedNodeId)
     for (const edge of outgoingEdges) {
       const downstreamNode = this.getById(edge.to_node_id)
       if (!downstreamNode) continue
       const processor = this.getProcessor(downstreamNode.type)
       if (processor?.onInputContentChange) {
+        console.log(`Notifying downstream node ${downstreamNode.id} (${downstreamNode.type}) of changes in node ${changedNodeId}`)
         const settings = this.getNodeSettings(downstreamNode)
         const planNodeUpdate = await processor.onInputContentChange(this, downstreamNode, changedNodeId, settings)
         if (planNodeUpdate) {
@@ -153,12 +149,13 @@ export class PlanNodeService implements NodeContext {
   // ─── Create ──────────────────────────────────────────────────────────────────
 
   create(data: PlanNodeCreate): { id: number } {
-    // Validate node type
-    const type = data.type ?? 'text'
-    if (!isValidNodeType(type)) {
+    if (!data.title) throw makeErrorWithStatus('title required', 400)
+    // Validate type if provided
+    if (data.type !== undefined && !isValidNodeType(data.type)) {
       const valid = NODE_TYPES.map(nt => nt.id).join(', ')
-      throw makeErrorWithStatus(`Invalid node type "${type}". Valid types: ${valid}`, 400)
+      throw makeErrorWithStatus(`Invalid node type "${data.type}". Valid types: ${valid}`, 400)
     }
+    const type = data.type
 
     // Check if node type can be created manually
     const nodeDef = NODE_TYPES.find(nt => nt.id === type)
@@ -255,7 +252,7 @@ export class PlanNodeService implements NodeContext {
     id: number,
     patch?: PlanNodeUpdate
   ) : Promise<PlanNodeRow> {
-    const oldNode = this.repo.getById(id)
+    const oldNode = this.repo.findById(id)
     if (!oldNode) throw makeErrorWithStatus('node not found', 404)
 
     const updateFields: PlanNodeUpdate = {
@@ -270,7 +267,7 @@ export class PlanNodeService implements NodeContext {
    * Accept the current review, clearing review state.
    */
   async acceptReview(id: number): Promise<PlanNodeRow> {
-    const oldNode = this.repo.getById(id)
+    const oldNode = this.repo.findById(id)
     if (!oldNode) throw makeErrorWithStatus('node not found', 404)
 
     return await this.patch(id, true, {
@@ -284,7 +281,7 @@ export class PlanNodeService implements NodeContext {
    * Handles merge node regeneration if needed.
    */
   async patch(nodeId: number, manual: boolean, data: PlanNodeUpdate): Promise<PlanNodeRow> {
-    let oldNode = this.repo.getById(nodeId)
+    let oldNode = this.repo.findById(nodeId)
     if (!oldNode) throw makeErrorWithStatus('node not found', 404)
 
     // Validate parent_id if present
@@ -304,14 +301,14 @@ export class PlanNodeService implements NodeContext {
       
       // If parent is not null, ensure it exists and check for cycles
       if (newParentId !== null) {
-        const target = this.repo.getById(newParentId)
+        const target = this.repo.findById(newParentId)
         if (!target) throw makeErrorWithStatus('target parent does not exist', 400)
         
         // Check for cycles
         let cur: number | null = newParentId
         while (cur !== null) {
           if (cur === nodeId) throw makeErrorWithStatus('cannot move node into its own descendant', 400)
-          const parent = this.repo.getById(cur)
+          const parent = this.repo.findById(cur)
           cur = parent?.parent_id ?? null
         }
       }
@@ -382,13 +379,14 @@ export class PlanNodeService implements NodeContext {
       : defaultSettings
 
     if (onUpdate) {
+      console.log(`Invoking onUpdate handler for node ${nodeId} of type ${type}`)
       return await onUpdate(this, nodeId, oldNode, newNode, settings)
     }
     return null
   }
 
   async regenerate<T extends Record<string, any> = Record<string, any>>(nodeId: number): Promise<PlanNodeRow> {
-    const node = this.repo.getById(nodeId)
+    const node = this.repo.findById(nodeId)
     if (!node) throw makeErrorWithStatus('node not found', 404)
 
     const nodeProcessor = this.processorRegistry.getProcessor(node.type) as NodeProcessor<T>
@@ -410,7 +408,7 @@ export class PlanNodeService implements NodeContext {
   delete(id: number) {
     console.log(`Deleting node with id ${id}`)
 
-    const oldNode = this.repo.getById(id)
+    const oldNode = this.repo.findById(id)
     if (!oldNode) throw makeErrorWithStatus('node not found', 404)
 
     // Delete connected edges first
@@ -424,7 +422,7 @@ export class PlanNodeService implements NodeContext {
   }
 
   async move(id: number, parentId: number | null) {
-    const oldNode = this.repo.getById(id)
+    const oldNode = this.repo.findById(id)
     if (!oldNode) throw makeErrorWithStatus('node not found', 404)
     
     // Check if node type is confined (cannot be moved)
@@ -437,14 +435,14 @@ export class PlanNodeService implements NodeContext {
     if (parentId === id) throw makeErrorWithStatus('cannot move node to itself', 400)
 
     if (parentId !== null) {
-      const target = this.repo.getById(parentId)
+      const target = this.repo.findById(parentId)
       if (!target) throw makeErrorWithStatus('target parent does not exist', 400)
 
       // Check for cycles
       let cur: number | null = parentId
       while (cur !== null) {
         if (cur === id) throw makeErrorWithStatus('cannot move node into its own descendant', 400)
-        const parent = this.repo.getById(cur)
+        const parent = this.repo.findById(cur)
         cur = parent?.parent_id ?? null
       }
     }

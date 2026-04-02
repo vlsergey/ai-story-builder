@@ -81,7 +81,7 @@ function replaceTemplates<T extends (string | null)>(content: string | null, tex
   const nodeRepo = new PlanNodeRepository()
   let result = (content || '').trim()
   for (const edge of textEdges) {
-    const fromNode = nodeRepo.getById(edge.from_node_id)
+    const fromNode = nodeRepo.findById(edge.from_node_id)
     if (fromNode) {
       const placeholder = `{{${fromNode.title}}}`
       const content = fromNode.content || ''

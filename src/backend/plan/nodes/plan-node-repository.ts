@@ -12,7 +12,7 @@ export class PlanNodeRepository {
   /**
    * Get all nodes (full rows) ordered by position, id.
    */
-  getAll(): PlanNodeRow[] {
+  findAll(): PlanNodeRow[] {
     return withDbRead(db =>
       db.prepare('SELECT * FROM plan_nodes ORDER BY position, id').all() as PlanNodeRow[]
     )
@@ -21,9 +21,15 @@ export class PlanNodeRepository {
   /**
    * Get a single node by ID, or undefined if not found.
    */
-  getById(id: number): PlanNodeRow | undefined {
+  findById(id: number): PlanNodeRow | undefined {
     return withDbRead(db =>
       db.prepare('SELECT * FROM plan_nodes WHERE id = ?').get(id) as PlanNodeRow | undefined
+    )
+  }
+
+  findByIds(ids: number[]): (PlanNodeRow | undefined)[] {
+    return withDbRead(db =>
+      ids.map(id => db.prepare('SELECT * FROM plan_nodes WHERE id = ?').get(id) as PlanNodeRow | undefined)
     )
   }
 

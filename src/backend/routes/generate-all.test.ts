@@ -172,7 +172,7 @@ describe('generateAll', () => {
 
     // Verify that node status is updated to GENERATED
     const nodeRepo = new PlanNodeRepository()
-    const node = nodeRepo.getById(1)
+    const node = nodeRepo.findById(1)
     expect(node).toBeDefined()
     expect(node?.status).toBe('GENERATED')
   })
@@ -211,7 +211,7 @@ describe('generateAll', () => {
 
     // Verify that node status is updated to GENERATED
     const nodeRepo = new PlanNodeRepository()
-    const node = nodeRepo.getById(1)
+    const node = nodeRepo.findById(1)
     expect(node).toBeDefined()
     expect(node?.status).toBe('GENERATED')
   })
@@ -298,7 +298,7 @@ describe('generateAll', () => {
 
     // Verify that node status is updated to ERROR
     const nodeRepo = new PlanNodeRepository()
-    const node = nodeRepo.getById(1)
+    const node = nodeRepo.findById(1)
     expect(node).toBeDefined()
     expect(node?.status).toBe('ERROR')
   })

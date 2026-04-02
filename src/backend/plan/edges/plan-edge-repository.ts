@@ -12,7 +12,7 @@ export class PlanEdgeRepository {
   /**
    * Get all edges (full rows) ordered by position, id.
    */
-  getAll(): PlanEdgeRow[] {
+  findAll(): PlanEdgeRow[] {
     return withDbRead(db =>
       db.prepare('SELECT * FROM plan_edges ORDER BY position, id').all() as PlanEdgeRow[]
     )
@@ -30,7 +30,7 @@ export class PlanEdgeRepository {
   /**
    * Get edges where the given node is the source (from_node_id).
    */
-  getByFromNodeId(fromNodeId: number): PlanEdgeRow[] {
+  findByFromNodeId(fromNodeId: number): PlanEdgeRow[] {
     return withDbRead(db =>
       db
         .prepare('SELECT * FROM plan_edges WHERE from_node_id = ? ORDER BY position, id')
@@ -41,7 +41,7 @@ export class PlanEdgeRepository {
   /**
    * Get edges where the given node is the target (to_node_id).
    */
-  getByToNodeId(toNodeId: number): PlanEdgeRow[] {
+  findByToNodeId(toNodeId: number): PlanEdgeRow[] {
     return withDbRead(db =>
       db
         .prepare('SELECT * FROM plan_edges WHERE to_node_id = ? ORDER BY position, id')

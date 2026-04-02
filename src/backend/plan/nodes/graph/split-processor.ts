@@ -73,16 +73,8 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
   }
 
   private getInputText(context: NodeContext, nodeId: number): string | null {
-    const incoming = context.getIncomingEdges(nodeId)
-    const textEdge = incoming.find(edge => edge.type === 'text')
-    if (!textEdge) {
-      return null
-    }
-    const sourceNode = context.getById(textEdge.from_node_id)
-    if (!sourceNode) {
-      return null
-    }
-    return sourceNode.content ?? null
+    const incoming = context.getNodeInputs(nodeId)
+    return incoming[0]?.input as string
   }
 
   private splitTextByRegex(text: string, regexPattern: string): string[] {
@@ -99,13 +91,6 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
   }
 
   async onInputContentChange(context: NodeContext, nodeData: PlanNodeRow, changedInputNodeId: number, settings: SplitSettings): Promise<PlanNodeUpdate | null> {
-    // Check if the changed input is the one we depend on
-    const incoming = context.getIncomingEdges(nodeData.id)
-    const depends = incoming.some(edge => edge.from_node_id === changedInputNodeId && edge.type === 'text')
-    if (!depends) {
-      return null
-    }
-
     // Check if auto‑update is enabled
     if (!settings.autoUpdate) {
       return null

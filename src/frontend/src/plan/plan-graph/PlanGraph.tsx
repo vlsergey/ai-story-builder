@@ -87,13 +87,13 @@ export default function PlanGraph() {
   const [nodes, setNodes, onNodesChangeImpl] = useNodesState<NodeImpl>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  const { data: serverNodes, isLoading: areNodesLoading } = trpc.plan.nodes.getAll.useQuery(undefined, {
+  const { data: serverNodes, isLoading: areNodesLoading } = trpc.plan.nodes.findAll.useQuery(undefined, {
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchOnMount: true,
     onSuccess: () => { console.log("Reloaded nodes from server") },
   })
-  const { data: serverEdges, isLoading: areEdgesLoading } = trpc.plan.edges.getAll.useQuery(undefined, {
+  const { data: serverEdges, isLoading: areEdgesLoading } = trpc.plan.edges.findAll.useQuery(undefined, {
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchOnMount: true,

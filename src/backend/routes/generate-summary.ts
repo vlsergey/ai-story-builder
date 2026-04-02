@@ -58,7 +58,7 @@ export async function updateSummary(planNodeId: number) {
   if (!SettingsRepository.getAutoGenerateSummary()) return
 
   const planNodeRepository = new PlanNodeRepository()
-  const planNode = planNodeRepository.getById(planNodeId)
+  const planNode = planNodeRepository.findById(planNodeId)
   if (!planNode) throw makeError(`Plan node ${planNodeId} not found`, 404)
 
   const newSummary = await generateSummary(planNode.content || '')

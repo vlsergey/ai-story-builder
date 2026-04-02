@@ -88,28 +88,11 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     return { content }
   }
 
-  private getInputArray(context: NodeContext, nodeId: number): string[] | null {
-    const incoming = context.getIncomingEdges(nodeId)
-    const textArrayEdge = incoming.find(edge => edge.type === 'textArray')
-    if (!textArrayEdge) {
-      return null
+  private getInputArray(context: NodeContext, nodeId: number): string[] {
+    const result = [] as string[]
+    for (const input of context.getNodeInputs(nodeId)) {
+      (input.input as string[]).forEach(item => result.push(item))
     }
-    const sourceNode = context.getById(textArrayEdge.from_node_id)
-    if (!sourceNode) {
-      return null
-    }
-    const processor = context.getProcessor(sourceNode.type)
-    if (!processor) {
-      return null
-    }
-    const output = processor.getOutput(sourceNode)
-    if (Array.isArray(output)) {
-      return output.map(item => typeof item === 'string' ? item : String(item))
-    }
-    // If output is a single string, wrap it in array
-    if (typeof output === 'string') {
-      return [output]
-    }
-    return null
+    return result
   }
 }

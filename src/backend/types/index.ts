@@ -2,16 +2,6 @@
 import { LoreNodeRow } from '../../shared/lore-node.js'
 import { PlanNodeRow } from '../../shared/plan-graph.js'
 
-export interface PlanEdgeRow {
-  id: number
-  from_node_id: number
-  to_node_id: number
-  type: string
-  position: number
-  label: string | null
-  template: string | null
-}
-
 export interface StoryPartRow {
   id: number
   plan_node_version_id: number

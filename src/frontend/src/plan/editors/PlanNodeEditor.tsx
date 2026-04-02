@@ -12,7 +12,7 @@ export interface PlanNodeEditorProps {
 }
 
 export default function PlanNodeEditor({ nodeId, panelApi }: PlanNodeEditorProps) {
-  const planNodeQuery = trpc.plan.nodes.get.useQuery(nodeId)
+  const planNodeQuery = trpc.plan.nodes.getById.useQuery(nodeId)
   const node = planNodeQuery.data
 
   useEffect(() => {
@@ -111,13 +111,23 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue } : PlanNodeEditorWrapperP
     handleChange({...value, node_type_settings: JSON.stringify(nodeTypeSettings)})
   }, [value, handleChange])
 
+  const regenerateMutation = trpc.plan.nodes.regenerate.useMutation()
+  const handleRegenerate = useCallback(async () => {
+    await handleSave(value)
+    const result = await regenerateMutation.mutateAsync(value.id)
+    setLastSaved(result)
+    setValue(result)
+  }, [regenerateMutation, handleSave, setLastSaved, setValue, value])
+
   return <Editor
+    dbValue={lastSaved}
     initialValue={firstInitialValue}
     value={value}
     nodeTypeSettings={nodeTypeSettings}
     onNodeTypeSettingsChange={handleNodeTypeSettingsChange}
     onChange={handleChange}
     onExternalUpdate={handleExternalUpdate}
-    save={handleSave}
+    onRegenerate={handleRegenerate}
+    onSave={handleSave}
     status={status} />
 }

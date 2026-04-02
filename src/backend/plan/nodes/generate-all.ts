@@ -36,7 +36,7 @@ export async function generateAllNodes(options?: {
   }
 
   // Fill adjacency from edges, but only edges where both nodes are in our node set
-  const edgeRows = planEdgeRepository.getAll()
+  const edgeRows = planEdgeRepository.findAll()
   for (const edge of edgeRows) {
     if (nodeIds.includes(edge.from_node_id) && nodeIds.includes(edge.to_node_id)) {
       incomingEdges.get(edge.to_node_id)!.push(edge.from_node_id)

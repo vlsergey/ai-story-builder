@@ -1,4 +1,4 @@
-import type { PlanEdgeType, PlanNodeRow } from '../../../../shared/plan-graph.js'
+import type { PlanEdgeRow, PlanNodeRow } from '../../../../shared/plan-graph.js'
 
 /**
  * Interface for nodes that can produce a single text output (for 'text' edges).
@@ -19,12 +19,10 @@ export interface TextArrayOutputNode {
  */
 export interface NodeContext {
   getById(id: number): PlanNodeRow | undefined
-  getIncomingEdges(nodeId: number): Array<{ from_node_id: number; type: PlanEdgeType }>
-  getOutgoingEdges(nodeId: number): Array<{ to_node_id: number; type: PlanEdgeType }>
-  getNodeInputsRaw(nodeId: number): Array<{
-    edgeType: PlanEdgeType
-    sourceNodeId: number
-    output: unknown
+  getNodeInputs(nodeId: number): Array<{
+    edge: PlanEdgeRow,
+    sourceNode: PlanNodeRow,
+    input: unknown,
   }>
   getByParentId(parentId: number | null): PlanNodeRow[]
   getProcessor(nodeType: import('../../../../shared/plan-graph.js').PlanNodeType): import('./node-processor.js').NodeProcessor | undefined

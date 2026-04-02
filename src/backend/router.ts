@@ -43,13 +43,6 @@ import {
 } from './lore/lore-routes.js';
 
 import {
-  getPlanNodes,
-  getPlanNode,
-  createPlanNode,
-} from './plan/nodes/plan-node-routes.js';
-
-import {
-  getPlanEdges,
   createGraphEdge,
   patchGraphEdge,
   deleteGraphEdge,
@@ -61,6 +54,8 @@ import { AiEngineConfig, AllAiEnginesConfig } from '../shared/ai-engine-config.j
 import { PlanNodeUpdate } from '../shared/plan-graph.js';
 import { PlanNodeService } from './plan/nodes/plan-node-service.js';
 import lastAiGenerationEventManager from './ai/last-ai-generation-event-manager.js';
+import { PlanEdgeRepository } from './plan/edges/plan-edge-repository.js';
+import { PlanNodeRepository } from './plan/nodes/plan-node-repository.js';
 
 const t = initTRPC.create({
   transformer: superjson
@@ -138,10 +133,13 @@ export const appRouter = t.router({
       batchPatch: t.procedure
         .input((v) => v as ({id: number, data: PlanNodeUpdate}[]))
         .mutation(({ input }) => input.forEach( ({ id, data }) => new PlanNodeService().patch(id, false, data))),
-      create: t.procedure.input(z.any()).mutation(({ input }) => createPlanNode(input)),
+      create: t.procedure.input(z.any()).mutation(({ input }) => new PlanNodeService().create(input)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => new PlanNodeService().delete(input)),
-      getAll: t.procedure.query(() => getPlanNodes()),
-      get: t.procedure.input(z.number()).query(({ input }) => getPlanNode(input)),
+      findAll: t.procedure.query(() => new PlanNodeRepository().findAll()),
+      getById: t.procedure.input(z.int()).query(({ input }) => new PlanNodeService().getById(input)),
+      getByIds: t.procedure
+        .input(z.array(z.int()))
+        .query(({ input }) => new PlanNodeService().getByIds(input)),
       patch: t.procedure
         .input((v) => v as ({id: number, manual: boolean, data: PlanNodeUpdate}))
         .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
@@ -153,7 +151,11 @@ export const appRouter = t.router({
       subscribe: t.procedure.subscription(() => planNodeEventManager.asSubscription()),
     }),
     edges: t.router({
-      getAll: t.procedure.query(() => getPlanEdges()),
+      findAll: t.procedure
+        .query(() => new PlanEdgeRepository().findAll()),
+      findByTarget: t.procedure
+        .input(z.int())  
+        .query(({input}) => new PlanEdgeRepository().findByToNodeId(input)),
       create: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),
       patch: t.procedure.input(z.object({ id: z.number(), data: z.any() }))
         .mutation(({ input }) => patchGraphEdge(input.id, input.data)),

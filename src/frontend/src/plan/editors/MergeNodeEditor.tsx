@@ -1,134 +1,56 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLocale } from '@/lib/locale'
-import { ipcClient } from '@/ipcClient'
+import { trpc } from '@/ipcClient'
 import { useTheme } from '@/lib/theme/theme-provider'
-import { PlanNodeRow } from '@shared/plan-graph'
 import { Button } from '@/ui-components/button'
 import { Label } from '@/ui-components/label'
 import { Switch } from '@/ui-components/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/ui-components/card'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { GripVertical, SortAsc, SortDesc, RefreshCw } from 'lucide-react'
-import CodeMirror from '@uiw/react-codemirror'
+import { GripVertical, SortAsc, SortDesc } from 'lucide-react'
+import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
-
-interface MergeNodeSettingsProps {
-  node: PlanNodeRow
-  onUpdate: (content: string) => void
-  panelApi?: { setTitle: (title: string) => void }
-  onNodeUpdated?: (node: PlanNodeRow) => void
-}
+import TypedPlanNodeEditorProps from './TypedPlanNodeEditorProps'
+import { MergeSettings } from '@shared/node-settings'
 
 interface InputNode {
-  id: number
+  edgeId: number
+  sourceNodeId: number
   title: string
   content: string | null
   position: number
 }
 
-export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdated }: MergeNodeSettingsProps) {
+export default function MergeNodeEditor({
+  dbValue,
+  nodeTypeSettings,
+  onChange,
+  onRegenerate,
+  onNodeTypeSettingsChange,
+  value,
+}: TypedPlanNodeEditorProps<MergeSettings>) {
   const { t } = useLocale()
   const { resolvedTheme } = useTheme()
+
+  const inputEdges = trpc.plan.edges.findByTarget.useQuery(value.id).data
+  const inputNodes = trpc.plan.nodes.getByIds.useQuery((inputEdges || []).map(t => t.from_node_id)).data
+  const serverInputs = useMemo<InputNode[]>(() => {
+    return (inputEdges || []).map(edge => {
+      const fromNode = (inputNodes || []).find(n => n.id === edge.from_node_id)
+      return fromNode ? {
+        edgeId: edge.id,
+        sourceNodeId: fromNode.id,
+        title: fromNode.title,
+        content: fromNode.content,
+        position: edge.position
+      } : null
+    }).filter( t => t !== null)
+  }, [inputEdges, inputNodes])
+
   const [inputs, setInputs] = useState<InputNode[]>([])
-  const [settings, setSettings] = useState({
-    includeNodeTitle: false,
-    includeInputTitles: false,
-    fixHeaders: false,
-    autoUpdate: false
-  })
+  useEffect(() => { setInputs(serverInputs) }, [serverInputs])
 
-  // Load input nodes connected with text or textArray edges
-  const loadInputs = useCallback(async () => {
-    try {
-      const [edges, nodes] = await Promise.all([
-        ipcClient.plan.edges.getAll.query(),
-        ipcClient.plan.nodes.getAll.query()
-      ])
-      const graphData = { edges, nodes }
-      const inputEdges = graphData.edges.filter(edge => edge.to_node_id === node.id && (edge.type === 'text' || edge.type === 'textArray'))
-      const inputNodes = inputEdges.map(edge => {
-        const fromNode = graphData.nodes.find(n => n.id === edge.from_node_id)
-        return fromNode ? {
-          id: fromNode.id,
-          title: fromNode.title,
-          content: fromNode.content,
-          position: edge.position
-        } : null
-      }).filter((node): node is InputNode => node !== null)
-      
-      // Sort by position
-      inputNodes.sort((a, b) => a.position - b.position)
-      setInputs(inputNodes)
-    } catch (error) {
-      console.error('Failed to load inputs:', error)
-    }
-  }, [node.id])
-
-  // Load saved settings
-  const loadSettings = useCallback(async () => {
-    try {
-      // Get the node data which now contains node_type_settings
-      const nodeData = await ipcClient.plan.nodes.get.query(node.id)
-      if (nodeData.node_type_settings) {
-        const parsed = JSON.parse(nodeData.node_type_settings)
-        setSettings(prev => ({ ...prev, ...parsed }))
-      }
-    } catch (error) {
-      console.error('Failed to load settings:', error)
-    }
-  }, [node.id])
-
-  // Load inputs and settings
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadInputs()
-    loadSettings()
-  }, [node.id, loadInputs, loadSettings])
-
-  // Save settings and fetch updated node
-  const saveSettings = useCallback(async (newSettings: typeof settings): Promise<PlanNodeRow | null> => {
-    try {
-      // Update the node with new node_type_settings (triggers regeneration)
-      const updatedNode = await ipcClient.plan.nodes.patch.mutate({id: node.id, manual: false, data: {
-        node_type_settings: JSON.stringify(newSettings)
-      }});
-      // Fetch updated node
-      onNodeUpdated?.(updatedNode);
-      return updatedNode;
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      return null;
-    }
-  }, [node.id, onNodeUpdated]);
-
-  // Regenerate content via backend
-  const regenerateContent = useCallback(async () => {
-    try {
-      // Send current settings to trigger regeneration
-      const updatedNode = await ipcClient.plan.nodes.patch.mutate({id: node.id, manual: false, data: {
-        node_type_settings: JSON.stringify(settings)
-      }});
-      onNodeUpdated?.(updatedNode);
-    } catch (error) {
-      console.error('Failed to regenerate content:', error);
-    }
-  }, [node.id, settings, onNodeUpdated]);
-
-  // Debounced regenerate content
-  const regenerateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const debouncedRegenerateContent = useCallback(() => {
-    if (regenerateTimeoutRef.current) clearTimeout(regenerateTimeoutRef.current);
-    regenerateTimeoutRef.current = setTimeout(() => {
-      regenerateContent();
-    }, 1000);
-  }, [regenerateContent]);
-
-  useEffect(() => {
-    return () => {
-      if (regenerateTimeoutRef.current) clearTimeout(regenerateTimeoutRef.current);
-    };
-  }, []);
+  const edgePatchMutation = trpc.plan.edges.patch.useMutation()
 
   // Handle drag end
   async function onDragEnd(result: DropResult) {
@@ -145,27 +67,8 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     }))
 
     setInputs(updatedItems)
-    
-    // Update edge positions
-    try {
-      const [edges, nodes] = await Promise.all([
-        ipcClient.plan.edges.getAll.query(),
-        ipcClient.plan.nodes.getAll.query()
-      ])
-      const graphData = { edges, nodes }
-      const updatePromises = updatedItems.map(async (item, index) => {
-        const edge = graphData.edges.find(e => e.from_node_id === item.id && e.to_node_id === node.id)
-        if (edge) {
-          await ipcClient.plan.edges.patch.mutate({id: edge.id, data: { position: index }})
-        }
-      })
-      await Promise.all(updatePromises)
-    } catch (error) {
-      console.error('Failed to update edge positions:', error)
-    }
-
-    if (settings.autoUpdate) {
-      regenerateContent()
+    for (const item of updatedItems) {
+      edgePatchMutation.mutate({ id: item.edgeId, data: { position: item.position }})
     }
   }
 
@@ -182,78 +85,10 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
     }))
     
     setInputs(updated)
-    
-    // Update edge positions
-    try {
-      const [edges, nodes] = await Promise.all([
-        ipcClient.plan.edges.getAll.query(),
-        ipcClient.plan.nodes.getAll.query()
-      ])
-      const graphData = { edges, nodes }
-      const updatePromises = updated.map(async (item, index) => {
-        const edge = graphData.edges.find(e => e.from_node_id === item.id && e.to_node_id === node.id)
-        if (edge) {
-          await ipcClient.plan.edges.patch.mutate({id: edge.id, data: { position: index } })
-        }
-      })
-      await Promise.all(updatePromises)
-    } catch (error) {
-      console.error('Failed to update edge positions:', error)
-    }
-
-    if (settings.autoUpdate) {
-      debouncedRegenerateContent()
+    for (const item of updated) {
+      edgePatchMutation.mutate({ id: item.edgeId, data: { position: item.position }})
     }
   }
-
-  // Debounced save settings
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const debouncedSaveSettings = useCallback((newSettings: typeof settings) => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveSettings(newSettings);
-    }, 1000);
-  }, [saveSettings]);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, []);
-
-  // Update setting
-  function updateSetting(key: keyof typeof settings, value: boolean) {
-    setSettings(prev => {
-      const newSettings = { ...prev, [key]: value };
-      if (key !== 'autoUpdate' || value) {
-        // Save new settings with debounce (triggers backend regeneration)
-        debouncedSaveSettings(newSettings);
-      }
-      return newSettings;
-    });
-  }
-
-
-  // Handle auto-update - ensure content is regenerated when any dependency changes
-  useEffect(() => {
-    if (settings.autoUpdate) {
-      debouncedRegenerateContent()
-    }
-  }, [inputs, settings, node.title, debouncedRegenerateContent])
-
-  // Manual update button
-  function handleManualUpdate() {
-    regenerateContent()
-  }
-
-  // Update the tab title to show the node title
-  useEffect(() => {
-    if (panelApi) {
-      panelApi.setTitle(node.title)
-    }
-  }, [node.title, panelApi])
-
 
   return (
     <div className="space-y-6 p-4">
@@ -271,10 +106,6 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
               <SortDesc className="h-4 w-4 mr-2" />
               {t('mergeNode.sortAlphabeticalReverse')}
             </Button>
-            <Button variant="outline" size="sm" onClick={loadInputs}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              {t('common.refresh')}
-            </Button>
           </div>
           
           <DragDropContext onDragEnd={onDragEnd}>
@@ -286,7 +117,7 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
                   className="space-y-2 min-h-[80px]"
                 >
                   {inputs.map((input, index) => (
-                    <Draggable key={input.id} draggableId={String(input.id)} index={index}>
+                    <Draggable key={input.edgeId} draggableId={String(input.edgeId)} index={index}>
                       {(provided) => (
                         <div
                           ref={provided.innerRef}
@@ -319,8 +150,8 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
             </Label>
             <Switch
               id="includeNodeTitle"
-              checked={settings.includeNodeTitle}
-              onCheckedChange={(checked: boolean) => updateSetting('includeNodeTitle', checked)}
+              checked={nodeTypeSettings.includeNodeTitle}
+              onCheckedChange={(checked: boolean) => onNodeTypeSettingsChange({ ...nodeTypeSettings, includeNodeTitle: checked })}
               className="w-11 h-6 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
             />
           </div>
@@ -331,8 +162,8 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
             </Label>
             <Switch
               id="includeInputTitles"
-              checked={settings.includeInputTitles}
-              onCheckedChange={(checked: boolean) => updateSetting('includeInputTitles', checked)}
+              checked={nodeTypeSettings.includeInputTitles}
+              onCheckedChange={(checked: boolean) => onNodeTypeSettingsChange({ ...nodeTypeSettings, includeInputTitles: checked })}
               className="w-11 h-6 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
             />
           </div>
@@ -343,8 +174,8 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
             </Label>
             <Switch
               id="fixHeaders"
-              checked={settings.fixHeaders}
-              onCheckedChange={(checked: boolean) => updateSetting('fixHeaders', checked)}
+              checked={nodeTypeSettings.fixHeaders}
+              onCheckedChange={(checked: boolean) => onNodeTypeSettingsChange({ ...nodeTypeSettings, fixHeaders: checked })}
               className="w-11 h-6 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
             />
           </div>
@@ -355,32 +186,39 @@ export default function MergeNodeEditor({ node, onUpdate, panelApi, onNodeUpdate
             </Label>
             <Switch
               id="autoUpdate"
-              checked={settings.autoUpdate}
-              onCheckedChange={(checked: boolean) => updateSetting('autoUpdate', checked)}
+              checked={nodeTypeSettings.autoUpdate}
+              onCheckedChange={(checked: boolean) => onNodeTypeSettingsChange({ ...nodeTypeSettings, autoUpdate: checked })}
               className="w-11 h-6 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
             />
           </div>
 
-          {!settings.autoUpdate && (
-            <Button onClick={handleManualUpdate} className="w-full">
+          {!nodeTypeSettings.autoUpdate && (
+            <Button onClick={onRegenerate} className="w-full">
               {t('common.update')}
             </Button>
           )}
         </CardContent>
       </Card>
 
-      <CodeMirror
-        value={node.content || ''}
-        height="80vh"
-        extensions={[markdown()]}
-        theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
-        className="border rounded"
-        onChange={(value) => {
-          onUpdate(value)
-          // Also update the node content via IPC
-          ipcClient.plan.nodes.patch.mutate({id: node.id, manual: true, data: { content: value }})
-        }}
-      />
+      {
+        nodeTypeSettings.autoUpdate
+          ? <CodeMirror
+              value={dbValue.content || ''}
+              height="80vh"
+              extensions={[markdown(), EditorView.lineWrapping]}
+              theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
+              className="border rounded"
+              readOnly={true}
+            />
+          : <CodeMirror
+              value={value.content || ''}
+              height="80vh"
+              extensions={[markdown(), EditorView.lineWrapping]}
+              theme={resolvedTheme === 'obsidian' ? 'dark' : 'light'}
+              className="border rounded"
+              onChange={(content) => { onChange({ ...value, content }) }}
+            />
+      }
     </div>
   )
 }

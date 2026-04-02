@@ -1,6 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useLocale } from '@/lib/locale'
-import { trpc } from '@/ipcClient'
 import { Button } from '@/ui-components/button'
 import { Label } from '@/ui-components/label'
 import { Switch } from '@/ui-components/switch'
@@ -10,18 +9,19 @@ import { SplitSettings } from '@shared/node-settings'
 import { Input } from '@/ui-components/input'
 
 export default function SplitNodeEditor({
-  value,
-  save,
+  dbValue,
   nodeTypeSettings,
-  onExternalUpdate,
   onNodeTypeSettingsChange,
+  onRegenerate,
+  value,
 }: TypedPlanNodeEditorProps<SplitSettings>) {
   const { t } = useLocale()
 
   const parts = useMemo<string[]>(() => {
-    if (value.content) {
+    const content = nodeTypeSettings.autoUpdate ? dbValue.content : value.content
+    if (content) {
       try {
-        const parsed = JSON.parse(value.content)
+        const parsed = JSON.parse(content)
         if (Array.isArray(parsed)) {
           return parsed
         } else {
@@ -33,14 +33,7 @@ export default function SplitNodeEditor({
     } else {
       return []
     }
-  }, [value.content])
-
-  const regenerateMutation = trpc.plan.nodes.regenerate.useMutation()
-  const handleRegenerate = useCallback(async () => {
-    await save(value)
-    const result = await regenerateMutation.mutateAsync(value.id)
-    onExternalUpdate(result)
-  }, [onExternalUpdate, regenerateMutation, save, value])
+  }, [nodeTypeSettings.autoUpdate, dbValue.content, value.content])
 
   return (
     <div className="space-y-6 p-4">
@@ -97,7 +90,7 @@ export default function SplitNodeEditor({
             />
           </div>
           {!nodeTypeSettings.autoUpdate && (
-            <Button onClick={handleRegenerate} className="w-full">
+            <Button onClick={onRegenerate} className="w-full">
               {t('common.update')}
             </Button>
           )}
