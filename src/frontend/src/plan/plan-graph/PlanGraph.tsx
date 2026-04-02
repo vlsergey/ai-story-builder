@@ -13,10 +13,12 @@ import {
   useEdgesState,
   NodeChange,
   ReactFlowInstance,
+  EdgeProps,
+  NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useLocale } from '../../lib/locale'
-import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow } from '@shared/plan-graph'
+import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow, PlanEdgeType } from '@shared/plan-graph'
 import { EDGE_TYPES, canCreateEdge, getCreatableNodeTypes, getNodeTypeDefinition } from '@shared/node-edge-dictionary'
 import { applyHierarchicalLayout } from './hierarchical-layout'
 import PlanEdgeComponent from './PlanEdge'
@@ -35,14 +37,16 @@ import EdgeTypeSelectionDialog from './EdgeTypeSelectionDialog'
 import AddNodeDialog from './AddNodeDialog'
 import SimpleNode from './SimpleNode'
 import GroupNode from './GroupNode'
+import { EdgeImpl, NodeImpl } from './Types'
 
-const nodeTypes = {
+const nodeTypes: Record<'simple' | 'group', React.FC<NodeProps<NodeImpl>>> = {
   'simple': SimpleNode,
   'group': GroupNode,
 }
 
-const edgeTypes = {
-  planEdge: PlanEdgeComponent,
+const edgeTypes: Record<PlanEdgeType, React.FC<EdgeProps<EdgeImpl> & {data: PlanEdgeRow} >> = {
+  'text': PlanEdgeComponent,
+  'textArray': PlanEdgeComponent,
 }
 
 function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => void): NodeImpl[] {
@@ -68,17 +72,15 @@ function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => v
   });
 }
 
-function toReactFlowEdges(graphEdges: PlanEdgeRow[], onDeleteEdge: (id: number) => void): Edge[] {
+function toReactFlowEdges(graphEdges: PlanEdgeRow[], onDeleteEdge: (id: number) => void): EdgeImpl[] {
   return graphEdges.map(e => ({
     id: String(e.id),
     source: String(e.from_node_id),
     target: String(e.to_node_id),
-    type: 'planEdge',
-    data: { type: e.type, label: e.label, onDelete: onDeleteEdge },
-  }))
+    type: e.type,
+    data: { ...e, onDelete: onDeleteEdge },
+  } as EdgeImpl))
 }
-
-type NodeImpl = Node<PlanNodeRow & Record<string, unknown>, 'simple' | 'group'>
 
 export default function PlanGraph() {
   const { t } = useLocale()

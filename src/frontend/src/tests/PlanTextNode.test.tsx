@@ -48,7 +48,7 @@ describe('PlanTextNode double-click', () => {
       <PlanTextNode
         id="5"
         data={mockData as any}
-        type="planText"
+        type="simple"
         selected={false}
         selectable={true}
         draggable={true}

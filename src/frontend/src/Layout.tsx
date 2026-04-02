@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react'
-import { DockviewReact, DockviewDefaultTab } from 'dockview'
+import { DockviewReact, DockviewDefaultTab, DockviewReadyEvent, DockviewApi } from 'dockview'
 import { useTheme } from './lib/theme/theme-provider'
 import { ipcClient, trpc } from './ipcClient'
 
@@ -9,7 +9,7 @@ import 'dockview/dist/styles/dockview.css'
 // Local small wrappers to keep import cycles simple
 import LoreSection from './lore/LoreSection'
 import LoreEditor from './lore/LoreEditor'
-import PlanEditor from './plan/PlanEditor'
+import PlanNodeEditorRouter from './plan/PlanNodeEditorRouter'
 import PlanGraph from './plan/plan-graph/PlanGraph'
 import SettingsPanel from './settings/SettingsPanel'
 import AiPlayground from './ai/AiPlayground'
@@ -18,6 +18,7 @@ import type { LoreNodeRow } from '@shared/lore-node'
 import { EditorSettingsProvider } from './settings/editor-settings'
 import { LoreSettingsProvider } from './settings/lore-settings'
 import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from './lib/plan-graph-events'
+import { PlanNodeRow } from '@shared/plan-graph'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -42,7 +43,7 @@ const WelcomeWatermark = () => (
  * This implementation uses dockview for a fully dockable, resizable interface.
  */
 export default function Layout({ onClose, initialLayout }: { onClose: () => void; initialLayout: unknown | null }) {
-  const dockviewRef = useRef<any>(null)
+  const dockviewRef = useRef<DockviewApi>(null)
   const { setPreference } = useTheme()
 
   /**
@@ -70,7 +71,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     api.addPanel({
       id: 'ai-playground',
       component: 'ai-playground',
-      tabComponent: 'loreEditorTab',
+      tabComponent: 'editorTab',
       title: 'AI Playground',
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
@@ -86,7 +87,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     api.addPanel({
       id: 'settings',
       component: 'settings',
-      tabComponent: 'loreEditorTab',
+      tabComponent: 'editorTab',
       title: 'Settings',
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
@@ -104,7 +105,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     api.addPanel({
       id: panelId,
       component: 'lore-editor',
-      tabComponent: 'loreEditorTab',
+      tabComponent: 'editorTab',
       title: node.title,
       params: { nodeId: node.id },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
@@ -112,19 +113,19 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   }
 
   /** Opens (or activates) a plan-node-editor tab for the given node. */
-  function openPlanNodeEditor(nodeId: number) {
+  function openPlanNodeEditor(node: PlanNodeRow) {
     const api = dockviewRef.current
     if (!api) return
-    const panelId = `plan-node-editor-${nodeId}`
+    const panelId = `plan-node-editor-${node.id}`
     const existing = api.getPanel(panelId)
     if (existing) { existing.api.setActive(); return }
     const editorGroup = findEditorGroup(api)
     api.addPanel({
       id: panelId,
       component: 'plan-node-editor',
-      tabComponent: 'loreEditorTab',
-      title: `Plan node #${nodeId}`,
-      params: { nodeId },
+      tabComponent: 'editorTab',
+      title: node.title,
+      params: { nodeId: node.id },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
   }
@@ -148,7 +149,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<OpenPlanNodeEditorDetail>).detail
-      openPlanNodeEditor(detail.nodeId)
+      openPlanNodeEditor(detail.node)
     }
     window.addEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
     return () => window.removeEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
@@ -287,7 +288,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   }, [])
 
 
-  const onReady = (event: any) => {
+  const onReady = (event: DockviewReadyEvent) => {
     dockviewRef.current = event.api
     // Subscribe to layout changes via the api (not a JSX prop)
     event.api.onDidLayoutChange(handleLayoutChange)
@@ -364,10 +365,10 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     );
   };
 
-  // Tab for lore-editor panels. Wraps DockviewDefaultTab but overrides the close
+  // Tab for editor panels. Wraps DockviewDefaultTab but overrides the close
   // action so that closing the last panel in a group keeps the group alive (shows
   // watermark) instead of collapsing the layout.
-  const LoreEditorTab = (props: any) => {
+  const EditorTab = (props: any) => {
     const closeAction = () => {
       const group = props.api?.group
       if (group && group.panels.length === 1) {
@@ -393,12 +394,12 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
         />
       </div>
     ),
-    'lore-editor': (props: any) => (
+    'lore-editor': (props: { api: { setTitle: (title: string) => void }, params: { nodeId: number } }) => (
       <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
     'plan-graph': () => <PlanGraph />,
-    'plan-node-editor': (props: any) => (
-      <PlanEditor
+    'plan-node-editor': (props: { api: { setTitle: (title: string) => void }, params: { nodeId: number } }) => (
+      <PlanNodeEditorRouter
         nodeId={props.params?.nodeId}
         panelApi={props.api}
       />
@@ -417,7 +418,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
   const tabComponents = {
     nonClosableTab: NonClosableTab,
     permanentTab: PermanentTab,
-    loreEditorTab: LoreEditorTab,
+    editorTab: EditorTab,
   };
 
   // Prevent sidebar/utility panels (lore, cards) from being dropped into the editor group.

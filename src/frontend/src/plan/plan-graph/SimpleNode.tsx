@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { MouseEventHandler, useCallback, useMemo } from 'react'
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import { dispatchOpenPlanNodeEditor } from '../../lib/plan-graph-events'
 import PlanNodeStatusIcon from './PlanNodeStatusIcon'
@@ -6,6 +6,7 @@ import DeleteNodeButton from './DeleteNodeButton'
 import { NodeImpl } from './Types'
 import { getNodeTypeDefinition } from '@shared/node-edge-dictionary'
 import NodeTypeIcons from './NodeTypeIcons'
+import { NodeTypeEditors } from '../NodeTypeEditors'
 
 export default function SimpleNode({ data }: NodeProps<NodeImpl>) {
   const nodeType = useMemo( () => getNodeTypeDefinition(data.type), [data.type] )
@@ -17,10 +18,17 @@ export default function SimpleNode({ data }: NodeProps<NodeImpl>) {
   const hasInputs = (nodeType?.allowedIncomingEdgeTypes || []).length > 0
   const hasOutputs = (nodeType?.allowedOutgoingEdgeTypes || []).length > 0
 
+  const handleDoubleClick = useCallback<MouseEventHandler>((e) => {
+    if (NodeTypeEditors[data.type]) {
+      e.stopPropagation();
+      dispatchOpenPlanNodeEditor(data)
+    }
+  }, [data])
+
   return (
     <div
       className="bg-background border-2 border-blue-400 rounded shadow-sm cursor-pointer select-none h-full w-full"
-      onDoubleClick={(e) => { e.stopPropagation(); dispatchOpenPlanNodeEditor(data.id) }}
+      onDoubleClick={handleDoubleClick}
     >
       { hasInputs && <Handle type="target" position={Position.Left} /> }
       <NodeResizer isVisible={true} />

@@ -5,16 +5,12 @@ import {
   type EdgeProps,
 } from '@xyflow/react'
 import { useLocale } from '../../lib/locale'
+import { EdgeImpl } from './Types'
+import { PlanEdgeRow, PlanEdgeType } from '@shared/plan-graph'
 
 const EDGE_COLORS: Record<string, string> = {
   text: '#3b82f6',   // blue
   textArray: '#3b82f6', // same as text
-}
-
-interface PlanEdgeData {
-  type?: string
-  label?: string | null
-  onDelete?: (edgeId: string) => void
 }
 
 export default function PlanEdge({
@@ -26,12 +22,11 @@ export default function PlanEdge({
   sourcePosition,
   targetPosition,
   data,
-}: EdgeProps) {
+}: EdgeProps<EdgeImpl> & {data: PlanEdgeRow}) {
   const { t } = useLocale()
   const [hovered, setHovered] = useState(false)
 
-  const edgeData = data as PlanEdgeData | undefined
-  const edgeType = edgeData?.type ?? 'text'
+  const edgeType = data.type
   const color = EDGE_COLORS[edgeType] ?? EDGE_COLORS.text
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
@@ -47,7 +42,7 @@ export default function PlanEdge({
   const isArray = edgeType === 'textArray'
   const offsets = isArray ? [-4, 4, 0] : [0]
 
-  const label = edgeData?.label ?? t(`planGraph.edge.${edgeType}`)
+  const label = data?.label ?? t(`planGraph.edge.${edgeType}`)
 
   return (
     <>
@@ -121,9 +116,9 @@ export default function PlanEdge({
               }}
             >
               {label}
-              {edgeData?.onDelete && (
+              {data?.onDelete && (
                 <button
-                  onClick={() => edgeData.onDelete!(id)}
+                  onClick={() => data.onDelete(Number(id))}
                   className="ml-1 text-destructive hover:text-destructive/80 font-bold"
                   title="Delete edge"
                 >
