@@ -6,7 +6,7 @@ import DeleteNodeButton from './DeleteNodeButton'
 import { NodeImpl } from './Types'
 import { getNodeTypeDefinition } from '@shared/node-edge-dictionary'
 import NodeTypeIcons from './NodeTypeIcons'
-import { NodeTypeEditors } from '../NodeTypeEditors'
+import { NodeTypeEditors } from '../editors/NodeTypeEditors'
 
 export default function SimpleNode({ data }: NodeProps<NodeImpl>) {
   const nodeType = useMemo( () => getNodeTypeDefinition(data.type), [data.type] )

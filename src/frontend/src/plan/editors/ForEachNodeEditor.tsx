@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { PlanNodeRow } from '@shared/plan-graph'
-import { useLocale } from '../lib/locale'
-import { Button } from '../ui-components/button'
-import { Input } from '../ui-components/input'
-import { Label } from '../ui-components/label'
-import { Textarea } from '../ui-components/textarea'
+import { useLocale } from '@/lib/locale'
+import { Button } from '@/ui-components/button'
+import { Input } from '@/ui-components/input'
+import { Label } from '@/ui-components/label'
+import { Textarea } from '@/ui-components/textarea'
 
 interface ForEachNodeEditorProps {
   node: PlanNodeRow

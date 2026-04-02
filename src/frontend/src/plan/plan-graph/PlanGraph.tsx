@@ -22,7 +22,7 @@ import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow, PlanEdgeType } fro
 import { EDGE_TYPES, canCreateEdge, getCreatableNodeTypes, getNodeTypeDefinition } from '@shared/node-edge-dictionary'
 import { applyHierarchicalLayout } from './hierarchical-layout'
 import PlanEdgeComponent from './PlanEdge'
-import GenerateAllDialog from '../GenerateAllDialog'
+import GenerateAllDialog from './GenerateAllDialog'
 import { trpc } from '../../ipcClient'
 import { PlanNodeRow } from '@shared/plan-graph'
 import { useDebouncedCallback } from 'use-debounce';

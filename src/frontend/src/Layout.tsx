@@ -9,7 +9,7 @@ import 'dockview/dist/styles/dockview.css'
 // Local small wrappers to keep import cycles simple
 import LoreSection from './lore/LoreSection'
 import LoreEditor from './lore/LoreEditor'
-import PlanNodeEditorRouter from './plan/PlanNodeEditorRouter'
+import PlanNodeEditor from './plan/editors/PlanNodeEditor'
 import PlanGraph from './plan/plan-graph/PlanGraph'
 import SettingsPanel from './settings/SettingsPanel'
 import AiPlayground from './ai/AiPlayground'
@@ -399,7 +399,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     ),
     'plan-graph': () => <PlanGraph />,
     'plan-node-editor': (props: { api: { setTitle: (title: string) => void }, params: { nodeId: number } }) => (
-      <PlanNodeEditorRouter
+      <PlanNodeEditor
         nodeId={props.params?.nodeId}
         panelApi={props.api}
       />

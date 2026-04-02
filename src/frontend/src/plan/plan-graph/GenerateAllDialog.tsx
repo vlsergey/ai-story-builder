@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
-import { useLocale } from '../lib/locale'
-import { generateAllStream } from '../lib/generate-node-stream'
+import { useLocale } from '../../lib/locale'
+import { generateAllStream } from '../../lib/generate-node-stream'
 
 interface GenerateAllDialogProps {
   onClose: () => void

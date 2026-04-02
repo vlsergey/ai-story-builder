@@ -1,67 +1,32 @@
 import { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel";
 import { trpc } from "@/ipcClient";
-import getDifference from "@/lib/getDifference";
-import NodeEditor, { EditorMode, NodeEditorState } from "@/nodes/NodeEditor"
+import NodeEditor, { EditorMode } from "@/nodes/NodeEditor"
 import { PlanNodeRow } from "@shared/plan-graph"
 import { useCallback, useRef, useState } from "react"
-import { useDebouncedCallback } from 'use-debounce';
+import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps";
 
-interface PlanNodeTextEditorProps {
-  nodeId: number,
-  initialValue: PlanNodeRow
-}
+type StatusOverride = null | 'GENERATING' | 'IMPROVING'
 
-export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTextEditorProps) {
-  const [firstInitialValue] = useState<PlanNodeRow>(initialValue)
-  const [lastSaved, setLastSaved] = useState<PlanNodeRow>(initialValue)
-  const [value, setValue] = useState<PlanNodeRow>(initialValue)
-  const [status, setStatus] = useState<NodeEditorState>('SAVED')
+export default function PlanNodeTextEditor({ initialValue, value, save, onChange, onExternalUpdate, status }: TypedPlanNodeEditorProps) {
+  const nodeId = initialValue.id
+  const [statusOverride, setStatusOverride] = useState<StatusOverride>(null)
 
   const [editorMode, setEditorMode] = useState<EditorMode>(
-    firstInitialValue.in_review === 1
-      ? firstInitialValue.ai_improve_instruction ? 'review_after_improve' : 'review_after_generate'
-      : firstInitialValue.content && (firstInitialValue.content as string).trim().length > 0 && firstInitialValue.ai_improve_instruction
+    initialValue.in_review === 1
+      ? initialValue.ai_improve_instruction ? 'review_after_improve' : 'review_after_generate'
+      : initialValue.content && (initialValue.content as string).trim().length > 0 && initialValue.ai_improve_instruction
       ? 'improve'
       : 'generate'
   )
 
-  const patchMutation = trpc.plan.nodes.patch.useMutation().mutateAsync
-
-  const save = useCallback(async (manual: boolean, value: PlanNodeRow) => {
-    setStatus('SAVING')
-
-    const diff = getDifference(lastSaved, value)
-    if (Object.keys(diff).length === 0) {
-      setStatus('SAVED')
-      return
-    }
-
-    const newValue = await patchMutation({id: nodeId, manual, data: diff})
-    setLastSaved(newValue)
-    setStatus('SAVED')
-  }, [lastSaved, nodeId, patchMutation, setLastSaved, setStatus])
-
-  const debounceSave = useDebouncedCallback(save, 1000)
-
   const acceptChangesMutation = trpc.plan.nodes.acceptReview.useMutation().mutateAsync
 
   const handleAcceptChanges = useCallback(async () => {
-    setStatus('SAVING')
-    debounceSave.cancel()
-    await save(true, value)
-    setStatus('SAVING')
+    await save(value)
     const newValue = await acceptChangesMutation(nodeId)
-    setLastSaved(newValue)
-    setValue(newValue)
+    onChange(newValue)
     setEditorMode((prevMode) => prevMode === 'review_after_generate' ? 'generate' : 'improve')
-    setStatus('SAVED')
-  }, [acceptChangesMutation, debounceSave, nodeId, save, value])
-
-  const handleChange = useCallback((value: PlanNodeRow) => {
-    setValue(value)
-    setStatus('DEBOUNCE')
-    debounceSave(true, value)
-  }, [setValue, setStatus, debounceSave])
+  }, [acceptChangesMutation, onChange, nodeId, save, value])
 
   const aiThinkinPanelRef = useRef<AiThinkingPanelHandle>(null)
   const [tempContent, setTempContent] = useState<string|null>(null)
@@ -83,15 +48,14 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
           }
           break
         case 'data':
-          setLastSaved(event.data)
-          setValue(event.data)
+          onExternalUpdate(event.data)
           setTempContent(null)
           break
         case 'completed':
           aiThinkinPanelRef?.current?.onComplete()
           setGenerationStarted(false)
           setTempContent(null)
-          setStatus('SAVED')
+          setStatusOverride(null)
           setEditorMode('review_after_generate')
           break
       }
@@ -102,11 +66,10 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
       setTempContent(null)
       setGenerationStarted(false);
       setEditorMode('generate')
-      setStatus('ERROR')
     }
   })
   const handleGenerate = useCallback(() => {
-    setStatus('GENERATING')
+    setStatusOverride('GENERATING')
     setGenerationStarted(true)
   }, [setGenerationStarted])
 
@@ -127,8 +90,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
           }
           break
         case 'data':
-          setLastSaved(event.data)
-          setValue(event.data)
+          onExternalUpdate(event.data)
           break
         case 'completed':
           aiThinkinPanelRef?.current?.onComplete()
@@ -145,7 +107,7 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
   })
 
   const handleImprove = useCallback(() => {
-    setStatus('IMPROVING')
+    setStatusOverride('IMPROVING')
     setImprovingStarted(true)
   }, [setImprovingStarted])
 
@@ -157,8 +119,8 @@ export default function PlanNodeTextEditor({ initialValue, nodeId }: PlanNodeTex
     i18nPrefix="plan"
     onImprove={handleImprove}
     onAcceptChanges={handleAcceptChanges}
-    onChange={handleChange}
-    status={status}
+    onChange={onChange}
+    status={statusOverride || status}
     value={{
       ...value,
       content: tempContent || value.content
