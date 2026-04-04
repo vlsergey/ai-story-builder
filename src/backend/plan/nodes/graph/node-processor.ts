@@ -1,6 +1,6 @@
 import { PlanNodeService } from '../plan-node-service.js'
 import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
-import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
+import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
 
 /**
  * Processor for a specific node type.
@@ -39,8 +39,8 @@ export interface NodeProcessor<S = unknown> {
    * Will return old planNodeRow if regeneration not required.
    */
   regenerate?(
-    context: PlanNodeService,
-    regenerateAllOptions: AiRegenerateOptions,
+    service: PlanNodeService,
+    context: RegenerationNodeContext,
     node: PlanNodeRow,
     settings: S
   ): Promise<PlanNodeUpdate | null>

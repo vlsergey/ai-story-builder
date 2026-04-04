@@ -32,7 +32,7 @@ export default function TextNodeEditor({ initialValue, value, onSave: save, onCh
   const [tempContent, setTempContent] = useState<string|null>(null)
 
   const [generationStarted, setGenerationStarted] = useState(false)
-  trpc.plan.nodes.aiGenerate.useSubscription( nodeId, {
+  trpc.plan.nodes.aiGenerateWatchAndReview.useSubscription( { id: nodeId, options: { regenerateManual: true } }, {
     enabled: generationStarted,
     onData: (event) => {
       switch (event.type) {

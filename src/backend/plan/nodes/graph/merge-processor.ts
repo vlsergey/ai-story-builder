@@ -2,7 +2,7 @@ import { PlanNodeService } from '../plan-node-service.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { MergeSettings } from '../../../../shared/node-settings.js'
-import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
+import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
 
 /**
  * Processor for 'merge' nodes.
@@ -27,7 +27,7 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     }
 
     // Regenerate merged content
-    const patch = await this.regenerate(context, {regenerateManual: false}, nodeData, settings)
+    const patch = await this.regenerate(context, undefined, nodeData, settings)
     if (!!patch?.content || patch?.content === nodeData.content) {
       // No change or generation failed
       return null
@@ -44,14 +44,19 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
       return null
     }
     console.log(`Regenerating auto-updatable merge node ${nodeId}`)
-    return await this.regenerate(context, {regenerateManual: false}, newNode, settings)
+    return await this.regenerate(context, undefined, newNode, settings)
   }
 
-  regenerate = async (context: PlanNodeService, regenerateAllOptions: AiRegenerateOptions, node: PlanNodeRow, settings: MergeSettings): Promise<PlanNodeUpdate> => {
+  async regenerate(
+    service: PlanNodeService,
+    context: RegenerationNodeContext | undefined,
+    node: PlanNodeRow,
+    settings: MergeSettings
+  ): Promise<PlanNodeUpdate> {
     const nodeTitle = node.title
 
     // Fetch inputs (expanded)
-    const inputs = this.getExpandedInputs(context, node.id)
+    const inputs = this.getExpandedInputs(service, node.id)
 
     let content = ''
 

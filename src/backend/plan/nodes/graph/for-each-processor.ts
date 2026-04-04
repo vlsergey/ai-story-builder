@@ -2,9 +2,9 @@ import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { ForEachSettings } from '../../../../shared/node-settings.js'
 import { ForEachNodeContent } from '../../../../shared/for-each-plan-node.js'
-import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
-import { generateAllNodes } from '../generate-all.js'
 import { PlanNodeService } from '../plan-node-service.js'
+import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
+import { regenerateSubtreeNodesContents } from '../generate/regenerateTreeNodesContents.js'
 
 export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
   readonly defaultSettings: ForEachSettings = {}
@@ -80,20 +80,24 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
 
   async regenerate(
     service: PlanNodeService,
-    regenerateOptions: AiRegenerateOptions,
+    context: RegenerationNodeContext,
     node: PlanNodeRow,
     settings: ForEachSettings
   ): Promise<PlanNodeUpdate | null> {
     let parsedContent = JSON.parse(node.content || '{}') as ForEachNodeContent
+    const totalIterations = parsedContent.length || 0
 
     console.log(`[ForEachProcessor] regenerating node ${node.id}`)
     const oldPage = parsedContent.currentIndex || 0
-    for (let iteration: number = 0; iteration < (parsedContent.length || 0); iteration++) {
-      console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}...`)
-      service.changeForEachNodePage(node.id, iteration)
-      await generateAllNodes(regenerateOptions, node.id)
-      console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`)
-    }
+
+    context.asContainer( totalIterations, async ( childContext ) => {
+      for (let iteration: number = 0; iteration < totalIterations; iteration++) {
+        console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}...`)
+        service.changeForEachNodePage(node.id, iteration)
+        await regenerateSubtreeNodesContents(childContext, node.id)
+        console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`)
+      }
+    } )
 
     return service.changeForEachNodePage(node.id, oldPage)
   }

@@ -3,7 +3,7 @@ import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeStatus, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { TextSettings } from '../../../../shared/node-settings.js'
 import { generatePlanNodeTextContent } from '../../../routes/generate-plan-node-text-content.js'
-import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
+import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
 
 /**
  * Processor for 'text' nodes.
@@ -15,14 +15,19 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     return nodeData.content ?? ''
   }
 
-  async onInputContentChange(context: PlanNodeService, nodeData: PlanNodeRow, changedInputNodeId: number, settings: TextSettings): Promise<PlanNodeUpdate | null> {
+  async onInputContentChange(
+    service: PlanNodeService,
+    data: PlanNodeRow,
+    changedInputNodeId: number,
+    settings: TextSettings
+  ): Promise<PlanNodeUpdate | null> {
     // Check if the changed input is referenced in ai_instructions via template
-    const changedNode = context.getById(changedInputNodeId)
+    const changedNode = service.getById(changedInputNodeId)
     if (!changedNode) {
       return null
     }
 
-    const instructions = nodeData.ai_user_prompt
+    const instructions = data.ai_user_prompt
     if (!instructions) {
       return null
     }
@@ -35,8 +40,8 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     }
 
     // If node status is GENERATED, mark it as OUTDATED
-    if (nodeData.status === 'GENERATED') {
-      console.log(`[TextProcessor] node ${nodeData.id} depends on changed input ${changedInputNodeId}, marking OUTDATED`)
+    if (data.status === 'GENERATED') {
+      console.log(`[TextProcessor] node ${data.id} depends on changed input ${changedInputNodeId}, marking OUTDATED`)
       return {
         status: 'OUTDATED' as PlanNodeStatus,
       }
@@ -47,14 +52,14 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
   }
 
   async regenerate(
-    context: PlanNodeService,
-    regenerateAllOptions: AiRegenerateOptions = {regenerateManual: false},
+    service: PlanNodeService,
+    context: RegenerationNodeContext,
     node: PlanNodeRow,
     settings: TextSettings
   ): Promise<PlanNodeUpdate | null> {
     // Generate content using AI for text nodes
     console.log(`[TextProcessor] regenerating node ${node.id} (title: ${node.title})`)
-    const content = await generatePlanNodeTextContent(node);
+    const content = await generatePlanNodeTextContent(node, (event) => context.onEvent(event))
     console.log(`[TextProcessor] generated content length: ${content?.length ?? 'null'}`)
     if (content == node.content) return null
     return { content }

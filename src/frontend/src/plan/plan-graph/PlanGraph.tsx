@@ -181,7 +181,7 @@ export default function PlanGraph() {
   }
 
   const patchNode = trpc.plan.nodes.patch.useMutation().mutateAsync
-  const regenerateNode = trpc.plan.nodes.regenerate.useMutation().mutateAsync
+  const regenerateNode = trpc.plan.nodes.aiGenerateOnly.useMutation().mutateAsync
 
   const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
     if (autoLayout) return
@@ -398,7 +398,7 @@ export default function PlanGraph() {
             aiGenerateSummary={aiGenerateSummary}
             deleteNode={deleteNode}
             moveNode={(nodeId, newParentId) => patchNode({id: nodeId, manual: true, data: {parent_id: newParentId}})}
-            regenerateNode={(nodeId) => regenerateNode(nodeId)}
+            regenerateNode={(nodeId) => regenerateNode({id: nodeId, options: {regenerateManual: true}})}
           />
         }
       </ContextMenu>

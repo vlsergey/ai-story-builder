@@ -1,9 +1,10 @@
 import { PlanNodeService } from '../plan-node-service.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
-import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
+import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
+import { ForEachOutputSettings } from '../../../../shared/node-settings.js'
 
-export class ForEachOutputProcessor implements NodeProcessor<unknown> {
+export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettings> {
   readonly defaultSettings = {}
 
   getOutput(context: PlanNodeService, node: PlanNodeRow): unknown {
@@ -32,8 +33,13 @@ export class ForEachOutputProcessor implements NodeProcessor<unknown> {
     return null
   }
 
-  async regenerate(context: PlanNodeService, regenerateAllOptions: AiRegenerateOptions, node: PlanNodeRow, settings: unknown): Promise<PlanNodeRow> {
-    const nodeInputs = context.getNodeInputs(node.id)
+  async regenerate(
+    service: PlanNodeService,
+    context: RegenerationNodeContext,
+    node: PlanNodeRow,
+    settings: ForEachOutputSettings,
+  ): Promise<PlanNodeRow> {
+    const nodeInputs = service.getNodeInputs(node.id)
     let content: string = ''
     for (const {input} of nodeInputs) {
       if (typeof input === 'string') {

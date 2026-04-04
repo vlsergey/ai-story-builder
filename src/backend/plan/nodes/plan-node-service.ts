@@ -17,11 +17,11 @@ import { generatePlanNodeTextContent } from '../../routes/generate-plan-node-tex
 import { Observable } from '@trpc/server/observable'
 import { generateSummary } from '../../routes/generate-summary.js'
 import { makeErrorWithStatus } from '../../lib/make-errors.js'
-import { AiRegenerateOptions } from '../../../shared/ai-regenerate-all.js'
 import { ForEachNodeContent } from '../../../shared/for-each-plan-node.js'
 import { SettingsRepository } from '../../settings/settings-repository.js'
 import { ForEachOutputProcessor } from './graph/for-each-output-processor.js'
 import { ForEachInputProcessor } from './graph/for-each-input-processor.js'
+import { RegenerationNodeContext } from './generate/RegenerationContext.js'
 
 export type NodeUpdateEvent = {
   nodeId: number
@@ -374,7 +374,10 @@ export class PlanNodeService {
     return null
   }
 
-  async regenerate<T extends Record<string, any> = Record<string, any>>(options: AiRegenerateOptions, nodeId: number): Promise<PlanNodeRow> {
+  async regenerate<T extends Record<string, any> = Record<string, any>>(
+    context: RegenerationNodeContext,
+    nodeId: number,
+  ): Promise<PlanNodeRow> {
     let node = this.repo.findById(nodeId)
     if (!node) throw makeErrorWithStatus('node not found', 404)
 
@@ -390,7 +393,7 @@ export class PlanNodeService {
         ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
         : nodeProcessor.defaultSettings    
 
-      let patch = await nodeProcessor.regenerate(this, options, node, settings)
+      let patch = await nodeProcessor.regenerate(this, context, node, settings)
       if (!patch) return node
 
       if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
@@ -524,27 +527,6 @@ export class PlanNodeService {
 
   private countBytes(text: string): number {
     return Buffer.byteLength(text, 'utf8')
-  }
-
-  aiGenerate(nodeId: number): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
-    const node = this.getById(nodeId);
-    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404);
-
-    return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
-      const newContent = await generatePlanNodeTextContent(node, (event) => {
-        emit.next({ type: 'event', event });
-      });
-
-      const newNode = await this.patch(nodeId, false, {
-        status: 'GENERATED',
-        content: newContent,
-        in_review: (newContent?.trim()?.length || 0) > 0 ? 1 : 0,
-        review_base_content: node.content,
-      });
-
-      emit.next({ type: 'data', data: newNode });      
-      emit.next({ type: 'completed' });
-    });
   }
 
   async aiGenerateSummary(nodeId: number): Promise<PlanNodeRow> {

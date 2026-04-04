@@ -56,6 +56,9 @@ import { PlanNodeService } from './plan/nodes/plan-node-service.js';
 import lastAiGenerationEventManager from './ai/last-ai-generation-event-manager.js';
 import { PlanEdgeRepository } from './plan/edges/plan-edge-repository.js';
 import { PlanNodeRepository } from './plan/nodes/plan-node-repository.js';
+import { RegenerateOptions } from '../shared/RegenerateOptions.js';
+import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from './plan/nodes/plan-node-routes.js';
+import { regenerateTreeNodesContents, subscribeToRegenerateTreeNodesContentsProgress } from './plan/nodes/generate/regenerateTreeNodesContents.js';
 
 const t = initTRPC.create({
   transformer: superjson
@@ -120,9 +123,12 @@ export const appRouter = t.router({
       acceptReview: t.procedure
         .input(z.int())
         .mutation(({ input }) => new PlanNodeService().acceptReview(input)),
-      aiGenerate: t.procedure
-        .input(z.int())
-        .subscription(({ input }) => new PlanNodeService().aiGenerate(input)),
+      aiGenerateOnly: t.procedure
+        .input((v) => v as ({id: number, options: RegenerateOptions}))
+        .mutation(({ input }) => aiRegenerateNodeContentOnly(input.id, input.options)),
+      aiGenerateWatchAndReview: t.procedure
+        .input((v) => v as ({id: number, options: RegenerateOptions}))
+        .subscription(({ input }) => aiRegenerateNodeContentWatchAndReview(input.id, input.options)),
       aiGenerateSummary: t.procedure
         .input(z.int())
         .mutation(({ input }) => new PlanNodeService().aiGenerateSummary(input)),
@@ -143,10 +149,13 @@ export const appRouter = t.router({
       patch: t.procedure
         .input((v) => v as ({id: number, manual: boolean, data: PlanNodeUpdate}))
         .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
-      regenerate: t.procedure
-        .input(z.int())
-        .mutation(({ input }) => new PlanNodeService().regenerate({regenerateManual: false}, input)),
-      startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() }))
+      regenerateTreeNodesContents: t.procedure
+        .input((v) => v as RegenerateOptions)
+        .mutation(({ input }) => regenerateTreeNodesContents(input)),
+      regenerateTreeNodesContentsProgress: t.procedure
+        .subscription(() => subscribeToRegenerateTreeNodesContentsProgress()),
+      startReview: t.procedure
+        .input(z.object({ id: z.number(), options: z.any().optional() }))
         .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
       subscribe: t.procedure.subscription(() => planNodeEventManager.asSubscription()),
       forEachNodes: t.router({

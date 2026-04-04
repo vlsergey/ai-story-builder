@@ -90,7 +90,7 @@ export default function SplitNodeEditor({
             />
           </div>
           {!nodeTypeSettings.autoUpdate && (
-            <Button onClick={onRegenerate} className="w-full">
+            <Button onClick={() => onRegenerate({regenerateManual: true})} className="w-full">
               {t('common.update')}
             </Button>
           )}

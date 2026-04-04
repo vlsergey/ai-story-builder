@@ -5,6 +5,7 @@ import { PlanNodeRow } from '@shared/plan-graph'
 import getDifference from '@/lib/getDifference'
 import { useDebouncedCallback } from 'use-debounce'
 import TypedPlanNodeEditorProps from './TypedPlanNodeEditorProps'
+import { RegenerateOptions } from '@shared/RegenerateOptions'
 
 export interface PlanNodeEditorProps {
   nodeId: number
@@ -111,10 +112,10 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue } : PlanNodeEditorWrapperP
     handleChange({...value, node_type_settings: JSON.stringify(nodeTypeSettings)})
   }, [value, handleChange])
 
-  const regenerateMutation = trpc.plan.nodes.regenerate.useMutation()
-  const handleRegenerate = useCallback(async () => {
+  const regenerateMutation = trpc.plan.nodes.aiGenerateOnly.useMutation()
+  const handleRegenerate = useCallback(async (options: RegenerateOptions) => {
     await handleSave(value)
-    const result = await regenerateMutation.mutateAsync(value.id)
+    const result = await regenerateMutation.mutateAsync({id: value.id, options})
     setLastSaved(result)
     setValue(result)
   }, [regenerateMutation, handleSave, setLastSaved, setValue, value])
