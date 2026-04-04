@@ -5,11 +5,13 @@ import {
   Edit,
   AlertTriangle,
   XCircle,
+  RefreshCwIcon,
 } from 'lucide-react'
 import type { PlanNodeStatus } from '../../../../shared/plan-graph.js'
 
 const STATUS_ICONS = {
   EMPTY: FileText,
+  GENERATING: RefreshCwIcon,
   GENERATED: CheckCircle2,
   MANUAL: Edit,
   OUTDATED: AlertTriangle,
@@ -18,6 +20,7 @@ const STATUS_ICONS = {
 
 const STATUS_COLORS = {
   EMPTY: 'text-muted-foreground bg-muted',
+  GENERATING: 'text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-900',
   GENERATED: 'text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-900',
   MANUAL: 'text-blue-800 bg-blue-100 dark:text-blue-200 dark:bg-blue-900',
   OUTDATED: 'text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-900',
@@ -54,7 +57,7 @@ export default function PlanNodeStatusIcon({
       className={`p-1 rounded shrink-0 ${colorClass} ${className}`}
       title={showTooltip ? status : undefined}
     >
-      <Icon size={size} />
+      <Icon size={size} style={ status === 'GENERATING' ? { animation: 'rotate 1s linear infinite' } : {} } />
     </div>
   )
 }

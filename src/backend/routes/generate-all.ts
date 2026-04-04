@@ -1,20 +1,20 @@
+import { AiRegenerateOptions } from '../../shared/ai-regenerate-all.js';
 import { generateAllNodes } from '../plan/nodes/generate-all.js';
 
 export async function generateAll(
-  params: { regenerateManual?: boolean },
+  params: AiRegenerateOptions,
   onThinking: (status: string, detail?: string) => void,
   onPartialJson: (data: Record<string, unknown>) => void,
 ): Promise<{ generated: number; skipped: number }> {
-  const regenerateManual = params.regenerateManual ?? false
-
   let generated = 0
   let skipped = 0
 
-  onThinking('start', `Starting generation of all nodes (regenerateManual: ${regenerateManual})`)
+  onThinking('start', `Starting generation of all nodes (${JSON.stringify(params)})`)
 
-  await generateAllNodes({
-    regenerateManual,
-    onProgress: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number, reason?: string) => {
+  await generateAllNodes(
+    params,
+    null,
+    (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number, reason?: string) => {
       if (status === 'processing') {
         onThinking('processing', `Processing node ${nodeId} (${queueSize} nodes left in queue)`)
       } else if (status === 'generated') {
@@ -51,7 +51,7 @@ export async function generateAll(
         })
       }
     },
-  })
+  )
 
   onThinking('done', `Generation completed: ${generated} generated, ${skipped} skipped`)
   return { generated, skipped }

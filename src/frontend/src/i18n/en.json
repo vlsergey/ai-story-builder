@@ -153,6 +153,8 @@
   "planGraph.applyLayout": "Apply layout",
   "planGraph.generateAll": "Generate all",
 
+  "planGraph.contextMenu.regenerate": "Refresh content",
+  "planGraph.contextMenu.aiGenerateSummary": "Refresh summary",
   "planGraph.contextMenu.delete": "Delete node",
   "planGraph.contextMenu.moveTo": "Move to…",
   "planGraph.contextMenu.moveToRoot": "Move to Root",
@@ -165,7 +167,6 @@
   "planGraph.node.notGenerated": "Not generated",
   "planGraph.node.generated": "Generated",
   "planGraph.node.review": "Review",
-  "planGraph.aiGenerateSummary": "(Re)generate summary",
   "planGraph.deleteNode": "Delete node",
   "planGraph.selectEdgeType": "Select edge type",
   "planGraph.deleteConfirmation": "Delete this node and all connected edges?",

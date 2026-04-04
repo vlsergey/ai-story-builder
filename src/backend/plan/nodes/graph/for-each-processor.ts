@@ -1,13 +1,11 @@
-import type { NodeContext } from './node-interfaces.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { ForEachSettings } from '../../../../shared/node-settings.js'
+import { ForEachNodeContent } from '../../../../shared/for-each-plan-node.js'
+import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
+import { generateAllNodes } from '../generate-all.js'
+import { PlanNodeService } from '../plan-node-service.js'
 
-/**
- * Processor for 'for-each' nodes.
- * Iterates over an input array of texts, runs internal subgraph for each element,
- * and collects outputs into an array.
- */
 export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
   readonly supportedTypes: PlanNodeType[] = ['for-each']
   readonly defaultSettings: ForEachSettings = {}
@@ -22,77 +20,110 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     return 'textArray'
   }
 
-  getOutput(nodeData: PlanNodeRow): unknown {
-    // Return parsed content as array of strings
-    return this.parseContentAsJsonArray(nodeData)
-  }
+  getOutput(context: PlanNodeService, node: PlanNodeRow): string[] {
+    if ((node.content ?? '').length == 0) return []
 
-  private parseContentAsJsonArray(nodeData: PlanNodeRow): string[] {
-    if (nodeData.content) {
-      try {
-        const parsed = JSON.parse(nodeData.content)
-        if (Array.isArray(parsed)) {
-          // Each element may be an object with content, or just a string
-          return parsed.map((item: any) => typeof item === 'string' ? item : item.content || '')
-        }
-      } catch (_) {
-        // Not valid JSON, treat as empty array
+    const parsedContent = JSON.parse(node.content || '{}') as ForEachNodeContent
+
+    const outputs = context.findByParentIdAndType(node.id, 'for-each-output')
+    if (outputs.length == 0) throw Error(`Missing for-each-output node for for-each node ${node.id}`)
+    if (outputs.length > 1) throw Error(`Too many for-each-output nodes for for-each node ${node.id}: ${outputs.map(i => i.id)}`)
+    const outputNode = outputs[0]
+
+    return (parsedContent.overrides || []).map((override, index) => {
+      if (index != parsedContent.currentIndex) {
+        // for non-current pages obtain content from stored overrides
+        return (override || {})[`${outputNode.id}`].content || ''
+      } else {
+        // if current page is selected, obtain content from node directly
+        return outputNode.content || ''
       }
-    }
-    return []
+    })
   }
 
   async onInputContentChange(
-    context: NodeContext,
+    service: PlanNodeService,
     nodeData: PlanNodeRow,
     changedInputNodeId: number,
     settings: ForEachSettings
   ): Promise<PlanNodeUpdate | null> {
-    // For-each nodes do not auto-update when input changes
-    return null
+    const inputs = this.getExpandedInputs(service, nodeData.id)
+    const internalInputNodeId = this.getInternalInputNodeId(service, nodeData.id)
+    const parsedContent = JSON.parse(nodeData.content || '{}') as ForEachNodeContent
+    console.log(`[ForEachProcessor] Updating node ${nodeData.id} for new input content (${inputs.length} items) as content overrides for for-each-input node ${internalInputNodeId}`)
+
+    let newOverrides = [...(parsedContent.overrides || [])]
+    for (let iteration: number = 0; iteration < inputs.length; iteration++) {
+      newOverrides[iteration] = {
+        ...newOverrides[iteration],
+        [`${internalInputNodeId}`]: {
+          ...(newOverrides[iteration] || {})[`${internalInputNodeId}`],
+          content: inputs[iteration],
+          status: 'GENERATED',
+        }
+      }
+    }
+
+    // replace current input
+    await (new PlanNodeService()).patch(internalInputNodeId, false, {
+      content: inputs[ parsedContent.currentIndex || 0 ],
+      status: 'GENERATED',
+    })
+
+    const newContent : ForEachNodeContent = {
+      ...parsedContent,
+      overrides: newOverrides,
+      length: inputs.length,
+    }
+
+    return {
+      content: JSON.stringify(newContent),
+      status: 'OUTDATED',
+    }
+  }
+
+  private getInternalInputNodeId(context: PlanNodeService, nodeId: number) : number {
+    const internalInputNodes = context.findByParentIdAndType(nodeId, 'for-each-input')
+    if (internalInputNodes.length == 0) throw Error(`Missing for-each-input node for for-each node ${nodeId}`)
+    if (internalInputNodes.length > 1) throw Error(`Too many for-each-input nodes for for-each node ${nodeId}: ${internalInputNodes.map(i => i.id)}`)
+    return internalInputNodes[0].id
   }
 
   async regenerate(
-    context: NodeContext,
+    service: PlanNodeService,
+    regenerateOptions: AiRegenerateOptions,
     node: PlanNodeRow,
     settings: ForEachSettings
   ): Promise<PlanNodeUpdate | null> {
+    let parsedContent = JSON.parse(node.content || '{}') as ForEachNodeContent
+
     console.log(`[ForEachProcessor] regenerating node ${node.id}`)
-
-    // 1. Get input array from upstream node(s)
-    const inputArray = this.getInputArray(context, node.id)
-    if (!inputArray) {
-      // No input, cannot generate
-      return null
+    const oldPage = parsedContent.currentIndex || 0
+    for (let iteration: number = 0; iteration < (parsedContent.length || 0); iteration++) {
+      console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}...`)
+      service.changeForEachNodePage(node.id, iteration)
+      await generateAllNodes(regenerateOptions, node.id)
+      console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`)
     }
 
-    // 2. Get child nodes (subgraph inside for-each)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const childNodes = context.getByParentId(node.id) // will be used later
-    // Find for-each-input and for-each-output nodes (special types?)
-    // For now, assume first child is input, second is output (simplified)
-    // TODO: implement proper detection
-
-    // 3. For each input element, run subgraph generation
-    const outputs: string[] = []
-    for (let i = 0; i < inputArray.length; i++) {
-      const element = inputArray[i]
-      // TODO: set for-each-input content to element, run generation for child subgraph,
-      // collect output from for-each-output
-      // This is a placeholder: just copy input as output
-      outputs.push(element)
-    }
-
-    // 4. Store outputs as JSON array
-    const content = JSON.stringify(outputs)
-    return { content }
+    return service.changeForEachNodePage(node.id, oldPage)
   }
 
-  private getInputArray(context: NodeContext, nodeId: number): string[] {
-    const result = [] as string[]
-    for (const input of context.getNodeInputs(nodeId)) {
-      (input.input as string[]).forEach(item => result.push(item))
+  private getExpandedInputs(context: PlanNodeService, nodeId: number): string[] {
+    const nodeInputs = context.getNodeInputs(nodeId)
+    const inputs: string[] = []
+
+    for (const nodeInput of nodeInputs) {
+      switch (nodeInput.edge.type) {
+        case 'text':
+          inputs.push(nodeInput.input as string)
+          break;
+        case 'textArray':
+          const parts = nodeInput.input as string[]
+          parts.forEach( part => inputs.push(part))
+          break
+      }
     }
-    return result
+    return inputs
   }
 }

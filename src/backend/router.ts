@@ -145,10 +145,15 @@ export const appRouter = t.router({
         .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
       regenerate: t.procedure
         .input(z.int())
-        .mutation(({ input }) => new PlanNodeService().regenerate(input)),
+        .mutation(({ input }) => new PlanNodeService().regenerate({regenerateManual: false}, input)),
       startReview: t.procedure.input(z.object({ id: z.number(), options: z.any().optional() }))
         .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
       subscribe: t.procedure.subscription(() => planNodeEventManager.asSubscription()),
+      forEachNodes: t.router({
+        changePage: t.procedure
+          .input(z.object({ nodeId: z.int(), page: z.int32() }))
+          .mutation(({ input: {nodeId, page} }) => new PlanNodeService().changeForEachNodePage(nodeId, page)),
+      }),
     }),
     edges: t.router({
       findAll: t.procedure

@@ -1,5 +1,6 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow } from '../../../shared/plan-graph.js'
+import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow, PlanNodeType } from '../../../shared/plan-graph.js'
 import { withDbWrite, withDbRead } from '../../db/connection.js'
+import { NodeOverride } from '../../../shared/for-each-plan-node.js'
 
 /**
  * Repository for plan_nodes table operations.
@@ -7,7 +8,53 @@ import { withDbWrite, withDbRead } from '../../db/connection.js'
  * Manages its own database connections.
  */
 export class PlanNodeRepository {
-  // ─── Basic CRUD ──────────────────────────────────────────────────────────────
+
+  applyForEachNodeIterationToChildren(forEachNodeId: number, overrides: Record<string, NodeOverride>) {
+    return withDbWrite(db => {
+      db.prepare(`UPDATE plan_nodes
+        SET 
+            content    = data.content,
+            summary    = data.summary,
+            word_count = COALESCE(CAST(data.word_count AS INTEGER), 0),
+            char_count = COALESCE(CAST(data.char_count AS INTEGER), 0),
+            byte_count = COALESCE(CAST(data.byte_count AS INTEGER), 0),
+            status     = COALESCE(data.status, 'EMPTY')
+        FROM (
+            SELECT 
+                CAST(sub.key AS INTEGER) AS target_id,
+                sub.value->>'content'    AS content,
+                sub.value->>'summary'    AS summary,
+                sub.value->>'word_count' AS word_count,
+                sub.value->>'char_count' AS char_count,
+                sub.value->>'byte_count' AS byte_count,
+                sub.value->>'status'     AS status
+            FROM plan_nodes
+            JOIN json_each(?) AS sub
+        ) AS data
+        WHERE plan_nodes.id = data.target_id 
+          AND plan_nodes.parent_id = ?`).run(JSON.stringify(overrides), forEachNodeId)
+    })
+  }
+
+  collectForEachNodeIterationContentFromChildren(forEachNodeId: number) : Record<string, NodeOverride> {
+    return withDbRead(db => {
+        const dbResult = db.prepare<number, {overrides_map: string}>(`SELECT json_group_object(
+              id, 
+              json_object(
+                  'content', content,
+                  'summary', summary,
+                  'word_count', word_count,
+                  'char_count', char_count,
+                  'byte_count', byte_count,
+                  'status', status
+              )
+          ) AS overrides_map
+          FROM plan_nodes
+          WHERE parent_id = ?`).get(forEachNodeId)
+        return JSON.parse(dbResult?.overrides_map || '{}') as Record<string, NodeOverride>
+      }
+    )
+  }
 
   /**
    * Get all nodes (full rows) ordered by position, id.
@@ -36,11 +83,22 @@ export class PlanNodeRepository {
   /**
    * Get nodes by parent ID (for tree building).
    */
-  getByParentId(parentId: number | null): PlanNodeRow[] {
+  findByParentId(parentId: number | null): PlanNodeRow[] {
     return withDbRead(db =>
       db
         .prepare('SELECT * FROM plan_nodes WHERE parent_id IS ? ORDER BY position, id')
         .all(parentId) as PlanNodeRow[]
+    )
+  }
+
+  /**
+   * Get nodes by parent ID (for tree building).
+   */
+  findByParentIdAndType(parentId: number | null, type: PlanNodeType): PlanNodeRow[] {
+    return withDbRead(db =>
+      db
+        .prepare('SELECT * FROM plan_nodes WHERE parent_id IS ? AND type IS ? ORDER BY position, id')
+        .all(parentId, type) as PlanNodeRow[]
     )
   }
 
@@ -137,7 +195,7 @@ export class PlanNodeRepository {
    * The fields object can contain any column of plan_nodes.
    * Returns updated object.
    */
-  patch(id: number, fields: PlanNodeUpdate): PlanNodeRow | undefined {
+  patch(id: number, fields: PlanNodeUpdate): PlanNodeRow {
     return withDbWrite(db => {
       const keys = Object.keys(fields) as (keyof typeof fields)[]
       if (keys.length === 0) throw Error('Need at least one updated field')
@@ -145,7 +203,7 @@ export class PlanNodeRepository {
       const setClause = keys.map(k => `${k} = ?`).join(', ')
       const values = keys.map(k => fields[k])
       const stmt = db.prepare(`UPDATE plan_nodes SET ${setClause} WHERE id = ? RETURNING *`)
-      return stmt.get(...values, id) as PlanNodeRow | undefined
+      return stmt.get(...values, id) as PlanNodeRow
     })
   }
 

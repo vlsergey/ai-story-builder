@@ -1,6 +1,7 @@
-import type { NodeContext } from './node-interfaces.js'
+import { PlanNodeService } from '../plan-node-service.js'
 import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import { makeErrorWithStatus } from '../../../lib/make-errors.js'
+import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
 
 /**
  * Processor for a specific node type.
@@ -28,9 +29,9 @@ export interface NodeProcessor<S = unknown> {
    * The output must match the type expected by the edge (e.g., string for 'text', string[] for 'textArray').
    * The edge type is determined by getOutputEdgeType().
    */
-  getOutput(planNodeRow: PlanNodeRow): unknown
+  getOutput(context: PlanNodeService, planNodeRow: PlanNodeRow): unknown
 
-  onUpdate?(context: NodeContext, nodeId: number, oldNode: PlanNodeRow | null, newNode: PlanNodeRow | null, settings: S): Promise<PlanNodeUpdate|null>
+  onUpdate?(context: PlanNodeService, nodeId: number, oldNode: PlanNodeRow | null, newNode: PlanNodeRow | null, settings: S): Promise<PlanNodeUpdate|null>
 
   /**
    * Called when an input node's content changes.
@@ -40,14 +41,19 @@ export interface NodeProcessor<S = unknown> {
    * @param changedInputNodeId The ID of the input node whose content changed.
    * @param settings The full settings for this node (merged from node_type_settings and defaults).
    */
-  onInputContentChange?(context: NodeContext, node: PlanNodeRow, changedInputNodeId: number, settings: S): Promise<PlanNodeUpdate | null>
+  onInputContentChange?(context: PlanNodeService, node: PlanNodeRow, changedInputNodeId: number, settings: S): Promise<PlanNodeUpdate | null>
 
   /**
    * Regenerate the node's content (e.g., AI generation, re‑split, re‑merge).
    * This method is also saves new content of the node.
    * Will return old planNodeRow if regeneration not required.
    */
-  regenerate?(context: NodeContext, node: PlanNodeRow, settings: S): Promise<PlanNodeUpdate | null>
+  regenerate?(
+    context: PlanNodeService,
+    regenerateAllOptions: AiRegenerateOptions,
+    node: PlanNodeRow,
+    settings: S
+  ): Promise<PlanNodeUpdate | null>
 }
 
 /**

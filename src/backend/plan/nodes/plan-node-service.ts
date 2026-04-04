@@ -1,4 +1,4 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus, PlanEdgeType, PlanEdgeRow } from '../../../shared/plan-graph.js'
+import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus, PlanEdgeRow } from '../../../shared/plan-graph.js'
 import { PlanNodeRepository } from './plan-node-repository.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
 import { isValidNodeType, NODE_TYPES, getNodeTypeDefinition } from '../../../shared/node-edge-dictionary.js'
@@ -9,7 +9,6 @@ import { LoreProcessor } from './graph/lore-processor.js'
 import { SplitProcessor } from './graph/split-processor.js'
 import { MergeProcessor } from './graph/merge-processor.js'
 import { ForEachProcessor } from './graph/for-each-processor.js'
-import type { NodeContext } from './graph/node-interfaces.js'
 import { mergeNodeSettings } from './graph/settings-helper.js'
 import { DataOrEventEvent, toObservable } from '../../lib/event-manager.js'
 import { improvePlanNodeContent } from '../../routes/improve-plan-node-content.js'
@@ -18,6 +17,11 @@ import { generatePlanNodeTextContent } from '../../routes/generate-plan-node-tex
 import { Observable } from '@trpc/server/observable'
 import { generateSummary } from '../../routes/generate-summary.js'
 import { makeErrorWithStatus } from '../../lib/make-errors.js'
+import { AiRegenerateOptions } from '../../../shared/ai-regenerate-all.js'
+import { ForEachNodeContent } from '../../../shared/for-each-plan-node.js'
+import { SettingsRepository } from '../../settings/settings-repository.js'
+import { ForEachOutputProcessor } from './graph/for-each-output-processor.js'
+import { ForEachInputProcessor } from './graph/for-each-input-processor.js'
 
 export type NodeUpdateEvent = {
   nodeId: number
@@ -28,7 +32,7 @@ export type NodeUpdateEvent = {
  * Service for plan node operations.
  * Encapsulates business logic and emits events on changes.
  */
-export class PlanNodeService implements NodeContext {
+export class PlanNodeService {
   private readonly repo: PlanNodeRepository
   private readonly processorRegistry: NodeProcessorRegistry
 
@@ -41,9 +45,11 @@ export class PlanNodeService implements NodeContext {
     this.processorRegistry.register(new SplitProcessor())
     this.processorRegistry.register(new MergeProcessor())
     this.processorRegistry.register(new ForEachProcessor())
+    this.processorRegistry.register(new ForEachInputProcessor())
+    this.processorRegistry.register(new ForEachOutputProcessor())
   }
 
-  getById(id: number): PlanNodeRow | undefined {
+  getById(id: number): PlanNodeRow {
     const result =  this.repo.findById(id)
     if (!result) {
       throw makeErrorWithStatus(`Plan node ${id} not found`, 404)
@@ -60,8 +66,12 @@ export class PlanNodeService implements NodeContext {
     })
   }
 
-  getByParentId(parentId: number | null): PlanNodeRow[] {
-    return this.repo.getByParentId(parentId)
+  findByParentId(parentId: number | null): PlanNodeRow[] {
+    return this.repo.findByParentId(parentId)
+  }
+
+  findByParentIdAndType(parentId: number | null, type: PlanNodeType): PlanNodeRow[] {
+    return this.repo.findByParentIdAndType(parentId, type)
   }
 
   count(): number {
@@ -95,7 +105,7 @@ export class PlanNodeService implements NodeContext {
       if (!sourceNode) continue
       const processor = this.getProcessor(sourceNode.type)
       if (!processor) continue
-      const input = processor.getOutput(sourceNode)
+      const input = processor.getOutput(this, sourceNode)
       // Verify that the edge type matches the processor's output edge type
       if (processor.getOutputEdgeType() !== edge.type) {
         throw new Error(`Edge type ${edge.type} does not match processor output type ${processor.getOutputEdgeType()}`)
@@ -110,17 +120,12 @@ export class PlanNodeService implements NodeContext {
     return inputs.sort((a, b) => a.edge.position - b.edge.position)
   }
 
-  getNodeOutput(nodeId: number, edgeType: PlanEdgeType): unknown {
+  getNodeOutput(nodeId: number): unknown {
     const node = this.getById(nodeId)
     if (!node) throw new Error(`Node ${nodeId} not found`)
     const processor = this.getProcessor(node.type)
     if (!processor) throw new Error(`No processor for node type ${node.type}`)
-    const output = processor.getOutput(node)
-    // Verify that the requested edge type matches the processor's output edge type
-    if (processor.getOutputEdgeType() !== edgeType) {
-      throw new Error(`Node ${nodeId} does not produce edge type ${edgeType}`)
-    }
-    return output
+    return processor.getOutput(this, node)
   }
 
   /**
@@ -139,7 +144,8 @@ export class PlanNodeService implements NodeContext {
         console.log(`Notifying downstream node ${downstreamNode.id} (${downstreamNode.type}) of changes in node ${changedNodeId}`)
         const settings = this.getNodeSettings(downstreamNode)
         const planNodeUpdate = await processor.onInputContentChange(this, downstreamNode, changedNodeId, settings)
-        if (planNodeUpdate) {
+        if (planNodeUpdate != null && Object.keys(planNodeUpdate).length !== 0) {
+          console.log(`[PlanNodeService] Updating downstream node ${downstreamNode.id} (${downstreamNode.type}) because of changes in node ${changedNodeId}: ${Object.keys(planNodeUpdate)}`)
           await this.patch( downstreamNode.id, false, planNodeUpdate )
         }
       }
@@ -290,7 +296,7 @@ export class PlanNodeService implements NodeContext {
       
       // Check if node type is confined (cannot be moved)
       const nodeDef = getNodeTypeDefinition(oldNode.type)
-      if (nodeDef?.confined) {
+      if (nodeDef?.confined && data.parent_id != oldNode.parent_id) {
         throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
       }
       
@@ -385,22 +391,62 @@ export class PlanNodeService implements NodeContext {
     return null
   }
 
-  async regenerate<T extends Record<string, any> = Record<string, any>>(nodeId: number): Promise<PlanNodeRow> {
-    const node = this.repo.findById(nodeId)
+  async regenerate<T extends Record<string, any> = Record<string, any>>(options: AiRegenerateOptions, nodeId: number): Promise<PlanNodeRow> {
+    let node = this.repo.findById(nodeId)
     if (!node) throw makeErrorWithStatus('node not found', 404)
 
-    const nodeProcessor = this.processorRegistry.getProcessor(node.type) as NodeProcessor<T>
-    const {defaultSettings, regenerate} = nodeProcessor
-    if (!regenerate)
-      throw makeErrorWithStatus('regenerate not supported by node type ' + node.type, 400)
+    node = this.repo.patch(nodeId, {status: 'GENERATING'})
+    planNodeEventManager.emitUpdate(nodeId, `Starting to generate node ${nodeId}`)
 
-    const settings = node.node_type_settings
-      ? mergeNodeSettings(defaultSettings, node.node_type_settings)
-      : defaultSettings    
+    try {
+      const nodeProcessor = this.processorRegistry.getProcessor(node.type) as NodeProcessor<T>
+      if (!nodeProcessor.regenerate)
+        throw makeErrorWithStatus('regenerate not supported by node type ' + node.type, 400)
 
-    const patch = await regenerate(this, node, settings)
-    if (!patch) return node
-    return await this.patch(nodeId, false, patch)
+      const settings = node.node_type_settings
+        ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
+        : nodeProcessor.defaultSettings    
+
+      let patch = await nodeProcessor.regenerate(this, options, node, settings)
+      if (!patch) return node
+
+      if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
+        if (patch.content) {
+          try {
+            patch = {
+              ...patch,
+              summary: await generateSummary( patch.content ) || '',
+              status: 'GENERATED',
+            }
+          } catch (e) {
+            console.error(e)
+            patch = {
+              ...patch,
+              summary: '(error): ' + e + '',
+              status: 'GENERATED',
+            }
+          }
+        } else {
+          patch = {
+            ...patch,
+            summary: null,
+            status: 'EMPTY',
+          }
+        }
+      } else {
+        patch = {
+          ...patch,
+          summary: patch.summary || null,
+          status: patch.content ? 'GENERATED' : 'EMPTY',
+        }
+      }
+
+      return await this.patch(nodeId, false, patch)
+    } catch (e) {
+      console.error(`Unable to regenerate node ${nodeId}`, e)
+      this.repo.patch(nodeId, {status: 'ERROR'})
+      throw e
+    }
   }
 
   // ─── Delete ──────────────────────────────────────────────────────────────────
@@ -456,6 +502,32 @@ export class PlanNodeService implements NodeContext {
     childIds.forEach((id, index) => {
       this.patch(id, true, { position: index })
     })
+  }
+
+  changeForEachNodePage(nodeId: number, page: number): PlanNodeRow {
+    const repo = this.repo
+    const node = this.getById(nodeId)
+    if (node.type != 'for-each') {
+      throw makeErrorWithStatus(`Node ${nodeId} is not a for-each node, but '${node.type}'`, 400)
+    }
+    let parsedContent = (JSON.parse(node.content || '{}') || {}) as ForEachNodeContent
+
+    // save current page
+    parsedContent.overrides = [...(parsedContent.overrides || [])]
+    parsedContent.overrides[parsedContent.currentIndex || 0] = repo.collectForEachNodeIterationContentFromChildren(nodeId)
+
+    repo.applyForEachNodeIterationToChildren(nodeId, parsedContent.overrides[page] || {})
+
+    parsedContent.currentIndex = page
+    const result = repo.patch(nodeId, {content: JSON.stringify(parsedContent)})
+
+    // Emit events to frontend
+    planNodeEventManager.emitUpdate(nodeId, `changed page in ${nodeId}`)
+    repo.findByParentId(nodeId).forEach(child => {
+      planNodeEventManager.emitUpdate(child.id, `changed page in ${nodeId}`)
+    })
+
+    return result
   }
 
   private countWords(text: string): number {

@@ -15,6 +15,7 @@ export interface NodeTypeDefinition {
   canCreate?: boolean
   /** Whether this node type can be deleted manually by user (default true) */
   canDelete?: boolean
+  canRegenerate?: boolean
   /** Whether this node type is a group node (rendered as React Flow group) */
   isGroup?: boolean
   /** Whether this node is confined to its parent (cannot be moved outside parent bounds) */
@@ -37,6 +38,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     allowedIncomingEdgeTypes: ['text'],
     canCreate: true,
     canDelete: true,
+    canRegenerate: true,
   },
   {
     id: 'lore',
@@ -51,6 +53,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     allowedIncomingEdgeTypes: ['text', 'textArray'],
     canCreate: true,
     canDelete: true,
+    canRegenerate: true,
   },
   {
     id: 'split',
@@ -58,6 +61,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     allowedIncomingEdgeTypes: ['text'],
     canCreate: true,
     canDelete: true,
+    canRegenerate: true,
   },
   {
     id: 'for-each',
@@ -66,6 +70,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canCreate: true,
     canDelete: true,
     isGroup: true,
+    canRegenerate: true,
   },
   {
     id: 'for-each-input',
@@ -74,6 +79,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canCreate: false,
     canDelete: false,
     confined: true,
+    canRegenerate: false,
   },
   {
     id: 'for-each-output',
@@ -82,6 +88,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canCreate: false,
     canDelete: false,
     confined: true,
+    canRegenerate: true,
   },
 ]
 

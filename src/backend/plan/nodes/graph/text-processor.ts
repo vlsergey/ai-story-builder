@@ -1,8 +1,9 @@
-import type { NodeContext } from './node-interfaces.js'
+import { PlanNodeService } from '../plan-node-service.js'
 import type { NodeProcessor } from './node-processor.js'
 import type { PlanNodeType, PlanEdgeType, PlanNodeStatus, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { TextSettings } from '../../../../shared/node-settings.js'
 import { generatePlanNodeTextContent } from '../../../routes/generate-plan-node-text-content.js'
+import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
 
 /**
  * Processor for 'text' nodes.
@@ -20,11 +21,11 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     return 'text'
   }
 
-  getOutput(nodeData: PlanNodeRow): unknown {
+  getOutput(context: PlanNodeService, nodeData: PlanNodeRow): unknown {
     return nodeData.content ?? ''
   }
 
-  async onInputContentChange(context: NodeContext, nodeData: PlanNodeRow, changedInputNodeId: number, settings: TextSettings): Promise<PlanNodeUpdate | null> {
+  async onInputContentChange(context: PlanNodeService, nodeData: PlanNodeRow, changedInputNodeId: number, settings: TextSettings): Promise<PlanNodeUpdate | null> {
     // Check if the changed input is referenced in ai_instructions via template
     const changedNode = context.getById(changedInputNodeId)
     if (!changedNode) {
@@ -55,7 +56,12 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     return null
   }
 
-  async regenerate(context: NodeContext, node: PlanNodeRow, settings: TextSettings): Promise<PlanNodeUpdate | null> {
+  async regenerate(
+    context: PlanNodeService,
+    regenerateAllOptions: AiRegenerateOptions = {regenerateManual: false},
+    node: PlanNodeRow,
+    settings: TextSettings
+  ): Promise<PlanNodeUpdate | null> {
     // Generate content using AI for text nodes
     console.log(`[TextProcessor] regenerating node ${node.id} (title: ${node.title})`)
     const content = await generatePlanNodeTextContent(node);

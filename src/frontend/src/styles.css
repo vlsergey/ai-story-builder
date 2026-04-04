@@ -305,3 +305,12 @@ html, body {
 .react-flow__node:hover .react-flow__resize-control {
   display: block;
 }
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

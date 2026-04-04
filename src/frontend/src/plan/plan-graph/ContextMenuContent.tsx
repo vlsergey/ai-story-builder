@@ -20,6 +20,7 @@ interface ContextMenuContentProps {
   aiGenerateSummary: (nodeId: number) => void;
   deleteNode: (nodeId: number) => void;
   moveNode: (nodeId: number, parentId: number | null) => void;
+  regenerateNode: (nodeId: number) => void;
 }
 
 export default function ContextMenuContent({
@@ -28,6 +29,7 @@ export default function ContextMenuContent({
   aiGenerateSummary,
   deleteNode,
   moveNode,
+  regenerateNode,
 }: ContextMenuContentProps) {
   const { t } = useLocale()
   const contextMenuNode = useMemo(() => serverNodes?.find(n => n.id === contextMenuNodeId), [serverNodes, contextMenuNodeId]);
@@ -36,8 +38,13 @@ export default function ContextMenuContent({
 
   return (
     <UIContextMenuContent>
+      { nodeDef?.canRegenerate && (
+        <ContextMenuItem onSelect={() => {regenerateNode(contextMenuNodeId)}}>
+          {t('planGraph.contextMenu.regenerate')}
+        </ContextMenuItem>
+      )}
       <ContextMenuItem onSelect={() => {aiGenerateSummary(contextMenuNodeId)}}>
-        {t('planGraph.aiGenerateSummary')}
+        {t('planGraph.contextMenu.aiGenerateSummary')}
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuGroup>

@@ -1,7 +1,7 @@
 export const NODE_TYPES = ['text', 'lore', 'merge', 'split', 'for-each', 'for-each-input', 'for-each-output'] as const
 export type PlanNodeType = typeof NODE_TYPES[number]
 
-export const PLAN_NODE_STATUSES = ['EMPTY', 'GENERATED', 'MANUAL', 'OUTDATED', 'ERROR'] as const
+export const PLAN_NODE_STATUSES = ['EMPTY', 'GENERATING', 'GENERATED', 'MANUAL', 'OUTDATED', 'ERROR'] as const
 export type PlanNodeStatus = typeof PLAN_NODE_STATUSES[number]
 
 export const EDGE_TYPES = ['text', 'textArray'] as const

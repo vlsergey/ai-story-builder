@@ -129,7 +129,7 @@ async function callGenerateAll(params: { regenerateManual?: boolean }) {
   const partials: Record<string, unknown>[] = []
   const onThinking = (status: string, detail?: string) => thinkings.push({ status, detail })
   const onPartialJson = (data: Record<string, unknown>) => partials.push(data)
-  const result = await generateAll(params, onThinking, onPartialJson)
+  const result = await generateAll({ ...{regenerateManual: false}, ...params} , onThinking, onPartialJson)
   return { result, thinkings, partials }
 }
 

@@ -154,6 +154,8 @@
   "planGraph.applyLayout": "Применить раскладку",
   "planGraph.generateAll": "Генерировать всё",
 
+  "planGraph.contextMenu.regenerate": "Обновить содержание",
+  "planGraph.contextMenu.aiGenerateSummary": "Обновить резюме",
   "planGraph.contextMenu.delete": "Удалить узел",
   "planGraph.contextMenu.moveTo": "Переместить в…",
   "planGraph.contextMenu.moveToRoot": "Переместить в корень",

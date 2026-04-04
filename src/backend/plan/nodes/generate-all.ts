@@ -1,3 +1,4 @@
+import { AiRegenerateOptions } from '../../../shared/ai-regenerate-all.js'
 import type { PlanNodeRow } from '../../../shared/plan-graph.js'
 import { generateSummary } from '../../routes/generate-summary.js'
 import { SettingsRepository } from '../../settings/settings-repository.js'
@@ -10,22 +11,18 @@ import { PlanNodeService } from './plan-node-service.js'
  * @param options.onProgress Optional callback to report progress (nodeId, status, queueSize, reason?).
  * @param options.parentId If provided, only nodes with this parent_id (or null for root) are processed; recursively processes child subgraphs.
  */
-export async function generateAllNodes(options?: {
-  regenerateManual?: boolean
-  onProgress?: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number, reason?: string) => void
-  parentId?: number | null
-}): Promise<void> {
+export async function generateAllNodes(
+  options: AiRegenerateOptions,
+  parentId: number | null,
+  onProgress?: (nodeId: number, status: 'pending' | 'processing' | 'generated' | 'skipped' | 'error', queueSize: number, reason?: string) => void,
+): Promise<void> {
   const planEdgeRepository = new PlanEdgeRepository()
   const planNodeService = new PlanNodeService()
 
-  const regenerateManual = options?.regenerateManual ?? false
   const regenerateSummary = SettingsRepository.getAutoGenerateSummary()
-  const onProgress = options?.onProgress
-
-  const parentId = options?.parentId ?? null
 
   // Get nodes with specific parent_id
-  const nodes = planNodeService.getByParentId(parentId)
+  const nodes = planNodeService.findByParentId(parentId)
   const nodeIds = nodes.map(n => n.id)
   const incomingEdges = new Map<number, number[]>()
   const outgoingEdges = new Map<number, number[]>()
@@ -74,56 +71,58 @@ export async function generateAllNodes(options?: {
     let shouldRegenerate = false
     if (node.status === 'ERROR' || node.status === 'EMPTY' || node.status === 'OUTDATED') {
       shouldRegenerate = true
-    } else if (node.status === 'MANUAL' && regenerateManual) {
+    } else if (node.status === 'MANUAL' && options.regenerateManual) {
       shouldRegenerate = true
     }
-    console.log(`[PlanNodeService] shouldRegenerate=${shouldRegenerate} (regenerateManual=${regenerateManual})`)
+    console.log(`[PlanNodeService] shouldRegenerate=${shouldRegenerate} (regenerateManual=${options.regenerateManual})`)
 
     if (shouldRegenerate) {
-      // Generate content using the node's processor
-      const processor = planNodeService.getProcessor(node.type)
-      if (processor?.regenerate) {
-        console.log(`[PlanNodeService] calling regenerate for node ${nodeId}`)
-        const settings = planNodeService.getNodeSettings(node)
-        try {
-          const patch = await processor.regenerate(planNodeService, node, settings)
-          console.log(`[PlanNodeService] regenerate returned content length=${patch?.content?.length ?? 'null'}`)
+      planNodeService.regenerate(options, nodeId)
 
-          if (patch && regenerateSummary && patch.content !== node.content) {
-            try {
-              patch.summary = await generateSummary(patch.content || '')
-            } catch (error) {
-              console.error(`[PlanNodeService] summary generation failed for node ${nodeId}:`, error)
-            }
-          }
+      // // Generate content using the node's processor
+      // const processor = planNodeService.getProcessor(node.type)
+      // if (processor?.regenerate) {
+      //   console.log(`[PlanNodeService] calling regenerate for node ${nodeId}`)
+      //   const settings = planNodeService.getNodeSettings(node)
+      //   try {
+      //     const patch = await processor.regenerate(planNodeService, options, node, settings)
+      //     console.log(`[PlanNodeService] regenerate returned content length=${patch?.content?.length ?? 'null'}`)
 
-          if (patch) {
-            const updatedNode = await planNodeService.patch(nodeId, false, patch)
-            // Update node data after content change (status may have changed)
-            nodeMap.set(nodeId, updatedNode)
-          }
-          if (onProgress) onProgress(nodeId, 'generated', queue.length)
-        } catch (error) {
-          console.error(`[PlanNodeService] regeneration failed for node ${nodeId}:`, error)
-          // Set status to ERROR, keep existing content
-          console.log(`[PlanNodeService] setting node ${nodeId} status to ERROR`)
-          await planNodeService.patch(nodeId, false, {status: 'ERROR'})
-          const updatedNode = planNodeService.getById(nodeId)
-          if (updatedNode) nodeMap.set(nodeId, updatedNode)
-          console.log(`[PlanNodeService] node ${nodeId} status updated to ERROR`)
-          const reason = error instanceof Error ? error.message : String(error)
-          if (onProgress) onProgress(nodeId, 'error', queue.length, `regeneration failed: ${reason}`)
-        }
-      } else {
-        console.log(`[PlanNodeService] no processor or regenerate method for node ${nodeId}`)
-        // Cannot regenerate, treat as skipped
-        if (onProgress) onProgress(nodeId, 'skipped', queue.length, 'no processor or regenerate method')
-      }
+      //     if (patch && regenerateSummary && patch.content !== node.content) {
+      //       try {
+      //         patch.summary = await generateSummary(patch.content || '')
+      //       } catch (error) {
+      //         console.error(`[PlanNodeService] summary generation failed for node ${nodeId}:`, error)
+      //       }
+      //     }
+
+      //     if (patch) {
+      //       const updatedNode = await planNodeService.patch(nodeId, false, patch)
+      //       // Update node data after content change (status may have changed)
+      //       nodeMap.set(nodeId, updatedNode)
+      //     }
+      //     if (onProgress) onProgress(nodeId, 'generated', queue.length)
+      //   } catch (error) {
+      //     console.error(`[PlanNodeService] regeneration failed for node ${nodeId}:`, error)
+      //     // Set status to ERROR, keep existing content
+      //     console.log(`[PlanNodeService] setting node ${nodeId} status to ERROR`)
+      //     await planNodeService.patch(nodeId, false, {status: 'ERROR'})
+      //     const updatedNode = planNodeService.getById(nodeId)
+      //     if (updatedNode) nodeMap.set(nodeId, updatedNode)
+      //     console.log(`[PlanNodeService] node ${nodeId} status updated to ERROR`)
+      //     const reason = error instanceof Error ? error.message : String(error)
+      //     if (onProgress) onProgress(nodeId, 'error', queue.length, `regeneration failed: ${reason}`)
+      //   }
+      // } else {
+      //   console.log(`[PlanNodeService] no processor or regenerate method for node ${nodeId}`)
+      //   // Cannot regenerate, treat as skipped
+      //   if (onProgress) onProgress(nodeId, 'skipped', queue.length, 'no processor or regenerate method')
+      // }
     } else {
       console.log(`[PlanNodeService] skipping node ${nodeId}`)
       // Determine skip reason based on node status and regenerateManual
       let skipReason = ''
-      if (node.status === 'MANUAL' && !regenerateManual) {
+      if (node.status === 'MANUAL' && !options.regenerateManual) {
         skipReason = 'MANUAL node (regenerateManual is false)'
       } else if (node.status === 'GENERATED') {
         skipReason = 'already GENERATED'
@@ -135,11 +134,6 @@ export async function generateAllNodes(options?: {
 
     // Mark as checked
     checked.add(nodeId)
-
-    // If this is a for-each node, recursively generate its child subgraph
-    if (node.type === 'for-each') {
-      await generateAllNodes({ ...options, parentId: node.id })
-    }
 
     // Add outgoing nodes to queue if not already in queue and not checked
     const outgoing = outgoingEdges.get(nodeId)!
