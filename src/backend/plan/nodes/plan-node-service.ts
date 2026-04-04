@@ -102,15 +102,7 @@ export class PlanNodeService {
       const processor = this.getProcessor(sourceNode.type)
       if (!processor) continue
       const input = processor.getOutput(this, sourceNode)
-      // Verify that the edge type matches the processor's output edge type
-      if (processor.getOutputEdgeType() !== edge.type) {
-        throw new Error(`Edge type ${edge.type} does not match processor output type ${processor.getOutputEdgeType()}`)
-      }
-      inputs.push({
-        edge,
-        sourceNode,
-        input,
-      })
+      inputs.push({ edge, sourceNode, input })
     }
 
     return inputs.sort((a, b) => a.edge.position - b.edge.position)

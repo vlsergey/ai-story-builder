@@ -1,5 +1,5 @@
 import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
+import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { ForEachSettings } from '../../../../shared/node-settings.js'
 import { ForEachNodeContent } from '../../../../shared/for-each-plan-node.js'
 import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
@@ -7,18 +7,7 @@ import { generateAllNodes } from '../generate-all.js'
 import { PlanNodeService } from '../plan-node-service.js'
 
 export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
-  readonly supportedTypes: PlanNodeType[] = ['for-each']
   readonly defaultSettings: ForEachSettings = {}
-
-  getInputEdgeTypes(): PlanEdgeType[] {
-    // Accepts textArray as input (array of texts to iterate over)
-    return ['textArray']
-  }
-
-  getOutputEdgeType(): PlanEdgeType {
-    // Produces textArray as output (array of processed texts)
-    return 'textArray'
-  }
 
   getOutput(context: PlanNodeService, node: PlanNodeRow): string[] {
     if ((node.content ?? '').length == 0) return []

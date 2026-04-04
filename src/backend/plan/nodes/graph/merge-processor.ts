@@ -1,6 +1,6 @@
 import { PlanNodeService } from '../plan-node-service.js'
 import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
+import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { MergeSettings } from '../../../../shared/node-settings.js'
 import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
 
@@ -8,22 +8,11 @@ import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
  * Processor for 'merge' nodes.
  */
 export class MergeProcessor implements NodeProcessor<MergeSettings> {
-  readonly supportedTypes: PlanNodeType[] = ['merge']
   readonly defaultSettings: MergeSettings = {
     includeNodeTitle: false,
     includeInputTitles: false,
     fixHeaders: false,
     autoUpdate: false,
-  }
-
-  getInputEdgeTypes(): PlanEdgeType[] {
-    // Merge node can accept both 'text' and 'textArray' edges
-    return ['text', 'textArray']
-  }
-
-  getOutputEdgeType(): PlanEdgeType {
-    // Merge node can output 'text' (the merged content)
-    return 'text'
   }
 
   getOutput(context: PlanNodeService, nodeData: PlanNodeRow): unknown {

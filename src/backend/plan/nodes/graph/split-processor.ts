@@ -1,6 +1,6 @@
 import { PlanNodeService } from '../plan-node-service.js'
 import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
+import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { SplitSettings } from '../../../../shared/node-settings.js'
 import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
 
@@ -8,20 +8,11 @@ import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
  * Processor for 'split' nodes.
  */
 export class SplitProcessor implements NodeProcessor<SplitSettings> {
-  readonly supportedTypes: PlanNodeType[] = ['split']
   readonly defaultSettings: SplitSettings = {
     separator: '',
     dropFirst: 0,
     dropLast: 0,
     autoUpdate: false,
-  }
-
-  getInputEdgeTypes(): PlanEdgeType[] {
-    return ['text']
-  }
-
-  getOutputEdgeType(): PlanEdgeType {
-    return 'textArray'
   }
 
   onUpdate = async (

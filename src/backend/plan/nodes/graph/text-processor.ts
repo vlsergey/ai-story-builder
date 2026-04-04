@@ -1,6 +1,6 @@
 import { PlanNodeService } from '../plan-node-service.js'
 import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeType, PlanEdgeType, PlanNodeStatus, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
+import type { PlanNodeStatus, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import type { TextSettings } from '../../../../shared/node-settings.js'
 import { generatePlanNodeTextContent } from '../../../routes/generate-plan-node-text-content.js'
 import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
@@ -9,17 +9,7 @@ import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
  * Processor for 'text' nodes.
  */
 export class TextProcessor implements NodeProcessor<TextSettings> {
-  readonly supportedTypes: PlanNodeType[] = ['text']
   readonly defaultSettings: TextSettings = {}
-
-  getInputEdgeTypes(): PlanEdgeType[] {
-    // Text nodes can have text inputs (for template substitution)
-    return ['text']
-  }
-
-  getOutputEdgeType(): PlanEdgeType {
-    return 'text'
-  }
 
   getOutput(context: PlanNodeService, nodeData: PlanNodeRow): unknown {
     return nodeData.content ?? ''

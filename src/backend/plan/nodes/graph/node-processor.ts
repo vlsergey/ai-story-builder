@@ -1,5 +1,5 @@
 import { PlanNodeService } from '../plan-node-service.js'
-import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
+import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
 import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
 
 /**
@@ -7,15 +7,6 @@ import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
  * Knows how to compute outputs, react to changes, and regenerate content.
  */
 export interface NodeProcessor<S = unknown> {
-  /** Node types this processor can handle */
-  readonly supportedTypes: PlanNodeType[]
-
-  /** Edge types that this node accepts as inputs */
-  getInputEdgeTypes(): PlanEdgeType[]
-
-  /** Edge type that this node produces as output (each node has exactly one output edge type) */
-  getOutputEdgeType(): PlanEdgeType
-
   /**
    * Default settings for this node type.
    * These settings are used when node_type_settings is null or missing fields.
