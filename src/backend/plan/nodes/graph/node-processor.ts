@@ -1,6 +1,5 @@
 import { PlanNodeService } from '../plan-node-service.js'
 import type { PlanNodeType, PlanEdgeType, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
-import { makeErrorWithStatus } from '../../../lib/make-errors.js'
 import { AiRegenerateOptions } from '../../../../shared/ai-regenerate-all.js'
 
 /**
@@ -54,33 +53,4 @@ export interface NodeProcessor<S = unknown> {
     node: PlanNodeRow,
     settings: S
   ): Promise<PlanNodeUpdate | null>
-}
-
-/**
- * Registry of node processors.
- */
-export class NodeProcessorRegistry {
-  private processors = new Map<PlanNodeType, NodeProcessor>()
-
-  register(processor: NodeProcessor) {
-    for (const type of processor.supportedTypes) {
-      this.processors.set(type, processor)
-    }
-  }
-
-  getProcessor(nodeType: PlanNodeType): NodeProcessor {
-    const processor = this.findProcessor(nodeType)
-    if (processor == null) {
-      throw makeErrorWithStatus(`No processor for node type ${nodeType}`, 400)
-    }
-    return processor
-  }
-
-  findProcessor(nodeType: PlanNodeType): NodeProcessor | undefined {
-    return this.processors.get(nodeType)
-  }
-
-  hasProcessor(nodeType: PlanNodeType): boolean {
-    return this.processors.has(nodeType)
-  }
 }

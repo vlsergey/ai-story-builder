@@ -3,7 +3,7 @@ import { PlanNodeRepository } from './plan-node-repository.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
 import { isValidNodeType, NODE_TYPES, getNodeTypeDefinition } from '../../../shared/node-edge-dictionary.js'
 import { planNodeEventManager } from './plan-node-event-manager.js'
-import { NodeProcessor, NodeProcessorRegistry } from './graph/node-processor.js'
+import { NodeProcessor } from './graph/node-processor.js'
 import { TextProcessor } from './graph/text-processor.js'
 import { LoreProcessor } from './graph/lore-processor.js'
 import { SplitProcessor } from './graph/split-processor.js'
@@ -28,26 +28,22 @@ export type NodeUpdateEvent = {
   updatedFields: Partial<PlanNodeRow>
 }
 
+export const NODE_PROCESSORS : Record<PlanNodeType, NodeProcessor> = {
+  'for-each': new ForEachProcessor(),
+  'for-each-input': new ForEachInputProcessor(),
+  'for-each-output': new ForEachOutputProcessor(),
+  'text': new TextProcessor(),
+  'lore': new LoreProcessor(),
+  'split': new SplitProcessor(),
+  'merge': new MergeProcessor(),
+}
+
 /**
  * Service for plan node operations.
  * Encapsulates business logic and emits events on changes.
  */
 export class PlanNodeService {
-  private readonly repo: PlanNodeRepository
-  private readonly processorRegistry: NodeProcessorRegistry
-
-  constructor() {
-    this.repo = new PlanNodeRepository()
-    this.processorRegistry = new NodeProcessorRegistry()
-
-    this.processorRegistry.register(new TextProcessor())
-    this.processorRegistry.register(new LoreProcessor())
-    this.processorRegistry.register(new SplitProcessor())
-    this.processorRegistry.register(new MergeProcessor())
-    this.processorRegistry.register(new ForEachProcessor())
-    this.processorRegistry.register(new ForEachInputProcessor())
-    this.processorRegistry.register(new ForEachOutputProcessor())
-  }
+  private readonly repo: PlanNodeRepository = new PlanNodeRepository()
 
   getById(id: number): PlanNodeRow {
     const result =  this.repo.findById(id)
@@ -78,8 +74,8 @@ export class PlanNodeService {
     return this.repo.count()
   }
 
-  getProcessor(nodeType: PlanNodeType) {
-    return this.processorRegistry.getProcessor(nodeType)
+  getProcessor(nodeType: PlanNodeType): NodeProcessor {
+    return NODE_PROCESSORS[nodeType]
   }
 
   getNodeSettings(node: PlanNodeRow): unknown {
@@ -373,20 +369,15 @@ export class PlanNodeService {
     const type = oldNode?.type ?? newNode?.type
     if (!type) return null
 
-    const nodeProcessor = this.processorRegistry.findProcessor(type) as NodeProcessor<T>
-    if (!nodeProcessor) {
-      return null
-    }
-
-    const {defaultSettings, onUpdate} = nodeProcessor
+    const nodeProcessor = this.getProcessor(type) as NodeProcessor<T>
 
     const settings = newNode?.node_type_settings
-      ? mergeNodeSettings(defaultSettings, newNode.node_type_settings)
-      : defaultSettings
+      ? mergeNodeSettings(nodeProcessor.defaultSettings, newNode.node_type_settings)
+      : nodeProcessor.defaultSettings
 
-    if (onUpdate) {
+    if (nodeProcessor.onUpdate) {
       console.log(`Invoking onUpdate handler for node ${nodeId} of type ${type}`)
-      return await onUpdate(this, nodeId, oldNode, newNode, settings)
+      return await nodeProcessor.onUpdate(this, nodeId, oldNode, newNode, settings)
     }
     return null
   }
@@ -399,7 +390,7 @@ export class PlanNodeService {
     planNodeEventManager.emitUpdate(nodeId, `Starting to generate node ${nodeId}`)
 
     try {
-      const nodeProcessor = this.processorRegistry.getProcessor(node.type) as NodeProcessor<T>
+      const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
       if (!nodeProcessor.regenerate)
         throw makeErrorWithStatus('regenerate not supported by node type ' + node.type, 400)
 
