@@ -1,5 +1,5 @@
 /**
- * Types for the Electron IPC bridge exposed via contextBridge in preload.js.
+ * Types for the Electron IPC bridge exposed via contextBridge in preload.cjs.
  * window.electronAPI is only present when the app runs inside Electron.
  */
 export {};

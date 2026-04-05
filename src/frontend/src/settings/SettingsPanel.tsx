@@ -45,7 +45,7 @@ function setAndInvalidate<T extends { useMutation: any }>(procedure: T) {
 
 export default function SettingsPanel() {
   const { t, locale, setLocale } = useLocale()
-  const { preference: themePreference, setPreference: setThemePreference } = useTheme()
+  const { themePreference, setThemePreference } = useTheme()
 
   const {data: aiConfigStore, isLoading: isAiConfigStoreLoading} = trpc.settings.allAiEnginesConfig.get.useQuery()
   const {data: currentEngine, isLoading: isCurrentEngineLoading} = trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery()

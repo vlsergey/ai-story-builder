@@ -210,8 +210,8 @@ function buildApplicationMenu() {
 }
 
 function createWindow() {
-  console.log('createWindow called with serverUrl:', serverUrl)
-  console.log('Попытка загрузить прелоад по пути:', path.join(__dirname, 'preload.js'));
+  console.log('createWindow called with serverUrl: ', serverUrl)
+  console.log('Loading preload script: ', path.join(__dirname, '../preload/preload.cjs'));
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -220,7 +220,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../preload/preload.cjs'),
     },
   })
 

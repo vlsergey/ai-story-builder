@@ -1,11 +1,8 @@
-import React, { useEffect, useState } from 'react'
-import { ipcClient } from '../ipcClient'
-
+import React from 'react'
+import { trpc } from '../ipcClient'
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { Button } from '../ui-components/button'
 import { Input } from '../ui-components/input'
-import { ProjectData } from '../types/models'
 import { useLocale } from '../lib/locale'
 
 /** Returns the project display name from a full filesystem path: basename without extension. */
@@ -14,21 +11,25 @@ function projectDisplayName(fullPath: string): string {
   return base.replace(/\.[^.]+$/, '')
 }
 
-function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectData) => void }) {
-  const navigate = useNavigate()
+function CreateNewForm() {
   const [name, setName] = React.useState('MyProject')
   const [textLanguage, setTextLanguage] = React.useState('ru-RU')
   const [busy, setBusy] = React.useState(false)
   const [createError, setCreateError] = React.useState<string | null>(null)
+
+  const utils = trpc.useUtils().project
+  const createProject = trpc.project.create.useMutation({
+    onSettled() {
+      utils.invalidate()
+    }
+  })
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setCreateError(null)
     try {
-      const j = await ipcClient.project.create.mutate({ name, text_language: textLanguage }) as ProjectData
-      onCreated(j.path, j)
-      navigate('/project')
+      await createProject.mutateAsync({name, text_language: textLanguage })
     } catch (err) {
       setCreateError('Create failed: ' + (err as Error).message)
     } finally {
@@ -64,39 +65,32 @@ function CreateNewForm({ onCreated }: { onCreated: (path: string, data: ProjectD
   )
 }
 
-export default function StartScreen({
-  onOpenProject,
-}: {
-  onOpenProject: (path: string, data: ProjectData) => void
-}) {
+export default function StartScreen() {
   const { t } = useLocale()
-  const [recent, setRecent] = useState<string[]>([])
-  const [projectsData, setProjectsData] = useState<{ dir: string; files: string[] } | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    ipcClient.project.recent.query().then(r => setRecent(r)).catch(() => setRecent([]))
-    ipcClient.project.files.query().then(r => setProjectsData(r)).catch(() => setProjectsData(null))
-  }, [])
+  const recent = trpc.project.recent.useQuery().data
+  const projectsData = trpc.project.files.useQuery().data
 
-  function openFolder() {
-    ipcClient.project.openFolder.mutate().catch(console.error)
-  }
+  const openFolder = trpc.project.openFolder.useMutation().mutateAsync
+
+  const utils = trpc.useUtils(); 
+  const recentDelete = trpc.project.recentDelete.useMutation()
 
   async function removeRecent(e: React.MouseEvent, p: string) {
     e.stopPropagation()
-    await ipcClient.project.recentDelete.mutate(p)
-    setRecent(prev => prev.filter(r => r !== p))
+    await recentDelete.mutateAsync(p)
+    utils.project.recent.invalidate()
   }
 
-  async function openRecent(path: string) {
-    setError(null)
-    try {
-      const data = await ipcClient.project.open.mutate(path) as ProjectData
-      onOpenProject(data.path, data)
-    } catch (err) {
-      setError('Error opening project: ' + (err as Error).message)
+  const projectUtils = trpc.useUtils().project
+  const openProject = trpc.project.open.useMutation({
+    onSettled() {
+      projectUtils.invalidate()
     }
+  })
+
+  async function openRecent(path: string) {
+    openProject.mutateAsync(path)
   }
 
   return (
@@ -126,19 +120,19 @@ export default function StartScreen({
             {t('start.recent')}
           </p>
 
-          {error && (
+          {openProject.isError && (
             <div className="mx-3 mb-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">
-              {error}
+              {`${openProject.error}`}
             </div>
           )}
 
-          {recent.length === 0 ? (
+          {(recent || []).length === 0 ? (
             <p className="px-5 py-2 text-xs text-muted-foreground">
               {t('start.no_recent')}
             </p>
           ) : (
             <ul className="space-y-0.5 px-2">
-              {recent.map(r => (
+              {(recent || []).map(r => (
                 <li key={r} className="group/item">
                   <button
                     onClick={() => openRecent(r)}
@@ -185,7 +179,7 @@ export default function StartScreen({
                 {t('start.create')}
               </h3>
             </div>
-            <CreateNewForm onCreated={(p, data) => onOpenProject(p, data)} />
+            <CreateNewForm />
           </section>
 
           <div className="border-t border-border" />
@@ -198,7 +192,7 @@ export default function StartScreen({
                 {t('start.projects_folder')}
               </h3>
               <button
-                onClick={openFolder}
+                onClick={() => openFolder()}
                 title="Open in file manager"
                 className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >

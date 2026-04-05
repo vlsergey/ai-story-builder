@@ -230,7 +230,7 @@
   "billing.last_7d": "Last 7d",
   "billing.last_30d": "Last 30d",
   "billing.no_data": "No data.",
-  "billing.refresh": "↺ Refresh",
+  "billing.refresh": "Refresh",
   "billing.error": "Error:",
 
   "ageRating.G.longLabel": "All Ages",
@@ -238,5 +238,25 @@
   "ageRating.12.longLabel": "Ages 12+",
   "ageRating.16.longLabel": "Ages 16+",
   "ageRating.18.longLabel": "Adults Only",
-  "ageRating.NC21.longLabel": "Adults Only 21+"
+  "ageRating.NC21.longLabel": "Adults Only 21+",
+
+  "regeneration.title": "Content Generation",
+  "regeneration.start": "Start",
+  "regeneration.stop": "Stop",
+  "regeneration.stop_confirmation": "Are you sure you want to stop the ongoing generation? This may leave some nodes in an inconsistent state.",
+  "regeneration.stopping": "Stopping...",
+  "regeneration.in_progress": "In progress",
+  "regeneration.idle": "Idle",
+  "regeneration.no_data": "No generation activity",
+  "regeneration.current_nodes": "Currently processing:",
+  "regeneration.error": "Error",
+  "regeneration.processed": "Processed",
+  "regeneration.new": "New",
+  "regeneration.same": "Same",
+  "regeneration.empty": "Empty",
+  "regeneration.skipped": "Skipped",
+  "regeneration.last_session": "Last session stats",
+
+  "regenerateOptions.regenerateManual.label": "Regenerate manual changes",
+  "regenerateOptions.regenerateManual.description": "Whether to regenerate nodes that have been manually modified after generation, including AI-driven improvements."
 }

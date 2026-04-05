@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 import type { PlanNodeRow } from '../../../../shared/plan-graph.js'
+import { RegenerateEvent } from '../../../../shared/RegenerateEvent.js'
 import { PlanEdgeRepository } from '../../edges/plan-edge-repository.js'
 import { PlanNodeService } from '../plan-node-service.js'
 import { PlanNodeAiGenerationStatus, RegenerationContainerContext, RegenerationNodeContext } from './RegenerationContext.js'
@@ -8,20 +9,6 @@ import { makeErrorWithStatus } from '../../../lib/make-errors.js';
 import { RegenerateOptions } from '../../../../shared/RegenerateOptions.js';
 
 const eventEmitter = new EventEmitter();
-
-interface RegenerateEvent {
-  inProcess: boolean
-  stopping: boolean
-
-  currentNodeStack: PlanNodeRow[]
-  firstError: unknown
-
-  queued: number
-  generatedNew: number
-  generatedSame: number
-  generatedEmpty: number
-  skipped: number
-}
 
 function emitRegenerateEvent() {
   eventEmitter.emit('regenerate', {
@@ -61,17 +48,26 @@ let generatedSame: number = 0
 let generatedEmpty: number = 0
 let skipped: number = 0
 
+export function regenerateTreeNodesContentsStop(): void {
+  if (inProcess && !stopping) {
+    stopping = true
+    emitRegenerateEvent()
+  }
+}
+
 /**
  * Generate content for all nodes in topological order, respecting dependencies.
  */
 export async function regenerateTreeNodesContents(options: RegenerateOptions): Promise<void> {
   if (inProcess) throw makeErrorWithStatus('Some regeneration is already in process', 429)
   inProcess = true
+  stopping = false
   firstError = null
   currentNodeStack.length = 0
 
   generatedEmpty = 0; generatedSame = 0; generatedNew = 0; skipped = 0
 
+  console.info("[regenerateTreeNodesContents] Starting regeneration")
   try {
     const containerContext: RegenerationContainerContext = {
       options,
@@ -84,6 +80,10 @@ export async function regenerateTreeNodesContents(options: RegenerateOptions): P
         block: (context: RegenerationNodeContext) => Promise<{ result: T, status: PlanNodeAiGenerationStatus }>
       ) {
         if (stopping) throw Error("Stop was required")
+        if (currentNodeStack.length > 0 && currentNodeStack[currentNodeStack.length-1].id != node.parent_id) {
+          throw Error(`Only child nodes can be pushed to regeneration processing stack (currentNodeStack).` +
+            `Current stack top is ${currentNodeStack[currentNodeStack.length-1].id}, parent of push node ${node.id} is ${node.parent_id}`)
+        }
         currentNodeStack.push(node)
         emitRegenerateEvent()
         try {
@@ -127,6 +127,7 @@ export async function regenerateTreeNodesContents(options: RegenerateOptions): P
       }
     }
 
+    await regenerateSubtreeNodesContents(containerContext, null)
   } finally {
     inProcess = false
   }
@@ -139,6 +140,8 @@ export async function regenerateSubtreeNodesContents(
   context: RegenerationContainerContext,
   parentId: number | null,
 ): Promise<void> {
+  console.info("[regenerateSubtreeNodesContents] Starting regeneration for parentId=" + parentId + "")
+
   const planEdgeRepository = new PlanEdgeRepository()
   const planNodeService = new PlanNodeService()
 
@@ -172,7 +175,16 @@ export async function regenerateSubtreeNodesContents(
     nodeMap.set(node.id, node)
   }
 
-  while (queue.length > 0) {
+  const shouldRegenerate: Record<PlanNodeRow['status'], boolean> = {
+    ERROR: true,
+    EMPTY: true,
+    GENERATING: true,
+    GENERATED: true,
+    OUTDATED: true,
+    MANUAL: context.options.regenerateManual,
+  }
+
+  while (queue.length > 0 && !stopping) {
     const nodeId = queue.shift()!
     const node = nodeMap.get(nodeId)!
 
@@ -186,17 +198,11 @@ export async function regenerateSubtreeNodesContents(
       continue
     }
 
-    // Determine if we should regenerate this node
-    let shouldRegenerate = false
-    if (node.status === 'ERROR' || node.status === 'EMPTY' || node.status === 'OUTDATED') {
-      shouldRegenerate = true
-    } else if (node.status === 'MANUAL' && context.options.regenerateManual) {
-      shouldRegenerate = true
-    }
-    console.log(`[PlanNodeService] shouldRegenerate=${shouldRegenerate} (regenerateManual=${context.options.regenerateManual})`)
+    const willRegenerate = shouldRegenerate[node.status]
+    console.log(`[PlanNodeService] willRegenerate=${willRegenerate} (regenerateManual=${context.options.regenerateManual})`)
 
-    if (shouldRegenerate) {
-      context.onNodeStart(node, async (childContext) => {
+    if (willRegenerate) {
+      await context.onNodeStart(node, async (childContext) => {
         const result = await planNodeService.regenerate(childContext, nodeId)
         const status = (result.content?.length || 0) === 0 ? 'EMPTY' :
           result.content == node.content ? 'SAME' : 'GENERATED'

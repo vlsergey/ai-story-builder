@@ -12,12 +12,9 @@ export interface AiEngineSyncRecord {
 /** Which statistic to show per node in the lore tree */
 export type LoreStatMode = 'none' | 'words' | 'chars' | 'bytes'
 
-export type ThemePreference = 'auto' | 'obsidian' | 'github'
-export type ResolvedTheme = 'obsidian' | 'github'
-
 export interface ProjectData {
   path: string
-  layout: unknown | null
+  layout?: unknown
   projectTitle: string | null
 }
 

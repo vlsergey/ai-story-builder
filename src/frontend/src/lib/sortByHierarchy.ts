@@ -7,6 +7,8 @@ export function sortByHierarchy<T>(
   getId: (item: T) => string | number,
   getParentId: (item: T) => string | number | null | undefined
 ): T[] {
+  if (items === undefined || items === null) return []
+
   const depthMap = new Map<string | number, number>();
   const visited = new Set<string | number>();
 

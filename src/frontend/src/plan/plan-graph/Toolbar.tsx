@@ -1,5 +1,6 @@
 import React from 'react';
 import { type PlanNodeType } from '@shared/plan-graph';
+import { useLocale } from '@/lib/locale';
 
 interface ToolbarProps {
   creatableNodeTypes: PlanNodeType[];
@@ -7,8 +8,6 @@ interface ToolbarProps {
   autoLayout: boolean;
   toggleAutoLayout: () => void;
   applyLayout: () => void;
-  setShowGenerateAll: (show: boolean) => void;
-  t: (key: string) => string;
 }
 
 export default function Toolbar({
@@ -17,9 +16,8 @@ export default function Toolbar({
   autoLayout,
   toggleAutoLayout,
   applyLayout,
-  setShowGenerateAll,
-  t,
 }: ToolbarProps) {
+  const { t } = useLocale()
   return (
     <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-background border border-border rounded shadow px-2 py-1.5 flex-wrap">
       {creatableNodeTypes.map((nodeType) => (
@@ -50,13 +48,6 @@ export default function Toolbar({
           {t('planGraph.applyLayout')}
         </button>
       )}
-      <div className="w-px h-4 bg-border mx-0.5" />
-      <button
-        onClick={() => setShowGenerateAll(true)}
-        className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-      >
-        ▶ {t('planGraph.generateAll')}
-      </button>
     </div>
   );
 }

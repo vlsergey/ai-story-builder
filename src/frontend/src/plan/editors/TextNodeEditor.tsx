@@ -4,6 +4,7 @@ import NodeEditor, { EditorMode } from "@/nodes/NodeEditor"
 import { PlanNodeRow } from "@shared/plan-graph"
 import { useCallback, useRef, useState } from "react"
 import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps";
+import { ResponseStreamEvent } from 'openai/resources/responses/responses.js';
 
 type StatusOverride = null | 'GENERATING' | 'IMPROVING'
 
@@ -37,14 +38,14 @@ export default function TextNodeEditor({ initialValue, value, onSave: save, onCh
     onData: (event) => {
       switch (event.type) {
         case 'event': 
-          const streamingEvent = event.event
-          switch(streamingEvent.type) {
+          const streamEvent = event.event as ResponseStreamEvent
+          switch(streamEvent.type) {
             case 'response.output_text.delta':
-              setTempContent((content) => (content || '') + streamingEvent.delta)
+              setTempContent((content) => (content || '') + streamEvent.delta)
               break
             default:
-              console.log( JSON.stringify(event.event) )
-              aiThinkinPanelRef?.current?.onEvent(event.event)
+              console.log( JSON.stringify(streamEvent) )
+              aiThinkinPanelRef?.current?.onEvent(streamEvent)
           }
           break
         case 'data':
@@ -79,14 +80,14 @@ export default function TextNodeEditor({ initialValue, value, onSave: save, onCh
     onData: (event) => {
       switch (event.type) {
         case 'event': 
-          const streamingEvent = event.event
-          switch(streamingEvent.type) {
+          const streamEvent = event.event as ResponseStreamEvent
+          switch(streamEvent.type) {
             case 'response.output_text.delta':
-              setTempContent((content) => (content || '') + streamingEvent.delta)
+              setTempContent((content) => (content || '') + streamEvent.delta)
               break
             default:
               console.log( JSON.stringify(event.event) )
-              aiThinkinPanelRef?.current?.onEvent(event.event)
+              aiThinkinPanelRef?.current?.onEvent(streamEvent)
           }
           break
         case 'data':

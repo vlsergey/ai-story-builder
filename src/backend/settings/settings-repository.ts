@@ -3,6 +3,7 @@ import { AiGenerationSettings } from '../../shared/ai-generation-settings.js';
 import { withDbRead, withDbWrite } from '../db/connection.js';
 import type { Database } from 'better-sqlite3';
 import { AiEngineConfig, AllAiEnginesConfig } from '../../shared/ai-engine-config.js'
+import type { ThemePreference } from '../../shared/themes.js'
 
 /**
  * Repository for accessing and modifying the `settings` table.
@@ -140,6 +141,14 @@ export class SettingsRepository {
     } else {
       this.set('text_language', lang);
     }
+  }
+
+  static getUiTheme(): ThemePreference | null {
+    return this.get('ui_theme') as ThemePreference | null;
+  }
+
+  static setUiTheme(theme: ThemePreference): void {
+    this.set('ui_theme', theme);
   }
 
   static getAutoGenerateSummary(): boolean {

@@ -1,13 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron'
-console.log('🔧 Preload initialized – ipcRenderer available:', !!ipcRenderer)
+import { ELECTRON_TRPC_CHANNEL } from 'electron-trpc/renderer'
 
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
-const { exposeElectronTRPC } = require('electron-trpc/main') 
-exposeElectronTRPC();
-console.log('🔧 electron‑trpc IPC exposed')
+console.log('Exposing tRPC Bridge...')
+contextBridge.exposeInMainWorld('electronTRPC', {
+  rpc: (op: any) => ipcRenderer.invoke(ELECTRON_TRPC_CHANNEL, op),
+  sendMessage: (op: any) => ipcRenderer.send(ELECTRON_TRPC_CHANNEL, op),
+  // 3. Для получения ответов и обновлений (Subscriptions)
+  onMessage: (callback: (op: any) => void) => {
+    const subscription = (_event: any, op: any) => callback(op)
+    ipcRenderer.on(ELECTRON_TRPC_CHANNEL, subscription)
+    return () => ipcRenderer.removeListener(ELECTRON_TRPC_CHANNEL, subscription)
+  },
+})
+console.log('Exposing tRPC Bridge... Done')
 
-contextBridge.exposeInMainWorld('electronAPI', {
+contextBridge.exposeInMainWorld('electronAPI', {  
   /**
    * Register a callback for native-menu actions sent from the main process.
    * Returns an unsubscribe function that removes only this specific listener.

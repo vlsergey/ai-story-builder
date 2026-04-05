@@ -1,51 +1,87 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { ThemePreference, ResolvedTheme } from '../../types/models'
-import { ipcClient } from '../../ipcClient'
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
+import { type ThemePreference, type ResolvedTheme, type ColorMode, DEFAULT_THEME_BY_MODE, THEME_TO_MODE, COLOR_MODES_VALUES } from '../../../../shared/themes.js'
+import { trpc } from '@/ipcClient'
+import { useSystemColorMode } from './useSystemColorMode.js'
 
 interface ThemeContextValue {
-  preference: ThemePreference
+  themePreference: ThemePreference
   resolvedTheme: ResolvedTheme
-  setPreference: (pref: string) => void
+  colorMode: ColorMode,
+  setThemePreference: (value: ThemePreference) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
-const VALID_PREFERENCES: ThemePreference[] = ['auto', 'obsidian', 'github']
 const STORAGE_KEY = 'ai-story-builder-theme'
 
-/** Returns the concrete theme name to apply given the user preference and the OS dark-mode state. */
-function resolve(preference: ThemePreference, systemDark: boolean): ResolvedTheme {
-  if (preference === 'auto') return systemDark ? 'obsidian' : 'github'
-  return preference
-}
-
 interface ThemeProviderProps {
-  children: React.ReactNode
-  defaultPreference?: ThemePreference
+  projectLoaded: boolean,
+  children: React.ReactNode,
 }
 
-export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemeProviderProps) {
-  const [preference, setPreferenceState] = useState<ThemePreference>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as ThemePreference | null
-    return saved && VALID_PREFERENCES.includes(saved) ? saved : defaultPreference
-  })
+export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
+  const systemColorMode = useSystemColorMode()
 
-  const [systemDark, setSystemDark] = useState(
-    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  const [localStorageSetting, setLocalStorageSetting] = useState<ThemePreference | null>(
+    localStorage.getItem(STORAGE_KEY) as ThemePreference | null
   )
 
-  /** Persists preference to localStorage and tries to sync to the open project (silent fail). */
-  const setPreference = useCallback((pref: string) => {
-    if (!VALID_PREFERENCES.includes(pref as ThemePreference)) return
-    localStorage.setItem(STORAGE_KEY, pref)
-    setPreferenceState(pref as ThemePreference)
-    ipcClient.settings.set.mutate(['ui_theme', pref]).catch(() => {})
-  }, [])
+  const projectSetting = trpc.settings.uiTheme.get.useQuery(undefined, {
+    enabled: projectLoaded,
+  })
+
+  const actualThemePreference = useMemo<ThemePreference>(() => {
+    if (projectSetting.isFetched && projectSetting.data) {
+      return projectSetting.data
+    }
+    if (localStorageSetting) {
+      return localStorageSetting
+    }
+    return 'auto'
+  }, [projectSetting.isFetched, projectSetting.data, localStorageSetting])
 
   // Sync preference to Electron native menu on mount and on change
   useEffect(() => {
-    window.electronAPI?.sendMenuState?.('theme', preference)
-  }, [preference])
+    window.electronAPI?.sendMenuState?.('theme', actualThemePreference)
+  }, [actualThemePreference])
+
+  const actualResolvedTheme = useMemo<ResolvedTheme>(() => {
+    if (actualThemePreference != 'auto') {
+      return actualThemePreference
+    }
+    return DEFAULT_THEME_BY_MODE[systemColorMode]
+  }, [actualThemePreference, systemColorMode])
+
+  // Apply resolved theme to <html>
+  useEffect(() => {
+    const root = window.document.documentElement
+    if (root.getAttribute('data-theme') != actualResolvedTheme) {
+      root.setAttribute('data-theme', actualResolvedTheme)
+    }
+
+    const requiredClass = THEME_TO_MODE[actualResolvedTheme]
+    if (!root.classList.contains(requiredClass)) {
+      root.classList.remove(...COLOR_MODES_VALUES)
+      root.classList.add(THEME_TO_MODE[actualResolvedTheme])
+    }
+  }, [actualResolvedTheme])
+
+  const projectSettingUtils = trpc.useUtils().settings
+  const projectSettingSet = trpc.settings.uiTheme.set.useMutation({
+    onSettled() {
+      projectSettingUtils.invalidate()
+    }
+  })
+
+  const handleChandgeTheme = useCallback((newTheme: ThemePreference) => {
+    if (localStorageSetting != newTheme) {
+      localStorage.setItem(STORAGE_KEY, newTheme)
+      setLocalStorageSetting(newTheme)
+    }
+    if (projectSetting.isFetched && projectSetting.data != newTheme) {
+      projectSettingSet.mutate(newTheme)
+    }
+  }, [localStorageSetting, projectSetting.isFetched, projectSetting.data, projectSettingSet])
 
   // Handle set-theme:* IPC from Electron menu.
   // Lives here (not in Layout) so it works on the start screen too.
@@ -53,33 +89,17 @@ export function ThemeProvider({ children, defaultPreference = 'auto' }: ThemePro
     if (!window.electronAPI) return
     const unsub = window.electronAPI.onMenuAction((action: string) => {
       if (!action.startsWith('set-theme:')) return
-      setPreference(action.slice(10))
+      handleChandgeTheme(action.slice(10) as ThemePreference)
     })
     return unsub
-  }, [setPreference])
-
-  // Track OS-level dark/light changes
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
-
-  // Apply resolved theme to <html>
-  useEffect(() => {
-    const resolved = resolve(preference, systemDark)
-    const root = window.document.documentElement
-    root.setAttribute('data-theme', resolved)
-    root.classList.remove('light', 'dark')
-    root.classList.add(resolved === 'obsidian' ? 'dark' : 'light')
-  }, [preference, systemDark])
+  }, [handleChandgeTheme])
 
   return (
     <ThemeContext.Provider value={{
-      preference,
-      resolvedTheme: resolve(preference, systemDark),
-      setPreference,
+      themePreference: actualThemePreference,
+      resolvedTheme: actualResolvedTheme,
+      colorMode: THEME_TO_MODE[actualResolvedTheme],
+      setThemePreference: handleChandgeTheme
     }}>
       {children}
     </ThemeContext.Provider>

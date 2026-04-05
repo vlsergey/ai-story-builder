@@ -1,12 +1,7 @@
+
 import React, { useRef, useEffect, useCallback } from 'react'
-import { DockviewReact, DockviewDefaultTab, DockviewReadyEvent, DockviewApi } from 'dockview'
-import { useTheme } from './lib/theme/theme-provider'
-import { ipcClient, trpc } from './ipcClient'
-
-// Import the dockview styles
-import 'dockview/dist/styles/dockview.css'
-
-// Local small wrappers to keep import cycles simple
+import { DockviewReact, DockviewDefaultTab, DockviewReadyEvent, DockviewApi, DockviewPanelApi } from 'dockview'
+import { trpc } from './ipcClient'
 import LoreSection from './lore/LoreSection'
 import LoreEditor from './lore/LoreEditor'
 import PlanNodeEditor from './plan/editors/PlanNodeEditor'
@@ -14,11 +9,14 @@ import PlanGraph from './plan/plan-graph/PlanGraph'
 import SettingsPanel from './settings/SettingsPanel'
 import AiPlayground from './ai/AiPlayground'
 import AiBillingPanel from './ai/AiBillingPanel'
+import RegenerationPanel from './plan/RegenerationPanel'
 import type { LoreNodeRow } from '@shared/lore-node'
 import { EditorSettingsProvider } from './settings/editor-settings'
 import { LoreSettingsProvider } from './settings/lore-settings'
 import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from './lib/plan-graph-events'
 import { PlanNodeRow } from '@shared/plan-graph'
+
+import 'dockview/dist/styles/dockview.css'
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -33,18 +31,8 @@ const WelcomeWatermark = () => (
   </div>
 )
 
-/**
- * Layout component provides the main 4-pane dock-like layout:
- * - Left (30%): Lore tree
- * - Center (40%): Plan graph + editors
- * - Right (30%): Cards definitions / list
- * - Bottom: Logs / AI & Billing panel
- *
- * This implementation uses dockview for a fully dockable, resizable interface.
- */
-export default function Layout({ onClose, initialLayout }: { onClose: () => void; initialLayout: unknown | null }) {
+export default function Layout() {
   const dockviewRef = useRef<DockviewApi>(null)
-  const { setPreference } = useTheme()
 
   /**
    * Returns the group that should receive editor-type panels (lore-editor, plan-node-editor, settings).
@@ -130,20 +118,15 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     })
   }
 
+  const newLoreItem = trpc.lore.create.useMutation()
+
   /** Creates a new blank child node under the given parent, then opens it in LoreEditor. */
   async function openLoreWizard(node: LoreNodeRow) {
     try {
-      const { id } = await ipcClient.lore.create.mutate({ parent_id: node.id, name: 'New lore item' })
+      const { id } = await newLoreItem.mutateAsync( { parent_id: node.id, name: 'New lore item' } )
       openLoreEditor({ id, title: 'New lore item', parent_id: node.id } as LoreNodeRow)
     } catch { /* ignore */ }
   }
-
-  // Load saved theme preference from the project settings
-  useEffect(() => {
-    ipcClient.settings.get.query('ui_theme')
-      .then((value) => { if (value) setPreference(value) })
-      .catch(() => {})
-  }, [setPreference])
 
   // Listen for open-plan-node-editor events from the PlanGraph canvas
   useEffect(() => {
@@ -235,12 +218,21 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       position: { referencePanel: 'cards-panel', direction: 'below' },
       minimumHeight: 100,
     })
+
+    dockviewRef.current.addPanel({
+      id: 'regeneration-panel',
+      component: 'regeneration',
+      tabComponent: 'nonClosableTab',
+      title: 'Generation Progress',
+      position: { referencePanel: 'billing-panel', direction: 'below' },
+      minimumHeight: 150,
+    })
   }, [])
 
   // helper used after ready or when project is loaded
   const restoreLayout = useCallback(async () => {
     if (!dockviewRef.current) return
-    const savedLayout = initialLayout != null ? initialLayout : layoutFromSettings
+    const savedLayout = layoutFromSettings
     if (savedLayout) {
       try {
         dockviewRef.current.fromJSON(normalizeLayout(savedLayout))
@@ -252,12 +244,14 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       setupDefaultLayout()
     }
     lockWatermarkGroups()
-  }, [initialLayout, layoutFromSettings, setupDefaultLayout, lockWatermarkGroups])
+  }, [layoutFromSettings, setupDefaultLayout, lockWatermarkGroups])
 
   // Load layout only once when component mounts (project is already open in server)
   useEffect(() => {
     restoreLayout()
   }, [restoreLayout])
+
+  const setLayoutInDb = trpc.settings.layout.set.useMutation()
 
   // Save layout to database
   const saveLayoutToDatabase = async (layout: any) => {
@@ -266,7 +260,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     if (panelsCount === 0) return
 
     try {
-      await ipcClient.settings.layout.set.mutate(layout)
+      await setLayoutInDb.mutateAsync(layout)
     } catch (e) {
       console.error('Failed to save layout to database:', e)
     }
@@ -324,12 +318,19 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     }
   }
 
+  const projectUtils = trpc.useUtils().project
+  const closeProject = trpc.project.close.useMutation({
+    onSettled() {
+      projectUtils.invalidate()
+    }
+  })
+
   // Native-menu IPC listener.
   // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
   // Note: 'set-locale:*' is handled in LocaleProvider so it works on the start screen too.
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, onClose, openSettings, openAiPlayground })
-  menuActionsRef.current = { handleResetLayouts, onClose, openSettings, openAiPlayground }
+  const menuActionsRef = useRef({ handleResetLayouts, openSettings, openAiPlayground, closeProject })
+  menuActionsRef.current = { handleResetLayouts, openSettings, openAiPlayground, closeProject }
 
   useEffect(() => {
     if (!window.electronAPI) return
@@ -341,7 +342,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
       } else if (action === 'reset-layouts') {
         menuActionsRef.current.handleResetLayouts()
       } else if (action === 'close-project') {
-        menuActionsRef.current.onClose()
+        menuActionsRef.current.closeProject.mutate()
       }
     })
     return unsub
@@ -394,11 +395,11 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
         />
       </div>
     ),
-    'lore-editor': (props: { api: { setTitle: (title: string) => void }, params: { nodeId: number } }) => (
+    'lore-editor': (props: { api: DockviewPanelApi, params: { nodeId: number } }) => (
       <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
     'plan-graph': () => <PlanGraph />,
-    'plan-node-editor': (props: { api: { setTitle: (title: string) => void }, params: { nodeId: number } }) => (
+    'plan-node-editor': (props: { api: DockviewPanelApi, params: { nodeId: number } }) => (
       <PlanNodeEditor
         nodeId={props.params?.nodeId}
         panelApi={props.api}
@@ -413,6 +414,7 @@ export default function Layout({ onClose, initialLayout }: { onClose: () => void
     settings: () => <SettingsPanel />,
     'ai-playground': () => <AiPlayground />,
     billing: () => <AiBillingPanel />,
+    regeneration: (props: {api: DockviewPanelApi}) => <RegenerationPanel panelApi={props.api} />,
   };
 
   const tabComponents = {

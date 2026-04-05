@@ -22,6 +22,10 @@ export class EventManager extends EventEmitter<PlanEvents> {
     return toObservable<number>(async (emit) => {
       const iterable = on(events, 'update');
       for await (const [id] of iterable) {
+        if (typeof id !== 'number') {
+          console.error("ID must be a number", id)
+          continue
+        }
         emit.next(id);
       }
     })
@@ -31,7 +35,11 @@ export class EventManager extends EventEmitter<PlanEvents> {
    * Emit an event to all subscribers.
    */
   emitUpdate(payload: number, reason?: string): void {
-    console.log(`Emit event ${this.path}: ${JSON.stringify(payload)}` + (reason ? ` (${reason})` : ''));
+    if (typeof payload !== 'number') {
+      console.error("Payload must be a number: " + (typeof payload), payload)
+      throw Error("Payload must be a number: " + (typeof payload))
+    }
+    console.info(`Emit event ${this.path}: ${JSON.stringify(payload)}` + (reason ? ` (${reason})` : ''));
     this.events.emit('update', payload);
   }
 }

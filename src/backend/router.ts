@@ -1,6 +1,5 @@
 import { initTRPC } from '@trpc/server';
 import { SettingsRepository } from './settings/settings-repository.js';
-import superjson from 'superjson';
 import { z } from 'zod';
 
 import { getAiBilling } from './routes/ai-billing.js';
@@ -58,17 +57,54 @@ import { PlanEdgeRepository } from './plan/edges/plan-edge-repository.js';
 import { PlanNodeRepository } from './plan/nodes/plan-node-repository.js';
 import { RegenerateOptions } from '../shared/RegenerateOptions.js';
 import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from './plan/nodes/plan-node-routes.js';
-import { regenerateTreeNodesContents, subscribeToRegenerateTreeNodesContentsProgress } from './plan/nodes/generate/regenerateTreeNodesContents.js';
+import { regenerateTreeNodesContents, subscribeToRegenerateTreeNodesContentsProgress, regenerateTreeNodesContentsStop } from './plan/nodes/generate/regenerateTreeNodesContents.js';
+import { THEME_PREFERENCE_VALUES } from '../shared/themes.js';
 
 const t = initTRPC.create({
-  transformer: superjson
+  // transformer: superjson,
+  errorFormatter({ shape, error }) {
+    // Это выведется в терминале Электрона при ЛЮБОЙ ошибке в процедурах
+    console.error('❌ tRPC Error:', error.message, error.cause);
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        // Добавляем стек для дебага, чтобы видеть, откуда прилетает "путь к файлу"
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      },
+    };
+  },
+});
+
+const dbGuardMiddleware = t.middleware(async ({ next, path }) => {
+  const result = await next();
+
+  // Проверяем, что вернула процедура (в ключе 'data')
+  if (result.ok && result.data) {
+    const data = result.data;
+
+    // Ищем признаки объекта SQLite (isOpen, path, name, или конструктор)
+    const isDatabase = data && (
+      data.constructor?.name === 'Database' || 
+      (typeof data === 'object' && 'isOpen' in data && 'name' in data) ||
+      (typeof data === 'object' && 'isOpen' in data && 'path' in data)
+    );
+
+    if (isDatabase) {
+      console.error(`🚨 КРИТИЧЕСКАЯ ОШИБКА: Процедура "${path}" вернула объект базы данных вместо данных!`);
+      // Вместо базы возвращаем ошибку или пустой массив, чтобы фронтенд не падал
+      throw new Error(`Security Leak: Procedure ${path} tried to return DB instance`);
+    }
+  }
+
+  return result;
 });
 
 export const appRouter = t.router({
   ai: t.router({
     lastGenerationEvent: t.router({
       get: t.procedure.query(() => lastAiGenerationEventManager.getLastAiGenerationEvent()),
-      subscribe: t.procedure.subscription(lastAiGenerationEventManager.onGenerationEventAsSubscription()),
+      subscribe: t.procedure.subscription(() => lastAiGenerationEventManager.onGenerationEventAsSubscription()),
     }),
     billing: t.router({
       get: t.procedure.query(() => getAiBilling()),
@@ -141,7 +177,7 @@ export const appRouter = t.router({
         .mutation(({ input }) => input.forEach( ({ id, data }) => new PlanNodeService().patch(id, false, data))),
       create: t.procedure.input(z.any()).mutation(({ input }) => new PlanNodeService().create(input)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => new PlanNodeService().delete(input)),
-      findAll: t.procedure.query(() => new PlanNodeRepository().findAll()),
+      findAll: t.procedure.use(dbGuardMiddleware).query(() => new PlanNodeRepository().findAll()),
       getById: t.procedure.input(z.int()).query(({ input }) => new PlanNodeService().getById(input)),
       getByIds: t.procedure
         .input(z.array(z.int()))
@@ -154,6 +190,8 @@ export const appRouter = t.router({
         .mutation(({ input }) => regenerateTreeNodesContents(input)),
       regenerateTreeNodesContentsProgress: t.procedure
         .subscription(() => subscribeToRegenerateTreeNodesContentsProgress()),
+      regenerateTreeNodesContentsStop: t.procedure
+        .mutation(() => regenerateTreeNodesContentsStop()),
       startReview: t.procedure
         .input(z.object({ id: z.number(), options: z.any().optional() }))
         .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
@@ -195,6 +233,13 @@ export const appRouter = t.router({
     textLanguage: t.router({
       get: t.procedure.query(() => SettingsRepository.getTextLanguage()),
       set: t.procedure.input(z.string()).mutation(({ input }) => SettingsRepository.setTextLanguage(input)),
+    }),
+
+    uiTheme: t.router({
+      get: t.procedure.query(() => SettingsRepository.getUiTheme()),
+      set: t.procedure
+        .input(z.enum(THEME_PREFERENCE_VALUES))
+        .mutation(({ input }) => SettingsRepository.setUiTheme(input)),
     }),
 
     verboseAiLogging: t.router({

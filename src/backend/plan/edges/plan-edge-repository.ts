@@ -21,9 +21,9 @@ export class PlanEdgeRepository {
   /**
    * Get a single edge by ID, or undefined if not found.
    */
-  getById(id: number): PlanEdgeRow | undefined {
+  getById(id: number): PlanEdgeRow | null {
     return withDbRead(db =>
-      db.prepare('SELECT * FROM plan_edges WHERE id = ?').get(id) as PlanEdgeRow | undefined
+      db.prepare<number, PlanEdgeRow>('SELECT * FROM plan_edges WHERE id = ?').get(id) ?? null
     )
   }
 
@@ -33,8 +33,8 @@ export class PlanEdgeRepository {
   findByFromNodeId(fromNodeId: number): PlanEdgeRow[] {
     return withDbRead(db =>
       db
-        .prepare('SELECT * FROM plan_edges WHERE from_node_id = ? ORDER BY position, id')
-        .all(fromNodeId) as PlanEdgeRow[]
+        .prepare<number, PlanEdgeRow>('SELECT * FROM plan_edges WHERE from_node_id = ? ORDER BY position, id')
+        .all(fromNodeId)
     )
   }
 
@@ -44,8 +44,8 @@ export class PlanEdgeRepository {
   findByToNodeId(toNodeId: number): PlanEdgeRow[] {
     return withDbRead(db =>
       db
-        .prepare('SELECT * FROM plan_edges WHERE to_node_id = ? ORDER BY position, id')
-        .all(toNodeId) as PlanEdgeRow[]
+        .prepare<number, PlanEdgeRow>('SELECT * FROM plan_edges WHERE to_node_id = ? ORDER BY position, id')
+        .all(toNodeId)
     )
   }
 
@@ -65,11 +65,12 @@ export class PlanEdgeRepository {
    * Get the first edge (by position) where the given node is the target and has a specific type.
    * Returns undefined if none found.
    */
-  getFirstByToNodeIdAndType(toNodeId: number, type: string): PlanEdgeRow | undefined {
+  getFirstByToNodeIdAndType(toNodeId: number, type: string): PlanEdgeRow | null {
     return withDbRead(db =>
       db
-        .prepare('SELECT * FROM plan_edges WHERE to_node_id = ? AND type = ? ORDER BY position, id LIMIT 1')
-        .get(toNodeId, type) as PlanEdgeRow | undefined
+        .prepare<[number, string], PlanEdgeRow>(
+          'SELECT * FROM plan_edges WHERE to_node_id = ? AND type = ? ORDER BY position, id LIMIT 1')
+        .get(toNodeId, type) ?? null
     )
   }
 
@@ -79,8 +80,8 @@ export class PlanEdgeRepository {
   getByNodeId(nodeId: number): PlanEdgeRow[] {
     return withDbRead(db =>
       db
-        .prepare('SELECT * FROM plan_edges WHERE from_node_id = ? OR to_node_id = ? ORDER BY position, id')
-        .all(nodeId, nodeId) as PlanEdgeRow[]
+        .prepare<[number, number], PlanEdgeRow>('SELECT * FROM plan_edges WHERE from_node_id = ? OR to_node_id = ? ORDER BY position, id')
+        .all(nodeId, nodeId)
     )
   }
 
@@ -89,8 +90,8 @@ export class PlanEdgeRepository {
    */
   count(): number {
     return withDbRead(db => {
-      const row = db.prepare('SELECT COUNT(*) AS c FROM plan_edges').get() as { c: number }
-      return row.c
+      const row = db.prepare<[], {c: number}>('SELECT COUNT(*) AS c FROM plan_edges').get()
+      return row?.c ?? 0
     })
   }
 
@@ -143,8 +144,9 @@ export class PlanEdgeRepository {
    * Delete an edge by ID.
    */
   delete(id: number): void {
-    return withDbWrite(db => {
-      db.prepare('DELETE FROM plan_edges WHERE id = ?').run(id)
+    withDbWrite(db => {
+      db.prepare<number>('DELETE FROM plan_edges WHERE id = ?').run(id)
+      return null
     })
   }
 
@@ -152,8 +154,9 @@ export class PlanEdgeRepository {
    * Delete all edges where the given node is either source or target.
    */
   deleteByNodeId(nodeId: number): void {
-    return withDbWrite(db => {
-      db.prepare('DELETE FROM plan_edges WHERE from_node_id = ? OR to_node_id = ?').run(nodeId, nodeId)
+    withDbWrite(db => {
+      db.prepare<[number, number]>('DELETE FROM plan_edges WHERE from_node_id = ? OR to_node_id = ?').run(nodeId, nodeId)
+      return null
     })
   }
 }

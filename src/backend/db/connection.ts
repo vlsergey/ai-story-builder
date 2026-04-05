@@ -1,11 +1,5 @@
-import { getCurrentDbPath } from './state.js'
-import Database from 'better-sqlite3'
-
-function makeError(message: string, status: number): Error {
-  const e = new Error(message)
-  ;(e as any).status = status
-  return e
-}
+import { getCurrentDb } from './state.js'
+import { Database } from 'better-sqlite3'
 
 /**
  * Executes a block with a database connection.
@@ -15,29 +9,21 @@ function makeError(message: string, status: number): Error {
  */
 export function withDb<T>(
   readonly: boolean,
-  block: (db: import('better-sqlite3').Database) => T
+  block: (db: Database) => T
 ): T {
-  const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
-  if (!Database) throw makeError('SQLite lib missing', 500)
-  const db = new Database(dbPath, { readonly })
-  try {
-    return block(db)
-  } finally {
-    db.close()
-  }
+  return block(getCurrentDb())
 }
 
 /**
  * Shorthand for withDb(false, block) (read/write)
  */
-export function withDbWrite<T>(block: (db: import('better-sqlite3').Database) => T): T {
+export function withDbWrite<T>(block: (db: Database) => T): T {
   return withDb(false, block)
 }
 
 /**
  * Shorthand for withDb(true, block) (readonly)
  */
-export function withDbRead<T>(block: (db: import('better-sqlite3').Database) => T): T {
+export function withDbRead<T>(block: (db: Database) => T): T {
   return withDb(true, block)
 }

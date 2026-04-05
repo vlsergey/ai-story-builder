@@ -22,7 +22,6 @@ import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow, PlanEdgeType } fro
 import { EDGE_TYPES, canCreateEdge, getCreatableNodeTypes, getNodeTypeDefinition } from '@shared/node-edge-dictionary'
 import { applyHierarchicalLayout } from './hierarchical-layout'
 import PlanEdgeComponent from './PlanEdge'
-import GenerateAllDialog from './GenerateAllDialog'
 import { trpc } from '../../ipcClient'
 import { PlanNodeRow } from '@shared/plan-graph'
 import { useDebouncedCallback } from 'use-debounce';
@@ -87,19 +86,19 @@ export default function PlanGraph() {
   const [nodes, setNodes, onNodesChangeImpl] = useNodesState<NodeImpl>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  const { data: serverNodes, isLoading: areNodesLoading } = trpc.plan.nodes.findAll.useQuery(undefined, {
+  const findAllNodes = trpc.plan.nodes.findAll.useQuery(undefined, {
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchOnMount: true,
     onSuccess: () => { console.log("Reloaded nodes from server") },
   })
-  const { data: serverEdges, isLoading: areEdgesLoading } = trpc.plan.edges.findAll.useQuery(undefined, {
+  const findAllEdges = trpc.plan.edges.findAll.useQuery(undefined, {
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchOnMount: true,
     onSuccess: () => { console.log("Reloaded edges from server") },
   })
-  const loading = areNodesLoading || areEdgesLoading
+  const loading = findAllNodes.isLoading || findAllEdges.isLoading
   const deleteEdge = trpc.plan.edges.delete.useMutation().mutate
   const deleteNodeMutation = trpc.plan.nodes.delete.useMutation().mutate
   const aiGenerateSummary = trpc.plan.nodes.aiGenerateSummary.useMutation().mutate
@@ -113,9 +112,11 @@ export default function PlanGraph() {
 
   // replace local cache with server data
   useEffect(() => {
-    if (serverNodes) setNodes(toReactFlowNodes(serverNodes ?? [], deleteNode))
-    if (serverEdges) setEdges(toReactFlowEdges(serverEdges ?? [], deleteEdge))
-  }, [serverNodes, serverEdges, deleteEdge, deleteNode, setNodes, setEdges])
+    if (findAllNodes.isFetched) setNodes(toReactFlowNodes(findAllNodes.data ?? [], deleteNode))
+  }, [findAllNodes.isFetched, findAllNodes.data, deleteNode, setNodes])
+  useEffect(() => {
+    if (findAllEdges.isFetched) setEdges(toReactFlowEdges(findAllEdges.data ?? [], deleteEdge))
+  }, [findAllEdges.isFetched, findAllEdges.data, deleteEdge, setEdges])
 
   const patchNodes = trpc.plan.nodes.batchPatch.useMutation().mutate
 
@@ -151,7 +152,6 @@ export default function PlanGraph() {
     catch { return true }
   })
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
-  const [showGenerateAll, setShowGenerateAll] = useState(false)
   const [addDialog, setAddDialog] = useState<{ type: PlanNodeType } | null>(null)
   const reactFlowInstance = useRef<ReactFlowInstance<NodeImpl, Edge>>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
@@ -341,8 +341,6 @@ export default function PlanGraph() {
         autoLayout={autoLayout}
         toggleAutoLayout={toggleAutoLayout}
         applyLayout={applyLayout}
-        setShowGenerateAll={setShowGenerateAll}
-        t={t}
       />
 
       <ReactFlow
@@ -373,13 +371,7 @@ export default function PlanGraph() {
         allowedEdgeTypes={allowedEdgeTypes}
         confirmConnect={confirmConnect}
         setShowConnectDialog={setShowConnectDialog}
-        t={t}
       />
-
-      {/* Generate All dialog */}
-      {showGenerateAll && (
-        <GenerateAllDialog onClose={() => setShowGenerateAll(false)} />
-      )}
 
       <AddNodeDialog
         addDialog={addDialog}
@@ -394,7 +386,7 @@ export default function PlanGraph() {
         { contextMenuNodeId && 
           <ContextMenuContent
             contextMenuNodeId={contextMenuNodeId}
-            serverNodes={serverNodes}
+            serverNodes={findAllNodes.data || []}
             aiGenerateSummary={aiGenerateSummary}
             deleteNode={deleteNode}
             moveNode={(nodeId, newParentId) => patchNode({id: nodeId, manual: true, data: {parent_id: newParentId}})}

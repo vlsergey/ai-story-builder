@@ -3,6 +3,7 @@ import path from 'path'
 import os from 'os'
 import type { AppSettings } from '../types/index.js'
 import electron from 'electron'
+import Db, { Database } from 'better-sqlite3'
 const { app } = electron
 
 /**
@@ -31,14 +32,43 @@ export function getDataDir(): string {
   }
 }
 
+let currentDb: Database | null = null
+let currentDbOpen: boolean = false
 let currentDbPath: string | null = null
+
+export function isOpen() {
+  return currentDbPath != null && currentDb != null && currentDbOpen
+}
 
 export function getCurrentDbPath(): string | null {
   return currentDbPath
 }
 
+export function getCurrentDb(): Database {
+  if (currentDb === null) {
+    throw new Error('No current database')
+  }
+  if (!currentDbOpen) {
+    throw new Error('Current database is not opened yet')
+  }
+  return currentDb
+}
+
 export function setCurrentDbPath(p: string | null): void {
+  if (p !== currentDbPath) {
+    if (currentDb != null) {
+      currentDbOpen = false
+      currentDb.close()
+      currentDb = null
+    }
+  }
   currentDbPath = p
+  if (currentDbPath !== null) {
+    currentDbOpen = false
+    currentDb = new Db(currentDbPath)
+    currentDbOpen = true
+  }
+
   const s = readAppSettings()
   if (p) {
     s.lastOpenedPath = p

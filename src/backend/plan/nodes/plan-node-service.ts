@@ -13,7 +13,6 @@ import { mergeNodeSettings } from './graph/settings-helper.js'
 import { DataOrEventEvent, toObservable } from '../../lib/event-manager.js'
 import { improvePlanNodeContent } from '../../routes/improve-plan-node-content.js'
 import { ResponseStreamEvent } from 'openai/resources/responses/responses.js'
-import { generatePlanNodeTextContent } from '../../routes/generate-plan-node-text-content.js'
 import { Observable } from '@trpc/server/observable'
 import { generateSummary } from '../../routes/generate-summary.js'
 import { makeErrorWithStatus } from '../../lib/make-errors.js'
@@ -378,6 +377,7 @@ export class PlanNodeService {
     context: RegenerationNodeContext,
     nodeId: number,
   ): Promise<PlanNodeRow> {
+    // await sleep(600000)
     let node = this.repo.findById(nodeId)
     if (!node) throw makeErrorWithStatus('node not found', 404)
 
@@ -386,8 +386,9 @@ export class PlanNodeService {
 
     try {
       const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
-      if (!nodeProcessor.regenerate)
-        throw makeErrorWithStatus('regenerate not supported by node type ' + node.type, 400)
+      if (!nodeProcessor.regenerate) {
+        return node
+      }
 
       const settings = node.node_type_settings
         ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
@@ -563,7 +564,9 @@ export class PlanNodeService {
 }
 
 export interface PlanNodeSubscriptionEvent {
-  
   event: ResponseStreamEvent,
-
 }
+
+const sleep = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};

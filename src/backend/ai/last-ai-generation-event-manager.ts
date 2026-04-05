@@ -1,5 +1,6 @@
-import { EventEmitter, on } from 'node:events';
+import { EventEmitter } from 'node:events';
 import { ResponseUsage } from 'openai/resources/responses/responses.js';
+import { Observable, observable } from '@trpc/server/observable';
 
 interface AiEvents {
   onGenerationEvent: [Partial<ResponseUsage>];
@@ -19,15 +20,17 @@ class LastAiGenerationEventManager {
     this.backToFrontEvents.emit('onGenerationEvent', lastEvent);
   }
 
-  onGenerationEventAsSubscription() {
+  onGenerationEventAsSubscription(): Observable<Partial<ResponseUsage>, unknown> {
     const backToFrontEvents = this.backToFrontEvents;
-    return async function* () {
-      const iterable = on(backToFrontEvents, 'onGenerationEvent');
-
-      for await (const event of iterable) {
-        yield event as Partial<ResponseUsage>;
-      }
-    };
+    return observable((emit) => {
+      const onData = (data: Partial<ResponseUsage>) => {
+        emit.next(data);
+      };
+      backToFrontEvents.on('onGenerationEvent', onData);
+      return () => {
+        backToFrontEvents.off('onGenerationEvent', onData);
+      };
+    })
   }
 }
 

@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import StartScreen from './pages/StartScreen'
 import Layout from './Layout'
 import './styles.css'
 import { ThemeProvider } from './lib/theme/theme-provider'
 import { LocaleProvider } from './lib/locale'
-import { ProjectData } from './types/models'
-import { trpc, ipcClient } from './ipcClient'
+import { trpc } from './ipcClient'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import superjson from 'superjson';
 import { ipcLink } from 'electron-trpc/renderer';
 import EventsListener from './EventsListener'
 
@@ -21,58 +18,29 @@ const queryClient = new QueryClient();
  * - Locale is managed by LocaleProvider (persisted to localStorage)
  */
 export default function App() {
-  const navigate = useNavigate()
-  const [projectOpen, setProjectOpen] = useState<boolean>(false)
-  const [initialLayout, setInitialLayout] = useState<unknown | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-
-  // Check if a project is already open on the server
-  useEffect(() => {
-    const checkProjectStatus = async () => {
-      try {
-        const data = await ipcClient.project.status.query()
-        setProjectOpen(data.isOpen)
-        if (data.isOpen) {
-          navigate('/project', { replace: true })
-        }
-      } catch (e) {
-        console.error('Failed to check project status:', e)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    checkProjectStatus()
-  }, [navigate])
-
-  function handleOpenProject(path: string, data: ProjectData) {
-    setInitialLayout(data?.layout ?? null)
-    setProjectOpen(true)
-    navigate('/project')
-  }
-
-  async function handleCloseProject() {
-    try {
-      await ipcClient.project.close.mutate()
-      setProjectOpen(false)
-      navigate('/', { replace: true })
-    } catch (e) {
-      console.error('Failed to close project:', e)
-      // Still close UI even if API fails
-      setProjectOpen(false)
-      navigate('/', { replace: true })
-    }
-  }
-
   const [trpcClient] = useState(() =>
     trpc.createClient({
-      transformer: superjson,
       links: [
         ipcLink(),
       ],
     })
   );
 
-  if (isLoading) {
+
+  return (
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <ProjectLoadCheck />
+        <EventsListener />
+      </QueryClientProvider>
+    </trpc.Provider>
+  )
+}
+
+function ProjectLoadCheck() {
+  const projectStatus = trpc.project.status.useQuery()
+
+  if (projectStatus.isLoading) {
     return (
       <LocaleProvider>
         <div className="app-root h-full flex items-center justify-center">
@@ -82,27 +50,15 @@ export default function App() {
     )
   }
 
-  return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <LocaleProvider>
-            <div className="app-root h-full">
-              <Routes>
-                <Route path="/" element={<StartScreen onOpenProject={handleOpenProject} />} />
-                <Route path="/project" element={
-                  projectOpen ? (
-                    <Layout onClose={handleCloseProject} initialLayout={initialLayout} />
-                  ) : (
-                    <StartScreen onOpenProject={handleOpenProject} />
-                  )
-                } />
-              </Routes>
-            </div>
-          </LocaleProvider>
-        </ThemeProvider>
-        <EventsListener />
-      </QueryClientProvider>
-    </trpc.Provider>
-  )
+  return <ThemeProvider projectLoaded={projectStatus.data?.isOpen || false}>
+    <LocaleProvider>
+      <div className="app-root h-full">
+        { projectStatus.data?.isOpen ? (
+          <Layout />
+        ) : (
+          <StartScreen/>
+        ) }
+      </div>
+    </LocaleProvider>
+  </ThemeProvider>
 }

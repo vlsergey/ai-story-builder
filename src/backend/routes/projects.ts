@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import type { ProjectInitialData } from '../types/index.js'
 import {
+  isOpen,
   getCurrentDbPath,
   setCurrentDbPath,
   readAppSettings,
@@ -56,8 +57,7 @@ function updateRecent(dbPath: string): void {
 }
 
 export function getProjectStatus(): { isOpen: boolean; path: string | null } {
-  const dbPath = getCurrentDbPath()
-  return { isOpen: !!dbPath, path: dbPath }
+  return { isOpen: isOpen(), path: getCurrentDbPath() }
 }
 
 export function closeProject(): { ok: boolean } {

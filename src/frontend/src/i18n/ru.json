@@ -232,7 +232,7 @@
   "billing.last_7d": "Последние 7д",
   "billing.last_30d": "Последние 30д",
   "billing.no_data": "Нет данных.",
-  "billing.refresh": "↺ Обновить",
+  "billing.refresh": "Обновить",
   "billing.error": "Ошибка:",
 
   "ageRating.G.longLabel": "Все возрасты",
@@ -240,5 +240,25 @@
   "ageRating.12.longLabel": "С 12 лет",
   "ageRating.16.longLabel": "С 16 лет",
   "ageRating.18.longLabel": "Только взрослые",
-  "ageRating.NC21.longLabel": "Только для взрослых 21+"
+  "ageRating.NC21.longLabel": "Только для взрослых 21+",
+
+  "regeneration.title": "Генерация содержимого",
+  "regeneration.start": "Запустить",
+  "regeneration.stop": "Остановить",
+  "regeneration.stop_confirmation": "Вы уверены, что хотите остановить текущую генерацию? Это может оставить некоторые узлы в несогласованном состоянии.",
+  "regeneration.stopping": "Останавливается...",
+  "regeneration.in_progress": "В процессе",
+  "regeneration.idle": "Бездействует",
+  "regeneration.no_data": "Нет активности генерации",
+  "regeneration.current_nodes": "Сейчас обрабатываются:",
+  "regeneration.error": "Ошибка",
+  "regeneration.processed": "Обработано",
+  "regeneration.new": "Новые",
+  "regeneration.same": "Не изменились",
+  "regeneration.empty": "Пустые",
+  "regeneration.skipped": "Пропущены",
+  "regeneration.last_session": "Статистика последней сессии",
+
+  "regenerateOptions.regenerateManual.label": "Перегенерировать ручные изменения",
+  "regenerateOptions.regenerateManual.description": "Нужно ли перегенерировать узлы, в которых были сделаны ручные изменения после генерации, в том числе улучшения с помощью ИИ."
 }

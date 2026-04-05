@@ -1,12 +1,12 @@
 import React from 'react';
 import { type Connection } from '@xyflow/react';
+import { useLocale } from '@/lib/locale';
 
 interface EdgeTypeSelectionDialogProps {
   showConnectDialog: Connection | null;
   allowedEdgeTypes: string[];
   confirmConnect: (edgeType: string) => void;
   setShowConnectDialog: (connection: Connection | null) => void;
-  t: (key: string) => string;
 }
 
 export default function EdgeTypeSelectionDialog({
@@ -14,8 +14,8 @@ export default function EdgeTypeSelectionDialog({
   allowedEdgeTypes,
   confirmConnect,
   setShowConnectDialog,
-  t,
 }: EdgeTypeSelectionDialogProps) {
+  const { t } = useLocale()
   if (!showConnectDialog) return null;
 
   return (
