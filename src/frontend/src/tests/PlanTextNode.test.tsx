@@ -3,17 +3,30 @@ import { render, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { OPEN_PLAN_NODE_EDITOR_EVENT } from '../lib/plan-graph-events'
 
-// Provide minimal stubs for @xyflow/react used inside PlanTextNode
-vi.mock('@xyflow/react', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@xyflow/react')>()
-  return {
-    ...actual,
-    Handle: () => null,
-  }
-})
+// Mock @xyflow/react synchronously
+vi.mock('@xyflow/react', () => ({
+  Handle: () => null,
+  NodeResizer: () => null,
+  Position: { Left: 'left', Right: 'right' },
+}))
 
 vi.mock('../lib/locale', () => ({
   useLocale: () => ({ locale: 'en', t: (key: string) => key }),
+}))
+
+// Mock NodeTypeEditors to ensure text editor exists
+vi.mock('../plan/editors/NodeTypeEditors', () => ({
+  NodeTypeEditors: {
+    'text': () => null,
+  },
+}))
+
+// Mock getNodeTypeDefinition
+vi.mock('@shared/node-edge-dictionary', () => ({
+  getNodeTypeDefinition: vi.fn(() => ({
+    allowedIncomingEdgeTypes: [],
+    allowedOutgoingEdgeTypes: [],
+  })),
 }))
 
 describe('PlanTextNode double-click', () => {
@@ -28,7 +41,7 @@ describe('PlanTextNode double-click', () => {
     const originalDispatch = window.dispatchEvent.bind(window)
     vi.spyOn(window, 'dispatchEvent').mockImplementation((event) => {
       if (event instanceof CustomEvent && event.type === OPEN_PLAN_NODE_EDITOR_EVENT) {
-        dispatched.push((event as CustomEvent<{ nodeId: number }>).detail.nodeId)
+        dispatched.push((event as CustomEvent<{ node: { id: number } }>).detail.node.id)
       }
       return originalDispatch(event)
     })

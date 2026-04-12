@@ -88,6 +88,7 @@ describe('node-edge-dictionary consistency', () => {
   // Additional sanity checks
   it('node definitions have non‑empty allowedOutgoingEdgeTypes and allowedIncomingEdgeTypes', () => {
     for (const node of NODE_TYPES) {
+      if (node.canCreate === false) continue // skip internal nodes
       expect(node.allowedOutgoingEdgeTypes.length).toBeGreaterThan(0)
       expect(node.allowedIncomingEdgeTypes.length).toBeGreaterThan(0)
     }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, waitFor } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@xyflow/react', () => ({
@@ -18,19 +18,36 @@ vi.mock('../lib/locale', () => ({
   useLocale: () => ({ locale: 'en', t: (key: string) => key }),
 }))
 
+// Mock trpc with useQuery and useMutation
+const mockUseQuery = vi.fn(() => ({
+  data: [],
+  isLoading: false,
+  isFetched: true,
+  isError: false,
+  error: null,
+  refetch: vi.fn(),
+}))
+const mockUseMutation = vi.fn(() => ({
+  mutate: vi.fn(() => Promise.resolve({ ok: true })),
+  mutateAsync: vi.fn(() => Promise.resolve({ ok: true })),
+}))
+
 vi.mock('../ipcClient', () => ({
-  ipcClient: {
+  trpc: {
     plan: {
       nodes: {
-        getAll: { query: vi.fn(() => Promise.resolve([])) },
-        delete: { mutate: vi.fn(() => Promise.resolve({ ok: true })) },
-        patch: { mutate: vi.fn(() => Promise.resolve({ ok: true })) },
-        create: { mutate: vi.fn(() => Promise.resolve({ id: 1 })) },
+        findAll: { useQuery: mockUseQuery },
+        delete: { useMutation: mockUseMutation },
+        patch: { useMutation: mockUseMutation },
+        create: { useMutation: mockUseMutation },
+        batchPatch: { useMutation: mockUseMutation },
+        aiGenerateSummary: { useMutation: mockUseMutation },
+        aiGenerateOnly: { useMutation: mockUseMutation },
       },
       edges: {
-        getAll: { query: vi.fn(() => Promise.resolve([])) },
-        delete: { mutate: vi.fn(() => Promise.resolve({ ok: true })) },
-        create: { mutate: vi.fn(() => Promise.resolve({ id: 1 })) },
+        findAll: { useQuery: mockUseQuery },
+        delete: { useMutation: mockUseMutation },
+        create: { useMutation: mockUseMutation },
       },
     },
   },
@@ -65,18 +82,15 @@ describe('PlanGraph', () => {
   it('renders without crashing', async () => {
     const PlanGraph = (await import('../plan/plan-graph/PlanGraph')).default
     const { unmount } = render(<PlanGraph />)
-    // Wait for loading to finish
-    await waitFor(() => {
-      // Expect no error
-    })
+    // Component should render without errors
+    // No need to wait for anything because queries are mocked
     unmount()
   })
 
   it('renders the ReactFlow component', async () => {
     const PlanGraph = (await import('../plan/plan-graph/PlanGraph')).default
     const { getByTestId } = render(<PlanGraph />)
-    await waitFor(() => {
-      expect(getByTestId('react-flow')).toBeInTheDocument()
-    })
+    // ReactFlow is mocked and should be present immediately
+    expect(getByTestId('react-flow')).toBeInTheDocument()
   })
 })

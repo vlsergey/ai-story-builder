@@ -21,52 +21,49 @@ function makeStream(events: Record<string, unknown>[]) {
   })()
 }
 
-describe('grokGenerate — onThinking callbacks', () => {
+describe('grokGenerate — onEvent callbacks', () => {
   beforeEach(() => mockCreate.mockReset())
 
-  it('calls onThinking("web_search_completed", query) when output_item.done fires with web_search_call', async () => {
-    mockCreate.mockResolvedValue(makeStream([
-      {
-        type: 'response.output_item.done',
-        item: {
-          type: 'web_search_call',
-          status: 'completed',
-          action: { type: 'search', query: 'some search query', sources: [] },
-        },
+  it('calls onEvent with response.output_item.done event when web_search_call completes', async () => {
+    const event = {
+      type: 'response.output_item.done',
+      item: {
+        type: 'web_search_call',
+        status: 'completed',
+        action: { type: 'search', query: 'some search query', sources: [] },
       },
-    ]))
+    } as const
+    mockCreate.mockResolvedValue(makeStream([event]))
 
-    const onThinking = vi.fn()
-    await grokGenerate('fake-key', { model: 'grok-3' }, onThinking)
+    const onEvent = vi.fn()
+    await grokGenerate('fake-key', { model: 'grok-3' }, onEvent)
 
-    expect(onThinking).toHaveBeenCalledWith('web_search_completed', 'some search query')
+    expect(onEvent).toHaveBeenCalledWith(event)
   })
 
-  it('calls onThinking("web_search_completed") without detail when no query in output_item.done', async () => {
-    mockCreate.mockResolvedValue(makeStream([
-      {
-        type: 'response.output_item.done',
-        item: { type: 'web_search_call', status: 'completed', action: { type: 'search', sources: [] } },
-      },
-    ]))
+  it('calls onEvent with response.output_item.done event when web_search_call completes without query', async () => {
+    const event = {
+      type: 'response.output_item.done',
+      item: { type: 'web_search_call', status: 'completed', action: { type: 'search', sources: [] } },
+    } as const
+    mockCreate.mockResolvedValue(makeStream([event]))
 
-    const onThinking = vi.fn()
-    await grokGenerate('fake-key', { model: 'grok-3' }, onThinking)
+    const onEvent = vi.fn()
+    await grokGenerate('fake-key', { model: 'grok-3' }, onEvent)
 
-    expect(onThinking).toHaveBeenCalledWith('web_search_completed', undefined)
+    expect(onEvent).toHaveBeenCalledWith(event)
   })
 
-  it('ignores output_item.done for non-web_search_call items', async () => {
-    mockCreate.mockResolvedValue(makeStream([
-      {
-        type: 'response.output_item.done',
-        item: { type: 'message', content: [] },
-      },
-    ]))
+  it('calls onEvent with response.output_item.done event for non-web_search_call items', async () => {
+    const event = {
+      type: 'response.output_item.done',
+      item: { type: 'message', content: [] },
+    } as const
+    mockCreate.mockResolvedValue(makeStream([event]))
 
-    const onThinking = vi.fn()
-    await grokGenerate('fake-key', { model: 'grok-3' }, onThinking)
+    const onEvent = vi.fn()
+    await grokGenerate('fake-key', { model: 'grok-3' }, onEvent)
 
-    expect(onThinking).not.toHaveBeenCalled()
+    expect(onEvent).toHaveBeenCalledWith(event)
   })
 })
