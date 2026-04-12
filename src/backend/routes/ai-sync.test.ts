@@ -2,14 +2,9 @@
  * Integration tests for syncLore()
  */
 
-import os from 'os'
-import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { migrateDatabase } from '../db/migrations.js'
 import { SettingsRepository } from '../settings/settings-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-import { setCurrentDbPath } from '../db/state.js'
-import Database from 'better-sqlite3'
 import { AllAiEnginesConfig } from '../../shared/ai-engine-config.js'
 import { setUpTestDb, tearDownTestDb } from '../db/test-db-utils.js'
 

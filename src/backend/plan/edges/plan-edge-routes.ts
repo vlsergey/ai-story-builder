@@ -1,4 +1,4 @@
-import type { PlanEdgeType, PlanEdgeRow } from '../../../shared/plan-graph.js'
+import type { PlanEdgeType } from '../../../shared/plan-graph.js'
 import { PlanEdgeRepository } from './plan-edge-repository.js'
 import { PlanNodeRepository } from '../nodes/plan-node-repository.js'
 import { isValidEdgeType, canCreateEdge, getEdgeTypeDefinition, EDGE_TYPES } from '../../../shared/node-edge-dictionary.js'

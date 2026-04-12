@@ -24,7 +24,6 @@ export default function ForEachNodeEditor({ node, onUpdate, panelApi }: ForEachN
   }, [panelApi, node.title])
 
   // Parse content as array of iterations
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (node.content) {
       try {

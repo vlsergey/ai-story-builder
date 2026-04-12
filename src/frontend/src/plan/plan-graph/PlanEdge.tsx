@@ -6,7 +6,7 @@ import {
 } from '@xyflow/react'
 import { useLocale } from '../../lib/locale'
 import { EdgeImpl } from './Types'
-import { PlanEdgeRow, PlanEdgeType } from '@shared/plan-graph'
+import { PlanEdgeRow } from '@shared/plan-graph'
 
 const EDGE_COLORS: Record<string, string> = {
   text: '#3b82f6',   // blue

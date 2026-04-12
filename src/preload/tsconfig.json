@@ -2,15 +2,14 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "bundler", // или "node" для старых версий
+    "moduleResolution": "bundler",
     "strict": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    /* Ключевой момент: объединяем типы Node и Browser */
     "lib": ["ES2022", "DOM"],
     "types": ["node", "electron"],
     "noEmit": true
   },
-  "include": ["./**/*.ts"]
+  "include": ["**/*.ts"]
 }

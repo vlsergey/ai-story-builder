@@ -17,7 +17,7 @@ export default [
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
-        project: ['./src/backend/tsconfig.json', './src/frontend/tsconfig.json'],
+        project: ['./src/backend/tsconfig.json', './src/preload/tsconfig.json', './src/frontend/tsconfig.json'],
       },
       globals: {
         ...globals.node,
