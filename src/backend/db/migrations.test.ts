@@ -78,19 +78,24 @@ describe('migrateDatabase', () => {
       ORDER BY type, name
     `).all() as Array<{ type: string; name: string; sql: string }>
 
-    const generated = rows
+    let generated = rows
       .map(row => {
         let sql = row.sql.trim()
         if (!sql.endsWith(';')) sql += ';'
         return sql
       })
       .join('\n\n') + '\n'
+    // Normalize line endings to \n for consistent comparison
+    generated = generated.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
     // Read the stored schema file
     const schemaPath = path.resolve(__dirname, 'schema.sql')
     const stored = fs.readFileSync(schemaPath, 'utf-8')
     // Remove the header comment (first three lines)
-    const storedSchema = stored.replace(/^--.*\n/gm, '').trim() + '\n'
+    // Support both \n and \r\n line endings
+    let storedSchema = stored.replace(/^--.*\r?\n/gm, '').trim() + '\n'
+    // Normalize line endings to \n for consistent comparison
+    storedSchema = storedSchema.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
     expect(generated).toBe(storedSchema)
     db.close()
