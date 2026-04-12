@@ -23,17 +23,22 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
   async onInputContentChange(context: PlanNodeService, nodeData: PlanNodeRow, changedInputNodeId: number, settings: MergeSettings): Promise<PlanNodeUpdate | null> {
     // Check if auto‑update is enabled
     if (!settings.autoUpdate) {
+      console.log(`[MergeProcessor] autoUpdate disabled for node ${nodeData.id}`)
       return null
     }
 
+    console.log(`[MergeProcessor] onInputContentChange called for node ${nodeData.id}, changed input ${changedInputNodeId}`)
     // Regenerate merged content
     const patch = await this.regenerate(context, undefined, nodeData, settings)
-    if (!!patch?.content || patch?.content === nodeData.content) {
+    console.log(`[MergeProcessor] regenerated content:`, patch?.content)
+    if (!patch?.content || patch?.content === nodeData.content) {
       // No change or generation failed
+      console.log(`[MergeProcessor] no change or empty content, skipping update`)
       return null
     }
 
     // Return updated node data
+    console.log(`[MergeProcessor] returning new content`)
     return {
       content: patch?.content,
     }

@@ -19,10 +19,24 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     if (outputs.length > 1) throw Error(`Too many for-each-output nodes for for-each node ${node.id}: ${outputs.map(i => i.id)}`)
     const outputNode = outputs[0]
 
+    console.log(`[ForEachProcessor] getOutput for node ${node.id}, overrides length: ${parsedContent.overrides?.length || 0}`)
+    console.log(`[ForEachProcessor] outputNode.id: ${outputNode.id}, outputNode.content: ${outputNode.content}`)
+    if (parsedContent.overrides) {
+      parsedContent.overrides.forEach((override, idx) => {
+        console.log(`[ForEachProcessor] override[${idx}]:`, override)
+        if (override && override[outputNode.id]) {
+          console.log(`[ForEachProcessor]   output content: ${override[outputNode.id].content}`)
+        } else {
+          console.log(`[ForEachProcessor]   output content missing`)
+        }
+      })
+    }
+
     return (parsedContent.overrides || []).map((override, index) => {
       if (index != parsedContent.currentIndex) {
         // for non-current pages obtain content from stored overrides
-        return (override || {})[`${outputNode.id}`].content || ''
+        const outputOverride = override ? override[`${outputNode.id}`] : null
+        return outputOverride?.content || ''
       } else {
         // if current page is selected, obtain content from node directly
         return outputNode.content || ''
@@ -43,10 +57,11 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
 
     let newOverrides = [...(parsedContent.overrides || [])]
     for (let iteration: number = 0; iteration < inputs.length; iteration++) {
+      const currentOverride = newOverrides[iteration] || {}
       newOverrides[iteration] = {
-        ...newOverrides[iteration],
+        ...currentOverride,
         [`${internalInputNodeId}`]: {
-          ...(newOverrides[iteration] || {})[`${internalInputNodeId}`],
+          ...currentOverride[`${internalInputNodeId}`],
           content: inputs[iteration],
           status: 'GENERATED',
         }
@@ -87,18 +102,22 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     let parsedContent = JSON.parse(node.content || '{}') as ForEachNodeContent
     const totalIterations = parsedContent.length || 0
 
-    console.log(`[ForEachProcessor] regenerating node ${node.id}`)
+    console.log(`[ForEachProcessor] regenerating node ${node.id}, totalIterations=${totalIterations}`)
     const oldPage = parsedContent.currentIndex || 0
 
-    context.asContainer( totalIterations, async ( childContext ) => {
+    // Wait for all iterations to complete
+    await context.asContainer( totalIterations, async ( childContext ) => {
       for (let iteration: number = 0; iteration < totalIterations; iteration++) {
         console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}...`)
         service.changeForEachNodePage(node.id, iteration)
         await regenerateSubtreeNodesContents(childContext, node.id)
+        // After regenerating child nodes, save their content into overrides for this iteration
+        service.changeForEachNodePage(node.id, iteration)
         console.info(`Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`)
       }
     } )
 
+    console.log(`[ForEachProcessor] regeneration completed, restoring page to ${oldPage}`)
     return service.changeForEachNodePage(node.id, oldPage)
   }
 

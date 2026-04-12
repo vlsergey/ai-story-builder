@@ -499,14 +499,21 @@ export class PlanNodeService {
     }
     let parsedContent = (JSON.parse(node.content || '{}') || {}) as ForEachNodeContent
 
+    console.log(`[changeForEachNodePage] node ${nodeId}, currentIndex=${parsedContent.currentIndex}, page=${page}, overrides before save:`, parsedContent.overrides)
     // save current page
     parsedContent.overrides = [...(parsedContent.overrides || [])]
-    parsedContent.overrides[parsedContent.currentIndex || 0] = repo.collectForEachNodeIterationContentFromChildren(nodeId)
+    const collected = repo.collectForEachNodeIterationContentFromChildren(nodeId)
+    console.log(`[changeForEachNodePage] collected overrides:`, collected)
+    console.log(`[changeForEachNodePage] collected keys:`, Object.keys(collected))
+    parsedContent.overrides[parsedContent.currentIndex || 0] = collected
 
+    console.log(`[changeForEachNodePage] overrides after save:`, parsedContent.overrides)
+    console.log(`[changeForEachNodePage] overrides[${parsedContent.currentIndex || 0}] keys:`, Object.keys(parsedContent.overrides[parsedContent.currentIndex || 0] || {}))
     repo.applyForEachNodeIterationToChildren(nodeId, parsedContent.overrides[page] || {})
 
     parsedContent.currentIndex = page
     const result = repo.patch(nodeId, {content: JSON.stringify(parsedContent)})
+    console.log(`[changeForEachNodePage] saved content:`, JSON.stringify(parsedContent))
 
     // Emit events to frontend
     planNodeEventManager.emitUpdate(nodeId, `changed page in ${nodeId}`)

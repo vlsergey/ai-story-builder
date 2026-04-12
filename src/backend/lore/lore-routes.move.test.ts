@@ -14,27 +14,12 @@
  *   - move to a different branch
  */
 
-import fs from 'fs'
-import os from 'os'
-import path from 'path'
-import Database from 'better-sqlite3'
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-
-// ── Mock state so the route uses our temp DB ──────────────────────────────
-
-let testDbPath = ''
-
-vi.mock('../db/state.js', () => ({
-  getCurrentDbPath: () => testDbPath,
-  getDataDir: () => os.tmpdir(),
-}))
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { setUpTestDb, tearDownTestDb } from '../db/test-db-utils.js'
 
 // Import pure functions AFTER mock is registered
 const { moveLoreNode } = await import('./lore-routes.js')
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-import { migrateDatabase } from '../db/migrations.js'
 import { LoreNodeRepository } from './lore-node-repository.js'
 
 /**
@@ -45,42 +30,29 @@ import { LoreNodeRepository } from './lore-node-repository.js'
  *   │  └─ 4 grandchild
  *   └─ 3 child-b
  */
-function setupDb(): string {
-  const file = path.join(os.tmpdir(), `lore_move_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`)
-
-  const db = new Database(file)
-  migrateDatabase(db)
-  db.close()
-
-  // Temporarily set global testDbPath so repository uses this file
-  const prev = testDbPath
-  testDbPath = file
+function setupDb() {
   const repo = new LoreNodeRepository()
   repo.insert({ id: 1, parent_id: null, title: 'root' })
   repo.insert({ id: 2, parent_id: 1, title: 'child-a' })
   repo.insert({ id: 3, parent_id: 1, title: 'child-b' })
   repo.insert({ id: 4, parent_id: 2, title: 'grandchild' })
-  testDbPath = prev
-  return file
 }
 
-function parentOf(file: string, id: number): number | null {
-  const prev = testDbPath
-  testDbPath = file
+function parentOf(id: number): number | null {
   const repo = new LoreNodeRepository()
   const node = repo.getById(id)
-  testDbPath = prev
   return node?.parent_id ?? null
 }
 
 // ── Test lifecycle ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  testDbPath = setupDb()
+  setUpTestDb()
+  setupDb()
 })
 
 afterEach(() => {
-  try { fs.unlinkSync(testDbPath) } catch { /* ignore */ }
+  tearDownTestDb()
 })
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -90,19 +62,19 @@ describe('moveLoreNode — invalid cases', () => {
   it('throws 403 when moving the root node', async () => {
     await expect(() => moveLoreNode(1, { parent_id: 2 })).toThrow(/root/)
     try { moveLoreNode(1, { parent_id: 2 }) } catch (e: any) { expect(e.status).toBe(403) }
-    expect(parentOf(testDbPath, 1)).toBeNull()
+    expect(parentOf(1)).toBeNull()
   })
 
   it('throws 400 when moving a node to itself', async () => {
     await expect(() => moveLoreNode(2, { parent_id: 2 })).toThrow(/itself/)
     try { moveLoreNode(2, { parent_id: 2 }) } catch (e: any) { expect(e.status).toBe(400) }
-    expect(parentOf(testDbPath, 2)).toBe(1)
+    expect(parentOf(2)).toBe(1)
   })
 
   it('throws 400 when moving a node to its direct child (direct cycle)', async () => {
     await expect(() => moveLoreNode(2, { parent_id: 4 })).toThrow(/descendant/)
     try { moveLoreNode(2, { parent_id: 4 }) } catch (e: any) { expect(e.status).toBe(400) }
-    expect(parentOf(testDbPath, 2)).toBe(1)
+    expect(parentOf(2)).toBe(1)
   })
 
   it('throws 400 when moving a node to a deeper descendant (indirect cycle)', async () => {
@@ -111,7 +83,7 @@ describe('moveLoreNode — invalid cases', () => {
 
     await expect(() => moveLoreNode(2, { parent_id: 5 })).toThrow(/descendant/)
     try { moveLoreNode(2, { parent_id: 5 }) } catch (e: any) { expect(e.status).toBe(400) }
-    expect(parentOf(testDbPath, 2)).toBe(1)
+    expect(parentOf(2)).toBe(1)
   })
 
   it('throws 404 when the node to move does not exist', async () => {
@@ -121,7 +93,7 @@ describe('moveLoreNode — invalid cases', () => {
   it('throws 400 when the target parent does not exist', async () => {
     await expect(() => moveLoreNode(3, { parent_id: 999 })).toThrow(/target parent/)
     try { moveLoreNode(3, { parent_id: 999 }) } catch (e: any) { expect(e.status).toBe(400) }
-    expect(parentOf(testDbPath, 3)).toBe(1)
+    expect(parentOf(3)).toBe(1)
   })
 
   it('throws 400 when moving an active node into a to_be_deleted parent', async () => {
@@ -130,7 +102,7 @@ describe('moveLoreNode — invalid cases', () => {
 
     await expect(() => moveLoreNode(3, { parent_id: 2 })).toThrow(/marked for deletion/)
     try { moveLoreNode(3, { parent_id: 2 }) } catch (e: any) { expect(e.status).toBe(400) }
-    expect(parentOf(testDbPath, 3)).toBe(1)
+    expect(parentOf(3)).toBe(1)
   })
 
 })
@@ -140,19 +112,19 @@ describe('moveLoreNode — valid cases', () => {
   it('moves node to a sibling (reparent within same level)', () => {
     const result = moveLoreNode(3, { parent_id: 2 })
     expect(result.ok).toBe(true)
-    expect(parentOf(testDbPath, 3)).toBe(2)
+    expect(parentOf(3)).toBe(2)
   })
 
   it('moves grandchild to a different branch', () => {
     const result = moveLoreNode(4, { parent_id: 3 })
     expect(result.ok).toBe(true)
-    expect(parentOf(testDbPath, 4)).toBe(3)
+    expect(parentOf(4)).toBe(3)
   })
 
   it('moves node directly under root', () => {
     const result = moveLoreNode(4, { parent_id: 1 })
     expect(result.ok).toBe(true)
-    expect(parentOf(testDbPath, 4)).toBe(1)
+    expect(parentOf(4)).toBe(1)
   })
 
 })

@@ -107,7 +107,9 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     node: PlanNodeRow,
     settings: SplitSettings,
   ): Promise<PlanNodeUpdate | null> {
+    console.log(`[SplitProcessor] regenerate called for node ${node.id}, settings:`, settings)
     const parts = this.splitInput(service, node, settings)
+    console.log(`[SplitProcessor] splitInput returned parts:`, parts)
     return {
       content: JSON.stringify(parts)
     }

@@ -218,11 +218,10 @@ export async function syncLore(): Promise<{
   search_index_id: string | null
 }> {
   // Step 1 — load settings and nodes
-  const currentEngine = SettingsRepository.getCurrentBackend()
-  const config = SettingsRepository.getAllAiEnginesConfig()
-
   const dbPath = getCurrentDbPath()
   if (!dbPath) throw makeError('no project open', 400)
+  const currentEngine = SettingsRepository.getCurrentBackend()
+  const config = SettingsRepository.getAllAiEnginesConfig()
   const repo = new LoreNodeRepository()
   const rows = repo.findAll()
 

@@ -1,8 +1,7 @@
-/**
+﻿/**
  * Integration tests for syncLore()
  */
 
-import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -12,14 +11,7 @@ import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 import { setCurrentDbPath } from '../db/state.js'
 import Database from 'better-sqlite3'
 import { AllAiEnginesConfig } from '../../shared/ai-engine-config.js'
-
-let testDbPath = ''
-
-vi.mock('../db/state.js', () => ({
-  getCurrentDbPath: () => testDbPath,
-  getDataDir: () => os.tmpdir(),
-  setCurrentDbPath: (p: string | null) => { testDbPath = p ?? '' },
-}))
+import { setUpTestDb, tearDownTestDb } from '../db/test-db-utils.js'
 
 // ─── OpenAI mock ──────────────────────────────────────────────────────────────
 
@@ -62,18 +54,7 @@ function setupDb(opts?: {
     to_be_deleted?: number
     ai_sync_info?: string | null
   }>
-}): string {
-  const file = path.join(
-    os.tmpdir(),
-    `ai_sync_test_${Date.now()}_${Math.random().toString(36).slice(2)}.sqlite`
-  )
-  const db = new Database(file)
-  migrateDatabase(db)
-  db.close()
-
-  // Set current DB path so repositories can find it
-  setCurrentDbPath(file)
-
+}) {
   const currentEngine = opts?.currentEngine
     ?? (opts?.grokApiKey ? 'grok' : opts?.apiKey || opts?.folderId ? 'yandex' : undefined)
   if (currentEngine) {
@@ -108,63 +89,59 @@ function setupDb(opts?: {
       ai_sync_info: n.ai_sync_info ?? null,
     })
   }
-
-  return file
 }
 
 beforeEach(() => {
-  testDbPath = ''
+  setUpTestDb()
   vi.resetAllMocks()
   mockToFile.mockResolvedValue({}) // restore default after reset
 })
 afterEach(() => {
   vi.useRealTimers()
-  if (testDbPath) {
-    try { fs.unlinkSync(testDbPath) } catch { /* ignore */ }
-  }
+  tearDownTestDb()
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('syncLore', () => {
 
-  // ─── 1. Basic validation ───────────────────────────────────────────────────
+  // ─── 1. Basic validation ─────────────────────────────────────────────────────
 
   it('throws 400 when no project open', async () => {
-    testDbPath = ''
+    tearDownTestDb()
     await expect(syncLore()).rejects.toThrow(/no project open/)
     try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   it('throws 400 when no AI engine is configured', async () => {
-    testDbPath = setupDb()
+    setupDb()
     await expect(syncLore()).rejects.toThrow(/no AI engine configured/)
     try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   it('throws 400 when current engine is unknown / not supported', async () => {
-    testDbPath = setupDb({ currentEngine: 'unknown-engine' })
+    setupDb({ currentEngine: 'unknown-engine' })
     await expect(syncLore()).rejects.toThrow(/not supported for engine 'unknown-engine'/)
     try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   it('throws 400 when api_key is missing', async () => {
-    testDbPath = setupDb({ folderId: 'b1g123' })
+    setupDb({ folderId: 'b1g123' })
     await expect(syncLore()).rejects.toThrow(/api_key/)
     try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
   it('throws 400 when folder_id is missing', async () => {
-    testDbPath = setupDb({ apiKey: 'AQVN-test' })
+    setupDb({ apiKey: 'AQVN-test' })
     await expect(syncLore()).rejects.toThrow(/folder_id/)
     try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  // ─── 3. All nodes already synced and up-to-date ───────────────────────────
+  // ─── 3. All nodes already synced and up-to-date ──────────────────────────────
 
   it('returns unchanged count when all nodes are already synced', async () => {
     const syncedAt = '2025-01-01T12:00:00.000Z'
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -185,7 +162,7 @@ describe('syncLore', () => {
       ],
     })
 
-    // Two unchanged nodes with file_ids → vector store will be created
+    // Two unchanged nodes with file_ids в†’ vector store will be created
     mockVsCreate.mockResolvedValueOnce({ id: 'vs-new', status: 'completed' })
 
     const result = await syncLore()
@@ -196,10 +173,10 @@ describe('syncLore', () => {
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
-  // ─── 4. Uploads new non-empty node ────────────────────────────────────────
+  // ─── 4. Uploads new non-empty node ───────────────────────────────────────────
 
   it('uploads a new non-empty node and stores file_id in ai_sync_info', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -245,11 +222,11 @@ describe('syncLore', () => {
     expect(mockFilesCreate.mock.calls[0][0].purpose).toBe('assistants')
   })
 
-  // ─── 5. Skips unchanged node ──────────────────────────────────────────────
+  // ─── 5. Skips unchanged node ─────────────────────────────────────────────────
 
   it('skips node where content_updated_at <= last_synced_at', async () => {
     const syncedAt = '2025-06-01T00:00:00.000Z'
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -272,10 +249,10 @@ describe('syncLore', () => {
     expect(mockFilesCreate).not.toHaveBeenCalled()
   })
 
-  // ─── 6. Re-uploads changed node ───────────────────────────────────────────
+  // ─── 6. Re-uploads changed node ──────────────────────────────────────────────
 
   it('re-uploads node when content_updated_at > last_synced_at', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -306,10 +283,10 @@ describe('syncLore', () => {
     expect(syncInfo.yandex.file_id).toBe('new-file-id')
   })
 
-  // ─── 7. Deletes remote file for to_be_deleted=1 node ─────────────────────
+  // ─── 7. Deletes remote file for to_be_deleted=1 node ─────────────────────────
 
   it('deletes remote file for to_be_deleted=1 node and physically removes row from DB', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -341,7 +318,7 @@ describe('syncLore', () => {
   })
 
   it('Yandex: physically removes to_be_deleted=1 node that was never synced (no file_id)', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -367,10 +344,10 @@ describe('syncLore', () => {
     void result
   })
 
-  // ─── 8. Deletes remote file for emptied node (word_count=0) ──────────────
+  // ─── 8. Deletes remote file for emptied node (word_count=0) ──────────────────
 
   it('deletes remote file for emptied node and clears file_id in ai_sync_info', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -400,10 +377,10 @@ describe('syncLore', () => {
     expect(syncInfo.yandex.file_id).toBeUndefined()
   })
 
-  // ─── 9. Deletes old VectorStore, creates new, polls until done ────────────
+  // ─── 9. Deletes old VectorStore, creates new, polls until done ───────────────
 
   it('deletes old VectorStore, creates new one, polls until done, stores search_index_id', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       searchIndexId: 'old-idx',
@@ -437,10 +414,10 @@ describe('syncLore', () => {
     expect(config.yandex?.search_index_id).toBe('new-idx-456')
   })
 
-  // ─── 10. Empty allFileIds: delete old index, don't create new one ────────
+  // ─── 10. Empty allFileIds: delete old index, don't create new one ────────────
 
   it('when all files deleted, removes old VectorStore and clears search_index_id', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       searchIndexId: 'old-idx',
@@ -471,10 +448,10 @@ describe('syncLore', () => {
     expect(config.yandex?.search_index_id).toBeUndefined()
   })
 
-  // ─── 11. Files uploaded first, then vector store created (Yandex) ─────────
+  // ─── 11. Files uploaded first, then vector store created (Yandex) ────────────
 
   it('uploads all files first, then creates the vector store with those file IDs (Yandex)', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -508,18 +485,18 @@ describe('syncLore', () => {
     )
   })
 
-  // ─── 12. Grok: returns 400 when api_key is missing ────────────────────────
+  // ─── 12. Grok: returns 400 when api_key is missing ───────────────────────────
 
   it('throws 400 for Grok when api_key is missing', async () => {
-    testDbPath = setupDb({ currentEngine: 'grok' })
+    setupDb({ currentEngine: 'grok' })
     await expect(syncLore()).rejects.toThrow(/api_key/)
     try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
   })
 
-  // ─── 13. throws when file upload fails ────────────────────────────────────
+  // ─── 13. throws when file upload fails ───────────────────────────────────────
 
   it('throws when file upload fails', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -539,10 +516,10 @@ describe('syncLore', () => {
     await expect(syncLore()).rejects.toThrow(/Upload failed/)
   })
 
-  // ─── 14. throws when VectorStore polling times out ────────────────────────
+  // ─── 14. throws when VectorStore polling times out ───────────────────────────
 
   it('throws when VectorStore polling exceeds timeout', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'AQVN-key',
       folderId: 'b1g123',
       nodes: [
@@ -564,7 +541,7 @@ describe('syncLore', () => {
 
     mockFilesCreate.mockResolvedValueOnce({ id: 'file-1' })
     mockVsCreate.mockResolvedValueOnce({ id: 'vs-timeout', status: 'in_progress' })
-    // Always return in_progress → triggers timeout
+    // Always return in_progress в†’ triggers timeout
     mockVsRetrieve.mockResolvedValue({ id: 'vs-timeout', status: 'in_progress' })
 
     try {
@@ -575,10 +552,10 @@ describe('syncLore', () => {
     }
   })
 
-  // ─── Grok sync (collapsed tree) ──────────────────────────────────────────
+  // ─── Grok sync (collapsed tree) ──────────────────────────────────────────────
 
   it('Grok: physically removes to_be_deleted=1 nodes after sync', async () => {
-    testDbPath = setupDb({
+    setupDb({
       grokApiKey: 'xai-key',
       nodes: [
         { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
@@ -603,8 +580,8 @@ describe('syncLore', () => {
   })
 
   it('Grok: uploads collapsed group for new nodes', async () => {
-    // Tree: root(id=1) → category(id=2) → item(id=3)
-    testDbPath = setupDb({
+    // Tree: root(id=1) в†’ category(id=2) в†’ item(id=3)
+    setupDb({
       grokApiKey: 'xai-key',
       nodes: [
         { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
@@ -638,7 +615,7 @@ describe('syncLore', () => {
 
   it('Grok: does not re-upload unchanged group', async () => {
     const syncedAt = '2025-01-01T12:00:00.000Z'
-    testDbPath = setupDb({
+    setupDb({
       grokApiKey: 'xai-key',
       nodes: [
         { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
@@ -662,7 +639,7 @@ describe('syncLore', () => {
   it('Grok: re-uploads group when node content changed', async () => {
     const syncedAt = '2025-01-01T12:00:00.000Z'
     const updatedAt = '2025-06-01T00:00:00.000Z'
-    testDbPath = setupDb({
+    setupDb({
       grokApiKey: 'xai-key',
       nodes: [
         { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
@@ -695,7 +672,7 @@ describe('syncLore', () => {
 
   it('Grok: re-uploads group when a new child node is added (no grok sync entry)', async () => {
     const syncedAt = '2025-01-01T12:00:00.000Z'
-    testDbPath = setupDb({
+    setupDb({
       grokApiKey: 'xai-key',
       nodes: [
         { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
@@ -718,7 +695,7 @@ describe('syncLore', () => {
 
   it('Grok: marks group as deleted locally but does NOT call files.delete (no fileDeletion capability)', async () => {
     const syncedAt = '2025-01-01T12:00:00.000Z'
-    testDbPath = setupDb({
+    setupDb({
       grokApiKey: 'xai-key',
       nodes: [
         { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
@@ -744,7 +721,7 @@ describe('syncLore', () => {
     for (let i = 2; i <= 12; i++) {
       nodes.push({ id: i, parent_id: 1, title: `Cat${i}`, content: `Content ${i}`, word_count: 2 })
     }
-    testDbPath = setupDb({ grokApiKey: 'xai-key', nodes })
+    setupDb({ grokApiKey: 'xai-key', nodes })
 
     await expect(syncLore()).rejects.toThrow(/Too many top-level lore categories/)
     try { await syncLore() } catch (e: any) { expect(e.status).toBe(400) }
@@ -752,7 +729,7 @@ describe('syncLore', () => {
   })
 
   it('Grok: uploads correct collapsed content with markdown headings', async () => {
-    testDbPath = setupDb({
+    setupDb({
       grokApiKey: 'xai-key',
       nodes: [
         { id: 1, parent_id: null, title: 'Root', content: null, word_count: 0 },
@@ -778,10 +755,10 @@ describe('syncLore', () => {
     expect(content).toContain('City info')
   })
 
-  // ─── 405 fallback: retrieve check (Yandex, which supports fileDeletion) ────
+  // ─── 405 fallback: retrieve check (Yandex, which supports fileDeletion) ──────
 
   it('Yandex: treats 405 on delete as success when retrieve returns 404', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'yandex-key',
       folderId: 'folder-1',
       nodes: [
@@ -792,7 +769,7 @@ describe('syncLore', () => {
 
     // delete returns 405
     mockFilesDel.mockRejectedValueOnce(Object.assign(new Error('HTTP 405'), { status: 405 }))
-    // retrieve returns 404 → file is already gone
+    // retrieve returns 404 в†’ file is already gone
     mockFilesRetrieve.mockRejectedValueOnce(Object.assign(new Error('HTTP 404'), { status: 404 }))
     mockVsCreate.mockResolvedValueOnce({ id: 'vs-1', status: 'completed' })
 
@@ -801,7 +778,7 @@ describe('syncLore', () => {
   })
 
   it('Yandex: throws when 405 on delete and retrieve confirms file still exists', async () => {
-    testDbPath = setupDb({
+    setupDb({
       apiKey: 'yandex-key',
       folderId: 'folder-1',
       nodes: [
@@ -812,9 +789,11 @@ describe('syncLore', () => {
 
     // delete returns 405
     mockFilesDel.mockRejectedValueOnce(Object.assign(new Error('HTTP 405'), { status: 405 }))
-    // retrieve succeeds → file still present
+    // retrieve succeeds в†’ file still present
     mockFilesRetrieve.mockResolvedValueOnce({ id: 'still-there' })
 
     await expect(syncLore()).rejects.toThrow(/405/)
   })
 })
+
+
