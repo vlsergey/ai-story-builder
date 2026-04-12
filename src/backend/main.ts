@@ -356,7 +356,7 @@ app.whenReady().then(async () => {
       console.warn('Failed to install React Developer Tools:', err)
     }
   } else {
-    serverUrl = `file://${path.join(app.getAppPath(), 'dist', 'index.html')}`
+    serverUrl = `file://${path.join(app.getAppPath(), 'dist', 'frontend', 'index.html')}`
     console.log('Production mode, serverUrl:', serverUrl)
   }
   console.log('Creating window...')

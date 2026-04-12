@@ -4,6 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   root: path.resolve(__dirname),
+  base: './',
   plugins: [react({
     fastRefresh: false,
     jsxRuntime: 'automatic'
@@ -25,7 +26,7 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: path.resolve(__dirname, '..', '..', 'dist'),
+    outDir: path.resolve(__dirname, '..', '..', 'dist', 'frontend'),
     emptyOutDir: true
   },
   optimizeDeps: {

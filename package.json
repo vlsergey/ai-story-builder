@@ -13,14 +13,22 @@
   "scripts": {
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "dev": "electron-rebuild -f -w better-sqlite3 && concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/main.js dist/preload/preload.cjs tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
-    "build": "npm run build --workspace=src/frontend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:frontend": "npm run build --workspace=src/frontend",
     "build:backend": "npm run build --workspace=src/backend",
     "test": "npm rebuild better-sqlite3 && npm run test --workspace=src/backend && npm run test --workspace=src/frontend",
     "typecheck": "npm run typecheck --workspace=src/backend && tsc -p src/frontend/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=100",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
-    "package": "npm run build:backend && npm run build && node scripts/package.js",
+    "package": "npm run build && electron-builder --publish never",
     "generate-schema": "npm rebuild better-sqlite3 && npm run build:backend && tsx scripts/generate-schema.ts"
+  },
+  "dependencies": {
+    "@trpc/server": "^10.45.4",
+    "best-effort-json-parser": "^1.4.0",
+    "electron-trpc": "^0.7.1",
+    "openai": "^6.33.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -55,10 +63,13 @@
     ],
     "files": [
       "src/backend/icons/*",
-      "dist/**/*"
+      "dist/**/*",
+      "package.json",
+      "node_modules/**/*"
     ],
+    "npmRebuild": true,
     "win": {
-      "icon": "src/electron/icons/icon.ico",
+      "icon": "src/backend/icons/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -69,7 +80,7 @@
       ]
     },
     "linux": {
-      "icon": "src/electron/icons/256x256.png",
+      "icon": "src/backend/icons/256x256.png",
       "target": [
         {
           "target": "AppImage",
@@ -80,7 +91,7 @@
       ]
     },
     "mac": {
-      "icon": "src/electron/icons/icon.icns",
+      "icon": "src/backend/icons/icon.icns",
       "target": [
         {
           "target": "dmg",
