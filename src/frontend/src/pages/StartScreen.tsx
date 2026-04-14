@@ -129,6 +129,7 @@ export default function StartScreen() {
               {(recent || []).map((r) => (
                 <li key={r} className="group/item">
                   <button
+                    type="button"
                     onClick={() => openRecent(r)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors text-left group"
                   >
@@ -176,6 +177,7 @@ export default function StartScreen() {
               <FolderOpen className="h-4 w-4 text-primary shrink-0" />
               <h3 className="text-sm font-semibold">{t("start.projects_folder")}</h3>
               <button
+                type="button"
                 onClick={() => openFolder()}
                 title="Open in file manager"
                 className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -196,6 +198,7 @@ export default function StartScreen() {
                 {projectsData.files.map((f) => (
                   <li key={f}>
                     <button
+                      type="button"
                       onClick={() => openRecent(f)}
                       className="w-full flex items-center gap-2.5 pl-6 pr-2 py-1.5 rounded-md text-sm hover:bg-accent transition-colors text-left group"
                     >

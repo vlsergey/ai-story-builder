@@ -185,6 +185,7 @@ export default function AiBillingPanel() {
       </section>
 
       <button
+        type="button"
         onClick={() => billingUtils.invalidate()}
         className="mt-auto self-start text-xs text-muted-foreground hover:text-foreground transition-colors"
       >

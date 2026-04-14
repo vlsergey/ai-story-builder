@@ -24,6 +24,7 @@ export default function EdgeTypeSelectionDialog({
         <div className="flex flex-col gap-2">
           {allowedEdgeTypes.map((type) => (
             <button
+              type="button"
               key={type}
               onClick={() => void confirmConnect(type)}
               className="px-3 py-1.5 text-sm rounded border border-border hover:bg-muted text-left"
@@ -33,6 +34,7 @@ export default function EdgeTypeSelectionDialog({
           ))}
         </div>
         <button
+          type="button"
           onClick={() => setShowConnectDialog(null)}
           className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground"
         >

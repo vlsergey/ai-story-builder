@@ -179,6 +179,7 @@ function Toolbar({
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border bg-muted/20 text-xs shrink-0 flex-wrap">
       <button
+        type="button"
         onClick={onPrev}
         disabled={currentIdx === 0 || hunkCount === 0}
         className="p-0.5 rounded hover:bg-muted disabled:opacity-30 transition-colors"
@@ -190,6 +191,7 @@ function Toolbar({
         {hunkCount === 0 ? "–" : `${currentIdx + 1} / ${hunkCount}`}
       </span>
       <button
+        type="button"
         onClick={onNext}
         disabled={currentIdx >= hunkCount - 1 || hunkCount === 0}
         className="p-0.5 rounded hover:bg-muted disabled:opacity-30 transition-colors"
@@ -202,6 +204,7 @@ function Toolbar({
         <>
           <div className="w-px h-4 bg-border mx-1" />
           <button
+            type="button"
             onClick={onAccept}
             className={`flex items-center gap-1 px-2 py-0.5 rounded font-medium transition-colors ${
               currentDecision === "accepted"
@@ -213,6 +216,7 @@ function Toolbar({
             {t("lore.hunk_accept")}
           </button>
           <button
+            type="button"
             onClick={onReject}
             className={`flex items-center gap-1 px-2 py-0.5 rounded font-medium transition-colors ${
               currentDecision === "rejected"
@@ -225,12 +229,14 @@ function Toolbar({
           </button>
           <div className="w-px h-4 bg-border mx-1" />
           <button
+            type="button"
             onClick={onAcceptAll}
             className="px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors"
           >
             {t("lore.accept_all")}
           </button>
           <button
+            type="button"
             onClick={onRejectAll}
             className="px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors"
           >
@@ -241,6 +247,7 @@ function Toolbar({
       <div className="flex-1" />
       <div className="w-px h-4 bg-border mx-1" />
       <button
+        type="button"
         onClick={onToggleWordWrap}
         className={`p-0.5 rounded transition-colors ${wordWrap ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"}`}
         title="Toggle word wrap"
@@ -248,6 +255,7 @@ function Toolbar({
         <WrapText size={14} />
       </button>
       <button
+        type="button"
         onClick={onToggleIgnoreWhitespace}
         className={`p-0.5 rounded transition-colors ${ignoreWhitespace ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"}`}
         title="Ignore whitespace"
@@ -317,6 +325,7 @@ function SplitView({
           }
           return (
             <button
+              type="button"
               key={sec.sectionIdx}
               onClick={() => setExpandedGaps((s) => new Set([...s, sec.sectionIdx]))}
               className="w-full px-3 py-1 bg-muted/50 text-muted-foreground text-xs border-y border-border/40 hover:bg-muted transition-colors text-left"
@@ -432,6 +441,7 @@ function UnifiedView({
           }
           return (
             <button
+              type="button"
               key={sec.sectionIdx}
               onClick={() => setExpandedGaps((s) => new Set([...s, sec.sectionIdx]))}
               className="w-full px-3 py-1 bg-muted/50 text-muted-foreground text-xs border-y border-border/40 hover:bg-muted transition-colors text-left"
@@ -469,6 +479,7 @@ function UnifiedView({
                 {t("lore.hunk_label")} {hunkIdx + 1}
               </span>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDecide(hunk.id, "accepted")
@@ -479,6 +490,7 @@ function UnifiedView({
                 {t("lore.hunk_accept")}
               </button>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDecide(hunk.id, "rejected")

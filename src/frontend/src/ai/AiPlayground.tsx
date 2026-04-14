@@ -101,6 +101,7 @@ export default function AiPlayground() {
             <div className="flex flex-col gap-1 shrink-0">
               {generating ? (
                 <button
+                  type="button"
                   onClick={handleStop}
                   className="px-3 py-1.5 text-sm rounded border border-destructive text-destructive hover:bg-destructive/10"
                 >
@@ -108,6 +109,7 @@ export default function AiPlayground() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={void handleGenerate}
                   disabled={!instructions.trim()}
                   className="px-3 py-1.5 text-sm rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -143,6 +145,7 @@ export default function AiPlayground() {
             {response && (
               <>
                 <button
+                  type="button"
                   onClick={handleCopyResponse}
                   title="Copy to clipboard"
                   className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -150,6 +153,7 @@ export default function AiPlayground() {
                   <Clipboard className="h-3.5 w-3.5" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setResponse("")}
                   title="Clear response"
                   className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"

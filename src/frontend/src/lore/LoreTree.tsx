@@ -690,6 +690,7 @@ export default function LoreTree({
           : ""
     return (
       <button
+        type="button"
         key={item.id}
         className={`${btnBase} ${variantCls} ${!item.enabled ? btnDisabled : ""}`}
         title={`${item.label}${item.shortcut ? ` (${item.shortcut})` : ""}`}

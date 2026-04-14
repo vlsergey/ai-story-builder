@@ -109,6 +109,7 @@ export default function PlanEdge({
               {label}
               {data?.onDelete && (
                 <button
+                  type="button"
                   onClick={() => data.onDelete(Number(id))}
                   className="ml-1 text-destructive hover:text-destructive/80 font-bold"
                   title="Delete edge"

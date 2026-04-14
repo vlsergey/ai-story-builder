@@ -313,6 +313,7 @@ export default function NodeEditor<N extends Node>({
           <div className="flex border-b border-border">
             {(["new", "sidebyside", "perlines"] as DiffTab[]).map((tab) => (
               <button
+                type="button"
                 key={tab}
                 onClick={() => setSelectedTab(tab)}
                 className={`px-3 py-1.5 text-sm border-r border-border last:border-r-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
