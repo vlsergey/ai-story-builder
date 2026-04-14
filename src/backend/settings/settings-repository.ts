@@ -37,7 +37,7 @@ export class SettingsRepository {
    * Returns null if the key does not exist or parsing fails.
    */
   static getJson<T>(key: string): T | null {
-    const raw = this.get(key)
+    const raw = SettingsRepository.get(key)
     if (raw === null) return null
     try {
       return JSON.parse(raw) as T
@@ -50,7 +50,7 @@ export class SettingsRepository {
    * Set a JSON-serializable value for a key.
    */
   static setJson(key: string, value: unknown): void {
-    this.set(key, JSON.stringify(value))
+    SettingsRepository.set(key, JSON.stringify(value))
   }
 
   /**
@@ -65,30 +65,30 @@ export class SettingsRepository {
   // ─── Specialized getters/setters ──────────────────────────────────────────────
 
   static getLayout(): unknown {
-    return this.getJson("layout")
+    return SettingsRepository.getJson("layout")
   }
 
   static saveLayout(layout: unknown): void {
-    this.setJson("layout", layout)
+    SettingsRepository.setJson("layout", layout)
   }
 
   static getVerboseAiLogging(): boolean {
-    const val = this.get("verbose_ai_logging")
+    const val = SettingsRepository.get("verbose_ai_logging")
     return val === "true"
   }
 
   static setVerboseAiLogging(enabled: boolean): void {
-    this.set("verbose_ai_logging", enabled ? "true" : "false")
+    SettingsRepository.set("verbose_ai_logging", enabled ? "true" : "false")
   }
 
   static getAllAiEnginesConfig(): AllAiEnginesConfig {
-    return this.getJson<AllAiEnginesConfig>("ai_config") ?? {}
+    return SettingsRepository.getJson<AllAiEnginesConfig>("ai_config") ?? {}
   }
 
   static getCurrentEngineConfig(): AiEngineConfig {
     const engine = SettingsRepository.getCurrentBackend()
     if (!engine) return {}
-    return this.getAllAiEnginesConfig()[engine] ?? {}
+    return SettingsRepository.getAllAiEnginesConfig()[engine] ?? {}
   }
 
   static getCurrentEngineAvailableModels(): string[] {
@@ -112,59 +112,59 @@ export class SettingsRepository {
   }
 
   static saveAllAiEnginesConfig(config: AllAiEnginesConfig): void {
-    this.setJson("ai_config", config)
+    SettingsRepository.setJson("ai_config", config)
   }
 
   static getCurrentBackend(): AiEngineKey | null {
-    return this.get("current_backend")
+    return SettingsRepository.get("current_backend")
   }
 
   static setCurrentBackend(engine: string | null): void {
     if (engine === null) {
-      this.delete("current_backend")
+      SettingsRepository.delete("current_backend")
     } else {
-      this.set("current_backend", engine)
+      SettingsRepository.set("current_backend", engine)
     }
   }
 
   static getTextLanguage(): string | null {
-    return this.get("text_language")
+    return SettingsRepository.get("text_language")
   }
 
   static setTextLanguage(lang: string | null): void {
     if (lang === null) {
-      this.delete("text_language")
+      SettingsRepository.delete("text_language")
     } else {
-      this.set("text_language", lang)
+      SettingsRepository.set("text_language", lang)
     }
   }
 
   static getUiTheme(): ThemePreference | null {
-    return this.get("ui_theme") as ThemePreference | null
+    return SettingsRepository.get("ui_theme") as ThemePreference | null
   }
 
   static setUiTheme(theme: ThemePreference): void {
-    this.set("ui_theme", theme)
+    SettingsRepository.set("ui_theme", theme)
   }
 
   static getAutoGenerateSummary(): boolean {
-    const val = this.get("auto_generate_summary")
+    const val = SettingsRepository.get("auto_generate_summary")
     return val === "true"
   }
 
   static setAutoGenerateSummary(enabled: boolean): void {
-    this.set("auto_generate_summary", enabled ? "true" : "false")
+    SettingsRepository.set("auto_generate_summary", enabled ? "true" : "false")
   }
 
   static getProjectTitle(): string | null {
-    return this.get("project_title")
+    return SettingsRepository.get("project_title")
   }
 
   static setProjectTitle(title: string | null): void {
     if (title === null) {
-      this.delete("project_title")
+      SettingsRepository.delete("project_title")
     } else {
-      this.set("project_title", title)
+      SettingsRepository.set("project_title", title)
     }
   }
 
@@ -172,7 +172,7 @@ export class SettingsRepository {
    * Get a setting value with a fallback default.
    */
   static getWithDefault(key: string, defaultValue: string): string {
-    const val = this.get(key)
+    const val = SettingsRepository.get(key)
     return val ?? defaultValue
   }
 
@@ -180,7 +180,7 @@ export class SettingsRepository {
    * Get a JSON setting with a fallback default.
    */
   static getJsonWithDefault<T>(key: string, defaultValue: T): T {
-    const val = this.getJson<T>(key)
+    const val = SettingsRepository.getJson<T>(key)
     return val ?? defaultValue
   }
 }

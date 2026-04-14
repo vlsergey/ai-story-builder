@@ -21,7 +21,7 @@
     "package": "npm run build && electron-builder --publish never",
     "generate-schema": "npm rebuild better-sqlite3 && npm run build:backend && tsx scripts/generate-schema.ts",
     "lint": "biome check .",
-    "lint:fix": "biome check --apply .",
+    "lint:fix": "biome check --write .",
     "format": "biome format .",
     "format:fix": "biome format --write ."
   },
