@@ -1,9 +1,10 @@
 import React from "react"
 import { trpc } from "../ipcClient"
-import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, X } from "lucide-react"
+import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, X, XIcon } from "lucide-react"
 import { Button } from "../ui-components/button"
 import { Input } from "../ui-components/input"
 import { useLocale } from "../lib/locale"
+import { ButtonGroup } from "@/ui-components/button-group"
 
 /** Returns the project display name from a full filesystem path: basename without extension. */
 function projectDisplayName(fullPath: string): string {
@@ -96,7 +97,7 @@ export default function StartScreen() {
   return (
     <div className="min-h-screen flex bg-background text-foreground">
       {/* ── Left panel: branding + recent projects ── */}
-      <aside className="w-64 shrink-0 flex flex-col border-r border-border bg-muted/20">
+      <aside className="w-80 shrink-0 flex flex-col border-r border-border bg-muted/20">
         {/* App identity */}
         <div className="px-5 pt-8 pb-5 border-b border-border">
           <div className="flex items-center gap-2.5">
@@ -125,28 +126,27 @@ export default function StartScreen() {
           {(recent || []).length === 0 ? (
             <p className="px-5 py-2 text-xs text-muted-foreground">{t("start.no_recent")}</p>
           ) : (
-            <ul className="space-y-0.5 px-2">
+            <ButtonGroup orientation="vertical" className="w-full">
               {(recent || []).map((r) => (
-                <li key={r} className="group/item">
-                  <button
-                    type="button"
-                    onClick={() => openRecent(r)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors text-left group"
-                  >
+                <ButtonGroup key={r} orientation="horizontal" className="w-full group/recent-item">
+                  <Button
+                    className="flex-1 min-w-0"
+                    variant="ghost"
+                    onClick={() => openRecent(r)}>
                     <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
-                    <span className="truncate flex-1">{projectDisplayName(r)}</span>
-                    <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 group-hover/item:hidden" />
-                    <span
-                      onClick={(e) => removeRecent(e, r)}
-                      title="Remove from list"
-                      className="h-4 w-4 shrink-0 hidden group-hover/item:flex items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </span>
-                  </button>
-                </li>
+                    <span className="flex-1 truncate text-left">{projectDisplayName(r)}</span>
+                    <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={(e) => removeRecent(e, r)}
+                    title="Remove from list"
+                    className="shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity">
+                      <XIcon className="h-3 w-3" />
+                  </Button>
+                </ButtonGroup>
               ))}
-            </ul>
+            </ButtonGroup>
           )}
         </div>
       </aside>
