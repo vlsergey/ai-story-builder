@@ -27,7 +27,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     if (parsedContent.overrides) {
       parsedContent.overrides.forEach((override, idx) => {
         console.log(`[ForEachProcessor] override[${idx}]:`, override)
-        if (override && override[outputNode.id]) {
+        if (override?.[outputNode.id]) {
           console.log(`[ForEachProcessor]   output content: ${override[outputNode.id].content}`)
         } else {
           console.log(`[ForEachProcessor]   output content missing`)

@@ -29,7 +29,7 @@ export default function AiGenerationSettingsFieldGroup({
 }: AiGenerationSettingsFieldGroupProps) {
   const engineDef = BUILTIN_ENGINES.find((e) => e.id === engineId)
   const allAiEnginesConfig = trpc.settings.allAiEnginesConfig.get.useQuery().data
-  const aiEngineConfig: AiEngineConfig = engineId ? (allAiEnginesConfig || {})[engineId] || {} : {}
+  const aiEngineConfig: AiEngineConfig = engineId ? allAiEnginesConfig?.[engineId] || {} : {}
   const availableModels = aiEngineConfig.available_models || []
 
   const modelFieldId = useId()

@@ -35,8 +35,7 @@
       },
       "complexity": {
         "noImportantStyles": "off",
-        "noStaticOnlyClass": "off",
-        "useOptionalChain": "off"
+        "noStaticOnlyClass": "off"
       },
       "correctness": {
         "noSwitchDeclarations": "off",
