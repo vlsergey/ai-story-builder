@@ -1,5 +1,12 @@
 import { useRef, useEffect, useCallback } from "react"
-import { DockviewReact, DockviewDefaultTab, DockviewReadyEvent, DockviewApi, DockviewPanelApi } from "dockview"
+import {
+  DockviewReact,
+  DockviewDefaultTab,
+  DockviewReadyEvent,
+  DockviewApi,
+  DockviewPanelApi,
+  DockviewGroupPanel,
+} from "dockview"
 import { trpc } from "./ipcClient"
 import LoreSection from "./lore/LoreSection"
 import LoreEditor from "./lore/LoreEditor"
@@ -30,25 +37,6 @@ const WelcomeWatermark = () => (
 
 export default function Layout() {
   const dockviewRef = useRef<DockviewApi>(null)
-
-  /**
-   * Returns the group that should receive editor-type panels (lore-editor, plan-node-editor, settings).
-   * Prefers an existing editor group; falls back to the plan-graph group; then an empty group.
-   */
-  function findEditorGroup(api: any): any {
-    return (
-      api.groups.find((g: any) =>
-        g.panels.some(
-          (p: any) =>
-            p.id.startsWith("lore-editor-") ||
-            p.id.startsWith("plan-node-editor-") ||
-            p.id === "settings" ||
-            p.id === "ai-playground" ||
-            p.id === "plan-graph",
-        ),
-      ) ?? api.groups.find((g: any) => g.panels.length === 0)
-    )
-  }
 
   /** Opens (or activates) the AI Playground singleton tab in the editor group. */
   function openAiPlayground() {
@@ -111,7 +99,7 @@ export default function Layout() {
   }
 
   /** Opens (or activates) a plan-node-editor tab for the given node. */
-  function openPlanNodeEditor(node: PlanNodeRow) {
+  const openPlanNodeEditor = useCallback((node: PlanNodeRow) => {
     const api = dockviewRef.current
     if (!api) return
     const panelId = `plan-node-editor-${node.id}`
@@ -129,7 +117,7 @@ export default function Layout() {
       params: { nodeId: node.id },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
-  }
+  }, [])
 
   const newLoreItem = trpc.lore.create.useMutation()
 
@@ -151,22 +139,7 @@ export default function Layout() {
     }
     window.addEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
     return () => window.removeEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // helper to massage storage format into the version expected by dockview
-  const normalizeLayout = (layout: any) => {
-    if (!layout || typeof layout !== "object") return layout
-    if (layout.panels) {
-      Object.values(layout.panels).forEach((p: any) => {
-        // dockview.toJSON currently emits "contentComponent"; fromJSON
-        // expects "component". copy over if missing.
-        if (p.contentComponent && !p.component) {
-          p.component = p.contentComponent
-        }
-      })
-    }
-    return layout
-  }
+  }, [openPlanNodeEditor])
 
   // Lock every group that has no panels (watermark groups).
   // Called after any layout application — both fromJSON() and setupDefaultLayout() —
@@ -478,5 +451,38 @@ export default function Layout() {
         </div>
       </EditorSettingsProvider>
     </LoreSettingsProvider>
+  )
+}
+
+// helper to massage storage format into the version expected by dockview
+function normalizeLayout(layout: any) {
+  if (!layout || typeof layout !== "object") return layout
+  if (layout.panels) {
+    Object.values(layout.panels).forEach((p: any) => {
+      // dockview.toJSON currently emits "contentComponent"; fromJSON
+      // expects "component". copy over if missing.
+      if (p.contentComponent && !p.component) {
+        p.component = p.contentComponent
+      }
+    })
+  }
+  return layout
+}
+/**
+ * Returns the group that should receive editor-type panels (lore-editor, plan-node-editor, settings).
+ * Prefers an existing editor group; falls back to the plan-graph group; then an empty group.
+ */
+function findEditorGroup(api: DockviewApi): DockviewGroupPanel | undefined {
+  return (
+    api.groups.find((g: any) =>
+      g.panels.some(
+        (p: any) =>
+          p.id.startsWith("lore-editor-") ||
+          p.id.startsWith("plan-node-editor-") ||
+          p.id === "settings" ||
+          p.id === "ai-playground" ||
+          p.id === "plan-graph",
+      ),
+    ) ?? api.groups.find((g: any) => g.panels.length === 0)
   )
 }

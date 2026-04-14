@@ -6,11 +6,11 @@ import { AiGenerationSettings, getAiGenerationSettingsSchema } from "@shared/ai-
 import { ReactNode, useCallback, useEffect, useId, useState } from "react"
 import { useForm } from "react-hook-form"
 import AiGenerationSettingsFieldGroup from "./AiGenerationSettingsFieldGroup"
-import debounce from "lodash/debounce"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui-components/accordion"
 import { Switch } from "../ui-components/switch"
 import { Label } from "../ui-components/label"
 import { Field } from "../ui-components/field"
+import { useDebouncedCallback } from "use-debounce"
 
 export default function AiGenerationSettingsFormWrapper(
   props: Omit<AiGenerationSettingsFormProps, "aiEngineDef" | "defaultAiGenerationSettings">,
@@ -54,7 +54,7 @@ function AiGenerationSettingsForm({
 
   useEffect(() => {
     setOverriden(value != null)
-  }, [value, setOverriden])
+  }, [value])
 
   const formSchema = getAiGenerationSettingsSchema(aiEngineDef)
 
@@ -75,16 +75,12 @@ function AiGenerationSettingsForm({
         onChange(null)
       }
     },
-    [setOverriden, handleSubmit, onChange],
-  )
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedSubmit = useCallback(
-    debounce(() => {
-      handleSubmit(onChange)()
-    }, 1000),
     [handleSubmit, onChange],
   )
+
+  const debouncedSubmit = useDebouncedCallback(() => {
+    handleSubmit(onChange)()
+  }, 1000)
 
   useEffect(() => {
     const subscription = watch(debouncedSubmit)

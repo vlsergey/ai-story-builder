@@ -40,7 +40,7 @@ export default function AddNodeDialog({ nodeType, open, onClose, onConfirm }: Ad
     if (!title.trim()) return
     onConfirm(title)
     setTitle("")
-  }, [onConfirm, setTitle, title])
+  }, [onConfirm, title])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {

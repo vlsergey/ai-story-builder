@@ -87,7 +87,7 @@ export default function TextNodeEditor({
   const handleGenerate = useCallback(() => {
     setStatusOverride("GENERATING")
     setGenerationStarted(true)
-  }, [setGenerationStarted])
+  }, [])
 
   const [improvingStarted, setImprovingStarted] = useState(false)
   trpc.plan.nodes.aiImprove.useSubscription(nodeId, {
@@ -126,7 +126,7 @@ export default function TextNodeEditor({
   const handleImprove = useCallback(() => {
     setStatusOverride("IMPROVING")
     setImprovingStarted(true)
-  }, [setImprovingStarted])
+  }, [])
 
   return (
     <NodeEditor<PlanNodeRow>

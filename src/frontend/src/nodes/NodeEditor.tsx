@@ -178,7 +178,7 @@ export default function NodeEditor<N extends Node>({
         }),
       })
     }
-  }, [codeMirrorRef])
+  }, [])
 
   useEffect(() => {
     if ((node.content && status == "GENERATING") || status == "IMPROVING") {

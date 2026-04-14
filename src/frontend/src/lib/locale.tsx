@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from "react"
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from "react"
 import en from "../i18n/en.json"
 import ru from "../i18n/ru.json"
 
@@ -18,10 +18,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     return localStorage.getItem("locale") ?? "en"
   })
 
-  function setLocale(l: string) {
+  const setLocale = useCallback((l: string) => {
     localStorage.setItem("locale", l)
     setLocaleState(l)
-  }
+  }, [])
 
   // Sync locale to the Electron native menu on mount and on change
   useEffect(() => {
@@ -37,7 +37,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       setLocale(action.slice(11))
     })
     return unsub
-  }, [])
+  }, [setLocale])
 
   const strings = useMemo<LocaleStrings>(() => LOCALES[locale] ?? en, [locale])
   const t = (key: string, fallback?: string | null): string => {

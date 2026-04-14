@@ -21,9 +21,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui-components/card"
 import { Separator } from "../ui-components/separator"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import debounce from "lodash/debounce"
 import AiEngineField from "./AiEngineField"
 import { Textarea } from "../ui-components/textarea"
+import { useDebouncedCallback } from "use-debounce"
 
 interface AiEngineConfigEditorProps {
   active: boolean
@@ -53,13 +53,9 @@ export default function AiEngineConfigEditor({ active, engine, value, onChange }
     form.reset(value)
   }, [value, form])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedSubmit = useCallback(
-    debounce(() => {
-      form.handleSubmit(onChange)()
-    }, 1000),
-    [form, onChange],
-  )
+  const debouncedSubmit = useDebouncedCallback(() => {
+    form.handleSubmit(onChange)()
+  }, 1000)
 
   useEffect(() => {
     const subscription = form.watch(debouncedSubmit)

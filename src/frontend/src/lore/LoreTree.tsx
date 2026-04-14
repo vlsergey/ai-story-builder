@@ -671,7 +671,7 @@ export default function LoreTree({
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [nodesById, viewState, treeQuery.data, onOpenLoreNode])
+  }, [nodesById, viewState, onOpenLoreNode])
 
   // ── Toolbar rendering ─────────────────────────────────────────────────────
 

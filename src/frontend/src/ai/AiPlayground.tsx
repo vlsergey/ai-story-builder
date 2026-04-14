@@ -19,6 +19,7 @@ export default function AiPlayground() {
   const responseRef = useRef<HTMLPreElement>(null)
 
   // Auto-scroll response to bottom during streaming
+  // biome-ignore lint/correctness/useExhaustiveDependencies: we are scrolling on response change
   useEffect(() => {
     if (generating && responseRef.current) {
       responseRef.current.scrollTop = responseRef.current.scrollHeight

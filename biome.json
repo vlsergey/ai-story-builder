@@ -40,7 +40,6 @@
       "correctness": {
         "noUnusedFunctionParameters": "off",
         "noUnusedVariables": "off",
-        "useExhaustiveDependencies": "off",
         "useParseIntRadix": "off"
       },
       "security": {

@@ -217,29 +217,26 @@ export default function PlanGraph() {
         return patchNode({ id: Number(node.id), manual: true, data: { parent_id: newParentId } })
       }
     },
-    [autoLayout, patchNode, reactFlowInstance],
+    [autoLayout, patchNode],
   )
 
   const contextMenuTriggerRef = useRef<HTMLSpanElement>(null)
   const [contextMenuNodeId, setContextMenuNodeId] = useState<number | null>(null)
-  const onNodeContextMenu = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      event.preventDefault()
-      if (contextMenuTriggerRef.current) {
-        setContextMenuNodeId(Number(node.id))
-        const fakeEvent = new MouseEvent("contextmenu", {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          clientX: event.clientX,
-          clientY: event.clientY,
-        })
-        // Генерируем событие на элементе-триггере
-        contextMenuTriggerRef.current.dispatchEvent(fakeEvent)
-      }
-    },
-    [contextMenuTriggerRef, setContextMenuNodeId],
-  )
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault()
+    if (contextMenuTriggerRef.current) {
+      setContextMenuNodeId(Number(node.id))
+      const fakeEvent = new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      })
+      // Генерируем событие на элементе-триггере
+      contextMenuTriggerRef.current.dispatchEvent(fakeEvent)
+    }
+  }, [])
 
   const scheduleLayout = useCallback(() => {
     if (autoLayout) {

@@ -90,7 +90,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
 
       setStatus("SAVED")
     },
-    [lastSaved, nodeId, patchMutation, setLastSaved, setStatus, setValue],
+    [lastSaved, nodeId, patchMutation],
   )
 
   const debounceSave = useDebouncedCallback(saveImpl, 1000)
@@ -101,16 +101,13 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
       setStatus("DEBOUNCE")
       debounceSave(true, value)
     },
-    [setValue, setStatus, debounceSave],
+    [debounceSave],
   )
 
-  const handleExternalUpdate = useCallback(
-    (value: PlanNodeRow) => {
-      setLastSaved(value)
-      setValue(value)
-    },
-    [setLastSaved, setValue],
-  )
+  const handleExternalUpdate = useCallback((value: PlanNodeRow) => {
+    setLastSaved(value)
+    setValue(value)
+  }, [])
 
   const handleSave = useCallback(
     async (value: PlanNodeRow) => {
@@ -142,7 +139,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
       setLastSaved(result)
       setValue(result)
     },
-    [regenerateMutation, handleSave, setLastSaved, setValue, value],
+    [regenerateMutation, handleSave, value],
   )
 
   return (
