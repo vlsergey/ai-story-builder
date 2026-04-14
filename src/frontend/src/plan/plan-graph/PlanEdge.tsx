@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { getSmoothStepPath, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react"
 import { useLocale } from "../../lib/locale"
-import { EdgeImpl } from "./Types"
-import { PlanEdgeRow } from "@shared/plan-graph"
+import type { EdgeImpl } from "./Types"
+import type { PlanEdgeRow } from "@shared/plan-graph"
 
 const EDGE_COLORS: Record<string, string> = {
   text: "#3b82f6", // blue

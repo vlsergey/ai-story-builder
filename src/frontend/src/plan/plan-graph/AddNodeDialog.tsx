@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from "react"
-import { type PlanNodeType } from "@shared/plan-graph"
+import type React from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import type { PlanNodeType } from "@shared/plan-graph"
 import { useLocale } from "@/lib/locale"
 import { Button } from "@/ui-components/button"
 import { Input } from "@/ui-components/input"

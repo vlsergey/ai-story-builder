@@ -1,10 +1,10 @@
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
-import { PlanEdgeRow, PlanNodeRow } from "../../shared/plan-graph.js"
+import type { PlanEdgeRow, PlanNodeRow } from "../../shared/plan-graph.js"
 import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
-import OpenAI from "openai"
+import type OpenAI from "openai"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 

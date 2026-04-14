@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react"
+import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 
 const WORD_WRAP_KEY = "ai-story-builder-word-wrap"
 

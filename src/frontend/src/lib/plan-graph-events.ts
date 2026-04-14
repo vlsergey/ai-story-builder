@@ -1,4 +1,4 @@
-import { PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeRow } from "@shared/plan-graph"
 
 /** Event fired to open a plan node editor panel. */
 export const OPEN_PLAN_NODE_EDITOR_EVENT = "open-plan-node-editor"

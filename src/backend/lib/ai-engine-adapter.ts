@@ -1,4 +1,4 @@
-import OpenAI from "openai"
+import type OpenAI from "openai"
 import type { AiEngineKey } from "../../shared/ai-engines.js"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 

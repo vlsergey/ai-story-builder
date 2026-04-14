@@ -1,4 +1,4 @@
-import { PlanNodeRow } from "./plan-graph.js"
+import type { PlanNodeRow } from "./plan-graph.js"
 
 export interface RegenerateEvent {
   inProcess: boolean

@@ -1,7 +1,7 @@
 import { useLocale } from "../lib/locale"
 import { trpc } from "../ipcClient"
 import { useState } from "react"
-import { ResponseUsage } from "openai/resources/responses/responses.js"
+import type { ResponseUsage } from "openai/resources/responses/responses.js"
 
 // 1 tick = 1e-10 USD
 const USD_PER_TICK = 1e-10

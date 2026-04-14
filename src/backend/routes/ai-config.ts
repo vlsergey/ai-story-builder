@@ -1,6 +1,6 @@
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { BUILTIN_ENGINES } from "../../shared/ai-engines.js"
-import { AiEngineConfig, GrokEngineConfig, YandexEngineConfig } from "../../shared/ai-engine-config.js"
+import type { AiEngineConfig, GrokEngineConfig, YandexEngineConfig } from "../../shared/ai-engine-config.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 

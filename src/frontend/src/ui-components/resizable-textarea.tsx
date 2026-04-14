@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from "react"
+import type React from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 
 interface ResizableTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
   value: string

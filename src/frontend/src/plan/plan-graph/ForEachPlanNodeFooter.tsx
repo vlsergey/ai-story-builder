@@ -1,7 +1,7 @@
 import { trpc } from "@/ipcClient"
 import PaginationWrapper from "@/lib/PaginationWrapper"
-import { ForEachNodeContent } from "@shared/for-each-plan-node"
-import { PlanNodeRow } from "@shared/plan-graph"
+import type { ForEachNodeContent } from "@shared/for-each-plan-node"
+import type { PlanNodeRow } from "@shared/plan-graph"
 import { useCallback, useMemo } from "react"
 
 interface ForEachPlanNodeFooterProps {

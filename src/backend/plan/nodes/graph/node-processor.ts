@@ -1,6 +1,6 @@
-import { PlanNodeService } from "../plan-node-service.js"
+import type { PlanNodeService } from "../plan-node-service.js"
 import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
-import { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**
  * Processor for a specific node type.

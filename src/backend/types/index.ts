@@ -1,6 +1,6 @@
 // Database row types matching the schema defined in db/migrations.ts
-import { LoreNodeRow } from "../../shared/lore-node.js"
-import { PlanNodeRow } from "../../shared/plan-graph.js"
+import type { LoreNodeRow } from "../../shared/lore-node.js"
+import type { PlanNodeRow } from "../../shared/plan-graph.js"
 
 export interface StoryPartRow {
   id: number

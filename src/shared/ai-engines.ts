@@ -16,7 +16,7 @@
  * Display strings (name, notes, field labels/hints, capability labels/descriptions, age rating long labels)
  * are intentionally absent — they live in the frontend i18n locale files (src/frontend/src/i18n/).
  */
-import { z, ZodType } from "zod"
+import { z, type ZodType } from "zod"
 
 export const AGE_RATING_ORDER = ["G", "PG", "12", "16", "18", "NC21"] as const
 export type AgeRating = (typeof AGE_RATING_ORDER)[number]

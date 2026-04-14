@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react"
+import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import type { LoreStatMode } from "../types/models"
 
 const LORE_STAT_KEY = "ai-story-builder-lore-stat"

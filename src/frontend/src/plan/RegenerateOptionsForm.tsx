@@ -1,9 +1,9 @@
 import { useLocale } from "@/lib/locale"
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/ui-components/field"
 import { Switch } from "@/ui-components/switch"
-import { RegenerateOptions } from "@shared/RegenerateOptions"
+import type { RegenerateOptions } from "@shared/RegenerateOptions"
 import { useId } from "react"
-import { Controller, UseFormReturn } from "react-hook-form"
+import { Controller, type UseFormReturn } from "react-hook-form"
 import z from "zod"
 
 interface RegenerateOptionsFormProps {

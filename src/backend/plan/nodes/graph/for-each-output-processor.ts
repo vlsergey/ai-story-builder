@@ -1,8 +1,8 @@
-import { PlanNodeService } from "../plan-node-service.js"
+import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
 import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
-import { RegenerationNodeContext } from "../generate/RegenerationContext.js"
-import { ForEachOutputSettings } from "../../../../shared/node-settings.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import type { ForEachOutputSettings } from "../../../../shared/node-settings.js"
 
 export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettings> {
   readonly defaultSettings = {}

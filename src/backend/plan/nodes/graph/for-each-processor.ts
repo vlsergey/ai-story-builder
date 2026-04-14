@@ -1,9 +1,9 @@
 import type { NodeProcessor } from "./node-processor.js"
 import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
 import type { ForEachSettings } from "../../../../shared/node-settings.js"
-import { ForEachNodeContent } from "../../../../shared/for-each-plan-node.js"
+import type { ForEachNodeContent } from "../../../../shared/for-each-plan-node.js"
 import { PlanNodeService } from "../plan-node-service.js"
-import { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import { regenerateSubtreeNodesContents } from "../generate/regenerateTreeNodesContents.js"
 
 export class ForEachProcessor implements NodeProcessor<ForEachSettings> {

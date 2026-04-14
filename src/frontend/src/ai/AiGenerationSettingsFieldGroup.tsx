@@ -1,12 +1,12 @@
 import { useId } from "react"
 import { BUILTIN_ENGINES } from "../../../shared/ai-engines"
-import { type AiGenerationSettings as AiGenerationSettingsDto } from "../../../shared/ai-generation-settings"
+import type { AiGenerationSettings as AiGenerationSettingsDto } from "../../../shared/ai-generation-settings"
 import AiEngineField from "./AiEngineField"
 import { trpc } from "@/ipcClient"
-import { AiEngineConfig } from "@shared/ai-engine-config"
+import type { AiEngineConfig } from "@shared/ai-engine-config"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui-components/select"
 import { Field, FieldGroup, FieldLabel } from "../ui-components/field"
-import { Control, Controller } from "react-hook-form"
+import { type Control, Controller } from "react-hook-form"
 
 function shortModelName(modelId: string): string {
   return modelId.replace(/^gpt:\/\/[^/]+\//, "")

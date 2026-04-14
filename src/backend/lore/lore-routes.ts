@@ -1,6 +1,6 @@
 import fs from "fs"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
-import { LoreNodeCreate, LoreNodeRow } from "../../shared/lore-node.js"
+import type { LoreNodeCreate, LoreNodeRow } from "../../shared/lore-node.js"
 import { loreEventManager } from "./lore-event-manager.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────

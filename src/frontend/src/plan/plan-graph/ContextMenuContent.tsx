@@ -8,7 +8,7 @@ import {
   ContextMenuGroup,
   ContextMenuSubContent,
 } from "@/ui-components/context-menu"
-import { type PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeRow } from "@shared/plan-graph"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import { useLocale } from "@/lib/locale"
 import NodeTypeIcons from "./NodeTypeIcons"

@@ -4,8 +4,8 @@ import { Button } from "@/ui-components/button"
 import { Label } from "@/ui-components/label"
 import { Switch } from "@/ui-components/switch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui-components/card"
-import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
-import { SplitSettings } from "@shared/node-settings"
+import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
+import type { SplitSettings } from "@shared/node-settings"
 import { Input } from "@/ui-components/input"
 
 export default function SplitNodeEditor({

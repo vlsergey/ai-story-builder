@@ -1,5 +1,5 @@
-import React from "react"
-import { ResponseOutputItem, ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import type React from "react"
+import type { ResponseOutputItem, ResponseStreamEvent } from "openai/resources/responses/responses.js"
 import { forwardRef, useImperativeHandle, useState } from "react"
 import { GlobeIcon, WrenchIcon } from "lucide-react"
 import { useLocale } from "@/lib/locale"

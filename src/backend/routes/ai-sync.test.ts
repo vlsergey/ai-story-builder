@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
-import { AllAiEnginesConfig } from "../../shared/ai-engine-config.js"
+import type { AllAiEnginesConfig } from "../../shared/ai-engine-config.js"
 import { setUpTestDb, tearDownTestDb } from "../db/test-db-utils.js"
 
 // ─── OpenAI mock ──────────────────────────────────────────────────────────────

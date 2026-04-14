@@ -1,5 +1,5 @@
-import { PlanNodeRow } from "@shared/plan-graph"
-import { RegenerateOptions } from "@shared/RegenerateOptions"
+import type { PlanNodeRow } from "@shared/plan-graph"
+import type { RegenerateOptions } from "@shared/RegenerateOptions"
 
 export default interface TypedPlanNodeEditorProps<NodeTypeSettings = unknown> {
   dbValue: PlanNodeRow

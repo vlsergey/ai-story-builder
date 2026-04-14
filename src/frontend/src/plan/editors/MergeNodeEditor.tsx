@@ -10,8 +10,8 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { GripVertical, SortAsc, SortDesc } from "lucide-react"
 import CodeMirror, { EditorView } from "@uiw/react-codemirror"
 import { markdown } from "@codemirror/lang-markdown"
-import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
-import { MergeSettings } from "@shared/node-settings"
+import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
+import type { MergeSettings } from "@shared/node-settings"
 
 interface InputNode {
   edgeId: number

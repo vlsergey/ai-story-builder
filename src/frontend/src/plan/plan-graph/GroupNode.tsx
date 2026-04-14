@@ -1,13 +1,14 @@
-import React, { useMemo } from "react"
+import type React from "react"
+import { useMemo } from "react"
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react"
 import PlanNodeStatusIcon from "./PlanNodeStatusIcon"
 import DeleteNodeButton from "./DeleteNodeButton"
 import { RepeatIcon } from "lucide-react"
-import { NodeImpl } from "./Types"
+import type { NodeImpl } from "./Types"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import ForEachPlanNodeFooter from "./ForEachPlanNodeFooter"
 import CreateNodeButtonGroup from "./CreateNodeButtonGroup"
-import { PlanContainerNodeType } from "@shared/plan-graph"
+import type { PlanContainerNodeType } from "@shared/plan-graph"
 
 export default function GroupNode({ data }: NodeProps<NodeImpl>) {
   const nodeType = useMemo(() => getNodeTypeDefinition(data.type), [data.type])

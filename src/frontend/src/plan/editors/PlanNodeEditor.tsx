@@ -1,11 +1,11 @@
-import { FC, useCallback, useEffect, useMemo, useState } from "react"
+import { type FC, useCallback, useEffect, useMemo, useState } from "react"
 import { trpc } from "../../ipcClient"
 import { NodeTypeEditors } from "./NodeTypeEditors"
-import { PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeRow } from "@shared/plan-graph"
 import getDifference from "@/lib/getDifference"
 import { useDebouncedCallback } from "use-debounce"
-import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
-import { RegenerateOptions } from "@shared/RegenerateOptions"
+import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
+import type { RegenerateOptions } from "@shared/RegenerateOptions"
 
 export interface PlanNodeEditorProps {
   nodeId: number

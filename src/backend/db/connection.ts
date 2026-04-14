@@ -1,5 +1,5 @@
 import { getCurrentDb } from "./state.js"
-import { Database } from "better-sqlite3"
+import type { Database } from "better-sqlite3"
 
 /**
  * Executes a block with a database connection.

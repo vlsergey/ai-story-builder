@@ -1,4 +1,4 @@
-import { Observable, observable, Observer } from "@trpc/server/observable"
+import { type Observable, observable, type Observer } from "@trpc/server/observable"
 import { EventEmitter } from "node:events"
 import { on } from "node:events" // Встроенная функция Node.js
 

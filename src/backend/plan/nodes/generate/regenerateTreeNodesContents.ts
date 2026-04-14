@@ -1,16 +1,16 @@
 import EventEmitter from "events"
 import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
-import { RegenerateEvent } from "../../../../shared/RegenerateEvent.js"
+import type { RegenerateEvent } from "../../../../shared/RegenerateEvent.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeService } from "../plan-node-service.js"
-import {
+import type {
   PlanNodeAiGenerationStatus,
   RegenerationContainerContext,
   RegenerationNodeContext,
 } from "./RegenerationContext.js"
-import { observable, Observable } from "@trpc/server/observable"
+import { observable, type Observable } from "@trpc/server/observable"
 import { makeErrorWithStatus } from "../../../lib/make-errors.js"
-import { RegenerateOptions } from "../../../../shared/RegenerateOptions.js"
+import type { RegenerateOptions } from "../../../../shared/RegenerateOptions.js"
 
 const eventEmitter = new EventEmitter()
 

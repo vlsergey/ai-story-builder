@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from "react"
+import type React from "react"
+import { createContext, useContext, useState, useMemo, useEffect, useCallback } from "react"
 import en from "../i18n/en.json"
 import ru from "../i18n/ru.json"
 

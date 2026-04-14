@@ -3,14 +3,14 @@ import { useLocale } from "../lib/locale"
 import { trpc } from "../ipcClient"
 import { Button } from "../ui-components/button"
 import { Card } from "../ui-components/card"
-import { DockviewPanelApi } from "dockview"
+import type { DockviewPanelApi } from "dockview"
 import { ButtonGroup } from "@/ui-components/button-group"
 import { PlayIcon, SquareIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
-import { RegenerateOptions } from "@shared/RegenerateOptions"
+import type { RegenerateOptions } from "@shared/RegenerateOptions"
 import { zodResolver } from "@hookform/resolvers/zod"
 import RegenerateOptionsForm, { formSchema } from "./RegenerateOptionsForm"
-import { RegenerateEvent } from "@shared/RegenerateEvent"
+import type { RegenerateEvent } from "@shared/RegenerateEvent"
 
 export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPanelApi }) {
   const { t } = useLocale()

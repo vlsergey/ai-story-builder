@@ -1,7 +1,7 @@
-import { FC } from "react"
-import { PlanNodeType } from "@shared/plan-graph"
+import type { FC } from "react"
+import type { PlanNodeType } from "@shared/plan-graph"
 import TextNodeEditor from "./TextNodeEditor"
-import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
+import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import SplitNodeEditor from "./SplitNodeEditor"
 import MergeNodeEditor from "./MergeNodeEditor"
 

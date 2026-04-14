@@ -2,7 +2,7 @@ import type { AiGenerationSettings } from "../../shared/ai-generation-settings.j
 import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
-import OpenAI from "openai"
+import type OpenAI from "openai"
 
 function makeError(message: string, status: number): Error {
   const e = new Error(message)

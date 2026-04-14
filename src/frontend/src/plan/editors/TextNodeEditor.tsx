@@ -1,10 +1,10 @@
-import { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
+import type { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
 import { trpc } from "@/ipcClient"
-import NodeEditor, { EditorMode } from "@/nodes/NodeEditor"
-import { PlanNodeRow } from "@shared/plan-graph"
+import NodeEditor, { type EditorMode } from "@/nodes/NodeEditor"
+import type { PlanNodeRow } from "@shared/plan-graph"
 import { useCallback, useRef, useState } from "react"
-import TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
-import { ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
+import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
 
 type StatusOverride = null | "GENERATING" | "IMPROVING"
 

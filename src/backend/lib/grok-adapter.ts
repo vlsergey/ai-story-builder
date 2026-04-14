@@ -2,8 +2,8 @@ import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapt
 import type { GrokAiGenerationSettings } from "../../shared/grok-ai-generation-settings.js"
 import { grokGenerate } from "./grok-client.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
-import OpenAI from "openai"
-import { ResponseCreateParamsStreaming, Tool } from "openai/resources/responses/responses.js"
+import type OpenAI from "openai"
+import type { ResponseCreateParamsStreaming, Tool } from "openai/resources/responses/responses.js"
 import { createHash } from "node:crypto"
 import { getCurrentDbPath } from "../db/state.js"
 

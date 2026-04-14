@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeRow } from "@shared/plan-graph"
 import { useLocale } from "@/lib/locale"
 import { Button } from "@/ui-components/button"
 import { Input } from "@/ui-components/input"

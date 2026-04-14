@@ -1,4 +1,4 @@
-import { PlanNodeService } from "../plan-node-service.js"
+import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
 import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
 

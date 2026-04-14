@@ -1,4 +1,4 @@
-import { ColorMode } from "@shared/themes"
+import type { ColorMode } from "@shared/themes"
 import { useEffect, useState } from "react"
 
 export function useSystemColorMode(): ColorMode {

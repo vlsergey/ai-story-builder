@@ -1,5 +1,5 @@
 import { Transaction } from "@codemirror/state"
-import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view"
+import { type EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view"
 
 /**
  * CodeMirror extension that preserves the scroll position when the document

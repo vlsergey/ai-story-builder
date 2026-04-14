@@ -1,12 +1,13 @@
-import React, { useEffect, useRef, useState, useMemo } from "react"
+import type React from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import {
   ControlledTreeEnvironment,
   Tree,
-  TreeItem,
-  TreeItemIndex,
-  TreeRef,
-  DraggingPosition,
-  TreeViewState,
+  type TreeItem,
+  type TreeItemIndex,
+  type TreeRef,
+  type DraggingPosition,
+  type TreeViewState,
   InteractionMode,
 } from "react-complex-tree"
 import { trpc } from "../ipcClient"
@@ -32,7 +33,7 @@ import {
   Loader2,
   Wand2,
 } from "lucide-react"
-import { LoreStatMode } from "../types/models"
+import type { LoreStatMode } from "../types/models"
 import type { LoreNodeRow } from "../../../shared/lore-node.js"
 import { useLoreSettings } from "../settings/lore-settings"
 import { engineSupportsFileUpload } from "../lib/ai-engines"

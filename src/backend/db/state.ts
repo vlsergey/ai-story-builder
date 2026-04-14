@@ -3,7 +3,7 @@ import path from "path"
 import os from "os"
 import type { AppSettings } from "../types/index.js"
 import electron from "electron"
-import Db, { Database } from "better-sqlite3"
+import Db, { type Database } from "better-sqlite3"
 const { app } = electron
 
 /**

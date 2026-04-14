@@ -5,7 +5,7 @@ import {
   dialog,
   ipcMain,
   Menu,
-  MenuItemConstructorOptions,
+  type MenuItemConstructorOptions,
   nativeTheme,
   shell,
 } from "electron"

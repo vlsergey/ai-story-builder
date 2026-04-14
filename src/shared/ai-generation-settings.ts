@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { AiEngineDefinition } from "./ai-engines"
+import type { AiEngineDefinition } from "./ai-engines"
 
 export interface AiGenerationSettings {
   model?: string | undefined

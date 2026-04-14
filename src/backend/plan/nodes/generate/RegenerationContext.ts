@@ -1,6 +1,6 @@
-import { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import { RegenerateOptions } from "../../../../shared/RegenerateOptions"
-import { PlanNodeRow } from "../../../../shared/plan-graph"
+import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import type { RegenerateOptions } from "../../../../shared/RegenerateOptions"
+import type { PlanNodeRow } from "../../../../shared/plan-graph"
 
 export type PlanNodeAiGenerationStatus = "EMPTY" | "SAME" | "GENERATED"
 

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import type React from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ReactFlow,
   Background,
@@ -11,19 +12,19 @@ import {
   BackgroundVariant,
   useNodesState,
   useEdgesState,
-  NodeChange,
-  ReactFlowInstance,
-  EdgeProps,
-  NodeProps,
+  type NodeChange,
+  type ReactFlowInstance,
+  type EdgeProps,
+  type NodeProps,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { useLocale } from "../../lib/locale"
-import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow, PlanEdgeType } from "@shared/plan-graph"
+import type { PlanNodeType, PlanNodeUpdate, PlanEdgeRow, PlanEdgeType } from "@shared/plan-graph"
 import { EDGE_TYPES, canCreateEdge, getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import { applyHierarchicalLayout } from "./hierarchical-layout"
 import PlanEdgeComponent from "./PlanEdge"
 import { trpc } from "../../ipcClient"
-import { PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeRow } from "@shared/plan-graph"
 import { useDebouncedCallback } from "use-debounce"
 import { ContextMenu, ContextMenuTrigger } from "@/ui-components/context-menu"
 import { sortByHierarchy } from "@/lib/sortByHierarchy"
@@ -32,7 +33,7 @@ import ContextMenuContent from "./ContextMenuContent"
 import EdgeTypeSelectionDialog from "./EdgeTypeSelectionDialog"
 import SimpleNode from "./SimpleNode"
 import GroupNode from "./GroupNode"
-import { EdgeImpl, NodeImpl } from "./Types"
+import type { EdgeImpl, NodeImpl } from "./Types"
 
 const nodeTypes: Record<"simple" | "group", React.FC<NodeProps<NodeImpl>>> = {
   simple: SimpleNode,

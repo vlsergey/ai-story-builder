@@ -40,13 +40,13 @@ import {
 import { createGraphEdge, patchGraphEdge, deleteGraphEdge } from "./plan/edges/plan-edge-routes.js"
 
 import { syncLore } from "./routes/ai-sync.js"
-import { AiEngineConfig, AllAiEnginesConfig } from "../shared/ai-engine-config.js"
-import { PlanNodeUpdate } from "../shared/plan-graph.js"
+import type { AiEngineConfig, AllAiEnginesConfig } from "../shared/ai-engine-config.js"
+import type { PlanNodeUpdate } from "../shared/plan-graph.js"
 import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
-import { RegenerateOptions } from "../shared/RegenerateOptions.js"
+import type { RegenerateOptions } from "../shared/RegenerateOptions.js"
 import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from "./plan/nodes/plan-node-routes.js"
 import {
   regenerateTreeNodesContents,

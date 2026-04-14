@@ -1,6 +1,6 @@
 import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow, PlanNodeType } from "../../../shared/plan-graph.js"
 import { withDbWrite, withDbRead } from "../../db/connection.js"
-import { NodeOverride } from "../../../shared/for-each-plan-node.js"
+import type { NodeOverride } from "../../../shared/for-each-plan-node.js"
 
 /**
  * Repository for plan_nodes table operations.

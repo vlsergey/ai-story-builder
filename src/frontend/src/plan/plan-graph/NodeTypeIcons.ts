@@ -1,15 +1,15 @@
-import { PlanNodeType } from "@shared/plan-graph"
+import type { PlanNodeType } from "@shared/plan-graph"
 import {
   BookOpenCheckIcon,
   FileTextIcon,
-  LucideProps,
+  type LucideProps,
   MergeIcon,
   RepeatIcon,
   SplitIcon,
   SquareArrowRightEnterIcon,
   SquareArrowRightExitIcon,
 } from "lucide-react"
-import { ForwardRefExoticComponent, RefAttributes } from "react"
+import type { ForwardRefExoticComponent, RefAttributes } from "react"
 import { SquareArrowRightRepeatIcon } from "./SquareArrowRightRepeatIcon"
 
 const NodeTypeIcons: Record<

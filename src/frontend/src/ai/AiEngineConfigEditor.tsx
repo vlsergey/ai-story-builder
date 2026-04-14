@@ -1,6 +1,6 @@
 import { useLocale } from "@/lib/locale"
-import { AiEngineConfig, getAiEngineConfigSchema } from "@shared/ai-engine-config"
-import { AGE_RATING_INFO, AGE_RATING_ORDER, AiEngineDefinition, CAPABILITY_KEYS } from "@shared/ai-engines"
+import { type AiEngineConfig, getAiEngineConfigSchema } from "@shared/ai-engine-config"
+import { AGE_RATING_INFO, AGE_RATING_ORDER, type AiEngineDefinition, CAPABILITY_KEYS } from "@shared/ai-engines"
 import { useCallback, useEffect } from "react"
 import { trpc } from "@/ipcClient"
 import AiGenerationSettingsFieldGroup from "./AiGenerationSettingsFieldGroup"

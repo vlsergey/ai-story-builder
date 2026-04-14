@@ -1,4 +1,4 @@
-import { type Connection } from "@xyflow/react"
+import type { Connection } from "@xyflow/react"
 import { useLocale } from "@/lib/locale"
 
 interface EdgeTypeSelectionDialogProps {

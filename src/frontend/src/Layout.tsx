@@ -2,10 +2,10 @@ import { useRef, useEffect, useCallback } from "react"
 import {
   DockviewReact,
   DockviewDefaultTab,
-  DockviewReadyEvent,
-  DockviewApi,
-  DockviewPanelApi,
-  DockviewGroupPanel,
+  type DockviewReadyEvent,
+  type DockviewApi,
+  type DockviewPanelApi,
+  type DockviewGroupPanel,
 } from "dockview"
 import { trpc } from "./ipcClient"
 import LoreSection from "./lore/LoreSection"
@@ -20,7 +20,7 @@ import type { LoreNodeRow } from "@shared/lore-node"
 import { EditorSettingsProvider } from "./settings/editor-settings"
 import { LoreSettingsProvider } from "./settings/lore-settings"
 import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from "./lib/plan-graph-events"
-import { PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeRow } from "@shared/plan-graph"
 
 import "dockview/dist/styles/dockview.css"
 

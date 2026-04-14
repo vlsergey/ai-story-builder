@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror"
+import type React from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror"
 import { markdown } from "@codemirror/lang-markdown"
 import { EditorView } from "@codemirror/view"
 import { useTheme } from "../lib/theme/theme-provider"
@@ -14,7 +15,7 @@ import AiGenerationSettingsForm from "../ai/AiGenerationSettingsForm"
 import { Textarea } from "../ui-components/textarea"
 import { Input } from "@/ui-components/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui-components/tabs"
-import AiThinkingPanel, { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
+import AiThinkingPanel, { type AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
 
 export interface NodeSavedPayload {
   nodeId: number

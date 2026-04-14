@@ -2,15 +2,15 @@ import type { PlanNodeCreate, PlanNodeRow } from "../../../shared/plan-graph.js"
 import { isValidNodeType, NODE_TYPES } from "../../../shared/node-edge-dictionary.js"
 import { PlanNodeService } from "./plan-node-service.js"
 import { makeErrorWithStatus } from "../../lib/make-errors.js"
-import { DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
-import { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import { Observable } from "@trpc/server/observable"
-import {
+import { type DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
+import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import type { Observable } from "@trpc/server/observable"
+import type {
   RegenerationContainerContext,
   RegenerationNodeContext,
   PlanNodeAiGenerationStatus,
 } from "./generate/RegenerationContext.js"
-import { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
+import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
 
 export function aiRegenerateNodeContentWatchAndReview(
   nodeId: number,
