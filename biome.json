@@ -26,9 +26,7 @@
     "rules": {
       "recommended": true,
       "a11y": {
-        "noRedundantRoles": "off",
         "noStaticElementInteractions": "off",
-        "useAriaPropsSupportedByRole": "off",
         "useButtonType": "off",
         "useKeyWithClickEvents": "off",
         "useSemanticElements": "off"

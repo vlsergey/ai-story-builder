@@ -15,7 +15,7 @@ import {
   FieldSet,
 } from "../ui-components/field"
 import { Button } from "../ui-components/button"
-import { RefreshCw } from "lucide-react"
+import { CheckIcon, RefreshCw, XIcon } from "lucide-react"
 import { ScrollArea } from "../ui-components/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui-components/card"
 import { Separator } from "../ui-components/separator"
@@ -207,14 +207,8 @@ export default function AiEngineConfigEditor({ active, engine, value, onChange }
               const supported = engine.capabilities[capKey]
               return (
                 <div key={capKey} className="flex items-start gap-2">
-                  <span
-                    className={`text-sm leading-tight mt-0.5 ${
-                      supported ? "text-green-600" : "text-muted-foreground/40"
-                    }`}
-                    aria-label={supported ? "supported" : "not supported"}
-                  >
-                    {supported ? "✓" : "✗"}
-                  </span>
+                  {supported && <CheckIcon aria-label="supported" className="shrink-0 text-green-600" />}
+                  {!supported && <XIcon aria-label="not supported" className="shrink-0 text-muted-foreground/40" />}
                   <div>
                     <p className={`text-xs font-medium leading-tight ${supported ? "" : "text-muted-foreground/60"}`}>
                       {t(`capability.${capKey}.label`)}
