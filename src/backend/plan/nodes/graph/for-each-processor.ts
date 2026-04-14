@@ -60,7 +60,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
       `[ForEachProcessor] Updating node ${nodeData.id} for new input content (${inputs.length} items) as content overrides for for-each-input node ${internalInputNodeId}`,
     )
 
-    let newOverrides = [...(parsedContent.overrides || [])]
+    const newOverrides = [...(parsedContent.overrides || [])]
     for (let iteration: number = 0; iteration < inputs.length; iteration++) {
       const currentOverride = newOverrides[iteration] || {}
       newOverrides[iteration] = {
@@ -105,7 +105,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     node: PlanNodeRow,
     settings: ForEachSettings,
   ): Promise<PlanNodeUpdate | null> {
-    let parsedContent = JSON.parse(node.content || "{}") as ForEachNodeContent
+    const parsedContent = JSON.parse(node.content || "{}") as ForEachNodeContent
     const totalIterations = parsedContent.length || 0
 
     console.log(`[ForEachProcessor] regenerating node ${node.id}, totalIterations=${totalIterations}`)

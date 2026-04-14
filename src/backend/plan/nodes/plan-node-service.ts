@@ -286,7 +286,7 @@ export class PlanNodeService {
    * Handles merge node regeneration if needed.
    */
   async patch(nodeId: number, manual: boolean, data: PlanNodeUpdate): Promise<PlanNodeRow> {
-    let oldNode = this.repo.findById(nodeId)
+    const oldNode = this.repo.findById(nodeId)
     if (!oldNode) throw makeErrorWithStatus("node not found", 404)
 
     // Validate parent_id if present
@@ -511,7 +511,7 @@ export class PlanNodeService {
     if (node.type != "for-each") {
       throw makeErrorWithStatus(`Node ${nodeId} is not a for-each node, but '${node.type}'`, 400)
     }
-    let parsedContent = (JSON.parse(node.content || "{}") || {}) as ForEachNodeContent
+    const parsedContent = (JSON.parse(node.content || "{}") || {}) as ForEachNodeContent
 
     console.log(
       `[changeForEachNodePage] node ${nodeId}, currentIndex=${parsedContent.currentIndex}, page=${page}, overrides before save:`,

@@ -9,7 +9,7 @@ interface ForEachPlanNodeFooterProps {
 }
 
 export default function ForEachPlanNodeFooter({ node }: ForEachPlanNodeFooterProps) {
-  let parsedContent = useMemo(() => JSON.parse(node.content || "{}") as ForEachNodeContent, [node.content])
+  const parsedContent = useMemo(() => JSON.parse(node.content || "{}") as ForEachNodeContent, [node.content])
 
   const changePage = trpc.plan.nodes.forEachNodes.changePage.useMutation()
   const handlePageChange = useCallback(

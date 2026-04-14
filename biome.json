@@ -43,7 +43,6 @@
       },
       "style": {
         "noNonNullAssertion": "off",
-        "useConst": "off",
         "useTemplate": "off"
       },
       "suspicious": {
