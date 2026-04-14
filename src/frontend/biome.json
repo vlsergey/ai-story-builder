@@ -4,6 +4,6 @@
   "extends": ["../../biome.json"],
   "files": {
     "ignoreUnknown": true,
-    "includes": ["*.js*", "**/*.js", "**/*.sql", "**/*.ts*"]
+    "includes": ["**/*", "!**/*.css", "!**/src/ui-components"]
   }
 }

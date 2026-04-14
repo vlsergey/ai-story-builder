@@ -7,6 +7,7 @@
     <!-- Critical minimal styles to ensure initial UI is readable before CSS bundle loads -->
     <script>
       // set theme class early to prevent flash
+      // biome-ignore lint/complexity/useArrowFunction: browsers compatibility
       (function(){
         const t=localStorage.getItem('theme');
         if(t==='dark') document.documentElement.classList.add('dark');
