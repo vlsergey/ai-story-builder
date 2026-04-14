@@ -1,5 +1,5 @@
-import fs from "fs"
-import path from "path"
+import fs from "node:fs"
+import path from "node:path"
 import type { ProjectInitialData } from "../types/index.js"
 import {
   isOpen,
@@ -15,7 +15,7 @@ import { SettingsRepository } from "../settings/settings-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
 import electron from "electron"
-import { exec } from "child_process"
+import { exec } from "node:child_process"
 import { openProjectDatabase } from "../db/index.js"
 
 const { shell } = electron

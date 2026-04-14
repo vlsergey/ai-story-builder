@@ -1,4 +1,4 @@
-import path from "path"
+import path from "node:path"
 import type OpenAI from "openai"
 import { toFile } from "openai"
 import { getCurrentDbPath } from "../db/state.js"

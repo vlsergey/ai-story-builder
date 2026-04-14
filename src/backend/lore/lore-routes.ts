@@ -1,4 +1,4 @@
-import fs from "fs"
+import fs from "node:fs"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
 import type { LoreNodeCreate, LoreNodeRow } from "../../shared/lore-node.js"
 import { loreEventManager } from "./lore-event-manager.js"

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest"
 import { applyHierarchicalLayout, defaultOptions } from "../../../plan/plan-graph/hierarchical-layout"
 import type { Node, Edge } from "@xyflow/react"
-import { writeFileSync, mkdirSync, existsSync } from "fs"
-import { join } from "path"
+import { writeFileSync, mkdirSync, existsSync } from "node:fs"
+import { join } from "node:path"
 
 // Helper to visualize layout as SVG
 function visualizeLayout(

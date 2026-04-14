@@ -9,10 +9,10 @@ import {
   nativeTheme,
   shell,
 } from "electron"
-import path from "path"
-import { fileURLToPath } from "url"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { default as installExtension, REACT_DEVELOPER_TOOLS } from "electron-devtools-installer"
-import { createRequire } from "module"
+import { createRequire } from "node:module"
 import { appRouter } from "./router.js"
 
 const __filename = fileURLToPath(import.meta.url)

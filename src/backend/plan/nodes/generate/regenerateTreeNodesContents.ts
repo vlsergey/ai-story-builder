@@ -1,4 +1,4 @@
-import EventEmitter from "events"
+import EventEmitter from "node:events"
 import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
 import type { RegenerateEvent } from "../../../../shared/RegenerateEvent.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
