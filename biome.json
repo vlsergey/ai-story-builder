@@ -40,7 +40,6 @@
       "correctness": {
         "noUnusedFunctionParameters": "off",
         "noUnusedVariables": "off",
-        "noVoidTypeReturn": "off",
         "useExhaustiveDependencies": "off",
         "useParseIntRadix": "off"
       },

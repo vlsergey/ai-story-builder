@@ -208,9 +208,7 @@ export class PlanNodeRepository {
   /**
    * Delete a node by ID (cascades to edges via foreign key, children via parent_id).
    */
-  delete(id: number): void {
-    return withDbWrite((db) => {
-      db.prepare("DELETE FROM plan_nodes WHERE id = ?").run(id)
-    })
+  delete(id: number): number {
+    return withDbWrite((db) => db.prepare("DELETE FROM plan_nodes WHERE id = ?").run(id).changes)
   }
 }

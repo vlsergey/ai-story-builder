@@ -319,19 +319,19 @@ export async function syncLore(): Promise<{
         for (const row of groupRows) {
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
           delete existing.grok
-          repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
+          repo.update(row.id, { ai_sync_info: JSON.stringify(existing) })
         }
       } else if (action === "upload" && newFileId) {
         const l2Row = idToRow.get(group.level2NodeId)!
         const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
         existing.grok = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
-        repo.updateAiSyncInfo(group.level2NodeId, JSON.stringify(existing))
+        repo.update(group.level2NodeId, { ai_sync_info: JSON.stringify(existing) })
 
         for (const row of groupRows) {
           if (row.id === group.level2NodeId) continue
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
           existing.grok = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
-          repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
+          repo.update(row.id, { ai_sync_info: JSON.stringify(existing) })
         }
       }
     }
@@ -464,7 +464,7 @@ export async function syncLore(): Promise<{
     const nodeRow = rows.find((r) => r.id === nodeId)
     const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
     existing.yandex = { last_synced_at: now, file_id: fileId, content_updated_at: now }
-    repo.updateAiSyncInfo(nodeId, JSON.stringify(existing))
+    repo.update(nodeId, { ai_sync_info: JSON.stringify(existing) })
   }
 
   for (const node of toDelete) {
@@ -475,7 +475,7 @@ export async function syncLore(): Promise<{
     } else {
       existing.yandex = { last_synced_at: now }
     }
-    repo.updateAiSyncInfo(node.id, JSON.stringify(existing))
+    repo.update(node.id, { ai_sync_info: JSON.stringify(existing) })
   }
 
   const updatedConfig = { ...config }

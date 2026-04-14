@@ -28,18 +28,18 @@ export async function generatePlanNodeTextContent(
 
   const engineFileIds: string[] = []
   // try {
-    // if (includeExistingLore && engine) {
-    //   const loreRepo = new LoreNodeRepository()
-    //   const nodes = loreRepo.getAllWithAiSyncInfo()
-    //   for (const node of nodes) {
-    //     try {
-    //       const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
-    //       const fileId = info[engine]?.file_id
-    //       if (fileId) engineFileIds.push(fileId)
-    //     } catch { /* ignore */ }
-    //   }
-    // }
-    // if (!textLanguage) throw makeError('text_language is not configured', 400)
+  // if (includeExistingLore && engine) {
+  //   const loreRepo = new LoreNodeRepository()
+  //   const nodes = loreRepo.getAllWithAiSyncInfo()
+  //   for (const node of nodes) {
+  //     try {
+  //       const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
+  //       const fileId = info[engine]?.file_id
+  //       if (fileId) engineFileIds.push(fileId)
+  //     } catch { /* ignore */ }
+  //   }
+  // }
+  // if (!textLanguage) throw makeError('text_language is not configured', 400)
   // } catch (e: any) {
   //   if (e.status) throw e
   //   throw makeError("failed to read project settings: " + String(e), 500)

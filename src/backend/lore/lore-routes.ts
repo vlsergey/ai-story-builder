@@ -245,7 +245,7 @@ export function moveLoreNode(id: number, data: { parent_id?: number | null }): {
     }
   }
 
-  repo.updateParent(nodeId, newParentId)
+  repo.update(nodeId, { parent_id: newParentId })
   loreEventManager.emitUpdate(nodeId)
   return { ok: true }
 }

@@ -74,7 +74,7 @@ export class LoreNodeRepository {
    * The IDs must belong to the same parent (caller's responsibility).
    */
   reorderChildren(childIds: number[]): void {
-    return withDbWrite((db) => {
+    withDbWrite((db) => {
       const update = db.prepare("UPDATE lore_nodes SET position = ? WHERE id = ?")
       db.transaction(() => {
         childIds.forEach((id, i) => update.run(i, id))
@@ -85,33 +85,37 @@ export class LoreNodeRepository {
   /**
    * Mark a node and all its descendants for deletion (to_be_deleted = 1).
    */
-  markForDeletionRecursive(id: number): void {
-    return withDbWrite((db) => {
-      db.prepare(`
+  markForDeletionRecursive(id: number): LoreNodeRow[] {
+    return withDbWrite((db) =>
+      db
+        .prepare<number, LoreNodeRow>(`
         WITH RECURSIVE sub AS (
           SELECT id FROM lore_nodes WHERE id = ?
           UNION ALL
           SELECT n.id FROM lore_nodes n INNER JOIN sub s ON n.parent_id = s.id
         )
-        UPDATE lore_nodes SET to_be_deleted = 1 WHERE id IN (SELECT id FROM sub)
-      `).run(id)
-    })
+        UPDATE lore_nodes SET to_be_deleted = 1 WHERE id IN (SELECT id FROM sub) RETURNING *
+      `)
+        .all(id),
+    )
   }
 
   /**
    * Restore a node and all its descendants from deletion (to_be_deleted = 0).
    */
-  restoreRecursive(id: number): void {
-    return withDbWrite((db) => {
-      db.prepare(`
+  restoreRecursive(id: number): LoreNodeRow[] {
+    return withDbWrite((db) =>
+      db
+        .prepare<number, LoreNodeRow>(`
         WITH RECURSIVE sub AS (
           SELECT id FROM lore_nodes WHERE id = ?
           UNION ALL
           SELECT n.id FROM lore_nodes n INNER JOIN sub s ON n.parent_id = s.id
         )
-        UPDATE lore_nodes SET to_be_deleted = 0 WHERE id IN (SELECT id FROM sub)
-      `).run(id)
-    })
+        UPDATE lore_nodes SET to_be_deleted = 0 WHERE id IN (SELECT id FROM sub) RETURNING *
+      `)
+        .all(id),
+    )
   }
 
   /**
@@ -141,15 +145,6 @@ export class LoreNodeRepository {
           | { parent_id: number | null; to_be_deleted: number }
           | undefined,
     )
-  }
-
-  /**
-   * Update the parent_id of a node.
-   */
-  updateParent(id: number, parentId: number | null): void {
-    return withDbWrite((db) => {
-      db.prepare("UPDATE lore_nodes SET parent_id = ? WHERE id = ?").run(parentId, id)
-    })
   }
 
   /**
@@ -272,15 +267,6 @@ export class LoreNodeRepository {
   }
 
   /**
-   * Update ai_sync_info for a specific node.
-   */
-  updateAiSyncInfo(id: number, aiSyncInfo: string | null): void {
-    return withDbWrite((db) => {
-      db.prepare("UPDATE lore_nodes SET ai_sync_info = ? WHERE id = ?").run(aiSyncInfo, id)
-    })
-  }
-
-  /**
    * Update multiple fields of a lore node.
    * The fields object can contain any column of lore_nodes.
    * Returns the number of rows changed.
@@ -300,18 +286,18 @@ export class LoreNodeRepository {
   /**
    * Delete a node by ID (cascades to children via foreign key).
    */
-  delete(id: number): void {
+  delete(id: number) {
     return withDbWrite((db) => {
-      db.prepare("DELETE FROM lore_nodes WHERE id = ?").run(id)
+      db.prepare("DELETE FROM lore_nodes WHERE id = ?").run(id).changes
     })
   }
 
   /**
    * Delete all nodes marked for deletion (to_be_deleted = 1).
    */
-  deleteMarkedForDeletion(): void {
+  deleteMarkedForDeletion() {
     return withDbWrite((db) => {
-      db.prepare("DELETE FROM lore_nodes WHERE to_be_deleted = 1").run()
+      db.prepare("DELETE FROM lore_nodes WHERE to_be_deleted = 1").run().changes
     })
   }
 }
