@@ -9,7 +9,7 @@ import { Switch } from "../ui-components/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui-components/select"
 import { Field, FieldLabel, FieldDescription, FieldGroup, FieldError, FieldContent } from "../ui-components/field"
 
-function setAndInvalidate<T extends { useMutation: any }>(procedure: T) {
+function useSetAndInvalidate<T extends { useMutation: any }>(procedure: T) {
   const utils = trpc.useUtils()
 
   // Достаем путь процедуры (в tRPC v10/11 он лежит в _def.path)
@@ -50,10 +50,10 @@ export default function SettingsPanel() {
     onSettled: () => utils.settings.allAiEnginesConfig.currentEngine.invalidate(),
   }).mutate
 
-  const setAllAiEnginesConfig = setAndInvalidate(trpc.settings.allAiEnginesConfig.set).mutate
-  const setAutoGenerateSummary = setAndInvalidate(trpc.settings.autoGenerateSummary.set).mutate
-  const setTextLanguage = setAndInvalidate(trpc.settings.textLanguage.set).mutate
-  const setVerboseAiLogging = setAndInvalidate(trpc.settings.verboseAiLogging.set).mutate
+  const setAllAiEnginesConfig = useSetAndInvalidate(trpc.settings.allAiEnginesConfig.set).mutate
+  const setAutoGenerateSummary = useSetAndInvalidate(trpc.settings.autoGenerateSummary.set).mutate
+  const setTextLanguage = useSetAndInvalidate(trpc.settings.textLanguage.set).mutate
+  const setVerboseAiLogging = useSetAndInvalidate(trpc.settings.verboseAiLogging.set).mutate
 
   const setAiEngineConfig = useCallback(
     (engineId: string, aiEngineConfig: AiEngineConfig) => {

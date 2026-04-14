@@ -48,7 +48,6 @@
         "noUnusedVariables": "off",
         "noVoidTypeReturn": "off",
         "useExhaustiveDependencies": "off",
-        "useHookAtTopLevel": "off",
         "useParseIntRadix": "off"
       },
       "security": {

@@ -28,13 +28,13 @@ export default function AiGenerationSettingsFieldGroup({
   disabled,
 }: AiGenerationSettingsFieldGroupProps) {
   const engineDef = BUILTIN_ENGINES.find((e) => e.id === engineId)
-  if (engineDef === undefined) return <span>Unknown engine {engineId}</span>
-
   const allAiEnginesConfig = trpc.settings.allAiEnginesConfig.get.useQuery().data
   const aiEngineConfig: AiEngineConfig = engineId ? (allAiEnginesConfig || {})[engineId] || {} : {}
   const availableModels = aiEngineConfig.available_models || []
 
   const modelFieldId = useId()
+
+  if (engineDef === undefined) return <span>Unknown engine {engineId}</span>
   return (
     <FieldGroup className={className}>
       <Controller

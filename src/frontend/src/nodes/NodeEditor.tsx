@@ -166,14 +166,6 @@ export default function NodeEditor<N extends Node>({
     [onChange, node],
   )
 
-  if (status == "LOADING") {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <span className="text-muted-foreground text-sm">Loading…</span>
-      </div>
-    )
-  }
-
   const inReview = editorMode == "review_after_generate" || editorMode == "review_after_improve"
   const codeMirrorRef = useRef<ReactCodeMirrorRef>(null)
 
@@ -193,6 +185,14 @@ export default function NodeEditor<N extends Node>({
       handleScrollToBottom()
     }
   }, [handleScrollToBottom, node.content, status])
+
+  if (status == "LOADING") {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span className="text-muted-foreground text-sm">Loading…</span>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full overflow-auto p-4">
