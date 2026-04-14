@@ -41,9 +41,6 @@
         "noUnusedFunctionParameters": "off",
         "noUnusedVariables": "off"
       },
-      "security": {
-        "noDangerouslySetInnerHtml": "off"
-      },
       "style": {
         "noNonNullAssertion": "off",
         "useConst": "off",

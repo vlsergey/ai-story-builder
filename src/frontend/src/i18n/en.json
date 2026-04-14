@@ -217,7 +217,7 @@
   "billing.period_stats": "Period statistics",
   "billing.loading": "Loading…",
   "billing.updating": "updating…",
-  "billing.configure_hint": "Configure <strong>Management Key</strong> and <strong>Team ID</strong> in Grok settings to view period statistics.",
+  "billing.configure_hint": "Configure Management Key and Team ID in Grok settings to view period statistics.",
   "billing.period": "Period",
   "billing.calls": "Calls",
   "billing.last_hour": "Last hour",

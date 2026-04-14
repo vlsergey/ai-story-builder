@@ -153,10 +153,7 @@ export default function AiBillingPanel() {
         {!billingData.data ? (
           <p className="text-muted-foreground text-xs">{t("billing.loading")}</p>
         ) : !billingData.data.configured ? (
-          <p
-            className="text-muted-foreground text-xs"
-            dangerouslySetInnerHTML={{ __html: t("billing.configure_hint") }}
-          />
+          <p className="text-muted-foreground text-xs">{t("billing.configure_hint")}</p>
         ) : billingData.data.error ? (
           <p className="text-destructive text-xs">
             {t("billing.error")} {billingData.data.error}

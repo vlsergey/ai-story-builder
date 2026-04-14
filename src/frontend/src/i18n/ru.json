@@ -223,7 +223,7 @@
   "billing.period_stats": "Статистика за период",
   "billing.loading": "Загрузка…",
   "billing.updating": "обновление…",
-  "billing.configure_hint": "Укажите <strong>Management Key</strong> и <strong>Team ID</strong> в настройках Grok для просмотра статистики по периодам.",
+  "billing.configure_hint": "Укажите Management Key и Team ID в настройках Grok для просмотра статистики по периодам.",
   "billing.period": "Период",
   "billing.calls": "Запросов",
   "billing.last_hour": "Последний час",
