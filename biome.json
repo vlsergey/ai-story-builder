@@ -39,8 +39,7 @@
       },
       "correctness": {
         "noUnusedFunctionParameters": "off",
-        "noUnusedVariables": "off",
-        "useParseIntRadix": "off"
+        "noUnusedVariables": "off"
       },
       "security": {
         "noDangerouslySetInnerHtml": "off"

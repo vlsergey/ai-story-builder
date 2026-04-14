@@ -77,7 +77,7 @@ export default function SplitNodeEditor({
               min="0"
               value={nodeTypeSettings.dropFirst}
               onChange={(e) =>
-                onNodeTypeSettingsChange({ ...nodeTypeSettings, dropFirst: parseInt(e.target.value) || 0 })
+                onNodeTypeSettingsChange({ ...nodeTypeSettings, dropFirst: parseInt(e.target.value, 10) || 0 })
               }
             />
           </div>
@@ -91,7 +91,7 @@ export default function SplitNodeEditor({
               min="0"
               value={nodeTypeSettings.dropLast}
               onChange={(e) =>
-                onNodeTypeSettingsChange({ ...nodeTypeSettings, dropLast: parseInt(e.target.value) || 0 })
+                onNodeTypeSettingsChange({ ...nodeTypeSettings, dropLast: parseInt(e.target.value, 10) || 0 })
               }
             />
           </div>
