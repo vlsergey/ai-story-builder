@@ -295,7 +295,7 @@ export class PlanNodeService {
 
       // Check if node type is confined (cannot be moved)
       const nodeDef = getNodeTypeDefinition(oldNode.type)
-      if (nodeDef?.confined && data.parent_id != oldNode.parent_id) {
+      if (nodeDef?.confined && data.parent_id !== oldNode.parent_id) {
         throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
       }
 
@@ -348,7 +348,7 @@ export class PlanNodeService {
       ...(await this.mayBeInvokeOnUpdate(nodeId, oldNode, { ...oldNode, ...update })),
     }
 
-    const updated = Object.keys(update).length != 0 ? this.repo.patch(nodeId, update) : oldNode
+    const updated = Object.keys(update).length !== 0 ? this.repo.patch(nodeId, update) : oldNode
     if (!updated) throw makeErrorWithStatus("node not found", 404)
 
     // Emit event to frontend
@@ -508,7 +508,7 @@ export class PlanNodeService {
   changeForEachNodePage(nodeId: number, page: number): PlanNodeRow {
     const repo = this.repo
     const node = this.getById(nodeId)
-    if (node.type != "for-each") {
+    if (node.type !== "for-each") {
       throw makeErrorWithStatus(`Node ${nodeId} is not a for-each node, but '${node.type}'`, 400)
     }
     const parsedContent = (JSON.parse(node.content || "{}") || {}) as ForEachNodeContent

@@ -22,7 +22,7 @@ export default function ForEachPlanNodeFooter({ node }: ForEachPlanNodeFooterPro
   return (
     <div className="for-each-plan-node-footer">
       <PaginationWrapper
-        disabled={changePage.isPending || node.status == "GENERATING"}
+        disabled={changePage.isPending || node.status === "GENERATING"}
         page={parsedContent.currentIndex || 0}
         onPageChange={handlePageChange}
         totalPages={parsedContent.length || 0}

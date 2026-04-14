@@ -17,7 +17,7 @@ export default function AiGenerationSettingsFormWrapper(
 ) {
   const { t } = useLocale()
   const currentAiEngine = trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery()?.data
-  const currentAiEngineDef = BUILTIN_ENGINES.find((it) => it.id == currentAiEngine)
+  const currentAiEngineDef = BUILTIN_ENGINES.find((it) => it.id === currentAiEngine)
   const defaultAiGenerationSettings =
     trpc.settings.allAiEnginesConfig.currentEngine.defaultAiGenerationSettings.get.useQuery()?.data || {}
 

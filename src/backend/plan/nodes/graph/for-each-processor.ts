@@ -10,12 +10,12 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
   readonly defaultSettings: ForEachSettings = {}
 
   getOutput(context: PlanNodeService, node: PlanNodeRow): string[] {
-    if ((node.content ?? "").length == 0) return []
+    if ((node.content ?? "").length === 0) return []
 
     const parsedContent = JSON.parse(node.content || "{}") as ForEachNodeContent
 
     const outputs = context.findByParentIdAndType(node.id, "for-each-output")
-    if (outputs.length == 0) throw Error(`Missing for-each-output node for for-each node ${node.id}`)
+    if (outputs.length === 0) throw Error(`Missing for-each-output node for for-each node ${node.id}`)
     if (outputs.length > 1)
       throw Error(`Too many for-each-output nodes for for-each node ${node.id}: ${outputs.map((i) => i.id)}`)
     const outputNode = outputs[0]
@@ -36,7 +36,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     }
 
     return (parsedContent.overrides || []).map((override, index) => {
-      if (index != parsedContent.currentIndex) {
+      if (index !== parsedContent.currentIndex) {
         // for non-current pages obtain content from stored overrides
         const outputOverride = override ? override[`${outputNode.id}`] : null
         return outputOverride?.content || ""
@@ -93,7 +93,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
 
   private getInternalInputNodeId(context: PlanNodeService, nodeId: number): number {
     const internalInputNodes = context.findByParentIdAndType(nodeId, "for-each-input")
-    if (internalInputNodes.length == 0) throw Error(`Missing for-each-input node for for-each node ${nodeId}`)
+    if (internalInputNodes.length === 0) throw Error(`Missing for-each-input node for for-each node ${nodeId}`)
     if (internalInputNodes.length > 1)
       throw Error(`Too many for-each-input nodes for for-each node ${nodeId}: ${internalInputNodes.map((i) => i.id)}`)
     return internalInputNodes[0].id

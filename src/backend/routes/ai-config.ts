@@ -15,7 +15,7 @@ function makeError(message: string, status: number): Error {
 export function setCurrentEngine(engine: string | null): { ok: boolean } {
   if (engine != null) {
     const config = SettingsRepository.getAllAiEnginesConfig()
-    const engineDef = BUILTIN_ENGINES.find((x) => x.id == engine)
+    const engineDef = BUILTIN_ENGINES.find((x) => x.id === engine)
     if (!engineDef) throw makeError(`Unknown engine: ${engine}`, 400)
 
     const missing: string[] = []

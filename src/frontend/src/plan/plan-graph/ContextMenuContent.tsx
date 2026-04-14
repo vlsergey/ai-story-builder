@@ -77,9 +77,9 @@ export default function ContextMenuContent({
                 </ContextMenuItem>
               )}
               {serverNodes
-                ?.filter((n) => n.id != contextMenuNodeId)
+                ?.filter((n) => n.id !== contextMenuNodeId)
                 ?.filter((n) => n.type === "for-each")
-                ?.filter((n) => n.id != contextMenuNode?.parent_id)
+                ?.filter((n) => n.id !== contextMenuNode?.parent_id)
                 .map((n) => (
                   <ContextMenuItem
                     key={n.id}

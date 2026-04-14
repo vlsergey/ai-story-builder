@@ -54,7 +54,7 @@ export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
   }, [actualThemePreference])
 
   const actualResolvedTheme = useMemo<ResolvedTheme>(() => {
-    if (actualThemePreference != "auto") {
+    if (actualThemePreference !== "auto") {
       return actualThemePreference
     }
     return DEFAULT_THEME_BY_MODE[systemColorMode]
@@ -63,7 +63,7 @@ export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
   // Apply resolved theme to <html>
   useEffect(() => {
     const root = window.document.documentElement
-    if (root.getAttribute("data-theme") != actualResolvedTheme) {
+    if (root.getAttribute("data-theme") !== actualResolvedTheme) {
       root.setAttribute("data-theme", actualResolvedTheme)
     }
 
@@ -83,11 +83,11 @@ export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
 
   const handleChandgeTheme = useCallback(
     (newTheme: ThemePreference) => {
-      if (localStorageSetting != newTheme) {
+      if (localStorageSetting !== newTheme) {
         localStorage.setItem(STORAGE_KEY, newTheme)
         setLocalStorageSetting(newTheme)
       }
-      if (projectSetting.isFetched && projectSetting.data != newTheme) {
+      if (projectSetting.isFetched && projectSetting.data !== newTheme) {
         projectSettingSet.mutate(newTheme)
       }
     },

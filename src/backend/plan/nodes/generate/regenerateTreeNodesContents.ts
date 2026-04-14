@@ -92,7 +92,7 @@ export async function regenerateTreeNodesContents(options: RegenerateOptions): P
         block: (context: RegenerationNodeContext) => Promise<{ result: T; status: PlanNodeAiGenerationStatus }>,
       ) {
         if (stopping) throw Error("Stop was required")
-        if (currentNodeStack.length > 0 && currentNodeStack[currentNodeStack.length - 1].id != node.parent_id) {
+        if (currentNodeStack.length > 0 && currentNodeStack[currentNodeStack.length - 1].id !== node.parent_id) {
           throw Error(
             `Only child nodes can be pushed to regeneration processing stack (currentNodeStack).` +
               `Current stack top is ${currentNodeStack[currentNodeStack.length - 1].id}, parent of push node ${node.id} is ${node.parent_id}`,
@@ -226,7 +226,7 @@ export async function regenerateSubtreeNodesContents(
       await context.onNodeStart(node, async (childContext) => {
         const result = await planNodeService.regenerate(childContext, nodeId)
         const status =
-          (result.content?.length || 0) === 0 ? "EMPTY" : result.content == node.content ? "SAME" : "GENERATED"
+          (result.content?.length || 0) === 0 ? "EMPTY" : result.content === node.content ? "SAME" : "GENERATED"
         return { result, status }
       })
     } else {

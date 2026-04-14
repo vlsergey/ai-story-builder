@@ -309,7 +309,7 @@ ipcMain.on("alert", (event, text) => {
 // Synchronous confirmation dialog
 ipcMain.on("confirm", (event, text) => {
   event.returnValue =
-    0 ==
+    0 ===
     dialog.showMessageBoxSync({
       message: text,
       type: "question",

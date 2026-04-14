@@ -415,6 +415,6 @@ export default function PlanGraph() {
 
 function excludeDuplicates<T extends {}>(objA: T, objB: any): Partial<T> {
   return Object.fromEntries(
-    Object.entries(objA).filter(([key, value]) => objB[key] !== value && value != undefined),
+    Object.entries(objA).filter(([key, value]) => objB[key] !== value && value !== undefined),
   ) as Partial<T>
 }

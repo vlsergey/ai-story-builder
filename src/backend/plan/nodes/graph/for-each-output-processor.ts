@@ -19,7 +19,7 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
         content += input
       }
     }
-    const summary = nodeInputs.length == 1 ? nodeInputs[0].sourceNode.summary : undefined
+    const summary = nodeInputs.length === 1 ? nodeInputs[0].sourceNode.summary : undefined
 
     if (node.content !== content) {
       return {
@@ -43,7 +43,7 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
         content += input
       }
     }
-    const summary = nodeInputs.length == 1 ? nodeInputs[0].sourceNode.summary : undefined
+    const summary = nodeInputs.length === 1 ? nodeInputs[0].sourceNode.summary : undefined
 
     if (node.content !== content) {
       return {

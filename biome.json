@@ -46,7 +46,6 @@
       },
       "suspicious": {
         "noArrayIndexKey": "off",
-        "noDoubleEquals": "off",
         "noEmptyInterface": "off",
         "noExplicitAny": "off",
         "noGlobalIsNan": "off",

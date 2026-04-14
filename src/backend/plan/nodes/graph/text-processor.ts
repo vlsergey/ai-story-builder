@@ -61,7 +61,7 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     console.log(`[TextProcessor] regenerating node ${node.id} (title: ${node.title})`)
     const content = await generatePlanNodeTextContent(node, (event) => context.onEvent(event))
     console.log(`[TextProcessor] generated content length: ${content?.length ?? "null"}`)
-    if (content == node.content) return null
+    if (content === node.content) return null
     return { content }
   }
 }

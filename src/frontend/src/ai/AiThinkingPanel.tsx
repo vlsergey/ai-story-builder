@@ -47,17 +47,17 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
   return (
     <div className={className ?? "text-muted-foreground"}>
       {items
-        .filter((item) => item.type != "message")
+        .filter((item) => item.type !== "message")
         .slice(-3)
         .map((item, index) => {
           const Icon = icons[item.type] ?? icons[`${item.type}.${(item as any).name}`]
           const icon = Icon ? <Icon className="w-3 h-3" /> : <WrenchIcon className="w-3 h-3" />
 
           let className = "flex items-center"
-          if ((item as any).status == "in_progress" || (item as any).status == "searching") {
+          if ((item as any).status === "in_progress" || (item as any).status === "searching") {
             className = "flex items-center animate-pulse"
           }
-          if ((item as any).status == "failed") {
+          if ((item as any).status === "failed") {
             className = "flex items-center text-destructive"
           }
 
@@ -83,16 +83,16 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
                     </span>
                   )}
 
-                  {item.type === "web_search_call" && item.action.type == "open_page" && (
+                  {item.type === "web_search_call" && item.action.type === "open_page" && (
                     <span>
                       {": "}
                       {item.action.url}
                     </span>
                   )}
-                  {item.type === "web_search_call" && item.action.type == "find_in_page" && (
+                  {item.type === "web_search_call" && item.action.type === "find_in_page" && (
                     <span>{`: ${item.action.pattern} @ ${item.action.url}`}</span>
                   )}
-                  {item.type === "web_search_call" && item.action.type == "search" && (
+                  {item.type === "web_search_call" && item.action.type === "search" && (
                     <span>
                       {": "}
                       {item.action.query}

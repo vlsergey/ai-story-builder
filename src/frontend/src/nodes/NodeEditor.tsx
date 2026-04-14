@@ -167,7 +167,7 @@ export default function NodeEditor<N extends Node>({
     [onChange, node],
   )
 
-  const inReview = editorMode == "review_after_generate" || editorMode == "review_after_improve"
+  const inReview = editorMode === "review_after_generate" || editorMode === "review_after_improve"
   const codeMirrorRef = useRef<ReactCodeMirrorRef>(null)
 
   const handleScrollToBottom = useCallback(() => {
@@ -182,12 +182,12 @@ export default function NodeEditor<N extends Node>({
   }, [])
 
   useEffect(() => {
-    if ((node.content && status == "GENERATING") || status == "IMPROVING") {
+    if ((node.content && status === "GENERATING") || status === "IMPROVING") {
       handleScrollToBottom()
     }
   }, [handleScrollToBottom, node.content, status])
 
-  if (status == "LOADING") {
+  if (status === "LOADING") {
     return (
       <div className="flex items-center justify-center h-full">
         <span className="text-muted-foreground text-sm">Loading…</span>
@@ -199,7 +199,7 @@ export default function NodeEditor<N extends Node>({
     <div className="flex flex-col h-full overflow-auto p-4">
       <Tabs
         defaultValue="user"
-        className={editorMode == "generate" ? "flex-1 w-full flex flex-col" : "flex-1 w-full flex flex-col hidden"}
+        className={editorMode === "generate" ? "flex-1 w-full flex flex-col" : "flex-1 w-full flex flex-col hidden"}
       >
         <TabsList className="shrink-0 flex-none">
           <TabsTrigger value="system">System Prompt</TabsTrigger>
@@ -234,13 +234,13 @@ export default function NodeEditor<N extends Node>({
           value={node.ai_improve_instruction || ""}
           onChange={onAiImproveInstructionsChange}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !(status == "GENERATING" || status == "IMPROVING")) {
+            if (e.key === "Enter" && !e.shiftKey && !(status === "GENERATING" || status === "IMPROVING")) {
               e.preventDefault()
               void handleImprove()
             }
           }}
           placeholder={tp("improve_placeholder")}
-          disabled={status == "GENERATING" || status == "IMPROVING"}
+          disabled={status === "GENERATING" || status === "IMPROVING"}
           rows={2}
           className="w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
         />
@@ -254,9 +254,9 @@ export default function NodeEditor<N extends Node>({
             className="shrink-0 self-end"
             onClick={handleImprove}
             variant="secondary"
-            disabled={status == "GENERATING" || status == "IMPROVING" || !node.ai_improve_instruction}
+            disabled={status === "GENERATING" || status === "IMPROVING" || !node.ai_improve_instruction}
           >
-            {status == "GENERATING" || status == "IMPROVING" ? "Generating…" : tp("repeat_improve")}
+            {status === "GENERATING" || status === "IMPROVING" ? "Generating…" : tp("repeat_improve")}
           </Button>
         </div>
       </div>
@@ -275,7 +275,7 @@ export default function NodeEditor<N extends Node>({
             onClick={handleGenerate}
             disabled={status !== "SAVED"}
           >
-            {status == "GENERATING" ? "Generating…" : hasContent ? tp("regenerate") : tp("generate")}
+            {status === "GENERATING" ? "Generating…" : hasContent ? tp("regenerate") : tp("generate")}
           </Button>
         </div>
       )}
@@ -330,7 +330,7 @@ export default function NodeEditor<N extends Node>({
 
       {/* ── CONTENT AREA — flex-1 ─────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {(editorMode == "generate" || editorMode == "improve" || (inReview && selectedTab === "new")) && (
+        {(editorMode === "generate" || editorMode === "improve" || (inReview && selectedTab === "new")) && (
           <CodeMirror
             ref={codeMirrorRef}
             value={node.content || ""}
@@ -371,7 +371,7 @@ export default function NodeEditor<N extends Node>({
       {/* ── [A→B] "IMPROVE WITH AI" BUTTON — mode A with content ──────────────── */}
       <div
         className="overflow-hidden shrink-0 transition-[max-height] duration-300 ease-in-out"
-        style={{ maxHeight: editorMode === "generate" && hasContent && status != "GENERATING" ? "52px" : "0px" }}
+        style={{ maxHeight: editorMode === "generate" && hasContent && status !== "GENERATING" ? "52px" : "0px" }}
       >
         <div className="flex justify-end px-2 py-1.5">
           <Button onClick={() => onEditorModeChange("improve")}>{tp("improve_with_ai")}</Button>
@@ -382,9 +382,9 @@ export default function NodeEditor<N extends Node>({
       <div
         className="flex-1 flex flex-col"
         style={{
-          maxHeight: editorMode != "improve" ? "0" : undefined,
-          overflow: editorMode != "improve" ? "hidden" : undefined,
-          visibility: editorMode == "improve" ? "visible" : "hidden",
+          maxHeight: editorMode !== "improve" ? "0" : undefined,
+          overflow: editorMode !== "improve" ? "hidden" : undefined,
+          visibility: editorMode === "improve" ? "visible" : "hidden",
           transition: "max-height 0.3s ease-in-out, visibility 0.3s ease-in-out",
         }}
       >
@@ -392,7 +392,7 @@ export default function NodeEditor<N extends Node>({
           value={node.ai_improve_instruction || ""}
           onChange={onAiImproveInstructionsChange}
           placeholder={tp("improve_placeholder")}
-          readOnly={status == "IMPROVING"}
+          readOnly={status === "IMPROVING"}
           className="flex-1 basis-auto min-h-[50px] [field-sizing:fixed]! resize-y! overflow-auto"
         />
         <div className="shrink-0 flex items-center justify-between flex-wrap px-2 py-1 border-t border-border">
@@ -401,7 +401,7 @@ export default function NodeEditor<N extends Node>({
             {/* {onGenerate.isIdle && adapter.renderEditModeExtras?.(nodeId)} */}
           </div>
           <div className="flex items-center gap-2">
-            {status == "SAVED" && (
+            {status === "SAVED" && (
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -414,9 +414,9 @@ export default function NodeEditor<N extends Node>({
             <Button
               variant="secondary"
               onClick={handleImprove}
-              disabled={status != "SAVED" || !node.ai_improve_instruction}
+              disabled={status !== "SAVED" || !node.ai_improve_instruction}
             >
-              {status == "IMPROVING" ? "Improving…" : tp("improve")}
+              {status === "IMPROVING" ? "Improving…" : tp("improve")}
             </Button>
           </div>
         </div>
