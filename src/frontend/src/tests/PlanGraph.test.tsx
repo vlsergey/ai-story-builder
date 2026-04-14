@@ -1,8 +1,8 @@
-import React from 'react'
-import { render } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import React from "react"
+import { render } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
-vi.mock('@xyflow/react', () => ({
+vi.mock("@xyflow/react", () => ({
   ReactFlow: () => <div data-testid="react-flow" />,
   Background: () => null,
   Controls: () => null,
@@ -11,11 +11,11 @@ vi.mock('@xyflow/react', () => ({
   useEdgesState: () => [[], vi.fn(), vi.fn()],
   addEdge: vi.fn(),
   useReactFlow: () => ({ fitView: vi.fn() }),
-  BackgroundVariant: { Dots: 'dots' },
+  BackgroundVariant: { Dots: "dots" },
 }))
 
-vi.mock('../lib/locale', () => ({
-  useLocale: () => ({ locale: 'en', t: (key: string) => key }),
+vi.mock("../lib/locale", () => ({
+  useLocale: () => ({ locale: "en", t: (key: string) => key }),
 }))
 
 // Mock trpc with useQuery and useMutation
@@ -32,7 +32,7 @@ const mockUseMutation = vi.fn(() => ({
   mutateAsync: vi.fn(() => Promise.resolve({ ok: true })),
 }))
 
-vi.mock('../ipcClient', () => ({
+vi.mock("../ipcClient", () => ({
   trpc: {
     plan: {
       nodes: {
@@ -53,44 +53,52 @@ vi.mock('../ipcClient', () => ({
   },
 }))
 
-vi.mock('../plan/plan-graph/PlanTextNode', () => ({ default: () => null }))
-vi.mock('../plan/plan-graph/PlanLoreNode', () => ({ default: () => null }))
-vi.mock('../plan/plan-graph/PlanEdge', () => ({ default: () => null }))
-vi.mock('../plan/GenerateAllDialog', () => ({ default: () => null }))
-vi.mock('@dagrejs/dagre', () => ({
+vi.mock("../plan/plan-graph/PlanTextNode", () => ({ default: () => null }))
+vi.mock("../plan/plan-graph/PlanLoreNode", () => ({ default: () => null }))
+vi.mock("../plan/plan-graph/PlanEdge", () => ({ default: () => null }))
+vi.mock("../plan/GenerateAllDialog", () => ({ default: () => null }))
+vi.mock("@dagrejs/dagre", () => ({
   default: {
-    graphlib: { Graph: class { setGraph() {} setDefaultEdgeLabel() {} setNode() {} setEdge() {} node() { return { x: 0, y: 0 } } } },
+    graphlib: {
+      Graph: class {
+        setGraph() {}
+        setDefaultEdgeLabel() {}
+        setNode() {}
+        setEdge() {}
+        node() {
+          return { x: 0, y: 0 }
+        }
+      },
+    },
     layout: vi.fn(),
-  }
+  },
 }))
 
-describe('PlanGraph', () => {
+describe("PlanGraph", () => {
   beforeEach(() => {
     // Ensure localStorage.getItem returns default
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => 
-      key === 'planGraph.autoLayout' ? 'true' : null
-    )
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {})
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation((key) => (key === "planGraph.autoLayout" ? "true" : null))
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {})
     // Ensure electronAPI.confirm returns true
-    vi.spyOn(window.electronAPI, 'confirm').mockReturnValue(true)
+    vi.spyOn(window.electronAPI, "confirm").mockReturnValue(true)
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('renders without crashing', async () => {
-    const PlanGraph = (await import('../plan/plan-graph/PlanGraph')).default
+  it("renders without crashing", async () => {
+    const PlanGraph = (await import("../plan/plan-graph/PlanGraph")).default
     const { unmount } = render(<PlanGraph />)
     // Component should render without errors
     // No need to wait for anything because queries are mocked
     unmount()
   })
 
-  it('renders the ReactFlow component', async () => {
-    const PlanGraph = (await import('../plan/plan-graph/PlanGraph')).default
+  it("renders the ReactFlow component", async () => {
+    const PlanGraph = (await import("../plan/plan-graph/PlanGraph")).default
     const { getByTestId } = render(<PlanGraph />)
     // ReactFlow is mocked and should be present immediately
-    expect(getByTestId('react-flow')).toBeInTheDocument()
+    expect(getByTestId("react-flow")).toBeInTheDocument()
   })
 })

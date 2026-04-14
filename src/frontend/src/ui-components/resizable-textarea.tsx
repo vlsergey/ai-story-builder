@@ -1,79 +1,82 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from "react"
 
-interface ResizableTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value'> {
-  value: string;
-  onChange: (value: string) => void;
+interface ResizableTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
+  value: string
+  onChange: (value: string) => void
   /** Initial height in pixels (or CSS string). If not provided, uses auto. */
-  initialHeight?: number | string;
+  initialHeight?: number | string
   /** Callback when user resizes the textarea (height in pixels) */
-  onHeightChange?: (height: number) => void;
+  onHeightChange?: (height: number) => void
   /** Minimum height in pixels */
-  minHeight?: number;
+  minHeight?: number
   /** Maximum height in pixels */
-  maxHeight?: number;
+  maxHeight?: number
   /** Whether to show the resize handle (default true) */
-  showHandle?: boolean;
+  showHandle?: boolean
 }
 
 export default function ResizableTextarea({
   value,
   onChange,
-  initialHeight = 'auto',
+  initialHeight = "auto",
   onHeightChange,
   minHeight = 40,
   maxHeight = 800,
   showHandle = true,
-  className = '',
+  className = "",
   ...props
 }: ResizableTextareaProps) {
-  const [height, setHeight] = useState<number | string>(initialHeight);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isDragging = useRef(false);
-  const startY = useRef(0);
-  const startHeight = useRef(0);
+  const [height, setHeight] = useState<number | string>(initialHeight)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isDragging = useRef(false)
+  const startY = useRef(0)
+  const startHeight = useRef(0)
 
   // Update height when initialHeight changes
   useEffect(() => {
     if (initialHeight !== height) {
-      setHeight(initialHeight);
+      setHeight(initialHeight)
     }
-  }, [initialHeight, height]);
+  }, [initialHeight, height])
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging.current) return;
-    const delta = e.clientY - startY.current;
-    let newHeight = startHeight.current + delta;
-    if (newHeight < minHeight) newHeight = minHeight;
-    if (newHeight > maxHeight) newHeight = maxHeight;
-    setHeight(newHeight);
-    onHeightChange?.(newHeight);
-  }, [minHeight, maxHeight, onHeightChange]);
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging.current) return
+      const delta = e.clientY - startY.current
+      let newHeight = startHeight.current + delta
+      if (newHeight < minHeight) newHeight = minHeight
+      if (newHeight > maxHeight) newHeight = maxHeight
+      setHeight(newHeight)
+      onHeightChange?.(newHeight)
+    },
+    [minHeight, maxHeight, onHeightChange],
+  )
 
   const handleMouseUp = useCallback(() => {
-    isDragging.current = false;
-    document.removeEventListener('mousemove', handleMouseMove);
+    isDragging.current = false
+    document.removeEventListener("mousemove", handleMouseMove)
     // eslint-disable-next-line react-hooks/immutability
-    document.removeEventListener('mouseup', handleMouseUp);
-  }, [handleMouseMove]);
+    document.removeEventListener("mouseup", handleMouseUp)
+  }, [handleMouseMove])
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    startY.current = e.clientY;
-    startHeight.current = typeof height === 'number' ? height : (textareaRef.current?.offsetHeight || minHeight);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
+    e.preventDefault()
+    isDragging.current = true
+    startY.current = e.clientY
+    startHeight.current = typeof height === "number" ? height : textareaRef.current?.offsetHeight || minHeight
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
+  }
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (isDragging.current) {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
       }
-    };
-  }, [handleMouseMove, handleMouseUp]);
+    }
+  }, [handleMouseMove, handleMouseUp])
 
   return (
     <div className="relative">
@@ -82,7 +85,7 @@ export default function ResizableTextarea({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`w-full resize-none ${className}`}
-        style={{ height: typeof height === 'number' ? `${height}px` : height }}
+        style={{ height: typeof height === "number" ? `${height}px` : height }}
         {...props}
       />
       {showHandle && (
@@ -95,5 +98,5 @@ export default function ResizableTextarea({
         </div>
       )}
     </div>
-  );
+  )
 }

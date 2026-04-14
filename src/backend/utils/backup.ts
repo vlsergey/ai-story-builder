@@ -1,6 +1,6 @@
-import fs from 'fs'
-import path from 'path'
-import { getDataDir } from '../db/state.js'
+import fs from "fs"
+import path from "path"
+import { getDataDir } from "../db/state.js"
 
 /**
  * Creates a backup of a project database file
@@ -9,12 +9,12 @@ import { getDataDir } from '../db/state.js'
  */
 export function createBackup(dbPath: string): string {
   // Ensure backups directory exists
-  const backupsDir = path.join(getDataDir(), 'backups')
+  const backupsDir = path.join(getDataDir(), "backups")
   fs.mkdirSync(backupsDir, { recursive: true })
 
   // Get the filename without extension for the backup name
   const filename = path.basename(dbPath)
-  const ts = new Date().toISOString().replace(/[:.]/g, '-')
+  const ts = new Date().toISOString().replace(/[:.]/g, "-")
   const backupName = `${filename}.${ts}.bak`
   const backupPath = path.join(backupsDir, backupName)
 
@@ -34,11 +34,15 @@ export function createBackup(dbPath: string): string {
  */
 export function trimBackups(filename: string, backupsDir: string): void {
   try {
-    const all = fs.readdirSync(backupsDir).filter(f => f.startsWith(filename + '.'))
+    const all = fs.readdirSync(backupsDir).filter((f) => f.startsWith(filename + "."))
     all.sort()
     while (all.length > 7) {
       const rm = all.shift()
-      try { fs.unlinkSync(path.join(backupsDir, rm!)) } catch (_) { /* ignore */ }
+      try {
+        fs.unlinkSync(path.join(backupsDir, rm!))
+      } catch (_) {
+        /* ignore */
+      }
     }
   } catch (_) {
     // Ignore errors in trimming
@@ -51,12 +55,12 @@ export function trimBackups(filename: string, backupsDir: string): void {
  * @returns Path to the most recent backup or null if none found
  */
 export function getLatestBackup(dbPath: string): string | null {
-  const backupsDir = path.join(getDataDir(), 'backups')
+  const backupsDir = path.join(getDataDir(), "backups")
   if (!fs.existsSync(backupsDir)) return null
 
   const filename = path.basename(dbPath)
   try {
-    const all = fs.readdirSync(backupsDir).filter(f => f.startsWith(filename + '.'))
+    const all = fs.readdirSync(backupsDir).filter((f) => f.startsWith(filename + "."))
     if (all.length === 0) return null
 
     all.sort()

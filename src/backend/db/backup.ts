@@ -1,5 +1,5 @@
-import fs from 'fs'
-import path from 'path'
+import fs from "fs"
+import path from "path"
 
 const MAX_BACKUPS = 7
 
@@ -16,15 +16,11 @@ const MAX_BACKUPS = 7
 export function createBackup(dbPath: string): void {
   if (!fs.existsSync(dbPath)) return
 
-  const backupDir = path.join(path.dirname(dbPath), 'backups')
+  const backupDir = path.join(path.dirname(dbPath), "backups")
   fs.mkdirSync(backupDir, { recursive: true })
 
   const basename = path.basename(dbPath, path.extname(dbPath))
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .replace('T', 'T')
-    .slice(0, 15) // "YYYYMMDDTHHmmss"
+  const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "T").slice(0, 15) // "YYYYMMDDTHHmmss"
   const backupName = `${basename}.${timestamp}.bak`
   const backupPath = path.join(backupDir, backupName)
 
@@ -45,9 +41,7 @@ function pruneBackups(backupDir: string, basename: string): void {
     return
   }
 
-  const backups = files
-    .filter(f => f.startsWith(`${basename}.`) && f.endsWith('.bak'))
-    .sort() // lexicographic order works because timestamps are in ISO format
+  const backups = files.filter((f) => f.startsWith(`${basename}.`) && f.endsWith(".bak")).sort() // lexicographic order works because timestamps are in ISO format
 
   const toDelete = backups.slice(0, Math.max(0, backups.length - MAX_BACKUPS))
   for (const f of toDelete) {

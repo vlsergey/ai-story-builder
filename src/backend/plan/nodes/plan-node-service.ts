@@ -1,42 +1,49 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeType, PlanNodeRow, PlanNodeStatus, PlanEdgeRow } from '../../../shared/plan-graph.js'
-import { PlanNodeRepository } from './plan-node-repository.js'
-import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
-import { isValidNodeType, NODE_TYPES, getNodeTypeDefinition } from '../../../shared/node-edge-dictionary.js'
-import { planNodeEventManager } from './plan-node-event-manager.js'
-import { NodeProcessor } from './graph/node-processor.js'
-import { TextProcessor } from './graph/text-processor.js'
-import { LoreProcessor } from './graph/lore-processor.js'
-import { SplitProcessor } from './graph/split-processor.js'
-import { MergeProcessor } from './graph/merge-processor.js'
-import { ForEachProcessor } from './graph/for-each-processor.js'
-import { mergeNodeSettings } from './graph/settings-helper.js'
-import { DataOrEventEvent, toObservable } from '../../lib/event-manager.js'
-import { improvePlanNodeContent } from '../../routes/improve-plan-node-content.js'
-import { ResponseStreamEvent } from 'openai/resources/responses/responses.js'
-import { Observable } from '@trpc/server/observable'
-import { generateSummary } from '../../ai/generate-summary.js'
-import { makeErrorWithStatus } from '../../lib/make-errors.js'
-import { ForEachNodeContent } from '../../../shared/for-each-plan-node.js'
-import { SettingsRepository } from '../../settings/settings-repository.js'
-import { ForEachOutputProcessor } from './graph/for-each-output-processor.js'
-import { ForEachInputProcessor } from './graph/for-each-input-processor.js'
-import { ForEachPrevOutputsProcessor } from './graph/for-each-prev-outputs-processor.js'
-import { RegenerationNodeContext } from './generate/RegenerationContext.js'
+import type {
+  PlanNodeCreate,
+  PlanNodeUpdate,
+  PlanNodeType,
+  PlanNodeRow,
+  PlanNodeStatus,
+  PlanEdgeRow,
+} from "../../../shared/plan-graph.js"
+import { PlanNodeRepository } from "./plan-node-repository.js"
+import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
+import { isValidNodeType, NODE_TYPES, getNodeTypeDefinition } from "../../../shared/node-edge-dictionary.js"
+import { planNodeEventManager } from "./plan-node-event-manager.js"
+import { NodeProcessor } from "./graph/node-processor.js"
+import { TextProcessor } from "./graph/text-processor.js"
+import { LoreProcessor } from "./graph/lore-processor.js"
+import { SplitProcessor } from "./graph/split-processor.js"
+import { MergeProcessor } from "./graph/merge-processor.js"
+import { ForEachProcessor } from "./graph/for-each-processor.js"
+import { mergeNodeSettings } from "./graph/settings-helper.js"
+import { DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
+import { improvePlanNodeContent } from "../../routes/improve-plan-node-content.js"
+import { ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import { Observable } from "@trpc/server/observable"
+import { generateSummary } from "../../ai/generate-summary.js"
+import { makeErrorWithStatus } from "../../lib/make-errors.js"
+import { ForEachNodeContent } from "../../../shared/for-each-plan-node.js"
+import { SettingsRepository } from "../../settings/settings-repository.js"
+import { ForEachOutputProcessor } from "./graph/for-each-output-processor.js"
+import { ForEachInputProcessor } from "./graph/for-each-input-processor.js"
+import { ForEachPrevOutputsProcessor } from "./graph/for-each-prev-outputs-processor.js"
+import { RegenerationNodeContext } from "./generate/RegenerationContext.js"
 
 export type NodeUpdateEvent = {
   nodeId: number
   updatedFields: Partial<PlanNodeRow>
 }
 
-export const NODE_PROCESSORS : Record<PlanNodeType, NodeProcessor> = {
-  'for-each': new ForEachProcessor(),
-  'for-each-input': new ForEachInputProcessor(),
-  'for-each-output': new ForEachOutputProcessor(),
-  'for-each-prev-outputs': new ForEachPrevOutputsProcessor(),
-  'text': new TextProcessor(),
-  'lore': new LoreProcessor(),
-  'split': new SplitProcessor(),
-  'merge': new MergeProcessor(),
+export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
+  "for-each": new ForEachProcessor(),
+  "for-each-input": new ForEachInputProcessor(),
+  "for-each-output": new ForEachOutputProcessor(),
+  "for-each-prev-outputs": new ForEachPrevOutputsProcessor(),
+  text: new TextProcessor(),
+  lore: new LoreProcessor(),
+  split: new SplitProcessor(),
+  merge: new MergeProcessor(),
 }
 
 /**
@@ -47,7 +54,7 @@ export class PlanNodeService {
   readonly repo: PlanNodeRepository = new PlanNodeRepository()
 
   getById(id: number): PlanNodeRow {
-    const result =  this.repo.findById(id)
+    const result = this.repo.findById(id)
     if (!result) {
       throw makeErrorWithStatus(`Plan node ${id} not found`, 404)
     }
@@ -90,11 +97,11 @@ export class PlanNodeService {
   }
 
   getNodeInputs(nodeId: number): Array<{
-    edge: PlanEdgeRow,
-    sourceNode: PlanNodeRow,
-    input: unknown,
+    edge: PlanEdgeRow
+    sourceNode: PlanNodeRow
+    input: unknown
   }> {
-    const incomingEdges = (new PlanEdgeRepository()).findByToNodeId(nodeId)
+    const incomingEdges = new PlanEdgeRepository().findByToNodeId(nodeId)
     const inputs = []
 
     for (const edge of incomingEdges) {
@@ -124,18 +131,22 @@ export class PlanNodeService {
    * and downstream notifications will propagate further.
    */
   async notifyDownstreamNodes(changedNodeId: number): Promise<void> {
-    const outgoingEdges = (new PlanEdgeRepository()).findByFromNodeId(changedNodeId)
+    const outgoingEdges = new PlanEdgeRepository().findByFromNodeId(changedNodeId)
     for (const edge of outgoingEdges) {
       const downstreamNode = this.getById(edge.to_node_id)
       if (!downstreamNode) continue
       const processor = this.getProcessor(downstreamNode.type)
       if (processor?.onInputContentChange) {
-        console.log(`Notifying downstream node ${downstreamNode.id} (${downstreamNode.type}) of changes in node ${changedNodeId}`)
+        console.log(
+          `Notifying downstream node ${downstreamNode.id} (${downstreamNode.type}) of changes in node ${changedNodeId}`,
+        )
         const settings = this.getNodeSettings(downstreamNode)
         const planNodeUpdate = await processor.onInputContentChange(this, downstreamNode, changedNodeId, settings)
         if (planNodeUpdate != null && Object.keys(planNodeUpdate).length !== 0) {
-          console.log(`[PlanNodeService] Updating downstream node ${downstreamNode.id} (${downstreamNode.type}) because of changes in node ${changedNodeId}: ${Object.keys(planNodeUpdate)}`)
-          await this.patch( downstreamNode.id, false, planNodeUpdate )
+          console.log(
+            `[PlanNodeService] Updating downstream node ${downstreamNode.id} (${downstreamNode.type}) because of changes in node ${changedNodeId}: ${Object.keys(planNodeUpdate)}`,
+          )
+          await this.patch(downstreamNode.id, false, planNodeUpdate)
         }
       }
     }
@@ -144,25 +155,27 @@ export class PlanNodeService {
   // ─── Create ──────────────────────────────────────────────────────────────────
 
   create(data: PlanNodeCreate): { id: number } {
-    if (!data.title) throw makeErrorWithStatus('title required', 400)
+    if (!data.title) throw makeErrorWithStatus("title required", 400)
     // Validate type if provided
     if (data.type !== undefined && !isValidNodeType(data.type)) {
-      const valid = NODE_TYPES.map(nt => nt.id).join(', ')
+      const valid = NODE_TYPES.map((nt) => nt.id).join(", ")
       throw makeErrorWithStatus(`Invalid node type "${data.type}". Valid types: ${valid}`, 400)
     }
     const type = data.type
 
     // Check if node type can be created manually
-    const nodeDef = NODE_TYPES.find(nt => nt.id === type)
+    const nodeDef = NODE_TYPES.find((nt) => nt.id === type)
     if (nodeDef && nodeDef.canCreate === false) {
       throw makeErrorWithStatus(`Node type "${type}" cannot be created manually.`, 400)
     }
 
     // Determine status based on content
-    let status: PlanNodeStatus = 'EMPTY'
-    let wordCount = 0, charCount = 0, byteCount = 0
-    if (data.content && data.content.trim() !== '') {
-      status = 'MANUAL'
+    let status: PlanNodeStatus = "EMPTY"
+    let wordCount = 0,
+      charCount = 0,
+      byteCount = 0
+    if (data.content && data.content.trim() !== "") {
+      status = "MANUAL"
       wordCount = this.countWords(data.content)
       charCount = this.countChars(data.content)
       byteCount = this.countBytes(data.content)
@@ -178,7 +191,7 @@ export class PlanNodeService {
     console.info(`Created node ${id} of type ${type}`)
 
     // If this is a for-each node, automatically create its internal input/output nodes
-    if (type === 'for-each') {
+    if (type === "for-each") {
       this.createForEachInternalNodes(id, data.x ?? 0, data.y ?? 0)
     }
 
@@ -193,8 +206,8 @@ export class PlanNodeService {
   private createForEachInternalNodes(parentId: number, parentX: number, parentY: number): void {
     // Create for-each-input node
     const inputId = this.repo.insert({
-      type: 'for-each-input',
-      title: 'Input',
+      type: "for-each-input",
+      title: "Input",
       parent_id: parentId,
       x: parentX - 50,
       y: parentY + 50,
@@ -205,7 +218,7 @@ export class PlanNodeService {
       ai_sync_info: null,
       node_type_settings: JSON.stringify({}),
       ai_settings: null,
-      status: 'EMPTY',
+      status: "EMPTY",
       in_review: 0,
       review_base_content: null,
       word_count: 0,
@@ -214,8 +227,8 @@ export class PlanNodeService {
     })
     // Create for-each-output node
     const outputId = this.repo.insert({
-      type: 'for-each-output',
-      title: 'Output',
+      type: "for-each-output",
+      title: "Output",
       parent_id: parentId,
       x: parentX + 50,
       y: parentY + 50,
@@ -226,7 +239,7 @@ export class PlanNodeService {
       ai_sync_info: null,
       node_type_settings: JSON.stringify({}),
       ai_settings: null,
-      status: 'EMPTY',
+      status: "EMPTY",
       in_review: 0,
       review_base_content: null,
       word_count: 0,
@@ -243,12 +256,9 @@ export class PlanNodeService {
    * If content is provided, it will replace the current content.
    * Sets changes_status = 'review' and stores review_base_content if not already in review.
    */
-  async startReview(
-    id: number,
-    patch?: PlanNodeUpdate
-  ) : Promise<PlanNodeRow> {
+  async startReview(id: number, patch?: PlanNodeUpdate): Promise<PlanNodeRow> {
     const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
 
     const updateFields: PlanNodeUpdate = {
       ...patch,
@@ -263,7 +273,7 @@ export class PlanNodeService {
    */
   async acceptReview(id: number): Promise<PlanNodeRow> {
     const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
 
     return await this.patch(id, true, {
       in_review: 0,
@@ -277,39 +287,39 @@ export class PlanNodeService {
    */
   async patch(nodeId: number, manual: boolean, data: PlanNodeUpdate): Promise<PlanNodeRow> {
     let oldNode = this.repo.findById(nodeId)
-    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
 
     // Validate parent_id if present
     if (data.parent_id !== undefined) {
       const newParentId = data.parent_id
-      
+
       // Check if node type is confined (cannot be moved)
       const nodeDef = getNodeTypeDefinition(oldNode.type)
       if (nodeDef?.confined && data.parent_id != oldNode.parent_id) {
         throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
       }
-      
+
       // Cannot set parent to itself
       if (newParentId === nodeId) {
-        throw makeErrorWithStatus('cannot set parent to itself', 400)
+        throw makeErrorWithStatus("cannot set parent to itself", 400)
       }
-      
+
       // If parent is not null, ensure it exists and check for cycles
       if (newParentId !== null) {
         const target = this.repo.findById(newParentId)
-        if (!target) throw makeErrorWithStatus('target parent does not exist', 400)
-        
+        if (!target) throw makeErrorWithStatus("target parent does not exist", 400)
+
         // Check for cycles
         let cur: number | null = newParentId
         while (cur !== null) {
-          if (cur === nodeId) throw makeErrorWithStatus('cannot move node into its own descendant', 400)
+          if (cur === nodeId) throw makeErrorWithStatus("cannot move node into its own descendant", 400)
           const parent = this.repo.findById(cur)
           cur = parent?.parent_id ?? null
         }
       }
     }
 
-    let update = {...data}
+    let update = { ...data }
 
     if (data.status !== undefined) {
       console.log("In patch there is a requirement to change status to " + data.status + "")
@@ -317,34 +327,32 @@ export class PlanNodeService {
       if (update.content !== undefined) {
         if (!update.content) {
           console.log("Status will be changed to EMPTY because content is empty")
-          update.status = 'EMPTY'
+          update.status = "EMPTY"
         } else {
           if (manual) {
             console.log("Status will be changed to MANUAL because content is not empty and manual is true")
-            update.status = 'MANUAL'
+            update.status = "MANUAL"
           } else {
             console.log("Status will be changed to GENERATED because content is not empty and manual is false")
-            update.status = 'GENERATED'
+            update.status = "GENERATED"
           }
         }
       }
       if (update.status === undefined && (update.ai_user_prompt !== undefined || update.ai_user_prompt !== undefined)) {
-        update.status = 'OUTDATED'
+        update.status = "OUTDATED"
       }
     }
 
     update = {
       ...update,
-      ...(await this.mayBeInvokeOnUpdate(nodeId, oldNode, {...oldNode, ...update}))
+      ...(await this.mayBeInvokeOnUpdate(nodeId, oldNode, { ...oldNode, ...update })),
     }
 
-    const updated = Object.keys(update).length != 0
-      ? this.repo.patch(nodeId, update)
-      : oldNode
-    if (!updated) throw makeErrorWithStatus('node not found', 404)
+    const updated = Object.keys(update).length != 0 ? this.repo.patch(nodeId, update) : oldNode
+    if (!updated) throw makeErrorWithStatus("node not found", 404)
 
     // Emit event to frontend
-    planNodeEventManager.emitUpdate(nodeId, 'patched keys: ' + Object.keys(data).join(', ') + '')
+    planNodeEventManager.emitUpdate(nodeId, "patched keys: " + Object.keys(data).join(", ") + "")
 
     // If content changed, notify downstream nodes
     if (update.content !== undefined) {
@@ -355,13 +363,9 @@ export class PlanNodeService {
   }
 
   private async mayBeInvokeOnUpdate<
-    N extends (PlanNodeRow | null) = PlanNodeRow,
-    T extends Record<string, any> = Record<string, any>
-  >(
-    nodeId: number,
-    oldNode: PlanNodeRow | null,
-    newNode: N,
-  ): Promise<PlanNodeUpdate | null> {
+    N extends PlanNodeRow | null = PlanNodeRow,
+    T extends Record<string, any> = Record<string, any>,
+  >(nodeId: number, oldNode: PlanNodeRow | null, newNode: N): Promise<PlanNodeUpdate | null> {
     const type = oldNode?.type ?? newNode?.type
     if (!type) return null
 
@@ -384,9 +388,9 @@ export class PlanNodeService {
   ): Promise<PlanNodeRow> {
     // await sleep(600000)
     let node = this.repo.findById(nodeId)
-    if (!node) throw makeErrorWithStatus('node not found', 404)
+    if (!node) throw makeErrorWithStatus("node not found", 404)
 
-    node = this.repo.patch(nodeId, {status: 'GENERATING'})
+    node = this.repo.patch(nodeId, { status: "GENERATING" })
     planNodeEventManager.emitUpdate(nodeId, `Starting to generate node ${nodeId}`)
 
     try {
@@ -397,14 +401,14 @@ export class PlanNodeService {
 
       const settings = node.node_type_settings
         ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
-        : nodeProcessor.defaultSettings    
+        : nodeProcessor.defaultSettings
 
       let patch = await nodeProcessor.regenerate(this, context, node, settings)
       if (!patch) return node
 
       const patchedContent = nodeProcessor.getOutput(this, {
         ...node,
-        ...patch
+        ...patch,
       })
 
       if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
@@ -412,36 +416,36 @@ export class PlanNodeService {
           try {
             patch = {
               ...patch,
-              summary: await generateSummary( ['plan-node-summary', `${nodeId}`], patchedContent ) || '',
-              status: 'GENERATED',
+              summary: (await generateSummary(["plan-node-summary", `${nodeId}`], patchedContent)) || "",
+              status: "GENERATED",
             }
           } catch (e) {
             console.error(e)
             patch = {
               ...patch,
-              summary: '(error): ' + e + '',
-              status: 'GENERATED',
+              summary: "(error): " + e + "",
+              status: "GENERATED",
             }
           }
         } else {
           patch = {
             ...patch,
             summary: null,
-            status: 'EMPTY',
+            status: "EMPTY",
           }
         }
       } else {
         patch = {
           ...patch,
           summary: patch.summary || null,
-          status: patchedContent ? 'GENERATED' : 'EMPTY',
+          status: patchedContent ? "GENERATED" : "EMPTY",
         }
       }
 
       return await this.patch(nodeId, false, patch)
     } catch (e) {
       console.error(`Unable to regenerate node ${nodeId}`, e)
-      this.repo.patch(nodeId, {status: 'ERROR'})
+      this.repo.patch(nodeId, { status: "ERROR" })
       throw e
     }
   }
@@ -452,7 +456,7 @@ export class PlanNodeService {
     console.log(`Deleting node with id ${id}`)
 
     const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
+    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
 
     // Delete connected edges first
     new PlanEdgeRepository().deleteByNodeId(id)
@@ -466,25 +470,25 @@ export class PlanNodeService {
 
   async move(id: number, parentId: number | null) {
     const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus('node not found', 404)
-    
+    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
+
     // Check if node type is confined (cannot be moved)
     const nodeDef = getNodeTypeDefinition(oldNode.type)
     if (nodeDef?.confined) {
       throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
     }
-    
-    if (oldNode.parent_id === null) throw makeErrorWithStatus('root node cannot be moved', 403)
-    if (parentId === id) throw makeErrorWithStatus('cannot move node to itself', 400)
+
+    if (oldNode.parent_id === null) throw makeErrorWithStatus("root node cannot be moved", 403)
+    if (parentId === id) throw makeErrorWithStatus("cannot move node to itself", 400)
 
     if (parentId !== null) {
       const target = this.repo.findById(parentId)
-      if (!target) throw makeErrorWithStatus('target parent does not exist', 400)
+      if (!target) throw makeErrorWithStatus("target parent does not exist", 400)
 
       // Check for cycles
       let cur: number | null = parentId
       while (cur !== null) {
-        if (cur === id) throw makeErrorWithStatus('cannot move node into its own descendant', 400)
+        if (cur === id) throw makeErrorWithStatus("cannot move node into its own descendant", 400)
         const parent = this.repo.findById(cur)
         cur = parent?.parent_id ?? null
       }
@@ -494,7 +498,7 @@ export class PlanNodeService {
   }
 
   async reorderChildren(childIds: number[]) {
-    if (!Array.isArray(childIds)) throw makeErrorWithStatus('child_ids must be an array', 400)
+    if (!Array.isArray(childIds)) throw makeErrorWithStatus("child_ids must be an array", 400)
 
     childIds.forEach((id, index) => {
       this.patch(id, true, { position: index })
@@ -504,12 +508,15 @@ export class PlanNodeService {
   changeForEachNodePage(nodeId: number, page: number): PlanNodeRow {
     const repo = this.repo
     const node = this.getById(nodeId)
-    if (node.type != 'for-each') {
+    if (node.type != "for-each") {
       throw makeErrorWithStatus(`Node ${nodeId} is not a for-each node, but '${node.type}'`, 400)
     }
-    let parsedContent = (JSON.parse(node.content || '{}') || {}) as ForEachNodeContent
+    let parsedContent = (JSON.parse(node.content || "{}") || {}) as ForEachNodeContent
 
-    console.log(`[changeForEachNodePage] node ${nodeId}, currentIndex=${parsedContent.currentIndex}, page=${page}, overrides before save:`, parsedContent.overrides)
+    console.log(
+      `[changeForEachNodePage] node ${nodeId}, currentIndex=${parsedContent.currentIndex}, page=${page}, overrides before save:`,
+      parsedContent.overrides,
+    )
     // save current page
     parsedContent.overrides = [...(parsedContent.overrides || [])]
     const collected = repo.collectForEachNodeIterationContentFromChildren(nodeId)
@@ -518,16 +525,19 @@ export class PlanNodeService {
     parsedContent.overrides[parsedContent.currentIndex || 0] = collected
 
     console.log(`[changeForEachNodePage] overrides after save:`, parsedContent.overrides)
-    console.log(`[changeForEachNodePage] overrides[${parsedContent.currentIndex || 0}] keys:`, Object.keys(parsedContent.overrides[parsedContent.currentIndex || 0] || {}))
+    console.log(
+      `[changeForEachNodePage] overrides[${parsedContent.currentIndex || 0}] keys:`,
+      Object.keys(parsedContent.overrides[parsedContent.currentIndex || 0] || {}),
+    )
     repo.applyForEachNodeIterationToChildren(nodeId, parsedContent.overrides[page] || {})
 
     parsedContent.currentIndex = page
-    const result = repo.patch(nodeId, {content: JSON.stringify(parsedContent)})
+    const result = repo.patch(nodeId, { content: JSON.stringify(parsedContent) })
     console.log(`[changeForEachNodePage] saved content:`, JSON.stringify(parsedContent))
 
     // Emit events to frontend
     planNodeEventManager.emitUpdate(nodeId, `changed page in ${nodeId}`)
-    repo.findByParentId(nodeId).forEach(child => {
+    repo.findByParentId(nodeId).forEach((child) => {
       planNodeEventManager.emitUpdate(child.id, `changed page in ${nodeId}`)
     })
 
@@ -536,7 +546,7 @@ export class PlanNodeService {
 
   private countWords(text: string): number {
     const t = text.trim()
-    return t === '' ? 0 : t.split(/\s+/).length
+    return t === "" ? 0 : t.split(/\s+/).length
   }
 
   private countChars(text: string): number {
@@ -544,45 +554,43 @@ export class PlanNodeService {
   }
 
   private countBytes(text: string): number {
-    return Buffer.byteLength(text, 'utf8')
+    return Buffer.byteLength(text, "utf8")
   }
 
   async aiGenerateSummary(nodeId: number): Promise<PlanNodeRow> {
-    const node = this.getById(nodeId);
-    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404);
+    const node = this.getById(nodeId)
+    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404)
 
     const nodeProcessor = this.getProcessor(node.type) as NodeProcessor
     const nodeContent = nodeProcessor.getOutput(this, node)
 
     return await this.patch(nodeId, false, {
-      summary: nodeContent
-        ? await generateSummary(['plan-node-summary', `${nodeId}`], nodeContent)
-        : '',
-    });
+      summary: nodeContent ? await generateSummary(["plan-node-summary", `${nodeId}`], nodeContent) : "",
+    })
   }
 
   aiImprove(nodeId: number): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
-    const node = this.getById(nodeId);
-    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404);
+    const node = this.getById(nodeId)
+    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404)
 
     return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
       const { oldNode, newContent } = await improvePlanNodeContent(nodeId, (event) => {
-        emit.next({ type: 'event', event });
-      });
+        emit.next({ type: "event", event })
+      })
 
       const newNode = await this.patch(nodeId, true, {
-        status: 'MANUAL',
+        status: "MANUAL",
         content: newContent,
-        in_review: ((oldNode.content?.trim?.()?.length || 0) > 0) ? 1 : 0,
+        in_review: (oldNode.content?.trim?.()?.length || 0) > 0 ? 1 : 0,
         review_base_content: oldNode.content,
-      });
+      })
 
-      emit.next({ type: 'data', data: newNode });      
-      emit.next({ type: 'completed' });
-    });
+      emit.next({ type: "data", data: newNode })
+      emit.next({ type: "completed" })
+    })
   }
 }
 
 export interface PlanNodeSubscriptionEvent {
-  event: ResponseStreamEvent,
+  event: ResponseStreamEvent
 }

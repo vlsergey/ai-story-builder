@@ -1,6 +1,6 @@
 // Database row types matching the schema defined in db/migrations.ts
-import { LoreNodeRow } from '../../shared/lore-node.js'
-import { PlanNodeRow } from '../../shared/plan-graph.js'
+import { LoreNodeRow } from "../../shared/lore-node.js"
+import { PlanNodeRow } from "../../shared/plan-graph.js"
 
 export interface StoryPartRow {
   id: number
@@ -54,7 +54,7 @@ export interface SettingRow {
 
 /** Full lore tree node (returned by GET /lore/tree).
  *  ai_sync_info is delivered as a parsed object (not raw JSON string). */
-export interface LoreTreeNode extends Omit<LoreNodeRow, 'ai_sync_info'> {
+export interface LoreTreeNode extends Omit<LoreNodeRow, "ai_sync_info"> {
   ai_sync_info: Record<string, AiEngineSyncRecord> | null
   children: LoreTreeNode[]
 }
@@ -80,10 +80,9 @@ export interface ProjectInitialData {
 }
 
 export interface AppSettings {
-  recent: string[];
+  recent: string[]
   /** Last successfully opened project path — restored on backend restart. */
-  lastOpenedPath?: string;
+  lastOpenedPath?: string
 }
 
-export type AppRouter = typeof import('../router').appRouter;
-
+export type AppRouter = typeof import("../router").appRouter

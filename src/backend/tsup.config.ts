@@ -1,15 +1,15 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from "tsup"
 
 export default defineConfig([
   {
-    entry: ['**/*.ts', '**/db/*.sql', 'icons/**/*.{icns,ico,png}'],
-    format: ['esm'],
-    target: 'node16',
-    platform: 'node',
-    outDir: '../../dist/backend',
+    entry: ["**/*.ts", "**/db/*.sql", "icons/**/*.{icns,ico,png}"],
+    format: ["esm"],
+    target: "node16",
+    platform: "node",
+    outDir: "../../dist/backend",
     // Native and optional modules must remain as runtime require() calls;
     // electron-builder rebuilds better-sqlite3 for the correct Electron ABI.
-    external: ['better-sqlite3', 'electron', 'electron-devtools-installer', 'electron-trpc'],
+    external: ["better-sqlite3", "electron", "electron-devtools-installer", "electron-trpc"],
     // 'true' doesn't work good with 'external' (ignores)
     bundle: false,
     sourcemap: false,
@@ -19,25 +19,25 @@ export default defineConfig([
     skipNodeModulesBundle: true,
     outExtension() {
       return {
-        js: '.js',
+        js: ".js",
       }
     },
     loader: {
-      '.icns': 'copy',
-      '.ico': 'copy',
-      '.png': 'copy',
-      '.sql': 'copy'
-    }
+      ".icns": "copy",
+      ".ico": "copy",
+      ".png": "copy",
+      ".sql": "copy",
+    },
   },
   {
-    entry: ['../shared/**/*.ts'],
-    format: ['esm'],
-    target: 'node16',
-    platform: 'node',
-    outDir: '../../dist/shared',
+    entry: ["../shared/**/*.ts"],
+    format: ["esm"],
+    target: "node16",
+    platform: "node",
+    outDir: "../../dist/shared",
     // Native and optional modules must remain as runtime require() calls;
     // electron-builder rebuilds better-sqlite3 for the correct Electron ABI.
-    external: ['better-sqlite3', 'electron', 'electron-devtools-installer', 'electron-trpc'],
+    external: ["better-sqlite3", "electron", "electron-devtools-installer", "electron-trpc"],
     // 'true' doesn't work good with 'external' (ignores)
     bundle: false,
     sourcemap: false,
@@ -47,28 +47,27 @@ export default defineConfig([
     skipNodeModulesBundle: true,
     outExtension() {
       return {
-        js: '.js',
+        js: ".js",
       }
     },
   },
   {
-    entry: ['../preload/preload.ts'],
-    format: ['cjs'],
-    target: 'chrome100',
-    platform: 'browser',
-    outDir: '../../dist/preload/',
+    entry: ["../preload/preload.ts"],
+    format: ["cjs"],
+    target: "chrome100",
+    platform: "browser",
+    outDir: "../../dist/preload/",
     bundle: false,
     sourcemap: false,
     clean: true,
-    noExternal: ['electron-trpc'],
-    external: ['electron'],
+    noExternal: ["electron-trpc"],
+    external: ["electron"],
     shims: true,
     skipNodeModulesBundle: true,
     outExtension() {
       return {
-        js: '.cjs',
+        js: ".cjs",
       }
     },
   },
-  
 ])

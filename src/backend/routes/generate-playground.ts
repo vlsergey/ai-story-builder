@@ -1,8 +1,8 @@
-import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
-import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
-import { SettingsRepository } from '../settings/settings-repository.js'
-import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-import OpenAI from 'openai';
+import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
+import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
+import { LoreNodeRepository } from "../lore/lore-node-repository.js"
+import OpenAI from "openai"
 
 function makeError(message: string, status: number): Error {
   const e = new Error(message)
@@ -16,14 +16,14 @@ export async function generatePlayground(
 ): Promise<{ response_id?: string }> {
   const { instructions, settings = {}, includeExistingLore = false } = params
 
-  if (!instructions?.trim()) throw makeError('instructions is required', 400)
+  if (!instructions?.trim()) throw makeError("instructions is required", 400)
 
   let engine: string | undefined
   const engineFileIds: string[] = []
 
   try {
     engine = SettingsRepository.getCurrentBackend() || undefined
-    if (!engine) throw makeError('no AI engine configured', 400)
+    if (!engine) throw makeError("no AI engine configured", 400)
 
     if (includeExistingLore && engine) {
       const repo = new LoreNodeRepository()
@@ -33,12 +33,14 @@ export async function generatePlayground(
           const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
           const fileId = info[engine]?.file_id
           if (fileId) engineFileIds.push(fileId)
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     }
   } catch (e: any) {
     if (e.status) throw e
-    throw makeError('failed to read project settings: ' + String(e), 500)
+    throw makeError("failed to read project settings: " + String(e), 500)
   }
 
   const adapter = getEngineAdapter(engine)

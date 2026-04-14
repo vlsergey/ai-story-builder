@@ -1,9 +1,0 @@
-{
-    "marketplaceRules": [],
-    "rules": [
-        {
-            "path": "rules\\claudemd.mdc",
-            "isUsed": true
-        }
-    ]
-}

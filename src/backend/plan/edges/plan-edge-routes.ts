@@ -1,8 +1,13 @@
-import type { PlanEdgeType } from '../../../shared/plan-graph.js'
-import { PlanEdgeRepository } from './plan-edge-repository.js'
-import { PlanNodeRepository } from '../nodes/plan-node-repository.js'
-import { isValidEdgeType, canCreateEdge, getEdgeTypeDefinition, EDGE_TYPES } from '../../../shared/node-edge-dictionary.js'
-import { planEdgeEventManager } from './plan-edge-event-manager.js'
+import type { PlanEdgeType } from "../../../shared/plan-graph.js"
+import { PlanEdgeRepository } from "./plan-edge-repository.js"
+import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
+import {
+  isValidEdgeType,
+  canCreateEdge,
+  getEdgeTypeDefinition,
+  EDGE_TYPES,
+} from "../../../shared/node-edge-dictionary.js"
+import { planEdgeEventManager } from "./plan-edge-event-manager.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -13,18 +18,18 @@ function makeError(message: string, status: number): Error {
 }
 
 function makeEdgeTypeError(type: string): Error {
-  const valid = EDGE_TYPES.map(et => et.id).join(', ')
+  const valid = EDGE_TYPES.map((et) => et.id).join(", ")
   return makeError(`Invalid edge type "${type}". Valid types: ${valid}`, 400)
 }
 
 function makeEdgeCompatibilityError(sourceType: string, targetType: string, edgeType: string): Error {
   const edgeDef = getEdgeTypeDefinition(edgeType as any)
   if (edgeDef) {
-    const allowedSource = edgeDef.allowedSourceNodeTypes.join(', ')
-    const allowedTarget = edgeDef.allowedTargetNodeTypes.join(', ')
+    const allowedSource = edgeDef.allowedSourceNodeTypes.join(", ")
+    const allowedTarget = edgeDef.allowedTargetNodeTypes.join(", ")
     return makeError(
       `Edge type "${edgeType}" not allowed between source node type "${sourceType}" and target node type "${targetType}". Allowed source types: ${allowedSource}. Allowed target types: ${allowedTarget}.`,
-      400
+      400,
     )
   }
   return makeError(`Edge type "${edgeType}" not allowed between node types "${sourceType}" and "${targetType}".`, 400)
@@ -40,9 +45,9 @@ export function createGraphEdge(data: {
   label?: string
   template?: string
 }): { id: number | bigint } {
-  const { from_node_id, to_node_id, type = 'text', position = 0, label, template } = data
+  const { from_node_id, to_node_id, type = "text", position = 0, label, template } = data
   if (from_node_id == null || to_node_id == null) {
-    throw makeError('from_node_id and to_node_id required', 400)
+    throw makeError("from_node_id and to_node_id required", 400)
   }
 
   // Validate edge type
@@ -54,7 +59,7 @@ export function createGraphEdge(data: {
   const sourceNode = nodeRepo.findById(from_node_id)
   const targetNode = nodeRepo.findById(to_node_id)
   if (!sourceNode || !targetNode) {
-    throw makeError('source or target node not found', 404)
+    throw makeError("source or target node not found", 404)
   }
 
   // Validate compatibility
@@ -78,13 +83,13 @@ export function createGraphEdge(data: {
 
 export function patchGraphEdge(
   id: number,
-  data: { type?: string; position?: number; label?: string; template?: string }
+  data: { type?: string; position?: number; label?: string; template?: string },
 ): { ok: boolean } {
   const { type, position, label, template } = data
   const edgeRepo = new PlanEdgeRepository()
   const currentEdge = edgeRepo.getById(id)
   if (!currentEdge) {
-    throw makeError('edge not found', 404)
+    throw makeError("edge not found", 404)
   }
 
   // Validate edge type if provided
@@ -96,7 +101,7 @@ export function patchGraphEdge(
     const sourceNode = nodeRepo.findById(currentEdge.from_node_id)
     const targetNode = nodeRepo.findById(currentEdge.to_node_id)
     if (!sourceNode || !targetNode) {
-      throw makeError('source or target node not found', 404)
+      throw makeError("source or target node not found", 404)
     }
     if (!canCreateEdge(sourceNode.type as any, targetNode.type as any, type as any)) {
       throw makeEdgeCompatibilityError(sourceNode.type, targetNode.type, type)
@@ -104,7 +109,7 @@ export function patchGraphEdge(
   }
 
   if (type == null && position == null && label === undefined && template === undefined) {
-    throw makeError('at least one field required', 400)
+    throw makeError("at least one field required", 400)
   }
 
   const updateFields: any = {}
@@ -122,7 +127,7 @@ export function deleteGraphEdge(id: number): { ok: boolean } {
   const edgeRepo = new PlanEdgeRepository()
   const edge = edgeRepo.getById(id)
   if (!edge) {
-    throw makeError('edge not found', 404)
+    throw makeError("edge not found", 404)
   }
   edgeRepo.delete(id)
   planEdgeEventManager.emitUpdate(id)

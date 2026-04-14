@@ -1,15 +1,15 @@
-import { PlanNodeService } from '../plan-node-service.js'
-import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
-import type { SplitSettings } from '../../../../shared/node-settings.js'
-import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
+import { PlanNodeService } from "../plan-node-service.js"
+import type { NodeProcessor } from "./node-processor.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { SplitSettings } from "../../../../shared/node-settings.js"
+import { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**
  * Processor for 'split' nodes.
  */
 export class SplitProcessor implements NodeProcessor<SplitSettings> {
   readonly defaultSettings: SplitSettings = {
-    separator: '',
+    separator: "",
     dropFirst: 0,
     dropLast: 0,
     autoUpdate: false,
@@ -39,7 +39,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
         const parsed = JSON.parse(node.content)
         if (Array.isArray(parsed)) {
           // Assume each element has a 'content' field (or is a string)
-          return parsed.map((item: any) => typeof item === 'string' ? item : item.content || '')
+          return parsed.map((item: any) => (typeof item === "string" ? item : item.content || ""))
         }
       } catch (_) {
         // Not valid JSON, treat as empty array
@@ -74,7 +74,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
       return [text]
     }
     try {
-      const regex = new RegExp(regexPattern, 'g')
+      const regex = new RegExp(regexPattern, "g")
       return text.split(regex)
     } catch (_) {
       // If regex is invalid, treat as literal string split
@@ -82,7 +82,12 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     }
   }
 
-  async onInputContentChange(context: PlanNodeService, nodeData: PlanNodeRow, changedInputNodeId: number, settings: SplitSettings): Promise<PlanNodeUpdate | null> {
+  async onInputContentChange(
+    context: PlanNodeService,
+    nodeData: PlanNodeRow,
+    changedInputNodeId: number,
+    settings: SplitSettings,
+  ): Promise<PlanNodeUpdate | null> {
     // Check if auto‑update is enabled
     if (!settings.autoUpdate) {
       return null
@@ -111,7 +116,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     const parts = this.splitInput(service, node, settings)
     console.log(`[SplitProcessor] splitInput returned parts:`, parts)
     return {
-      content: JSON.stringify(parts)
+      content: JSON.stringify(parts),
     }
   }
 }

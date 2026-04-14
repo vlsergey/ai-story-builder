@@ -9,5 +9,5 @@
  *   — namely \ / : * ? " < > | and the null byte — are replaced with _.
  */
 export function sanitizeProjectName(name: string): string {
-  return name.replace(/[\\/:*?"<>|\x00]/g, '_')
+  return name.replace(/[\\/:*?"<>|\x00]/g, "_")
 }

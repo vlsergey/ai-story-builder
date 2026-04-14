@@ -1,41 +1,39 @@
-
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
   "root": true,
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true
-	},
-	"formatter": {
-		"enabled": false,
-		"formatWithErrors": false,
-		"indentStyle": "space",
-		"indentWidth": 2,
-		"lineWidth": 100,
-		"lineEnding": "auto"
-	},
-	"assist": {
-		"enabled": false,
-		"actions": {
-			"source": {
-				"organizeImports": "on"
-			}
-		}
-	},
-	"linter": {
+  "vcs": {
     "enabled": true,
-		"rules": {
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120,
+    "lineEnding": "auto"
+  },
+  "assist": {
+    "enabled": false,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
       "recommended": true,
-			"a11y": {
-				"noRedundantRoles": "off",
-				"noStaticElementInteractions": "off",
-				"useAriaPropsSupportedByRole": "off",
-				"useButtonType": "off",
-				"useKeyWithClickEvents": "off",
-				"useSemanticElements": "off"
-			},
-			"complexity": {
+      "a11y": {
+        "noRedundantRoles": "off",
+        "noStaticElementInteractions": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "useButtonType": "off",
+        "useKeyWithClickEvents": "off",
+        "useSemanticElements": "off"
+      },
+      "complexity": {
         "noImportantStyles": "off",
         "noStaticOnlyClass": "off",
         "noThisInStatic": "off",
@@ -76,5 +74,10 @@
         "noControlCharactersInRegex": "off"
       }
     }
-	}
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded"
+    }
+  }
 }

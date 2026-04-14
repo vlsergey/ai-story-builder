@@ -1,7 +1,7 @@
-import fs from 'fs'
-import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-import { LoreNodeCreate, LoreNodeRow } from '../../shared/lore-node.js';
-import { loreEventManager } from './lore-event-manager.js'
+import fs from "fs"
+import { LoreNodeRepository } from "../lore/lore-node-repository.js"
+import { LoreNodeCreate, LoreNodeRow } from "../../shared/lore-node.js"
+import { loreEventManager } from "./lore-event-manager.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -15,15 +15,15 @@ function makeError(message: string, status: number): Error {
 
 function countWords(text: string): number {
   const t = text.trim()
-  return t === '' ? 0 : t.split(/\s+/).length
+  return t === "" ? 0 : t.split(/\s+/).length
 }
 
 function countChars(text: string): number {
-  return [...text].length  // Unicode code points
+  return [...text].length // Unicode code points
 }
 
 function countBytes(text: string): number {
-  return Buffer.byteLength(text, 'utf8')
+  return Buffer.byteLength(text, "utf8")
 }
 
 // ── Tree ──────────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ export function importLoreNode(data: { title: string; content: string; parentId:
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
 export function create(data: LoreNodeCreate): { id: number } {
-  if (!data.title?.trim()) throw makeError('name required', 400)
+  if (!data.title?.trim()) throw makeError("name required", 400)
   const repo = new LoreNodeRepository()
   const pid = data.parent_id ?? null
   const maxPos = repo.getMaxPosition(pid)
@@ -69,17 +69,17 @@ export function create(data: LoreNodeCreate): { id: number } {
 }
 
 export function reorderLoreChildren(child_ids: number[]): { ok: boolean } {
-  if (!Array.isArray(child_ids)) throw makeError('child_ids must be an array', 400)
+  if (!Array.isArray(child_ids)) throw makeError("child_ids must be an array", 400)
   const repo = new LoreNodeRepository()
   repo.reorderChildren(child_ids)
-  child_ids.forEach(id => loreEventManager.emitUpdate(id))
+  child_ids.forEach((id) => loreEventManager.emitUpdate(id))
   return { ok: true }
 }
 
 export function getLoreNode(id: number): LoreNodeRow {
   const repo = new LoreNodeRepository()
   const node = repo.getById(id)
-  if (!node) throw makeError('node not found', 404)
+  if (!node) throw makeError("node not found", 404)
   return node
 }
 
@@ -93,7 +93,7 @@ export function patchLoreNode(
     ai_user_prompt?: string | null
     ai_system_prompt?: string | null
     ai_settings?: string | null
-  }
+  },
 ): {
   ok: boolean
   word_count?: number | null
@@ -102,20 +102,28 @@ export function patchLoreNode(
   ai_sync_info?: Record<string, Record<string, unknown>> | null
 } {
   const { title: title, content, start_review, accept_review, ai_user_prompt, ai_system_prompt, ai_settings } = data
-  const hasName = typeof title === 'string' && title.trim().length > 0
+  const hasName = typeof title === "string" && title.trim().length > 0
   const hasContent = content !== undefined
   const hasAiUserPrompt = ai_user_prompt !== undefined
   const hasAiSystemPrompt = ai_system_prompt !== undefined
   const hasAiSettings = ai_settings !== undefined
   const hasStartReview = start_review === true
   const hasAcceptReview = accept_review === true
-  if (!hasName && !hasContent && !hasAiUserPrompt && !hasAiSystemPrompt && !hasAiSettings && !hasStartReview && !hasAcceptReview) {
-    throw makeError('title or content required', 400)
+  if (
+    !hasName &&
+    !hasContent &&
+    !hasAiUserPrompt &&
+    !hasAiSystemPrompt &&
+    !hasAiSettings &&
+    !hasStartReview &&
+    !hasAcceptReview
+  ) {
+    throw makeError("title or content required", 400)
   }
 
   const repo = new LoreNodeRepository()
   const node = repo.getById(id)
-  if (!node) throw makeError('node not found', 404)
+  if (!node) throw makeError("node not found", 404)
 
   const updates: Partial<LoreNodeRow> = {}
   if (hasName) updates.title = title.trim()
@@ -140,7 +148,9 @@ export function patchLoreNode(
         }
         updates.ai_sync_info = JSON.stringify(syncInfo)
         updatedSyncInfo = syncInfo
-      } catch { /* ignore malformed JSON */ }
+      } catch {
+        /* ignore malformed JSON */
+      }
     }
   }
 
@@ -164,7 +174,7 @@ export function patchLoreNode(
     updates.in_review = 1
     updates.ai_improve_instruction = ai_user_prompt ?? null
     if (node.in_review !== 1) {
-      updates.review_base_content = node.content ?? ''
+      updates.review_base_content = node.content ?? ""
     }
   }
 
@@ -187,8 +197,8 @@ export function patchLoreNode(
 export function deleteLoreNode(id: number): { ok: boolean } {
   const repo = new LoreNodeRepository()
   const node = repo.getById(id)
-  if (!node) throw makeError('node not found', 404)
-  if (node.parent_id === null) throw makeError('root node cannot be deleted', 403)
+  if (!node) throw makeError("node not found", 404)
+  if (node.parent_id === null) throw makeError("root node cannot be deleted", 403)
   repo.markForDeletionRecursive(id)
   loreEventManager.emitUpdate(id)
   return { ok: true }
@@ -215,23 +225,23 @@ export function moveLoreNode(id: number, data: { parent_id?: number | null }): {
   const newParentId = parent_id ?? null
 
   const node = repo.getNodeInfo(nodeId)
-  if (!node) throw makeError('node not found', 404)
-  if (node.parent_id === null) throw makeError('root node cannot be moved', 403)
+  if (!node) throw makeError("node not found", 404)
+  if (node.parent_id === null) throw makeError("root node cannot be moved", 403)
 
-  if (newParentId === nodeId) throw makeError('cannot move node to itself', 400)
+  if (newParentId === nodeId) throw makeError("cannot move node to itself", 400)
 
   if (newParentId !== null) {
     const target = repo.getNodeInfo(newParentId)
-    if (!target) throw makeError('target parent does not exist', 400)
+    if (!target) throw makeError("target parent does not exist", 400)
     if (target.to_be_deleted && !node.to_be_deleted) {
-      throw makeError('cannot move active node into a node marked for deletion', 400)
+      throw makeError("cannot move active node into a node marked for deletion", 400)
     }
   }
 
   if (newParentId !== null) {
     const parentChain = repo.getParentChain(newParentId)
     if (parentChain.includes(nodeId)) {
-      throw makeError('cannot move node into its own descendant', 400)
+      throw makeError("cannot move node into its own descendant", 400)
     }
   }
 

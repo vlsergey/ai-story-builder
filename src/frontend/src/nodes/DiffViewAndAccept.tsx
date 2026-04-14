@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import * as Diff from 'diff'
-import { ChevronLeft, ChevronRight, Check, X, WrapText, Pilcrow } from 'lucide-react'
-import { useLocale } from '../lib/locale'
+import React, { useEffect, useMemo, useRef, useState } from "react"
+import * as Diff from "diff"
+import { ChevronLeft, ChevronRight, Check, X, WrapText, Pilcrow } from "lucide-react"
+import { useLocale } from "../lib/locale"
 
 export interface DiffViewAndAcceptProps {
   oldText: string
   newText: string
   /** 'split' = side-by-side read-only; 'unified' = per-hunk accept/reject */
-  viewType: 'split' | 'unified'
+  viewType: "split" | "unified"
   /** Called when a hunk is rejected — new content with that hunk reverted to old */
   onChange?: (newContent: string) => void
   /** Called when a hunk is accepted — new base with that hunk promoted from new */
@@ -22,20 +22,20 @@ const CONTEXT = 3
 
 interface NormLine {
   idx: number
-  type: 'add' | 'del' | 'eq'
+  type: "add" | "del" | "eq"
   text: string
-  hunkId?: number  // set for 'add'/'del' lines
+  hunkId?: number // set for 'add'/'del' lines
 }
 
 interface Hunk {
   id: number
   /** Indices into normLines for all lines belonging to this hunk's display range */
-  displayRange: [number, number]  // [start, end] inclusive
+  displayRange: [number, number] // [start, end] inclusive
 }
 
 type Section =
-  | { type: 'hunk'; hunk: Hunk; hunkIdx: number }
-  | { type: 'gap'; count: number; startLine: number; sectionIdx: number }
+  | { type: "hunk"; hunk: Hunk; hunkIdx: number }
+  | { type: "gap"; count: number; startLine: number; sectionIdx: number }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -43,11 +43,11 @@ function toDiffLines(oldText: string, newText: string, ignoreWhitespace = false)
   const parts = Diff.diffLines(oldText, newText, { ignoreWhitespace })
   const lines: NormLine[] = []
   for (const part of parts) {
-    const raw = part.value.endsWith('\n') ? part.value.slice(0, -1) : part.value
-    for (const text of raw.split('\n')) {
+    const raw = part.value.endsWith("\n") ? part.value.slice(0, -1) : part.value
+    for (const text of raw.split("\n")) {
       lines.push({
         idx: lines.length,
-        type: part.added ? 'add' : part.removed ? 'del' : 'eq',
+        type: part.added ? "add" : part.removed ? "del" : "eq",
         text,
       })
     }
@@ -56,27 +56,26 @@ function toDiffLines(oldText: string, newText: string, ignoreWhitespace = false)
 }
 
 function computeHunks(lines: NormLine[]): Hunk[] {
-  const changeIdxs = lines.filter(l => l.type !== 'eq').map(l => l.idx)
+  const changeIdxs = lines.filter((l) => l.type !== "eq").map((l) => l.idx)
   if (changeIdxs.length === 0) return []
 
   const clusters: Array<[number, number]> = []
-  let cs = changeIdxs[0], ce = changeIdxs[0]
+  let cs = changeIdxs[0],
+    ce = changeIdxs[0]
   for (let i = 1; i < changeIdxs.length; i++) {
     if (changeIdxs[i] - ce <= 2 * CONTEXT) {
       ce = changeIdxs[i]
     } else {
       clusters.push([cs, ce])
-      cs = changeIdxs[i]; ce = changeIdxs[i]
+      cs = changeIdxs[i]
+      ce = changeIdxs[i]
     }
   }
   clusters.push([cs, ce])
 
   return clusters.map(([start, end], id) => ({
     id,
-    displayRange: [
-      Math.max(0, start - CONTEXT),
-      Math.min(lines.length - 1, end + CONTEXT),
-    ] as [number, number],
+    displayRange: [Math.max(0, start - CONTEXT), Math.min(lines.length - 1, end + CONTEXT)] as [number, number],
   }))
 }
 
@@ -84,28 +83,25 @@ function assignHunkIds(lines: NormLine[], hunks: Hunk[]): void {
   for (const hunk of hunks) {
     const [s, e] = hunk.displayRange
     for (let i = s; i <= e; i++) {
-      if (lines[i].type !== 'eq') lines[i].hunkId = hunk.id
+      if (lines[i].type !== "eq") lines[i].hunkId = hunk.id
     }
   }
 }
 
-function recomputeContent(
-  lines: NormLine[],
-  decisions: Record<number, 'accepted' | 'rejected'>,
-): string {
+function recomputeContent(lines: NormLine[], decisions: Record<number, "accepted" | "rejected">): string {
   const out: string[] = []
   for (const line of lines) {
-    if (line.type === 'eq') {
+    if (line.type === "eq") {
       out.push(line.text)
-    } else if (line.type === 'del') {
-      const d = line.hunkId !== undefined ? (decisions[line.hunkId] ?? 'accepted') : 'accepted'
-      if (d === 'rejected') out.push(line.text)
+    } else if (line.type === "del") {
+      const d = line.hunkId !== undefined ? (decisions[line.hunkId] ?? "accepted") : "accepted"
+      if (d === "rejected") out.push(line.text)
     } else {
-      const d = line.hunkId !== undefined ? (decisions[line.hunkId] ?? 'accepted') : 'accepted'
-      if (d === 'accepted') out.push(line.text)
+      const d = line.hunkId !== undefined ? (decisions[line.hunkId] ?? "accepted") : "accepted"
+      if (d === "accepted") out.push(line.text)
     }
   }
-  return out.join('\n')
+  return out.join("\n")
 }
 
 function buildSections(hunks: Hunk[], lineCount: number): Section[] {
@@ -116,34 +112,34 @@ function buildSections(hunks: Hunk[], lineCount: number): Section[] {
     const hunk = hunks[hi]
     const [s] = hunk.displayRange
     if (s > pos) {
-      sections.push({ type: 'gap', count: s - pos, startLine: pos, sectionIdx: sectionIdx++ })
+      sections.push({ type: "gap", count: s - pos, startLine: pos, sectionIdx: sectionIdx++ })
     }
-    sections.push({ type: 'hunk', hunk, hunkIdx: hi })
+    sections.push({ type: "hunk", hunk, hunkIdx: hi })
     sectionIdx++
     pos = hunk.displayRange[1] + 1
   }
   if (pos < lineCount) {
-    sections.push({ type: 'gap', count: lineCount - pos, startLine: pos, sectionIdx: sectionIdx++ })
+    sections.push({ type: "gap", count: lineCount - pos, startLine: pos, sectionIdx: sectionIdx++ })
   }
   return sections
 }
 
 // Build paired left/right columns for a set of lines (for split view)
 function buildSplitColumns(hunkLines: NormLine[]) {
-  const left: Array<{ text: string; type: 'del' | 'eq' | 'empty' }> = []
-  const right: Array<{ text: string; type: 'add' | 'eq' | 'empty' }> = []
+  const left: Array<{ text: string; type: "del" | "eq" | "empty" }> = []
+  const right: Array<{ text: string; type: "add" | "eq" | "empty" }> = []
   for (const line of hunkLines) {
-    if (line.type === 'del') {
-      left.push({ text: line.text, type: 'del' })
-    } else if (line.type === 'add') {
-      right.push({ text: line.text, type: 'add' })
+    if (line.type === "del") {
+      left.push({ text: line.text, type: "del" })
+    } else if (line.type === "add") {
+      right.push({ text: line.text, type: "add" })
     } else {
-      left.push({ text: line.text, type: 'eq' })
-      right.push({ text: line.text, type: 'eq' })
+      left.push({ text: line.text, type: "eq" })
+      right.push({ text: line.text, type: "eq" })
     }
   }
-  while (left.length < right.length) left.push({ text: '', type: 'empty' })
-  while (right.length < left.length) right.push({ text: '', type: 'empty' })
+  while (left.length < right.length) left.push({ text: "", type: "empty" })
+  while (right.length < left.length) right.push({ text: "", type: "empty" })
   return { left, right }
 }
 
@@ -166,7 +162,7 @@ function Toolbar({
 }: {
   hunkCount: number
   currentIdx: number
-  currentDecision: 'accepted' | 'rejected' | undefined
+  currentDecision: "accepted" | "rejected" | undefined
   wordWrap: boolean
   ignoreWhitespace: boolean
   onPrev: () => void
@@ -191,7 +187,7 @@ function Toolbar({
         <ChevronLeft size={14} />
       </button>
       <span className="text-muted-foreground min-w-14 text-center tabular-nums">
-        {hunkCount === 0 ? '–' : `${currentIdx + 1} / ${hunkCount}`}
+        {hunkCount === 0 ? "–" : `${currentIdx + 1} / ${hunkCount}`}
       </span>
       <button
         onClick={onNext}
@@ -208,37 +204,37 @@ function Toolbar({
           <button
             onClick={onAccept}
             className={`flex items-center gap-1 px-2 py-0.5 rounded font-medium transition-colors ${
-              currentDecision === 'accepted'
-                ? 'bg-green-500 text-white'
-                : 'border border-green-500/60 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30'
+              currentDecision === "accepted"
+                ? "bg-green-500 text-white"
+                : "border border-green-500/60 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30"
             }`}
           >
             <Check size={12} />
-            {t('lore.hunk_accept')}
+            {t("lore.hunk_accept")}
           </button>
           <button
             onClick={onReject}
             className={`flex items-center gap-1 px-2 py-0.5 rounded font-medium transition-colors ${
-              currentDecision === 'rejected'
-                ? 'bg-red-500 text-white'
-                : 'border border-red-500/60 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30'
+              currentDecision === "rejected"
+                ? "bg-red-500 text-white"
+                : "border border-red-500/60 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
             }`}
           >
             <X size={12} />
-            {t('lore.hunk_reject')}
+            {t("lore.hunk_reject")}
           </button>
           <div className="w-px h-4 bg-border mx-1" />
           <button
             onClick={onAcceptAll}
             className="px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors"
           >
-            {t('lore.accept_all')}
+            {t("lore.accept_all")}
           </button>
           <button
             onClick={onRejectAll}
             className="px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors"
           >
-            {t('lore.reject_all')}
+            {t("lore.reject_all")}
           </button>
         </>
       )}
@@ -246,14 +242,14 @@ function Toolbar({
       <div className="w-px h-4 bg-border mx-1" />
       <button
         onClick={onToggleWordWrap}
-        className={`p-0.5 rounded transition-colors ${wordWrap ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+        className={`p-0.5 rounded transition-colors ${wordWrap ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"}`}
         title="Toggle word wrap"
       >
         <WrapText size={14} />
       </button>
       <button
         onClick={onToggleIgnoreWhitespace}
-        className={`p-0.5 rounded transition-colors ${ignoreWhitespace ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+        className={`p-0.5 rounded transition-colors ${ignoreWhitespace ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"}`}
         title="Ignore whitespace"
       >
         <Pilcrow size={14} />
@@ -282,24 +278,20 @@ function SplitView({
   const [expandedGaps, setExpandedGaps] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    hunkRefs.current[currentHunkIdx]?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+    hunkRefs.current[currentHunkIdx]?.scrollIntoView?.({ behavior: "smooth", block: "nearest" })
   }, [currentHunkIdx])
 
   if (hunks.length === 0) {
-    return (
-      <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground">
-        No changes
-      </div>
-    )
+    return <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground">No changes</div>
   }
 
   const sections = buildSections(hunks, lines.length)
-  const wsCls = wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre'
+  const wsCls = wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
 
   return (
     <div className="flex-1 overflow-auto font-mono text-xs">
       {sections.map((sec) => {
-        if (sec.type === 'gap') {
+        if (sec.type === "gap") {
           const isExpanded = expandedGaps.has(sec.sectionIdx)
           if (isExpanded) {
             const gapLines = lines.slice(sec.startLine, sec.startLine + sec.count)
@@ -326,10 +318,10 @@ function SplitView({
           return (
             <button
               key={sec.sectionIdx}
-              onClick={() => setExpandedGaps(s => new Set([...s, sec.sectionIdx]))}
+              onClick={() => setExpandedGaps((s) => new Set([...s, sec.sectionIdx]))}
               className="w-full px-3 py-1 bg-muted/50 text-muted-foreground text-xs border-y border-border/40 hover:bg-muted transition-colors text-left"
             >
-              {t('lore.expand_lines')} ({sec.count})
+              {t("lore.expand_lines")} ({sec.count})
             </button>
           )
         }
@@ -343,37 +335,39 @@ function SplitView({
         return (
           <div
             key={hunk.id}
-            ref={el => { hunkRefs.current[hunkIdx] = el }}
+            ref={(el) => {
+              hunkRefs.current[hunkIdx] = el
+            }}
             onClick={() => onHunkClick(hunkIdx)}
             className={`border-y transition-colors cursor-pointer border-l-4 ${
               isCurrent
-                ? 'border-l-blue-500 border-blue-300/50 dark:border-blue-600/50 bg-blue-50/40 dark:bg-blue-950/20'
-                : 'border-l-transparent border-border/40'
+                ? "border-l-blue-500 border-blue-300/50 dark:border-blue-600/50 bg-blue-50/40 dark:bg-blue-950/20"
+                : "border-l-transparent border-border/40"
             }`}
           >
             <div className="flex">
-              <div className={`flex-1 border-r border-border ${wordWrap ? '' : 'overflow-x-auto'}`}>
+              <div className={`flex-1 border-r border-border ${wordWrap ? "" : "overflow-x-auto"}`}>
                 {left.map((l, i) => (
                   <div
                     key={i}
                     className={`px-2 py-0.5 ${wsCls} leading-5 ${
-                      l.type === 'del' ? 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300' : ''
+                      l.type === "del" ? "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300" : ""
                     }`}
                   >
-                    {l.type === 'del' && <span className="select-none text-red-400 mr-1">-</span>}
+                    {l.type === "del" && <span className="select-none text-red-400 mr-1">-</span>}
                     {l.text || <span className="text-transparent">_</span>}
                   </div>
                 ))}
               </div>
-              <div className={`flex-1 ${wordWrap ? '' : 'overflow-x-auto'}`}>
+              <div className={`flex-1 ${wordWrap ? "" : "overflow-x-auto"}`}>
                 {right.map((l, i) => (
                   <div
                     key={i}
                     className={`px-2 py-0.5 ${wsCls} leading-5 ${
-                      l.type === 'add' ? 'bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300' : ''
+                      l.type === "add" ? "bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300" : ""
                     }`}
                   >
-                    {l.type === 'add' && <span className="select-none text-green-400 mr-1">+</span>}
+                    {l.type === "add" && <span className="select-none text-green-400 mr-1">+</span>}
                     {l.text || <span className="text-transparent">_</span>}
                   </div>
                 ))}
@@ -400,7 +394,7 @@ function UnifiedView({
   hunks: Hunk[]
   currentHunkIdx: number
   wordWrap: boolean
-  onDecide: (hunkId: number, decision: 'accepted' | 'rejected') => void
+  onDecide: (hunkId: number, decision: "accepted" | "rejected") => void
   onHunkClick: (idx: number) => void
 }) {
   const { t } = useLocale()
@@ -408,24 +402,20 @@ function UnifiedView({
   const [expandedGaps, setExpandedGaps] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    hunkRefs.current[currentHunkIdx]?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+    hunkRefs.current[currentHunkIdx]?.scrollIntoView?.({ behavior: "smooth", block: "nearest" })
   }, [currentHunkIdx])
 
   if (hunks.length === 0) {
-    return (
-      <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground">
-        No changes
-      </div>
-    )
+    return <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground">No changes</div>
   }
 
   const sections = buildSections(hunks, lines.length)
-  const wsCls = wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre'
+  const wsCls = wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
 
   return (
     <div className="flex-1 overflow-auto font-mono text-xs">
       {sections.map((sec) => {
-        if (sec.type === 'gap') {
+        if (sec.type === "gap") {
           const isExpanded = expandedGaps.has(sec.sectionIdx)
           if (isExpanded) {
             const gapLines = lines.slice(sec.startLine, sec.startLine + sec.count)
@@ -443,10 +433,10 @@ function UnifiedView({
           return (
             <button
               key={sec.sectionIdx}
-              onClick={() => setExpandedGaps(s => new Set([...s, sec.sectionIdx]))}
+              onClick={() => setExpandedGaps((s) => new Set([...s, sec.sectionIdx]))}
               className="w-full px-3 py-1 bg-muted/50 text-muted-foreground text-xs border-y border-border/40 hover:bg-muted transition-colors text-left"
             >
-              {t('lore.expand_lines')} ({sec.count})
+              {t("lore.expand_lines")} ({sec.count})
             </button>
           )
         }
@@ -459,11 +449,13 @@ function UnifiedView({
         return (
           <div
             key={hunk.id}
-            ref={el => { hunkRefs.current[hunkIdx] = el }}
+            ref={(el) => {
+              hunkRefs.current[hunkIdx] = el
+            }}
             className={`border-y transition-colors border-l-4 ${
               isCurrent
-                ? 'border-l-blue-500 border-blue-300/50 dark:border-blue-600/50 bg-blue-50/40 dark:bg-blue-950/20'
-                : 'border-l-transparent border-border/40'
+                ? "border-l-blue-500 border-blue-300/50 dark:border-blue-600/50 bg-blue-50/40 dark:bg-blue-950/20"
+                : "border-l-transparent border-border/40"
             }`}
           >
             {/* Hunk header */}
@@ -471,31 +463,44 @@ function UnifiedView({
               onClick={() => onHunkClick(hunkIdx)}
               className="flex items-center gap-2 px-2 py-1 border-b border-border/40 cursor-pointer bg-muted/30"
             >
-              <span className={`flex-1 text-xs ${isCurrent ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-muted-foreground'}`}>
-                {t('lore.hunk_label')} {hunkIdx + 1}
+              <span
+                className={`flex-1 text-xs ${isCurrent ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-muted-foreground"}`}
+              >
+                {t("lore.hunk_label")} {hunkIdx + 1}
               </span>
               <button
-                onClick={e => { e.stopPropagation(); onDecide(hunk.id, 'accepted') }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDecide(hunk.id, "accepted")
+                }}
                 className="flex items-center gap-1 px-2 py-0.5 rounded font-medium transition-colors border border-green-500/60 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30"
               >
                 <Check size={10} />
-                {t('lore.hunk_accept')}
+                {t("lore.hunk_accept")}
               </button>
               <button
-                onClick={e => { e.stopPropagation(); onDecide(hunk.id, 'rejected') }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDecide(hunk.id, "rejected")
+                }}
                 className="flex items-center gap-1 px-2 py-0.5 rounded font-medium transition-colors border border-red-500/60 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
               >
                 <X size={10} />
-                {t('lore.hunk_reject')}
+                {t("lore.hunk_reject")}
               </button>
             </div>
 
             {/* Lines */}
             {hunkLines.map((line, li) => {
-              let bg = ''
-              let prefix = ' '
-              if (line.type === 'del') { bg = 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300'; prefix = '-' }
-              else if (line.type === 'add') { bg = 'bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300'; prefix = '+' }
+              let bg = ""
+              let prefix = " "
+              if (line.type === "del") {
+                bg = "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300"
+                prefix = "-"
+              } else if (line.type === "add") {
+                bg = "bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300"
+                prefix = "+"
+              }
               return (
                 <div key={li} className={`flex px-2 py-0.5 ${wsCls} leading-5 ${bg}`}>
                   <span className="w-4 shrink-0 select-none text-muted-foreground">{prefix}</span>
@@ -535,29 +540,31 @@ export default function DiffViewAndAccept({
   // Keep currentHunkIdx in bounds when hunks count changes (after parent updates texts)
   useEffect(() => {
     if (hunks.length === 0) return
-    setCurrentHunkIdx(i => Math.min(i, hunks.length - 1)) // eslint-disable-line react-hooks/set-state-in-effect
+    setCurrentHunkIdx((i) => Math.min(i, hunks.length - 1)) // eslint-disable-line react-hooks/set-state-in-effect
   }, [hunks.length])
 
   function goToPrev() {
-    setCurrentHunkIdx(i => Math.max(0, i - 1))
+    setCurrentHunkIdx((i) => Math.max(0, i - 1))
   }
 
   function goToNext() {
-    setCurrentHunkIdx(i => Math.min(hunks.length - 1, i + 1))
+    setCurrentHunkIdx((i) => Math.min(hunks.length - 1, i + 1))
   }
 
-  function decide(hunkId: number, decision: 'accepted' | 'rejected') {
-    const hunkIdx = hunks.findIndex(h => h.id === hunkId)
-    if (decision === 'accepted') {
+  function decide(hunkId: number, decision: "accepted" | "rejected") {
+    const hunkIdx = hunks.findIndex((h) => h.id === hunkId)
+    if (decision === "accepted") {
       // Promote this hunk's new lines into oldText — diff will no longer show it
-      const newBase = recomputeContent(lines,
-        Object.fromEntries(hunks.map(h => [h.id, h.id === hunkId ? 'accepted' : 'rejected']))
+      const newBase = recomputeContent(
+        lines,
+        Object.fromEntries(hunks.map((h) => [h.id, h.id === hunkId ? "accepted" : "rejected"])),
       )
       onBaseChange?.(newBase)
     } else {
       // Revert this hunk's new lines in newText — diff will no longer show it
-      const newContent = recomputeContent(lines,
-        Object.fromEntries(hunks.map(h => [h.id, h.id === hunkId ? 'rejected' : 'accepted']))
+      const newContent = recomputeContent(
+        lines,
+        Object.fromEntries(hunks.map((h) => [h.id, h.id === hunkId ? "rejected" : "accepted"])),
       )
       onChange?.(newContent)
     }
@@ -567,12 +574,12 @@ export default function DiffViewAndAccept({
   }
 
   function acceptAll() {
-    onBaseChange?.(newText)  // old becomes new → no diff
+    onBaseChange?.(newText) // old becomes new → no diff
     onAllResolved?.()
   }
 
   function rejectAll() {
-    onChange?.(oldText)  // new becomes old → no diff
+    onChange?.(oldText) // new becomes old → no diff
     onAllResolved?.()
   }
 
@@ -586,14 +593,14 @@ export default function DiffViewAndAccept({
         ignoreWhitespace={ignoreWhitespace}
         onPrev={goToPrev}
         onNext={goToNext}
-        onAccept={() => hunks.length > 0 && decide(hunks[currentHunkIdx].id, 'accepted')}
-        onReject={() => hunks.length > 0 && decide(hunks[currentHunkIdx].id, 'rejected')}
+        onAccept={() => hunks.length > 0 && decide(hunks[currentHunkIdx].id, "accepted")}
+        onReject={() => hunks.length > 0 && decide(hunks[currentHunkIdx].id, "rejected")}
         onAcceptAll={acceptAll}
         onRejectAll={rejectAll}
-        onToggleWordWrap={() => setWordWrap(v => !v)}
-        onToggleIgnoreWhitespace={() => setIgnoreWhitespace(v => !v)}
+        onToggleWordWrap={() => setWordWrap((v) => !v)}
+        onToggleIgnoreWhitespace={() => setIgnoreWhitespace((v) => !v)}
       />
-      {viewType === 'split' ? (
+      {viewType === "split" ? (
         <SplitView
           lines={lines}
           hunks={hunks}

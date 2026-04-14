@@ -20,25 +20,27 @@ export function isVerboseLogging(): boolean {
 
 /** Masks the token in an Authorization header value, keeping the scheme visible. */
 function maskAuth(value: string): string {
-  return value.replace(/^(Bearer\s+)\S+$/i, '$1***')
+  return value.replace(/^(Bearer\s+)\S+$/i, "$1***")
 }
 
 type FetchParams = Parameters<typeof fetch>
 type RequestInitOrUndefined = FetchParams[1]
-type HeadersField = NonNullable<RequestInitOrUndefined>['headers']
+type HeadersField = NonNullable<RequestInitOrUndefined>["headers"]
 /** Normalises request headers (Headers | Record | [k,v][]) to a plain masked object for logging. */
 export function maskedHeaders(raw: HeadersField | undefined): Record<string, string> {
   const out: Record<string, string> = {}
   if (!raw) return out
   if (raw instanceof Headers) {
-    raw.forEach((v, k) => { out[k] = k.toLowerCase() === 'authorization' ? maskAuth(v) : v })
+    raw.forEach((v, k) => {
+      out[k] = k.toLowerCase() === "authorization" ? maskAuth(v) : v
+    })
   } else if (Array.isArray(raw)) {
     for (const [k, v] of raw as string[][]) {
-      out[k] = k.toLowerCase() === 'authorization' ? maskAuth(v) : v
+      out[k] = k.toLowerCase() === "authorization" ? maskAuth(v) : v
     }
   } else {
     for (const [k, v] of Object.entries(raw)) {
-      out[k] = k.toLowerCase() === 'authorization' ? maskAuth(v) : v
+      out[k] = k.toLowerCase() === "authorization" ? maskAuth(v) : v
     }
   }
   return out
@@ -50,23 +52,23 @@ export function maskedHeaders(raw: HeadersField | undefined): Record<string, str
  * @param providerName  Label used in log lines, e.g. `'Yandex'` or `'Grok'`.
  * @param baseUrl       Base URL stripped from logged URLs for brevity.
  */
-export function makeLoggingFetch(
-  providerName: string,
-  baseUrl: string,
-): typeof globalThis.fetch {
-  return async function loggingFetch(url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> {
-    const method = (init?.method ?? 'GET').padEnd(6)
-    const shortUrl = String(url).replace(baseUrl + '/', '')
+export function makeLoggingFetch(providerName: string, baseUrl: string): typeof globalThis.fetch {
+  return async function loggingFetch(
+    url: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> {
+    const method = (init?.method ?? "GET").padEnd(6)
+    const shortUrl = String(url).replace(baseUrl + "/", "")
     const start = Date.now()
 
-    let reqSize = ''
+    let reqSize = ""
     if (init?.body) {
-      if (typeof init.body === 'string') {
-        reqSize = ` req:${Buffer.byteLength(init.body, 'utf-8')}B`
+      if (typeof init.body === "string") {
+        reqSize = ` req:${Buffer.byteLength(init.body, "utf-8")}B`
       } else if (Buffer.isBuffer(init.body)) {
         reqSize = ` req:${(init.body as Buffer).length}B`
       } else {
-        reqSize = ' req:multipart'
+        reqSize = " req:multipart"
       }
     }
 
@@ -74,7 +76,7 @@ export function makeLoggingFetch(
       const ts = new Date().toISOString()
       console.log(`[${providerName}] [${ts}] REQ ${method.trim()} ${shortUrl}`)
       console.log(`[${providerName}] REQ headers: ${JSON.stringify(maskedHeaders(init?.headers))}`)
-      if (init?.body && typeof init.body === 'string') {
+      if (init?.body && typeof init.body === "string") {
         console.log(`[${providerName}] REQ body: ${init.body}`)
       } else if (init?.body instanceof FormData) {
         const fields: Record<string, string> = {}
@@ -89,17 +91,21 @@ export function makeLoggingFetch(
     try {
       response = await globalThis.fetch(url, init)
     } catch (e) {
-      console.error(`[${providerName}] [${new Date().toISOString()}] ${method} ${shortUrl}${reqSize} — ERROR after ${Date.now() - start}ms: ${e}`)
+      console.error(
+        `[${providerName}] [${new Date().toISOString()}] ${method} ${shortUrl}${reqSize} — ERROR after ${Date.now() - start}ms: ${e}`,
+      )
       throw e
     }
 
     const elapsed = Date.now() - start
-    const contentLength = response.headers.get('content-length')
-    const respSize = contentLength ? ` resp:${contentLength}B` : ''
-    const traceId = response.headers.get('x-server-trace-id') ?? ''
-    const traceStr = traceId ? ` trace:${traceId}` : ''
+    const contentLength = response.headers.get("content-length")
+    const respSize = contentLength ? ` resp:${contentLength}B` : ""
+    const traceId = response.headers.get("x-server-trace-id") ?? ""
+    const traceStr = traceId ? ` trace:${traceId}` : ""
     const ts = new Date().toISOString()
-    console.log(`[${providerName}] [${ts}] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`)
+    console.log(
+      `[${providerName}] [${ts}] ${method} ${shortUrl}${reqSize} → ${response.status} ${elapsed}ms${respSize}${traceStr}`,
+    )
 
     if (!response.ok) {
       // Eagerly read body so it can be included in the error details.
@@ -109,8 +115,8 @@ export function makeLoggingFetch(
       }
       // Embed request context as synthetic headers so formatApiError can report them.
       const augmented = new Headers(response.headers)
-      augmented.set('x-request-url', String(url))
-      augmented.set('x-request-method', (init?.method ?? 'GET').toUpperCase())
+      augmented.set("x-request-url", String(url))
+      augmented.set("x-request-method", (init?.method ?? "GET").toUpperCase())
       return new Response(bodyText, {
         status: response.status,
         statusText: response.statusText,
@@ -120,11 +126,15 @@ export function makeLoggingFetch(
 
     // For SSE streaming responses, skip body dump here — the caller (e.g. grokGenerate)
     // logs individual events as they arrive, which is more useful than a bulk dump at the end.
-    const isSse = response.headers.get('content-type')?.includes('text/event-stream') ?? false
+    const isSse = response.headers.get("content-type")?.includes("text/event-stream") ?? false
     if (verboseLogging && !isSse) {
-      response.clone().text().then(body => {
-        console.log(`[${providerName}] RESP body: ${body}`)
-      }).catch(() => {})
+      response
+        .clone()
+        .text()
+        .then((body) => {
+          console.log(`[${providerName}] RESP body: ${body}`)
+        })
+        .catch(() => {})
     }
 
     return response

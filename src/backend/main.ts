@@ -1,9 +1,19 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeTheme, shell } from 'electron'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { default as installExtension, REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer'
-import { createRequire } from 'module';
-import { appRouter } from './router.js';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  Menu,
+  MenuItemConstructorOptions,
+  nativeTheme,
+  shell,
+} from "electron"
+import path from "path"
+import { fileURLToPath } from "url"
+import { default as installExtension, REACT_DEVELOPER_TOOLS } from "electron-devtools-installer"
+import { createRequire } from "module"
+import { appRouter } from "./router.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -11,55 +21,55 @@ const __dirname = path.dirname(__filename)
 /** Native menu label translations. */
 const MENU_STRINGS = {
   en: {
-    file: 'File',
-    closeProject: 'Close Project',
-    view: 'View',
-    settings: 'Settings',
-    aiPlayground: 'AI Playground',
-    resetLayouts: 'Reset layouts',
-    wordWrap: 'Word Wrap in Editors',
-    showInLoreTree: 'Show in Lore Tree',
-    loreStat_none: 'Nothing',
-    loreStat_words: 'Words',
-    loreStat_chars: 'Characters',
-    loreStat_bytes: 'Bytes',
-    theme: 'Theme',
-    theme_auto: 'Auto',
-    theme_obsidian: 'Obsidian (dark)',
-    theme_github: 'GitHub (light)',
-    language: 'Language',
-    language_en: 'English',
-    language_ru: 'Русский',
+    file: "File",
+    closeProject: "Close Project",
+    view: "View",
+    settings: "Settings",
+    aiPlayground: "AI Playground",
+    resetLayouts: "Reset layouts",
+    wordWrap: "Word Wrap in Editors",
+    showInLoreTree: "Show in Lore Tree",
+    loreStat_none: "Nothing",
+    loreStat_words: "Words",
+    loreStat_chars: "Characters",
+    loreStat_bytes: "Bytes",
+    theme: "Theme",
+    theme_auto: "Auto",
+    theme_obsidian: "Obsidian (dark)",
+    theme_github: "GitHub (light)",
+    language: "Language",
+    language_en: "English",
+    language_ru: "Русский",
   },
   ru: {
-    file: 'Файл',
-    closeProject: 'Закрыть проект',
-    view: 'Вид',
-    settings: 'Настройки',
-    aiPlayground: 'Плейграунд ИИ',
-    resetLayouts: 'Сбросить разметку',
-    wordWrap: 'Перенос строк в редакторах',
-    showInLoreTree: 'Показывать в дереве',
-    loreStat_none: 'Ничего',
-    loreStat_words: 'Слова',
-    loreStat_chars: 'Символы',
-    loreStat_bytes: 'Байты',
-    theme: 'Тема',
-    theme_auto: 'Авто',
-    theme_obsidian: 'Obsidian (тёмная)',
-    theme_github: 'GitHub (светлая)',
-    language: 'Язык',
-    language_en: 'English',
-    language_ru: 'Русский',
+    file: "Файл",
+    closeProject: "Закрыть проект",
+    view: "Вид",
+    settings: "Настройки",
+    aiPlayground: "Плейграунд ИИ",
+    resetLayouts: "Сбросить разметку",
+    wordWrap: "Перенос строк в редакторах",
+    showInLoreTree: "Показывать в дереве",
+    loreStat_none: "Ничего",
+    loreStat_words: "Слова",
+    loreStat_chars: "Символы",
+    loreStat_bytes: "Байты",
+    theme: "Тема",
+    theme_auto: "Авто",
+    theme_obsidian: "Obsidian (тёмная)",
+    theme_github: "GitHub (светлая)",
+    language: "Язык",
+    language_en: "English",
+    language_ru: "Русский",
   },
 }
 
 // Current toggle/radio states — kept in sync via set-menu-state IPC from the renderer.
 // Used when rebuilding the menu (e.g. on locale change) so checked states are preserved.
 let currentWordWrap = true
-let currentLoreStat = 'words'
-let currentTheme = 'auto'
-let currentLocale: ('ru' | 'en') = 'en'
+let currentLoreStat = "words"
+let currentTheme = "auto"
+let currentLocale: "ru" | "en" = "en"
 
 /** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
 let wordWrapMenuItem: MenuItemConstructorOptions = {}
@@ -71,19 +81,19 @@ let loreStatMenuItems: Record<string, MenuItemConstructorOptions> = {}
 let themeMenuItems: Record<string, MenuItemConstructorOptions> = {}
 
 /** References to the Language radio items, keyed by locale code. */
-let localeMenuItems : Record<string, MenuItemConstructorOptions> = {}
+let localeMenuItems: Record<string, MenuItemConstructorOptions> = {}
 
-const isDev = process.env.NODE_ENV === 'development'
+const isDev = process.env.NODE_ENV === "development"
 
 // Stored once the server (or dev Vite) is ready, reused on macOS re-activate.
-let serverUrl : string | null = null
+let serverUrl: string | null = null
 
 /**
  * Sends a menu action string to the focused BrowserWindow's renderer process.
  * The renderer listens via window.electronAPI.onMenuAction().
  */
 function sendMenuAction(action: any) {
-  BrowserWindow.getFocusedWindow()?.webContents.send('menu-action', action)
+  BrowserWindow.getFocusedWindow()?.webContents.send("menu-action", action)
 }
 
 /**
@@ -95,7 +105,7 @@ function buildApplicationMenu() {
   const s = MENU_STRINGS[currentLocale] ?? MENU_STRINGS.en
 
   wordWrapMenuItem = {
-    type: 'checkbox',
+    type: "checkbox",
     label: s.wordWrap,
     checked: currentWordWrap,
     click: (item) => sendMenuAction(`set-word-wrap:${item.checked}`),
@@ -103,13 +113,13 @@ function buildApplicationMenu() {
 
   loreStatMenuItems = {}
   for (const [mode, key] of [
-    ['none', 'loreStat_none'],
-    ['words', 'loreStat_words'],
-    ['chars', 'loreStat_chars'],
-    ['bytes', 'loreStat_bytes'],
+    ["none", "loreStat_none"],
+    ["words", "loreStat_words"],
+    ["chars", "loreStat_chars"],
+    ["bytes", "loreStat_bytes"],
   ]) {
     loreStatMenuItems[mode] = {
-      type: 'radio',
+      type: "radio",
       label: s[key as keyof typeof s],
       checked: mode === currentLoreStat,
       click: () => sendMenuAction(`set-lore-stat:${mode}`),
@@ -118,12 +128,12 @@ function buildApplicationMenu() {
 
   themeMenuItems = {}
   for (const [theme, key] of [
-    ['auto', 'theme_auto'],
-    ['obsidian', 'theme_obsidian'],
-    ['github', 'theme_github'],
+    ["auto", "theme_auto"],
+    ["obsidian", "theme_obsidian"],
+    ["github", "theme_github"],
   ]) {
     themeMenuItems[theme] = {
-      type: 'radio',
+      type: "radio",
       label: s[key as keyof typeof s],
       checked: theme === currentTheme,
       click: () => sendMenuAction(`set-theme:${theme}`),
@@ -132,39 +142,39 @@ function buildApplicationMenu() {
 
   localeMenuItems = {}
   for (const [locale, key] of [
-    ['en', 'language_en'],
-    ['ru', 'language_ru'],
+    ["en", "language_en"],
+    ["ru", "language_ru"],
   ]) {
     localeMenuItems[locale] = {
-      type: 'radio',
+      type: "radio",
       label: s[key as keyof typeof s],
       checked: locale === currentLocale,
       click: () => sendMenuAction(`set-locale:${locale}`),
     }
   }
 
-  const viewSubmenu : MenuItemConstructorOptions[] = [
+  const viewSubmenu: MenuItemConstructorOptions[] = [
     {
       label: s.settings,
-      click: () => sendMenuAction('open-settings'),
+      click: () => sendMenuAction("open-settings"),
     },
     {
       label: s.aiPlayground,
-      click: () => sendMenuAction('open-ai-playground'),
+      click: () => sendMenuAction("open-ai-playground"),
     },
-    { type: 'separator' },
+    { type: "separator" },
     {
       label: s.resetLayouts,
-      click: () => sendMenuAction('reset-layouts'),
+      click: () => sendMenuAction("reset-layouts"),
     },
-    { type: 'separator' },
+    { type: "separator" },
     wordWrapMenuItem,
-    { type: 'separator' },
+    { type: "separator" },
     {
       label: s.showInLoreTree,
       submenu: Object.values(loreStatMenuItems),
     },
-    { type: 'separator' },
+    { type: "separator" },
     {
       label: s.theme,
       submenu: Object.values(themeMenuItems),
@@ -176,60 +186,62 @@ function buildApplicationMenu() {
   ]
 
   if (isDev) {
-    viewSubmenu.push({ type: 'separator' })
-    viewSubmenu.push({ role: 'toggleDevTools' })
+    viewSubmenu.push({ type: "separator" })
+    viewSubmenu.push({ role: "toggleDevTools" })
   }
 
-  const template : MenuItemConstructorOptions[]  = [
+  const template: MenuItemConstructorOptions[] = [
     // macOS: first entry is always the app menu (app name, About, Quit, etc.)
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu' } as MenuItemConstructorOptions] : ([] as MenuItemConstructorOptions[])),
+    ...(process.platform === "darwin"
+      ? [{ role: "appMenu" } as MenuItemConstructorOptions]
+      : ([] as MenuItemConstructorOptions[])),
 
     {
       label: s.file,
       submenu: [
         {
           label: s.closeProject,
-          click: () => sendMenuAction('close-project'),
+          click: () => sendMenuAction("close-project"),
         },
-        { type: 'separator' },
-        { role: 'quit' },
+        { type: "separator" },
+        { role: "quit" },
       ],
     },
 
-    { role: 'editMenu' },
+    { role: "editMenu" },
 
     {
       label: s.view,
       submenu: viewSubmenu,
     },
 
-    { role: 'windowMenu' },
+    { role: "windowMenu" },
   ]
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
 function createWindow() {
-  console.log('createWindow called with serverUrl: ', serverUrl)
-  console.log('Loading preload script: ', path.join(__dirname, '../preload/preload.cjs'));
+  console.log("createWindow called with serverUrl: ", serverUrl)
+  console.log("Loading preload script: ", path.join(__dirname, "../preload/preload.cjs"))
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    icon: path.join(__dirname, 'icons/256x256.png'),
+    icon: path.join(__dirname, "icons/256x256.png"),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      preload: path.join(__dirname, '../preload/preload.cjs'),
+      preload: path.join(__dirname, "../preload/preload.cjs"),
     },
   })
 
   if (serverUrl) {
-    win.loadURL(serverUrl).catch(err => {
-      console.error('Failed to load URL:', err)
+    win.loadURL(serverUrl).catch((err) => {
+      console.error("Failed to load URL:", err)
     })
   } else {
-    console.error('No server URL provided')
+    console.error("No server URL provided")
   }
 
   if (isDev) {
@@ -239,10 +251,10 @@ function createWindow() {
   // Open target="_blank" links in the system browser, not a new Electron window.
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
-    return { action: 'deny' }
+    return { action: "deny" }
   })
 
-  console.log('Window created successfully')
+  console.log("Window created successfully")
   return win
 }
 
@@ -251,32 +263,32 @@ function createWindow() {
 // instead of crashing with a cryptic native-module message.
 async function checkNativeDeps() {
   try {
-    await import('better-sqlite3')
+    await import("better-sqlite3")
   } catch (e: any) {
     dialog.showErrorBox(
-      'Native module needs rebuild',
-      'better-sqlite3 was compiled for a different version of Node.js.\n\n' +
-      'Run the following command and restart the application:\n\n' +
-      '    npm run rebuild\n\n' +
-      `Details: ${e.message}`
+      "Native module needs rebuild",
+      "better-sqlite3 was compiled for a different version of Node.js.\n\n" +
+        "Run the following command and restart the application:\n\n" +
+        "    npm run rebuild\n\n" +
+        `Details: ${e.message}`,
     )
     app.exit(1)
   }
 }
 
 // Show a native error dialog with a "Copy to Clipboard" button.
-ipcMain.handle('show-error-dialog', async (event, { title, message }) => {
+ipcMain.handle("show-error-dialog", async (event, { title, message }) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win === null) {
-    console.error('Failed to get window from webContents')
+    console.error("Failed to get window from webContents")
     return
   }
 
   const { response } = await dialog.showMessageBox(win, {
-    type: 'error',
+    type: "error",
     title,
     message,
-    buttons: ['Close', 'Copy to Clipboard'],
+    buttons: ["Close", "Copy to Clipboard"],
     defaultId: 0,
     cancelId: 0,
   })
@@ -286,39 +298,39 @@ ipcMain.handle('show-error-dialog', async (event, { title, message }) => {
 })
 
 // Synchronous alert dialog
-ipcMain.on('alert', (event, text) => {
+ipcMain.on("alert", (event, text) => {
   event.returnValue = dialog.showMessageBoxSync({
     message: text,
-    type: 'warning',
-    title: 'Alert',
+    type: "warning",
+    title: "Alert",
   })
 })
 
 // Synchronous confirmation dialog
-ipcMain.on('confirm', (event, text) => {
+ipcMain.on("confirm", (event, text) => {
   event.returnValue =
     0 ==
     dialog.showMessageBoxSync({
       message: text,
-      type: 'question',
-      title: 'Confirm',
-      buttons: ['OK', 'Cancel'],
+      type: "question",
+      title: "Confirm",
+      buttons: ["OK", "Cancel"],
       defaultId: 0,
       cancelId: 1,
     })
 })
 
 // Renderer sends this to keep menu checkbox/radio in sync with localStorage state
-ipcMain.on('set-menu-state', (_event, { key, value }) => {
-  if (key === 'word-wrap') {
+ipcMain.on("set-menu-state", (_event, { key, value }) => {
+  if (key === "word-wrap") {
     currentWordWrap = value
     if (wordWrapMenuItem) wordWrapMenuItem.checked = value
-  } else if (key === 'lore-stat') {
+  } else if (key === "lore-stat") {
     currentLoreStat = value
     for (const [mode, item] of Object.entries(loreStatMenuItems)) {
       item.checked = mode === value
     }
-  } else if (key === 'theme') {
+  } else if (key === "theme") {
     currentTheme = value
     for (const [theme, item] of Object.entries(themeMenuItems)) {
       item.checked = theme === value
@@ -326,10 +338,10 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
     // Sync native window chrome (title bar, menu bar) to the selected theme.
     // Note: on Linux the window frame is controlled by the window manager and
     // nativeTheme.themeSource may not visually change the title bar.
-    if (value === 'obsidian') nativeTheme.themeSource = 'dark'
-    else if (value === 'github') nativeTheme.themeSource = 'light'
-    else nativeTheme.themeSource = 'system'
-  } else if (key === 'locale') {
+    if (value === "obsidian") nativeTheme.themeSource = "dark"
+    else if (value === "github") nativeTheme.themeSource = "light"
+    else nativeTheme.themeSource = "system"
+  } else if (key === "locale") {
     currentLocale = value
     // Rebuild entire menu so all labels appear in the new language.
     buildApplicationMenu()
@@ -337,49 +349,49 @@ ipcMain.on('set-menu-state', (_event, { key, value }) => {
 })
 
 app.whenReady().then(async () => {
-  console.log('Electron app is ready')
+  console.log("Electron app is ready")
   await checkNativeDeps()
-  console.log('Native deps checked')
+  console.log("Native deps checked")
   buildApplicationMenu()
-  console.log('Application menu built')
+  console.log("Application menu built")
 
   if (isDev) {
-    serverUrl = 'http://localhost:3000'
-    console.log('Development mode, serverUrl:', serverUrl)
+    serverUrl = "http://localhost:3000"
+    console.log("Development mode, serverUrl:", serverUrl)
     // Install React Developer Tools
     try {
       await installExtension(REACT_DEVELOPER_TOOLS, {
         loadExtensionOptions: { allowFileAccess: true },
       })
-      console.log('React Developer Tools installed')
+      console.log("React Developer Tools installed")
     } catch (err) {
-      console.warn('Failed to install React Developer Tools:', err)
+      console.warn("Failed to install React Developer Tools:", err)
     }
   } else {
-    serverUrl = `file://${path.join(app.getAppPath(), 'dist', 'frontend', 'index.html')}`
-    console.log('Production mode, serverUrl:', serverUrl)
+    serverUrl = `file://${path.join(app.getAppPath(), "dist", "frontend", "index.html")}`
+    console.log("Production mode, serverUrl:", serverUrl)
   }
-  console.log('Creating window...')
+  console.log("Creating window...")
   const window = createWindow()
-  console.log('Window created')
+  console.log("Window created")
 
   // Import tRPC IPC handlers instead of the old HTTP server
-  console.log('Creating tRPC IPC handler')
-  const require = createRequire(import.meta.url);
-  const { createIPCHandler } = require('electron-trpc/main');
-  createIPCHandler({ router: appRouter, windows: [window] });
-  console.log('Проверка роутера:', Object.keys(appRouter));
-  console.log('tRPC IPC handler created')
+  console.log("Creating tRPC IPC handler")
+  const require = createRequire(import.meta.url)
+  const { createIPCHandler } = require("electron-trpc/main")
+  createIPCHandler({ router: appRouter, windows: [window] })
+  console.log("Проверка роутера:", Object.keys(appRouter))
+  console.log("tRPC IPC handler created")
 })
 
 // Quit when all windows are closed, except on macOS where the app stays
 // running in the Dock until the user quits explicitly.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit()
 })
 
 // Re-create a window on macOS when the Dock icon is clicked and no windows exist.
-app.on('activate', () => {
+app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0 && serverUrl) {
     createWindow()
   }

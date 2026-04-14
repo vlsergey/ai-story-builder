@@ -1,6 +1,6 @@
-import fs from 'fs'
-import path from 'path'
-import type { ProjectInitialData } from '../types/index.js'
+import fs from "fs"
+import path from "path"
+import type { ProjectInitialData } from "../types/index.js"
 import {
   isOpen,
   getCurrentDbPath,
@@ -8,15 +8,15 @@ import {
   readAppSettings,
   writeAppSettings,
   getDataDir,
-} from '../db/state.js'
-import { setVerboseLogging } from '../lib/ai-logging.js'
-import { sanitizeProjectName } from '../lib/project-name.js'
-import { SettingsRepository } from '../settings/settings-repository.js'
-import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
-import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-import electron from 'electron'
-import { exec } from 'child_process'
-import { openProjectDatabase } from '../db/index.js'
+} from "../db/state.js"
+import { setVerboseLogging } from "../lib/ai-logging.js"
+import { sanitizeProjectName } from "../lib/project-name.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
+import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
+import { LoreNodeRepository } from "../lore/lore-node-repository.js"
+import electron from "electron"
+import { exec } from "child_process"
+import { openProjectDatabase } from "../db/index.js"
 
 const { shell } = electron
 
@@ -35,7 +35,7 @@ function getProjectInitialData(dbPath: string): ProjectInitialData {
     const projectTitle = SettingsRepository.getProjectTitle()
     return { layout, projectTitle }
   } catch (e) {
-    console.warn('[getProjectInitialData] failed to read initial data from', dbPath, (e as Error).message)
+    console.warn("[getProjectInitialData] failed to read initial data from", dbPath, (e as Error).message)
     return { layout: null, projectTitle: null }
   }
 }
@@ -67,10 +67,10 @@ export function closeProject(): { ok: boolean } {
 }
 
 export function openProject(dbPath: string): { path: string; layout: unknown; projectTitle: string | null } {
-  if (!dbPath) throw makeError('path required', 400)
+  if (!dbPath) throw makeError("path required", 400)
 
   if (!fs.existsSync(dbPath)) {
-    throw makeError('database file not found', 404)
+    throw makeError("database file not found", 404)
   }
 
   try {
@@ -84,12 +84,12 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
     const planRepo = new PlanNodeRepository()
     const planCount = planRepo.count()
     if (planCount === 0) {
-      const rootTitle = SettingsRepository.getProjectTitle() ?? 'Plan'
+      const rootTitle = SettingsRepository.getProjectTitle() ?? "Plan"
       planRepo.insert({ title: rootTitle, parent_id: null, position: 0 })
     }
   } catch (e) {
-    console.error(e);
-    throw makeError('failed to open database: ' + String(e), 500)
+    console.error(e)
+    throw makeError("failed to open database: " + String(e), 500)
   }
 
   applyRuntimeSettings(dbPath)
@@ -103,7 +103,7 @@ export function getRecentProjects(): string[] {
 }
 
 export function deleteRecentProject(p: string): { ok: boolean } {
-  if (!p) throw makeError('path required', 400)
+  if (!p) throw makeError("path required", 400)
   const s = readAppSettings()
   s.recent = (s.recent || []).filter((x) => x !== p)
   writeAppSettings(s)
@@ -111,17 +111,17 @@ export function deleteRecentProject(p: string): { ok: boolean } {
 }
 
 export function listProjectFiles(): { dir: string; files: string[] } {
-  const projectsDir = path.join(getDataDir(), 'projects')
+  const projectsDir = path.join(getDataDir(), "projects")
   if (!fs.existsSync(projectsDir)) return { dir: projectsDir, files: [] }
   const files = fs
     .readdirSync(projectsDir)
-    .filter((f) => f.endsWith('.sqlite') || f.endsWith('.db'))
+    .filter((f) => f.endsWith(".sqlite") || f.endsWith(".db"))
     .map((f) => path.join(projectsDir, f))
   return { dir: projectsDir, files }
 }
 
 export function openProjectFolder(): { ok: boolean } {
-  const projectsDir = path.join(getDataDir(), 'projects')
+  const projectsDir = path.join(getDataDir(), "projects")
   fs.mkdirSync(projectsDir, { recursive: true })
   try {
     // In production, the backend runs inside Electron — use shell.openPath()
@@ -129,9 +129,9 @@ export function openProjectFolder(): { ok: boolean } {
   } catch {
     // In dev, fall back to a platform-specific CLI command
     const cmd =
-      process.platform === 'win32'
+      process.platform === "win32"
         ? `explorer "${projectsDir}"`
-        : process.platform === 'darwin'
+        : process.platform === "darwin"
           ? `open "${projectsDir}"`
           : `xdg-open "${projectsDir}"`
     exec(cmd)
@@ -146,22 +146,22 @@ export function createProject(data: { name?: string; text_language?: string }): 
   reused?: boolean
 } {
   const name = data?.name ? data.name : `project-${Date.now()}`
-  const text_language = data?.text_language ?? 'ru-RU'
+  const text_language = data?.text_language ?? "ru-RU"
   const safeName = sanitizeProjectName(name)
-  const projectsDir = path.join(getDataDir(), 'projects')
+  const projectsDir = path.join(getDataDir(), "projects")
   fs.mkdirSync(projectsDir, { recursive: true })
   const dbPath = path.join(projectsDir, `${safeName}.sqlite`)
 
-  const defaultNodes = text_language.startsWith('ru')
-    ? { root: 'Лор истории', children: ['Персонажи', 'Локации', 'Способности', 'Заклинания', 'Бестиарий', 'Задания'] }
-    : { root: 'Story Lore',  children: ['Characters', 'Locations', 'Abilities', 'Spells', 'Bestiary', 'Quests'] }
+  const defaultNodes = text_language.startsWith("ru")
+    ? { root: "Лор истории", children: ["Персонажи", "Локации", "Способности", "Заклинания", "Бестиарий", "Задания"] }
+    : { root: "Story Lore", children: ["Characters", "Locations", "Abilities", "Spells", "Bestiary", "Quests"] }
 
   if (fs.existsSync(dbPath)) {
     try {
       // Ensure the project is set as current for repositories
       setCurrentDbPath(dbPath)
       const loreRepo = new LoreNodeRepository()
-      const rootNodes = loreRepo.findAll().filter(n => n.parent_id === null)
+      const rootNodes = loreRepo.findAll().filter((n) => n.parent_id === null)
       if (rootNodes.length === 0) {
         const rootId = loreRepo.insert({ parent_id: null, title: defaultNodes.root })
         for (const childTitle of defaultNodes.children) {
@@ -188,7 +188,7 @@ export function createProject(data: { name?: string; text_language?: string }): 
     }
 
     SettingsRepository.setProjectTitle(name)
-    SettingsRepository.set('locale', 'en')
+    SettingsRepository.set("locale", "en")
     SettingsRepository.setTextLanguage(text_language)
 
     const planRepo = new PlanNodeRepository()

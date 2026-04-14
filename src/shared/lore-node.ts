@@ -19,9 +19,9 @@ export interface LoreNodeRow {
   ai_improve_instruction: string | null
 }
 
-type LoreNodeInsert = Omit<LoreNodeRow, 'id' | 'created_at'>
+type LoreNodeInsert = Omit<LoreNodeRow, "id" | "created_at">
 
-export const LoreNodeDefaults : Partial<LoreNodeInsert> = {
+export const LoreNodeDefaults: Partial<LoreNodeInsert> = {
   parent_id: null,
   content: null,
   to_be_deleted: 0,
@@ -37,6 +37,7 @@ export const LoreNodeDefaults : Partial<LoreNodeInsert> = {
   ai_improve_instruction: null,
 }
 
-type DefaultLoreNodeKeys = keyof typeof LoreNodeDefaults;
-export type LoreNodeCreate = Omit<Omit<LoreNodeInsert, 'position'>, DefaultLoreNodeKeys> & Partial<Pick<LoreNodeInsert, DefaultLoreNodeKeys>>;
-export type LoreNodeUpdate = Partial<Omit<LoreNodeRow, 'id' | 'created_at'>>
+type DefaultLoreNodeKeys = keyof typeof LoreNodeDefaults
+export type LoreNodeCreate = Omit<Omit<LoreNodeInsert, "position">, DefaultLoreNodeKeys> &
+  Partial<Pick<LoreNodeInsert, DefaultLoreNodeKeys>>
+export type LoreNodeUpdate = Partial<Omit<LoreNodeRow, "id" | "created_at">>

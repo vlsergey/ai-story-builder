@@ -56,11 +56,8 @@ export type CollapseLoreTreeResult = CollapsedGroup[] | { error: string }
  * @param rows   All lore node rows.
  * @param maxFiles  Maximum number of groups allowed. Returns `{ error }` if exceeded.
  */
-export function collapseLoreTree(
-  rows: LoreNodeForCollapse[],
-  maxFiles: number,
-): CollapseLoreTreeResult {
-  const idToRow = new Map(rows.map(r => [r.id, r]))
+export function collapseLoreTree(rows: LoreNodeForCollapse[], maxFiles: number): CollapseLoreTreeResult {
+  const idToRow = new Map(rows.map((r) => [r.id, r]))
   const childrenMap = new Map<number, number[]>()
 
   for (const row of rows) {
@@ -71,7 +68,7 @@ export function collapseLoreTree(
   }
 
   // Find the root node (parent_id IS NULL)
-  const rootRow = rows.find(r => r.parent_id === null)
+  const rootRow = rows.find((r) => r.parent_id === null)
   if (!rootRow) return []
 
   // Level-2 = direct children of root
@@ -109,16 +106,16 @@ export function collapseLoreTree(
     depth: number,
     ancestorPath: string[],
     allNodeIds: number[],
-    contentParts: string[]
+    contentParts: string[],
   ): void {
     const row = idToRow.get(nodeId)!
     allNodeIds.push(nodeId)
     const currentPath = [...ancestorPath, row.title]
 
     if (row.to_be_deleted === 0 && row.word_count > 0 && row.content) {
-      const heading = '#'.repeat(depth)
+      const heading = "#".repeat(depth)
       // From depth 2 onwards include ancestor breadcrumbs in the heading
-      const headingText = depth >= 2 ? currentPath.join(' / ') : row.title
+      const headingText = depth >= 2 ? currentPath.join(" / ") : row.title
       contentParts.push(`${heading} ${headingText}\n\n${row.content}`)
     }
 
@@ -134,7 +131,7 @@ export function collapseLoreTree(
 
     collectNode(l2Id, 1, [], allNodeIds, contentParts)
 
-    const content = contentParts.join('\n\n---\n\n')
+    const content = contentParts.join("\n\n---\n\n")
     groups.push({
       level2NodeId: l2Id,
       level2NodeTitle: l2Row.title,

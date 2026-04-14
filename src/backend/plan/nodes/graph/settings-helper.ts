@@ -1,4 +1,3 @@
-
 /**
  * Merge node_type_settings JSON with default settings.
  * @param defaultSettings Default settings object (all required fields)
@@ -7,7 +6,7 @@
  */
 export function mergeNodeSettings<T extends Record<string, any>>(
   defaultSettings: T,
-  nodeTypeSettings: string | null
+  nodeTypeSettings: string | null,
 ): T {
   if (!nodeTypeSettings) {
     return defaultSettings

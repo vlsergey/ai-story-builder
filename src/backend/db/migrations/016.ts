@@ -1,4 +1,4 @@
-import type { Database } from 'better-sqlite3'
+import type { Database } from "better-sqlite3"
 
 export default function migration(db: Database): void {
   // Create a new table with the correct default
@@ -22,8 +22,8 @@ export default function migration(db: Database): void {
   `)
 
   // Drop the old table
-  db.exec('DROP TABLE plan_edges')
+  db.exec("DROP TABLE plan_edges")
 
   // Rename new table to original name
-  db.exec('ALTER TABLE plan_edges_new RENAME TO plan_edges')
+  db.exec("ALTER TABLE plan_edges_new RENAME TO plan_edges")
 }

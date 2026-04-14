@@ -1,3 +1,3 @@
 export interface RegenerateOptions {
-  regenerateManual: boolean;
+  regenerateManual: boolean
 }

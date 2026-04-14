@@ -1,9 +1,9 @@
-import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
-import { PlanNodeRow } from '../../shared/plan-graph.js'
-import { getEngineAdapter } from '../lib/ai-engine-adapter.js'
-import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
-import { SettingsRepository } from '../settings/settings-repository.js'
-import OpenAI from 'openai'
+import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
+import { PlanNodeRow } from "../../shared/plan-graph.js"
+import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
+import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
+import OpenAI from "openai"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -14,8 +14,8 @@ function makeError(message: string, status: number): Error {
 }
 
 interface ImproveResult {
-  oldNode: PlanNodeRow,
-  newContent: string,
+  oldNode: PlanNodeRow
+  newContent: string
 }
 
 export async function improvePlanNodeContent(
@@ -25,27 +25,25 @@ export async function improvePlanNodeContent(
   const nodeRepo = new PlanNodeRepository()
 
   const planNode = nodeRepo.findById(nodeId)
-  if (!planNode) throw makeError('node not found', 404)
+  if (!planNode) throw makeError("node not found", 404)
 
-  const {
-    ai_improve_instruction: aiImproveInstruction,
-    ai_settings: nodeAiSettings,
-  } = planNode
-  if (!aiImproveInstruction) throw makeError('no ai improve instructions found', 400)
+  const { ai_improve_instruction: aiImproveInstruction, ai_settings: nodeAiSettings } = planNode
+  if (!aiImproveInstruction) throw makeError("no ai improve instructions found", 400)
 
   const systemPrompt = aiImproveInstruction
-  const userPrompt = planNode.content || ''
+  const userPrompt = planNode.content || ""
 
   const engineId = SettingsRepository.getCurrentBackend()
-  if (!engineId) throw makeError('no AI engine configured', 400)
+  if (!engineId) throw makeError("no AI engine configured", 400)
 
   const adapter = getEngineAdapter(engineId)
   if (!adapter) throw makeError(`Engine ${engineId} not found`, 400)
 
-  const nodeEngineAiSettings = (JSON.parse(nodeAiSettings || '{}') as Record<string, AiGenerationSettings>)[engineId] || {}
+  const nodeEngineAiSettings =
+    (JSON.parse(nodeAiSettings || "{}") as Record<string, AiGenerationSettings>)[engineId] || {}
   const actualAiSettings = {
     ...SettingsRepository.getCurrentEngineDefaultAiGenerationSettings(),
-    ...nodeEngineAiSettings
+    ...nodeEngineAiSettings,
   }
 
   const newContent = await adapter.generateResponse(

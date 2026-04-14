@@ -1,7 +1,7 @@
-import { getCurrentDbPath } from '../db/state.js'
-import { SettingsRepository } from '../settings/settings-repository.js'
+import { getCurrentDbPath } from "../db/state.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
 
-const MANAGEMENT_API_BASE = 'https://management-api.x.ai'
+const MANAGEMENT_API_BASE = "https://management-api.x.ai"
 
 /** Reads Grok management credentials from project settings. */
 function readGrokManagementConfig(dbPath: string): { managementKey: string; teamId: string } | null {
@@ -19,7 +19,10 @@ function readGrokManagementConfig(dbPath: string): { managementKey: string; team
 
 /** Formats a Date as "YYYY-MM-DD HH:MM:SS" in UTC (xAI billing API format). */
 function formatBillingDate(d: Date): string {
-  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+  return d
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d{3}Z$/, "")
 }
 
 /** Fetches usage totals from xAI Management API for a given time window. */
@@ -34,28 +37,23 @@ async function fetchUsage(
       timeRange: {
         startTime: formatBillingDate(startTime),
         endTime: formatBillingDate(endTime),
-        timezone: 'Etc/GMT',
+        timezone: "Etc/GMT",
       },
-      timeUnit: 'TIME_UNIT_NONE',
-      values: [
-        { name: 'usd', aggregation: 'AGGREGATION_SUM' },
-      ],
+      timeUnit: "TIME_UNIT_NONE",
+      values: [{ name: "usd", aggregation: "AGGREGATION_SUM" }],
       groupBy: [],
       filters: [],
     },
   }
-  console.log('[billing] request:', JSON.stringify(requestBody))
-  const response = await fetch(
-    `${MANAGEMENT_API_BASE}/v1/billing/teams/${teamId}/usage`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${managementKey}`,
-      },
-      body: JSON.stringify(requestBody),
-    }
-  )
+  console.log("[billing] request:", JSON.stringify(requestBody))
+  const response = await fetch(`${MANAGEMENT_API_BASE}/v1/billing/teams/${teamId}/usage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${managementKey}`,
+    },
+    body: JSON.stringify(requestBody),
+  })
   const responseText = await response.text()
   console.log(`[billing] response ${response.status}:`, responseText)
   if (!response.ok) {
@@ -71,7 +69,7 @@ export async function getAiBilling(): Promise<{
 }> {
   const dbPath = getCurrentDbPath()
   if (!dbPath) {
-    return { configured: false, error: 'no project open' }
+    return { configured: false, error: "no project open" }
   }
 
   const creds = readGrokManagementConfig(dbPath)
@@ -82,10 +80,10 @@ export async function getAiBilling(): Promise<{
   const now = new Date()
 
   const periods: Array<{ key: string; hours: number }> = [
-    { key: 'last_hour', hours: 1 },
-    { key: 'last_24h', hours: 24 },
-    { key: 'last_7d', hours: 24 * 7 },
-    { key: 'last_30d', hours: 24 * 30 },
+    { key: "last_hour", hours: 1 },
+    { key: "last_24h", hours: 24 },
+    { key: "last_7d", hours: 24 * 7 },
+    { key: "last_30d", hours: 24 * 30 },
   ]
 
   try {
@@ -94,7 +92,7 @@ export async function getAiBilling(): Promise<{
         const startTime = new Date(now.getTime() - hours * 60 * 60 * 1000)
         const data = await fetchUsage(creds.managementKey, creds.teamId, startTime, now)
         return { key, data }
-      })
+      }),
     )
 
     const totals: Record<string, unknown> = {}

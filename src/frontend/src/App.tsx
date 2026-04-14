@@ -1,15 +1,15 @@
-import { useState } from 'react'
-import StartScreen from './pages/StartScreen'
-import Layout from './Layout'
-import './styles.css'
-import { ThemeProvider } from './lib/theme/theme-provider'
-import { LocaleProvider } from './lib/locale'
-import { trpc } from './ipcClient'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ipcLink } from 'electron-trpc/renderer';
-import EventsListener from './EventsListener'
+import { useState } from "react"
+import StartScreen from "./pages/StartScreen"
+import Layout from "./Layout"
+import "./styles.css"
+import { ThemeProvider } from "./lib/theme/theme-provider"
+import { LocaleProvider } from "./lib/locale"
+import { trpc } from "./ipcClient"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { ipcLink } from "electron-trpc/renderer"
+import EventsListener from "./EventsListener"
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient()
 
 /**
  * Root application component
@@ -20,12 +20,9 @@ const queryClient = new QueryClient();
 export default function App() {
   const [trpcClient] = useState(() =>
     trpc.createClient({
-      links: [
-        ipcLink(),
-      ],
-    })
-  );
-
+      links: [ipcLink()],
+    }),
+  )
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
@@ -50,15 +47,11 @@ function ProjectLoadCheck() {
     )
   }
 
-  return <ThemeProvider projectLoaded={projectStatus.data?.isOpen || false}>
-    <LocaleProvider>
-      <div className="app-root h-full">
-        { projectStatus.data?.isOpen ? (
-          <Layout />
-        ) : (
-          <StartScreen/>
-        ) }
-      </div>
-    </LocaleProvider>
-  </ThemeProvider>
+  return (
+    <ThemeProvider projectLoaded={projectStatus.data?.isOpen || false}>
+      <LocaleProvider>
+        <div className="app-root h-full">{projectStatus.data?.isOpen ? <Layout /> : <StartScreen />}</div>
+      </LocaleProvider>
+    </ThemeProvider>
+  )
 }

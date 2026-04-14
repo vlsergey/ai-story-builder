@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
-import { Loader2, CheckCircle2, Clipboard, Trash2 } from 'lucide-react'
-import { generatePlaygroundStream } from '../lib/generate-playground-stream'
-import type { AiGenerationSettings } from '../../../shared/ai-generation-settings'
-import AiGenerationSettingsForm from './AiGenerationSettingsForm'
+import { useEffect, useRef, useState } from "react"
+import { Loader2, CheckCircle2, Clipboard, Trash2 } from "lucide-react"
+import { generatePlaygroundStream } from "../lib/generate-playground-stream"
+import type { AiGenerationSettings } from "../../../shared/ai-generation-settings"
+import AiGenerationSettingsForm from "./AiGenerationSettingsForm"
 
 export default function AiPlayground() {
   const [aiGenerationSettings, setAiGenerationSettings] = useState<AiGenerationSettings | null>()
 
-  const [instructions, setInstructions] = useState('')
-  const [response, setResponse] = useState('')
+  const [instructions, setInstructions] = useState("")
+  const [response, setResponse] = useState("")
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export default function AiPlayground() {
     abortRef.current = new AbortController()
     setGenerating(true)
     setError(null)
-    setResponse('')
+    setResponse("")
     setThinkingStatus(null)
     setThinkingDetail(null)
     setThinkingDone(false)
@@ -42,17 +42,20 @@ export default function AiPlayground() {
         aiGenerationSettings: aiGenerationSettings || {},
         signal: abortRef.current.signal,
         onThinking: (status, detail) => {
-          if (status === 'done') setThinkingDone(true)
-          else { setThinkingStatus(status); setThinkingDone(false) }
+          if (status === "done") setThinkingDone(true)
+          else {
+            setThinkingStatus(status)
+            setThinkingDone(false)
+          }
           setThinkingDetail(detail ?? null)
         },
         onPartialJson: (partial) => {
-          if (typeof partial.content === 'string') setResponse(partial.content)
+          if (typeof partial.content === "string") setResponse(partial.content)
         },
         onDone: () => {},
       })
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') {
+      if ((e as Error).name !== "AbortError") {
         setError(e instanceof Error ? e.message : String(e))
       }
     } finally {
@@ -71,24 +74,24 @@ export default function AiPlayground() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">
-
       {/* Settings bar */}
-      <AiGenerationSettingsForm
-        value={aiGenerationSettings}
-        onChange={setAiGenerationSettings}
-      />
+      <AiGenerationSettingsForm value={aiGenerationSettings} onChange={setAiGenerationSettings} />
 
       {/* Main area: split vertically — input top, output bottom */}
       <div className="flex flex-col flex-1 min-h-0 divide-y divide-border">
-
         {/* Input section */}
         <div className="flex flex-col shrink-0 max-h-[50%]">
           {/* Instructions */}
           <div className="flex gap-2 p-2 border-b border-border items-end">
             <textarea
               value={instructions}
-              onChange={e => setInstructions(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !generating) { e.preventDefault(); void handleGenerate() } }}
+              onChange={(e) => setInstructions(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !generating) {
+                  e.preventDefault()
+                  void handleGenerate()
+                }
+              }}
               placeholder="Instructions… (Ctrl+Enter to send)"
               disabled={generating}
               rows={7}
@@ -123,11 +126,13 @@ export default function AiPlayground() {
             {/* Thinking status */}
             {thinkingStatus !== null && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {thinkingDone
-                  ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                  : <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />}
+                {thinkingDone ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                ) : (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                )}
                 <span className="truncate max-w-[200px]" title={thinkingDetail ?? undefined}>
-                  {thinkingDone ? 'Done' : (thinkingDetail ?? thinkingStatus)}
+                  {thinkingDone ? "Done" : (thinkingDetail ?? thinkingStatus)}
                 </span>
               </div>
             )}
@@ -144,7 +149,7 @@ export default function AiPlayground() {
                   <Clipboard className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => setResponse('')}
+                  onClick={() => setResponse("")}
                   title="Clear response"
                   className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                 >

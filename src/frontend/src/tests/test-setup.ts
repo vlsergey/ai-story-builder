@@ -1,6 +1,6 @@
-import { afterEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import '@testing-library/jest-dom/vitest';
+import { afterEach, vi } from "vitest"
+import { cleanup } from "@testing-library/react"
+import "@testing-library/jest-dom/vitest"
 
 // Mock ResizeObserver for dockview
 class ResizeObserver {
@@ -9,7 +9,7 @@ class ResizeObserver {
   disconnect() {}
 }
 
-window.ResizeObserver = ResizeObserver;
+window.ResizeObserver = ResizeObserver
 
 // Mock electronAPI
 window.electronAPI = {
@@ -22,15 +22,15 @@ window.electronAPI = {
   onStreamEvent: vi.fn().mockReturnValue(() => {}),
   alert: vi.fn(),
   confirm: vi.fn().mockReturnValue(true),
-};
+}
 
 // Mock electronTRPC for ipcLink
-(window as any).electronTRPC = {
+;(window as any).electronTRPC = {
   sendMessage: vi.fn(),
   onMessage: vi.fn(),
-};
+}
 
 // Clean up after each test
 afterEach(() => {
-  cleanup();
-});
+  cleanup()
+})

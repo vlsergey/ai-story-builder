@@ -1,4 +1,4 @@
-import type { AiGenerationSettings } from '../../../shared/ai-generation-settings'
+import type { AiGenerationSettings } from "../../../shared/ai-generation-settings"
 
 export interface GeneratePlaygroundOptions {
   userPrompt: string
@@ -16,32 +16,38 @@ export async function generatePlaygroundStream(options: GeneratePlaygroundOption
   await new Promise<void>((resolve, reject) => {
     const unsub = window.electronAPI.onStreamEvent((event) => {
       if (event.streamId !== streamId) return
-      if (event.type === 'thinking') {
+      if (event.type === "thinking") {
         options.onThinking?.(event.data.status as string, event.data.detail as string | undefined)
-      } else if (event.type === 'partial_json') {
+      } else if (event.type === "partial_json") {
         options.onPartialJson?.(event.data)
-      } else if (event.type === 'done') {
+      } else if (event.type === "done") {
         unsub()
         options.onDone?.(event.data as { response_id?: string })
         resolve()
-      } else if (event.type === 'error') {
+      } else if (event.type === "error") {
         unsub()
         reject(new Error(event.data.message as string))
       }
     })
 
     if (options.signal) {
-      options.signal.addEventListener('abort', () => {
-        unsub()
-        window.electronAPI.abortStream(streamId)
-        reject(new DOMException('Aborted', 'AbortError'))
-      }, { once: true })
+      options.signal.addEventListener(
+        "abort",
+        () => {
+          unsub()
+          window.electronAPI.abortStream(streamId)
+          reject(new DOMException("Aborted", "AbortError"))
+        },
+        { once: true },
+      )
     }
 
-    window.electronAPI.startStream(streamId, 'generate-playground', {
-      userPrompt: options.userPrompt,
-      systemPrompt: options.systemPrompt,
-      aiGenerationSettings: options.aiGenerationSettings,
-    }).catch(reject)
+    window.electronAPI
+      .startStream(streamId, "generate-playground", {
+        userPrompt: options.userPrompt,
+        systemPrompt: options.systemPrompt,
+        aiGenerationSettings: options.aiGenerationSettings,
+      })
+      .catch(reject)
   })
 }

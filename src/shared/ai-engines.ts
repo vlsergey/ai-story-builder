@@ -16,10 +16,10 @@
  * Display strings (name, notes, field labels/hints, capability labels/descriptions, age rating long labels)
  * are intentionally absent — they live in the frontend i18n locale files (src/frontend/src/i18n/).
  */
-import { z, ZodType } from "zod";
+import { z, ZodType } from "zod"
 
-export const AGE_RATING_ORDER = ['G', 'PG', '12', '16', '18', 'NC21'] as const
-export type AgeRating = typeof AGE_RATING_ORDER[number]
+export const AGE_RATING_ORDER = ["G", "PG", "12", "16", "18", "NC21"] as const
+export type AgeRating = (typeof AGE_RATING_ORDER)[number]
 
 export interface AgeRatingInfo {
   /** Short rating code shown as a badge (e.g. "G", "18+"). Not translated. */
@@ -32,16 +32,16 @@ export interface AgeRatingInfo {
 }
 
 export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
-  G:    { label: 'G',      minAge: 0,  bg: '#16a34a', fg: '#fff' }, // green-600
-  PG:   { label: 'PG',    minAge: 7,  bg: '#65a30d', fg: '#fff' }, // lime-600
-  '12': { label: '12+',   minAge: 12, bg: '#eab308', fg: '#000' }, // yellow-500
-  '16': { label: '16+',   minAge: 16, bg: '#f97316', fg: '#fff' }, // orange-500
-  '18': { label: '18+',   minAge: 18, bg: '#dc2626', fg: '#fff' }, // red-600
-  NC21: { label: 'NC-21', minAge: 21, bg: '#6b21a8', fg: '#fff' }, // purple-800
+  G: { label: "G", minAge: 0, bg: "#16a34a", fg: "#fff" }, // green-600
+  PG: { label: "PG", minAge: 7, bg: "#65a30d", fg: "#fff" }, // lime-600
+  "12": { label: "12+", minAge: 12, bg: "#eab308", fg: "#000" }, // yellow-500
+  "16": { label: "16+", minAge: 16, bg: "#f97316", fg: "#fff" }, // orange-500
+  "18": { label: "18+", minAge: 18, bg: "#dc2626", fg: "#fff" }, // red-600
+  NC21: { label: "NC-21", minAge: 21, bg: "#6b21a8", fg: "#fff" }, // purple-800
 }
 
 export const AI_ENGINES_KEYS = ["grok", "yandex"]
-export type AiEngineKey = typeof AI_ENGINES_KEYS[number]
+export type AiEngineKey = (typeof AI_ENGINES_KEYS)[number]
 
 export interface AiEngineCapabilities {
   /** Upload documents to persistent AI storage. */
@@ -67,12 +67,12 @@ export interface AiEngineCapabilities {
 
 export interface AiEngineFieldDef {
   key: string
-  type: 'checkbox' | 'decimal' | 'integer' | 'password' | 'select' | 'input' | 'textarea'
+  type: "checkbox" | "decimal" | "integer" | "password" | "select" | "input" | "textarea"
   /** Default value pre-filled in the field when no saved value exists. */
-  defaultValue?: string,
-  required?: boolean,
-  options?: string[],
-  schema?: ZodType,
+  defaultValue?: string
+  required?: boolean
+  options?: string[]
+  schema?: ZodType
 }
 
 export interface AiEngineDefinition {
@@ -82,7 +82,7 @@ export interface AiEngineDefinition {
   capabilities: AiEngineCapabilities
   ageRating: AgeRating
   configFields: AiEngineFieldDef[]
-  aiSettingsFields: AiEngineFieldDef[],
+  aiSettingsFields: AiEngineFieldDef[]
   /**
    * Maximum number of files that can be attached to a single request, or null if unlimited.
    * When set and the engine supports fileUpload + fileAttachment, the lore tree is collapsed
@@ -93,17 +93,17 @@ export interface AiEngineDefinition {
 
 /** Capability keys in display order. Labels and descriptions are in i18n locale files. */
 export const CAPABILITY_KEYS: Array<keyof AiEngineCapabilities> = [
-  'fileUpload',
-  'fileDeletion',
-  'fileAttachment',
-  'knowledgeBase',
-  'knowledgeBaseAttachment',
+  "fileUpload",
+  "fileDeletion",
+  "fileAttachment",
+  "knowledgeBase",
+  "knowledgeBaseAttachment",
 ]
 
-export const GROK_ENGINE_DEF : AiEngineDefinition = {
-  id: 'grok',
-  provider: 'xAI',
-  ageRating: 'NC21',
+export const GROK_ENGINE_DEF: AiEngineDefinition = {
+  id: "grok",
+  provider: "xAI",
+  ageRating: "NC21",
   capabilities: {
     fileUpload: true,
     fileDeletion: false,
@@ -112,24 +112,24 @@ export const GROK_ENGINE_DEF : AiEngineDefinition = {
     knowledgeBaseAttachment: false,
   },
   configFields: [
-    { key: 'api_key', type: 'password' },
-    { key: 'management_key', type: 'password' },
-    { key: 'team_id', type: 'input' },
+    { key: "api_key", type: "password" },
+    { key: "management_key", type: "password" },
+    { key: "team_id", type: "input" },
   ],
   aiSettingsFields: [
-    { key: 'max_output_tokens', defaultValue: "0", type: 'integer', schema: z.coerce.number().int().min(0)},
-    { key: 'temperature', defaultValue: "1", type: 'decimal', schema: z.coerce.number().min(0).max(2)},
-    { key: 'top_p', defaultValue: "1", type: 'decimal', schema: z.coerce.number().min(0).max(1)},
-    { key: 'x_search', type: 'checkbox', schema: z.coerce.boolean()},
-    { key: 'web_search', type: 'checkbox', schema: z.coerce.boolean()}
+    { key: "max_output_tokens", defaultValue: "0", type: "integer", schema: z.coerce.number().int().min(0) },
+    { key: "temperature", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(2) },
+    { key: "top_p", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(1) },
+    { key: "x_search", type: "checkbox", schema: z.coerce.boolean() },
+    { key: "web_search", type: "checkbox", schema: z.coerce.boolean() },
   ],
   maxFilesPerRequest: 10,
 }
 
-export const YANDEX_ENGINE_DEF : AiEngineDefinition = {
-  id: 'yandex',
-  provider: 'Yandex',
-  ageRating: '12',
+export const YANDEX_ENGINE_DEF: AiEngineDefinition = {
+  id: "yandex",
+  provider: "Yandex",
+  ageRating: "12",
   capabilities: {
     fileUpload: true,
     fileDeletion: true,
@@ -138,26 +138,23 @@ export const YANDEX_ENGINE_DEF : AiEngineDefinition = {
     knowledgeBaseAttachment: true,
   },
   configFields: [
-    { key: 'api_key',   type: 'password' },
-    { key: 'folder_id', type: 'input' },
+    { key: "api_key", type: "password" },
+    { key: "folder_id", type: "input" },
   ],
   aiSettingsFields: [
-    { key: 'max_completion_tokens', defaultValue: "0", type: 'integer', schema: z.coerce.number().int().min(0)},
-    { key: 'webSearch', type: 'select', options: ['none', 'low', 'medium', 'high'], defaultValue: 'none' }
+    { key: "max_completion_tokens", defaultValue: "0", type: "integer", schema: z.coerce.number().int().min(0) },
+    { key: "webSearch", type: "select", options: ["none", "low", "medium", "high"], defaultValue: "none" },
   ],
   maxFilesPerRequest: null,
 }
 
 /** Built-in AI engine definitions. */
-export const BUILTIN_ENGINES: AiEngineDefinition[] = [
-  GROK_ENGINE_DEF,
-  YANDEX_ENGINE_DEF,
-]
+export const BUILTIN_ENGINES: AiEngineDefinition[] = [GROK_ENGINE_DEF, YANDEX_ENGINE_DEF]
 
 /** Returns the capabilities of the given engine, or null if unknown. */
 export function getEngineCapabilities(engineId: string | null | undefined): AiEngineCapabilities | null {
   if (!engineId) return null
-  return BUILTIN_ENGINES.find(e => e.id === engineId)?.capabilities ?? null
+  return BUILTIN_ENGINES.find((e) => e.id === engineId)?.capabilities ?? null
 }
 
 /** Returns true if the given engine (by id) supports file upload. Unknown engine ids return false. */

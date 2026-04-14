@@ -1,20 +1,20 @@
-import { ResponseStreamEvent } from "openai/resources/responses/responses.js";
-import { RegenerateOptions } from "../../../../shared/RegenerateOptions";
-import { PlanNodeRow } from "../../../../shared/plan-graph";
+import { ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import { RegenerateOptions } from "../../../../shared/RegenerateOptions"
+import { PlanNodeRow } from "../../../../shared/plan-graph"
 
-export type PlanNodeAiGenerationStatus = 'EMPTY' | 'SAME' | 'GENERATED'
+export type PlanNodeAiGenerationStatus = "EMPTY" | "SAME" | "GENERATED"
 
 export interface RegenerationContainerContext {
-  options: RegenerateOptions,
+  options: RegenerateOptions
   onNodeSkip(node: PlanNodeRow, skipReason: string): void
   onNodeStart<T>(
     node: PlanNodeRow,
-    block: (context: RegenerationNodeContext) => Promise<{ result: T, status: PlanNodeAiGenerationStatus }>
+    block: (context: RegenerationNodeContext) => Promise<{ result: T; status: PlanNodeAiGenerationStatus }>,
   ): Promise<T>
 }
 
 export interface RegenerationNodeContext {
-  options: RegenerateOptions,
+  options: RegenerateOptions
   onData(node: PlanNodeRow): void
   onEvent(event: ResponseStreamEvent): void
   /**

@@ -1,15 +1,23 @@
-export const CONTAINER_NODE_TYPES = ['for-each'] as const
-export const NON_CONTAINER_NODE_TYPES = ['text', 'lore', 'merge', 'split', 'for-each-input', 'for-each-output', 'for-each-prev-outputs'] as const
+export const CONTAINER_NODE_TYPES = ["for-each"] as const
+export const NON_CONTAINER_NODE_TYPES = [
+  "text",
+  "lore",
+  "merge",
+  "split",
+  "for-each-input",
+  "for-each-output",
+  "for-each-prev-outputs",
+] as const
 
-export const NODE_TYPES = [ ...CONTAINER_NODE_TYPES, ...NON_CONTAINER_NODE_TYPES] as const
-export type PlanContainerNodeType = typeof CONTAINER_NODE_TYPES[number]
-export type PlanNodeType = typeof NODE_TYPES[number]
+export const NODE_TYPES = [...CONTAINER_NODE_TYPES, ...NON_CONTAINER_NODE_TYPES] as const
+export type PlanContainerNodeType = (typeof CONTAINER_NODE_TYPES)[number]
+export type PlanNodeType = (typeof NODE_TYPES)[number]
 
-export const PLAN_NODE_STATUSES = ['EMPTY', 'GENERATING', 'GENERATED', 'MANUAL', 'OUTDATED', 'ERROR'] as const
-export type PlanNodeStatus = typeof PLAN_NODE_STATUSES[number]
+export const PLAN_NODE_STATUSES = ["EMPTY", "GENERATING", "GENERATED", "MANUAL", "OUTDATED", "ERROR"] as const
+export type PlanNodeStatus = (typeof PLAN_NODE_STATUSES)[number]
 
-export const EDGE_TYPES = ['text', 'textArray'] as const
-export type PlanEdgeType = typeof EDGE_TYPES[number]
+export const EDGE_TYPES = ["text", "textArray"] as const
+export type PlanEdgeType = (typeof EDGE_TYPES)[number]
 
 export interface PlanNodeRow {
   id: number
@@ -38,9 +46,9 @@ export interface PlanNodeRow {
   created_at: string
 }
 
-type PlanNodeInsert = Omit<PlanNodeRow, 'id' | 'created_at'>
+type PlanNodeInsert = Omit<PlanNodeRow, "id" | "created_at">
 
-export const PlanNodeRowDefaults : Partial<PlanNodeInsert> = {
+export const PlanNodeRowDefaults: Partial<PlanNodeInsert> = {
   parent_id: null,
   position: null,
   ai_user_prompt: null,
@@ -59,9 +67,10 @@ export const PlanNodeRowDefaults : Partial<PlanNodeInsert> = {
   ai_improve_instruction: null,
 }
 
-type DefaultPlanNodeKeys = keyof typeof PlanNodeRowDefaults;
-export type PlanNodeCreate = Omit<PlanNodeInsert, DefaultPlanNodeKeys> & Partial<Pick<PlanNodeInsert, DefaultPlanNodeKeys>>;
-export type PlanNodeUpdate = Partial<Omit<PlanNodeRow, 'id' | 'created_at' | 'type'>>
+type DefaultPlanNodeKeys = keyof typeof PlanNodeRowDefaults
+export type PlanNodeCreate = Omit<PlanNodeInsert, DefaultPlanNodeKeys> &
+  Partial<Pick<PlanNodeInsert, DefaultPlanNodeKeys>>
+export type PlanNodeUpdate = Partial<Omit<PlanNodeRow, "id" | "created_at" | "type">>
 
 export interface PlanEdgeRow {
   id: number
@@ -73,10 +82,10 @@ export interface PlanEdgeRow {
   template: string | null
 }
 
-type PlanEdgeInsert = Omit<PlanEdgeRow, 'id'>
+type PlanEdgeInsert = Omit<PlanEdgeRow, "id">
 
 export const PlanEdgeRowDefaults: Partial<PlanEdgeInsert> = {
-  type: 'text',
+  type: "text",
   position: 0,
   label: null,
   template: null,

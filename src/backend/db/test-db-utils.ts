@@ -1,5 +1,5 @@
-import { migrateDatabase } from './migrations.js'
-import * as DbState from './state.js'
+import { migrateDatabase } from "./migrations.js"
+import * as DbState from "./state.js"
 
 /**
  * Функция, которую следует вызывать в beforeEach теста.
@@ -7,7 +7,7 @@ import * as DbState from './state.js'
  */
 export function setUpTestDb(migrate: boolean = true) {
   DbState.setCurrentDbPath(null)
-  DbState.setCurrentDbPath(':memory:')
+  DbState.setCurrentDbPath(":memory:")
   if (migrate) {
     migrateDatabase(DbState.getCurrentDb())
   }

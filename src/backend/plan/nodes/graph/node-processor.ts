@@ -1,6 +1,6 @@
-import { PlanNodeService } from '../plan-node-service.js'
-import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
-import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
+import { PlanNodeService } from "../plan-node-service.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**
  * Processor for a specific node type.
@@ -21,7 +21,13 @@ export interface NodeProcessor<S = unknown> {
    */
   getOutput(context: PlanNodeService, planNodeRow: PlanNodeRow): unknown
 
-  onUpdate?(context: PlanNodeService, nodeId: number, oldNode: PlanNodeRow | null, newNode: PlanNodeRow | null, settings: S): Promise<PlanNodeUpdate|null>
+  onUpdate?(
+    context: PlanNodeService,
+    nodeId: number,
+    oldNode: PlanNodeRow | null,
+    newNode: PlanNodeRow | null,
+    settings: S,
+  ): Promise<PlanNodeUpdate | null>
 
   /**
    * Called when an input node's content changes.
@@ -31,7 +37,12 @@ export interface NodeProcessor<S = unknown> {
    * @param changedInputNodeId The ID of the input node whose content changed.
    * @param settings The full settings for this node (merged from node_type_settings and defaults).
    */
-  onInputContentChange?(context: PlanNodeService, node: PlanNodeRow, changedInputNodeId: number, settings: S): Promise<PlanNodeUpdate | null>
+  onInputContentChange?(
+    context: PlanNodeService,
+    node: PlanNodeRow,
+    changedInputNodeId: number,
+    settings: S,
+  ): Promise<PlanNodeUpdate | null>
 
   /**
    * Regenerate the node's content (e.g., AI generation, re‑split, re‑merge).
@@ -42,6 +53,6 @@ export interface NodeProcessor<S = unknown> {
     service: PlanNodeService,
     context: RegenerationNodeContext,
     node: PlanNodeRow,
-    settings: S
+    settings: S,
   ): Promise<PlanNodeUpdate | null>
 }

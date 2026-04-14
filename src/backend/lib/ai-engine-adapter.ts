@@ -1,6 +1,6 @@
-import OpenAI from 'openai'
-import type { AiEngineKey } from '../../shared/ai-engines.js'
-import type { AiGenerationSettings } from '../../shared/ai-generation-settings.js'
+import OpenAI from "openai"
+import type { AiEngineKey } from "../../shared/ai-engines.js"
+import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 
 export interface JsonSchemaSpec {
   /** Identifier used in the API call (no spaces, e.g. "lore_node") */
@@ -50,12 +50,12 @@ export interface AiEngineAdapter<T extends AiGenerationSettings = AiGenerationSe
   ): Promise<string>
 }
 
-import { GrokAdapter } from './grok-adapter.js'
-import { YandexAdapter } from './yandex-adapter.js'
+import { GrokAdapter } from "./grok-adapter.js"
+import { YandexAdapter } from "./yandex-adapter.js"
 
 const adapters: Record<AiEngineKey, AiEngineAdapter<AiGenerationSettings>> = {
-  'grok': new GrokAdapter(),
-  'yandex': new YandexAdapter(),
+  grok: new GrokAdapter(),
+  yandex: new YandexAdapter(),
 }
 
 /** Returns the adapter for the given engine ID, or null if unsupported. */

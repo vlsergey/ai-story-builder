@@ -1,22 +1,21 @@
+import React, { useRef, useEffect, useCallback } from "react"
+import { DockviewReact, DockviewDefaultTab, DockviewReadyEvent, DockviewApi, DockviewPanelApi } from "dockview"
+import { trpc } from "./ipcClient"
+import LoreSection from "./lore/LoreSection"
+import LoreEditor from "./lore/LoreEditor"
+import PlanNodeEditor from "./plan/editors/PlanNodeEditor"
+import PlanGraph from "./plan/plan-graph/PlanGraph"
+import SettingsPanel from "./settings/SettingsPanel"
+import AiPlayground from "./ai/AiPlayground"
+import AiBillingPanel from "./ai/AiBillingPanel"
+import RegenerationPanel from "./plan/RegenerationPanel"
+import type { LoreNodeRow } from "@shared/lore-node"
+import { EditorSettingsProvider } from "./settings/editor-settings"
+import { LoreSettingsProvider } from "./settings/lore-settings"
+import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from "./lib/plan-graph-events"
+import { PlanNodeRow } from "@shared/plan-graph"
 
-import React, { useRef, useEffect, useCallback } from 'react'
-import { DockviewReact, DockviewDefaultTab, DockviewReadyEvent, DockviewApi, DockviewPanelApi } from 'dockview'
-import { trpc } from './ipcClient'
-import LoreSection from './lore/LoreSection'
-import LoreEditor from './lore/LoreEditor'
-import PlanNodeEditor from './plan/editors/PlanNodeEditor'
-import PlanGraph from './plan/plan-graph/PlanGraph'
-import SettingsPanel from './settings/SettingsPanel'
-import AiPlayground from './ai/AiPlayground'
-import AiBillingPanel from './ai/AiBillingPanel'
-import RegenerationPanel from './plan/RegenerationPanel'
-import type { LoreNodeRow } from '@shared/lore-node'
-import { EditorSettingsProvider } from './settings/editor-settings'
-import { LoreSettingsProvider } from './settings/lore-settings'
-import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from './lib/plan-graph-events'
-import { PlanNodeRow } from '@shared/plan-graph'
-
-import 'dockview/dist/styles/dockview.css'
+import "dockview/dist/styles/dockview.css"
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -25,9 +24,7 @@ import 'dockview/dist/styles/dockview.css'
  */
 const WelcomeWatermark = () => (
   <div className="flex items-center justify-center h-full bg-background select-none">
-    <span className="text-3xl font-bold text-muted-foreground/40 tracking-wide">
-      AI Story Builder
-    </span>
+    <span className="text-3xl font-bold text-muted-foreground/40 tracking-wide">AI Story Builder</span>
   </div>
 )
 
@@ -41,10 +38,14 @@ export default function Layout() {
   function findEditorGroup(api: any): any {
     return (
       api.groups.find((g: any) =>
-        g.panels.some((p: any) =>
-          p.id.startsWith('lore-editor-') || p.id.startsWith('plan-node-editor-') ||
-          p.id === 'settings' || p.id === 'ai-playground' || p.id === 'plan-graph'
-        )
+        g.panels.some(
+          (p: any) =>
+            p.id.startsWith("lore-editor-") ||
+            p.id.startsWith("plan-node-editor-") ||
+            p.id === "settings" ||
+            p.id === "ai-playground" ||
+            p.id === "plan-graph",
+        ),
       ) ?? api.groups.find((g: any) => g.panels.length === 0)
     )
   }
@@ -53,14 +54,17 @@ export default function Layout() {
   function openAiPlayground() {
     const api = dockviewRef.current
     if (!api) return
-    const existing = api.getPanel('ai-playground')
-    if (existing) { existing.api.setActive(); return }
+    const existing = api.getPanel("ai-playground")
+    if (existing) {
+      existing.api.setActive()
+      return
+    }
     const editorGroup = findEditorGroup(api)
     api.addPanel({
-      id: 'ai-playground',
-      component: 'ai-playground',
-      tabComponent: 'editorTab',
-      title: 'AI Playground',
+      id: "ai-playground",
+      component: "ai-playground",
+      tabComponent: "editorTab",
+      title: "AI Playground",
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
   }
@@ -69,14 +73,17 @@ export default function Layout() {
   function openSettings() {
     const api = dockviewRef.current
     if (!api) return
-    const existing = api.getPanel('settings')
-    if (existing) { existing.api.setActive(); return }
+    const existing = api.getPanel("settings")
+    if (existing) {
+      existing.api.setActive()
+      return
+    }
     const editorGroup = findEditorGroup(api)
     api.addPanel({
-      id: 'settings',
-      component: 'settings',
-      tabComponent: 'editorTab',
-      title: 'Settings',
+      id: "settings",
+      component: "settings",
+      tabComponent: "editorTab",
+      title: "Settings",
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
   }
@@ -88,12 +95,15 @@ export default function Layout() {
     const panelId = `lore-editor-${node.id}`
     // If already open, just bring it to the front
     const existing = api.getPanel(panelId)
-    if (existing) { existing.api.setActive(); return }
+    if (existing) {
+      existing.api.setActive()
+      return
+    }
     const editorGroup = findEditorGroup(api)
     api.addPanel({
       id: panelId,
-      component: 'lore-editor',
-      tabComponent: 'editorTab',
+      component: "lore-editor",
+      tabComponent: "editorTab",
       title: node.title,
       params: { nodeId: node.id },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
@@ -106,12 +116,15 @@ export default function Layout() {
     if (!api) return
     const panelId = `plan-node-editor-${node.id}`
     const existing = api.getPanel(panelId)
-    if (existing) { existing.api.setActive(); return }
+    if (existing) {
+      existing.api.setActive()
+      return
+    }
     const editorGroup = findEditorGroup(api)
     api.addPanel({
       id: panelId,
-      component: 'plan-node-editor',
-      tabComponent: 'editorTab',
+      component: "plan-node-editor",
+      tabComponent: "editorTab",
       title: node.title,
       params: { nodeId: node.id },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
@@ -123,9 +136,11 @@ export default function Layout() {
   /** Creates a new blank child node under the given parent, then opens it in LoreEditor. */
   async function openLoreWizard(node: LoreNodeRow) {
     try {
-      const { id } = await newLoreItem.mutateAsync( { parent_id: node.id, name: 'New lore item' } )
-      openLoreEditor({ id, title: 'New lore item', parent_id: node.id } as LoreNodeRow)
-    } catch { /* ignore */ }
+      const { id } = await newLoreItem.mutateAsync({ parent_id: node.id, name: "New lore item" })
+      openLoreEditor({ id, title: "New lore item", parent_id: node.id } as LoreNodeRow)
+    } catch {
+      /* ignore */
+    }
   }
 
   // Listen for open-plan-node-editor events from the PlanGraph canvas
@@ -140,7 +155,7 @@ export default function Layout() {
 
   // helper to massage storage format into the version expected by dockview
   const normalizeLayout = (layout: any) => {
-    if (!layout || typeof layout !== 'object') return layout
+    if (!layout || typeof layout !== "object") return layout
     if (layout.panels) {
       Object.values(layout.panels).forEach((p: any) => {
         // dockview.toJSON currently emits "contentComponent"; fromJSON
@@ -162,7 +177,7 @@ export default function Layout() {
       if (group.panels.length === 0) {
         // Prevent the group from being a drag/drop target
         // eslint-disable-next-line react-hooks/immutability
-        group.locked = 'no-drop-target'
+        group.locked = "no-drop-target"
         // Hide the tab bar entirely — it contains dv-void-container/dv-draggable
         // which lets the user drag the group even when there are no panels
         group.header.hidden = true
@@ -184,47 +199,47 @@ export default function Layout() {
 
     // Add lore tree to the left
     dockviewRef.current.addPanel({
-      id: 'lore-panel',
-      component: 'lore',
-      tabComponent: 'nonClosableTab',
-      title: 'Lore',
-      position: { referenceGroup: centerGroup, direction: 'left' },
+      id: "lore-panel",
+      component: "lore",
+      tabComponent: "nonClosableTab",
+      title: "Lore",
+      position: { referenceGroup: centerGroup, direction: "left" },
       minimumWidth: 200,
     })
 
     // Add plan-graph panel to the center group
     dockviewRef.current.addPanel({
-      id: 'plan-graph',
-      component: 'plan-graph',
-      tabComponent: 'permanentTab',
-      title: 'Plan',
+      id: "plan-graph",
+      component: "plan-graph",
+      tabComponent: "permanentTab",
+      title: "Plan",
       position: { referenceGroup: centerGroup },
     })
 
     dockviewRef.current.addPanel({
-      id: 'cards-panel',
-      component: 'cards',
-      tabComponent: 'nonClosableTab',
-      title: 'Cards',
-      position: { referenceGroup: centerGroup, direction: 'right' },
+      id: "cards-panel",
+      component: "cards",
+      tabComponent: "nonClosableTab",
+      title: "Cards",
+      position: { referenceGroup: centerGroup, direction: "right" },
       minimumWidth: 200,
     })
 
     dockviewRef.current.addPanel({
-      id: 'billing-panel',
-      component: 'billing',
-      tabComponent: 'nonClosableTab',
-      title: 'AI Billing',
-      position: { referencePanel: 'cards-panel', direction: 'below' },
+      id: "billing-panel",
+      component: "billing",
+      tabComponent: "nonClosableTab",
+      title: "AI Billing",
+      position: { referencePanel: "cards-panel", direction: "below" },
       minimumHeight: 100,
     })
 
     dockviewRef.current.addPanel({
-      id: 'regeneration-panel',
-      component: 'regeneration',
-      tabComponent: 'nonClosableTab',
-      title: 'Generation Progress',
-      position: { referencePanel: 'billing-panel', direction: 'below' },
+      id: "regeneration-panel",
+      component: "regeneration",
+      tabComponent: "nonClosableTab",
+      title: "Generation Progress",
+      position: { referencePanel: "billing-panel", direction: "below" },
       minimumHeight: 150,
     })
   }, [])
@@ -237,7 +252,7 @@ export default function Layout() {
       try {
         dockviewRef.current.fromJSON(normalizeLayout(savedLayout))
       } catch (e) {
-        console.warn('Failed to restore layout', e)
+        console.warn("Failed to restore layout", e)
         setupDefaultLayout()
       }
     } else {
@@ -262,7 +277,7 @@ export default function Layout() {
     try {
       await setLayoutInDb.mutateAsync(layout)
     } catch (e) {
-      console.error('Failed to save layout to database:', e)
+      console.error("Failed to save layout to database:", e)
     }
   }
 
@@ -275,12 +290,11 @@ export default function Layout() {
       // - Never implicitly on page unload
     }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener("beforeunload", handleBeforeUnload)
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener("beforeunload", handleBeforeUnload)
     }
   }, [])
-
 
   const onReady = (event: DockviewReadyEvent) => {
     dockviewRef.current = event.api
@@ -322,7 +336,7 @@ export default function Layout() {
   const closeProject = trpc.project.close.useMutation({
     onSettled() {
       projectUtils.invalidate()
-    }
+    },
   })
 
   // Native-menu IPC listener.
@@ -335,13 +349,13 @@ export default function Layout() {
   useEffect(() => {
     if (!window.electronAPI) return
     const unsub = window.electronAPI.onMenuAction((action: string) => {
-      if (action === 'open-settings') {
+      if (action === "open-settings") {
         menuActionsRef.current.openSettings()
-      } else if (action === 'open-ai-playground') {
+      } else if (action === "open-ai-playground") {
         menuActionsRef.current.openAiPlayground()
-      } else if (action === 'reset-layouts') {
+      } else if (action === "reset-layouts") {
         menuActionsRef.current.handleResetLayouts()
-      } else if (action === 'close-project') {
+      } else if (action === "close-project") {
         menuActionsRef.current.closeProject.mutate()
       }
     })
@@ -354,8 +368,8 @@ export default function Layout() {
       <div className="dv-default-tab">
         <div className="dv-default-tab-content">{props.params?.title || props.api?.title}</div>
       </div>
-    );
-  };
+    )
+  }
 
   // Permanent tab — like NonClosableTab, no close button; used for plan-graph
   const PermanentTab = (props: any) => {
@@ -363,8 +377,8 @@ export default function Layout() {
       <div className="dv-default-tab">
         <div className="dv-default-tab-content">{props.params?.title || props.api?.title}</div>
       </div>
-    );
-  };
+    )
+  }
 
   // Tab for editor panels. Wraps DockviewDefaultTab but overrides the close
   // action so that closing the last panel in a group keeps the group alive (shows
@@ -374,16 +388,13 @@ export default function Layout() {
       const group = props.api?.group
       if (group && group.panels.length === 1) {
         // Last panel — remove without destroying the group
-        (props.containerApi).component.removePanel(
-          (props.api).panel,
-          { removeEmptyGroup: false }
-        )
+        props.containerApi.component.removePanel(props.api.panel, { removeEmptyGroup: false })
       } else {
         props.api?.close()
       }
     }
     return <DockviewDefaultTab {...props} closeActionOverride={closeAction} />
-  };
+  }
 
   const components = {
     lore: () => (
@@ -391,19 +402,16 @@ export default function Layout() {
         <LoreSection
           onSelectLoreNode={() => {}}
           onOpenLoreNode={openLoreEditor}
-          onOpenLoreWizard={node => void openLoreWizard(node)}
+          onOpenLoreWizard={(node) => void openLoreWizard(node)}
         />
       </div>
     ),
-    'lore-editor': (props: { api: DockviewPanelApi, params: { nodeId: number } }) => (
+    "lore-editor": (props: { api: DockviewPanelApi; params: { nodeId: number } }) => (
       <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
-    'plan-graph': () => <PlanGraph />,
-    'plan-node-editor': (props: { api: DockviewPanelApi, params: { nodeId: number } }) => (
-      <PlanNodeEditor
-        nodeId={props.params?.nodeId}
-        panelApi={props.api}
-      />
+    "plan-graph": () => <PlanGraph />,
+    "plan-node-editor": (props: { api: DockviewPanelApi; params: { nodeId: number } }) => (
+      <PlanNodeEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
     cards: () => (
       <div className="p-2 h-full">
@@ -412,31 +420,37 @@ export default function Layout() {
       </div>
     ),
     settings: () => <SettingsPanel />,
-    'ai-playground': () => <AiPlayground />,
+    "ai-playground": () => <AiPlayground />,
     billing: () => <AiBillingPanel />,
-    regeneration: (props: {api: DockviewPanelApi}) => <RegenerationPanel panelApi={props.api} />,
-  };
+    regeneration: (props: { api: DockviewPanelApi }) => <RegenerationPanel panelApi={props.api} />,
+  }
 
   const tabComponents = {
     nonClosableTab: NonClosableTab,
     permanentTab: PermanentTab,
     editorTab: EditorTab,
-  };
+  }
 
   // Prevent sidebar/utility panels (lore, cards) from being dropped into the editor group.
   const handleWillDrop = (event: any) => {
     const targetGroup = event.group
     if (!targetGroup) return
     const isEditorGroup = targetGroup.panels.some(
-      (p: any) => p.id.startsWith('lore-editor-') || p.id.startsWith('plan-node-editor-') ||
-        p.id === 'plan-graph' || p.id === 'settings' || p.id === 'ai-playground'
+      (p: any) =>
+        p.id.startsWith("lore-editor-") ||
+        p.id.startsWith("plan-node-editor-") ||
+        p.id === "plan-graph" ||
+        p.id === "settings" ||
+        p.id === "ai-playground",
     )
     if (!isEditorGroup) return
     const draggedPanelId = event.getData?.()?.panelId ?? event.panel?.id
-    const isEditorPanel = draggedPanelId?.startsWith('lore-editor-') ||
-      draggedPanelId?.startsWith('plan-node-editor-') ||
-      draggedPanelId === 'plan-graph' ||
-      draggedPanelId === 'settings' || draggedPanelId === 'ai-playground'
+    const isEditorPanel =
+      draggedPanelId?.startsWith("lore-editor-") ||
+      draggedPanelId?.startsWith("plan-node-editor-") ||
+      draggedPanelId === "plan-graph" ||
+      draggedPanelId === "settings" ||
+      draggedPanelId === "ai-playground"
     if (!isEditorPanel) {
       event.preventDefault()
     }

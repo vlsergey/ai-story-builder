@@ -1,12 +1,12 @@
-import React from 'react';
-import { type Connection } from '@xyflow/react';
-import { useLocale } from '@/lib/locale';
+import React from "react"
+import { type Connection } from "@xyflow/react"
+import { useLocale } from "@/lib/locale"
 
 interface EdgeTypeSelectionDialogProps {
-  showConnectDialog: Connection | null;
-  allowedEdgeTypes: string[];
-  confirmConnect: (edgeType: string) => void;
-  setShowConnectDialog: (connection: Connection | null) => void;
+  showConnectDialog: Connection | null
+  allowedEdgeTypes: string[]
+  confirmConnect: (edgeType: string) => void
+  setShowConnectDialog: (connection: Connection | null) => void
 }
 
 export default function EdgeTypeSelectionDialog({
@@ -16,14 +16,14 @@ export default function EdgeTypeSelectionDialog({
   setShowConnectDialog,
 }: EdgeTypeSelectionDialogProps) {
   const { t } = useLocale()
-  if (!showConnectDialog) return null;
+  if (!showConnectDialog) return null
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-64">
-        <h3 className="text-sm font-semibold mb-3">{t('planGraph.selectEdgeType')}</h3>
+        <h3 className="text-sm font-semibold mb-3">{t("planGraph.selectEdgeType")}</h3>
         <div className="flex flex-col gap-2">
-          {allowedEdgeTypes.map(type => (
+          {allowedEdgeTypes.map((type) => (
             <button
               key={type}
               onClick={() => void confirmConnect(type)}
@@ -37,9 +37,9 @@ export default function EdgeTypeSelectionDialog({
           onClick={() => setShowConnectDialog(null)}
           className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground"
         >
-          {t('common.cancel')}
+          {t("common.cancel")}
         </button>
       </div>
     </div>
-  );
+  )
 }

@@ -1,21 +1,20 @@
-import { useLocale } from '../lib/locale'
-import { trpc } from '../ipcClient'
-import { useState } from 'react'
-import { ResponseUsage } from 'openai/resources/responses/responses.js'
+import { useLocale } from "../lib/locale"
+import { trpc } from "../ipcClient"
+import { useState } from "react"
+import { ResponseUsage } from "openai/resources/responses/responses.js"
 
 // 1 tick = 1e-10 USD
 const USD_PER_TICK = 1e-10
 
 function formatCost(ticks: number | null | undefined): string {
-  if (ticks == null) return '—'
+  if (ticks == null) return "—"
   const usd = ticks * USD_PER_TICK
-  if (usd === 0) return '$0.00'
-  if (usd < 0.000001) return `$${usd.toFixed(10).replace(/0+$/, '').replace(/\.$/, '')}`
+  if (usd === 0) return "$0.00"
+  if (usd < 0.000001) return `$${usd.toFixed(10).replace(/0+$/, "").replace(/\.$/, "")}`
   if (usd < 0.001) return `$${usd.toFixed(7)}`
   if (usd < 1) return `$${usd.toFixed(5)}`
   return `$${usd.toFixed(2)}`
 }
-
 
 function timeAgo(isoStr: string): string {
   const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000)
@@ -53,9 +52,9 @@ function extractCostUsd(period: XaiTimeSeries | undefined): number | null {
 }
 
 function formatUsd(usd: number | null | undefined): string {
-  if (usd == null) return '—'
-  if (usd === 0) return '$0.00'
-  if (usd < 0.000001) return `$${usd.toFixed(10).replace(/0+$/, '').replace(/\.$/, '')}`
+  if (usd == null) return "—"
+  if (usd === 0) return "$0.00"
+  if (usd < 0.000001) return `$${usd.toFixed(10).replace(/0+$/, "").replace(/\.$/, "")}`
   if (usd < 0.001) return `$${usd.toFixed(7)}`
   if (usd < 1) return `$${usd.toFixed(5)}`
   return `$${usd.toFixed(2)}`
@@ -67,24 +66,24 @@ export default function AiBillingPanel() {
   const { t } = useLocale()
   // Format tokens with unit (e.g., "1,234 tokens")
   function formatTokensWithUnit(n: number | null | undefined): string {
-    if (n == null) return '—';
-    return `${n.toLocaleString()} ${t('billing.tokens_unit')}`;
+    if (n == null) return "—"
+    return `${n.toLocaleString()} ${t("billing.tokens_unit")}`
   }
   const billingUtils = trpc.useUtils().ai.billing
-  const billingData = trpc.ai.billing.get.useQuery(undefined, { refetchInterval : POLL_INTERVAL_MS })
+  const billingData = trpc.ai.billing.get.useQuery(undefined, { refetchInterval: POLL_INTERVAL_MS })
   const [lastRequest, setLastRequest] = useState<Partial<ResponseUsage> | null>(null)
 
   trpc.ai.lastGenerationEvent.subscribe.useSubscription(undefined, {
     onData(data: Partial<ResponseUsage>) {
       setLastRequest(data)
-    }
+    },
   })
 
-  const periods: Array<{ key: keyof NonNullable<BillingData['totals']>; label: string }> = [
-    { key: 'last_hour', label: t('billing.last_hour') },
-    { key: 'last_24h',  label: t('billing.last_24h') },
-    { key: 'last_7d',   label: t('billing.last_7d') },
-    { key: 'last_30d',  label: t('billing.last_30d') },
+  const periods: Array<{ key: keyof NonNullable<BillingData["totals"]>; label: string }> = [
+    { key: "last_hour", label: t("billing.last_hour") },
+    { key: "last_24h", label: t("billing.last_24h") },
+    { key: "last_7d", label: t("billing.last_7d") },
+    { key: "last_30d", label: t("billing.last_30d") },
   ]
 
   const hasPeriodData = billingData.data?.configured && billingData.data?.totals && !billingData.data?.error
@@ -94,8 +93,10 @@ export default function AiBillingPanel() {
       {/* Last request */}
       <section>
         <div className="flex items-center justify-between mb-1">
-          <span className="font-semibold text-foreground">{t('billing.last_request')}</span>
-          {billingData.isLoading && <span className="text-xs text-muted-foreground animate-pulse">{t('billing.updating')}</span>}
+          <span className="font-semibold text-foreground">{t("billing.last_request")}</span>
+          {billingData.isLoading && (
+            <span className="text-xs text-muted-foreground animate-pulse">{t("billing.updating")}</span>
+          )}
         </div>
         {lastRequest != null ? (
           <div className="rounded border border-border bg-muted/30 px-3 py-2 space-y-1">
@@ -104,16 +105,18 @@ export default function AiBillingPanel() {
               <span className="font-mono font-semibold text-foreground">{formatCost(lastRequest.costUsdTicks)}</span>
             </div> */}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('billing.total_tokens')}</span>
+              <span className="text-muted-foreground">{t("billing.total_tokens")}</span>
               <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.total_tokens)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground pl-3">{t('billing.input_tokens')}</span>
+              <span className="text-muted-foreground pl-3">{t("billing.input_tokens")}</span>
               <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.input_tokens)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground pl-6">{t('billing.cached')}</span>
-              <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.input_tokens_details?.cached_tokens)}</span>
+              <span className="text-muted-foreground pl-6">{t("billing.cached")}</span>
+              <span className="font-mono text-foreground">
+                {formatTokensWithUnit(lastRequest.input_tokens_details?.cached_tokens)}
+              </span>
             </div>
             {/* <div className="flex justify-between">
               <span className="text-muted-foreground pl-3">{t('billing.output_tokens')}</span>
@@ -140,28 +143,30 @@ export default function AiBillingPanel() {
             <div className="text-xs text-muted-foreground text-right">{timeAgo(lastRequest.timestamp)}</div> */}
           </div>
         ) : (
-          <p className="text-muted-foreground text-xs">{t('billing.no_requests')}</p>
+          <p className="text-muted-foreground text-xs">{t("billing.no_requests")}</p>
         )}
       </section>
 
       {/* Period statistics */}
       <section>
-        <div className="font-semibold text-foreground mb-1">{t('billing.period_stats')}</div>
+        <div className="font-semibold text-foreground mb-1">{t("billing.period_stats")}</div>
         {!billingData.data ? (
-          <p className="text-muted-foreground text-xs">{t('billing.loading')}</p>
+          <p className="text-muted-foreground text-xs">{t("billing.loading")}</p>
         ) : !billingData.data.configured ? (
           <p
             className="text-muted-foreground text-xs"
-            dangerouslySetInnerHTML={{ __html: t('billing.configure_hint') }}
+            dangerouslySetInnerHTML={{ __html: t("billing.configure_hint") }}
           />
         ) : billingData.data.error ? (
-          <p className="text-destructive text-xs">{t('billing.error')} {billingData.data.error}</p>
+          <p className="text-destructive text-xs">
+            {t("billing.error")} {billingData.data.error}
+          </p>
         ) : hasPeriodData ? (
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="text-muted-foreground">
-                <th className="text-left font-normal pb-1">{t('billing.period')}</th>
-                <th className="text-right font-normal pb-1">{t('billing.cost')}</th>
+                <th className="text-left font-normal pb-1">{t("billing.period")}</th>
+                <th className="text-right font-normal pb-1">{t("billing.cost")}</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +183,7 @@ export default function AiBillingPanel() {
             </tbody>
           </table>
         ) : (
-          <p className="text-muted-foreground text-xs">{t('billing.no_data')}</p>
+          <p className="text-muted-foreground text-xs">{t("billing.no_data")}</p>
         )}
       </section>
 
@@ -186,7 +191,7 @@ export default function AiBillingPanel() {
         onClick={() => billingUtils.invalidate()}
         className="mt-auto self-start text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        {t('billing.refresh')}
+        {t("billing.refresh")}
       </button>
     </div>
   )

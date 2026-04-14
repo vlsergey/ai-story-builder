@@ -1,6 +1,6 @@
-import { migrateDatabase, CURRENT_VERSION } from './migrations.js'
-import { createBackup } from './backup.js'
-import Database from 'better-sqlite3'
+import { migrateDatabase, CURRENT_VERSION } from "./migrations.js"
+import { createBackup } from "./backup.js"
+import Database from "better-sqlite3"
 
 /**
  * Opens a project database, creates a backup of any existing file, runs all

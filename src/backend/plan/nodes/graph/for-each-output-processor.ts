@@ -1,24 +1,21 @@
-import { PlanNodeService } from '../plan-node-service.js'
-import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
-import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
-import { ForEachOutputSettings } from '../../../../shared/node-settings.js'
+import { PlanNodeService } from "../plan-node-service.js"
+import type { NodeProcessor } from "./node-processor.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import { ForEachOutputSettings } from "../../../../shared/node-settings.js"
 
 export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettings> {
   readonly defaultSettings = {}
 
   getOutput(context: PlanNodeService, node: PlanNodeRow): unknown {
-    return node.content ?? ''
+    return node.content ?? ""
   }
 
-  async onInputContentChange(
-    context: PlanNodeService,
-    node: PlanNodeRow,
-  ): Promise<PlanNodeUpdate | null> {
+  async onInputContentChange(context: PlanNodeService, node: PlanNodeRow): Promise<PlanNodeUpdate | null> {
     const nodeInputs = context.getNodeInputs(node.id)
-    let content: string = ''
-    for (const {input} of nodeInputs) {
-      if (typeof input === 'string') {
+    let content: string = ""
+    for (const { input } of nodeInputs) {
+      if (typeof input === "string") {
         content += input
       }
     }
@@ -40,9 +37,9 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
     settings: ForEachOutputSettings,
   ): Promise<PlanNodeRow> {
     const nodeInputs = service.getNodeInputs(node.id)
-    let content: string = ''
-    for (const {input} of nodeInputs) {
-      if (typeof input === 'string') {
+    let content: string = ""
+    for (const { input } of nodeInputs) {
+      if (typeof input === "string") {
         content += input
       }
     }
@@ -58,4 +55,3 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
     return node
   }
 }
-

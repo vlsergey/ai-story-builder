@@ -1,9 +1,9 @@
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
-import type { AppSettings } from '../types/index.js'
-import electron from 'electron'
-import Db, { Database } from 'better-sqlite3'
+import fs from "fs"
+import path from "path"
+import os from "os"
+import type { AppSettings } from "../types/index.js"
+import electron from "electron"
+import Db, { Database } from "better-sqlite3"
 const { app } = electron
 
 /**
@@ -13,22 +13,22 @@ const { app } = electron
  */
 export function getDataDir(): string {
   try {
-    return app.getPath('userData')
+    return app.getPath("userData")
   } catch (_) {
     // Fallback for development mode: mimic Electron's userData path
     const home = os.homedir()
     let appData: string
     switch (process.platform) {
-      case 'win32':
-        appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming')
+      case "win32":
+        appData = process.env.APPDATA || path.join(home, "AppData", "Roaming")
         break
-      case 'darwin':
-        appData = path.join(home, 'Library', 'Application Support')
+      case "darwin":
+        appData = path.join(home, "Library", "Application Support")
         break
       default: // Linux and other
-        appData = process.env.XDG_CONFIG_HOME || path.join(home, '.config')
+        appData = process.env.XDG_CONFIG_HOME || path.join(home, ".config")
     }
-    return path.join(appData, 'ai-story-builder')
+    return path.join(appData, "ai-story-builder")
   }
 }
 
@@ -46,10 +46,10 @@ export function getCurrentDbPath(): string | null {
 
 export function getCurrentDb(): Database {
   if (currentDb === null) {
-    throw new Error('No current database')
+    throw new Error("No current database")
   }
   if (!currentDbOpen) {
-    throw new Error('Current database is not opened yet')
+    throw new Error("Current database is not opened yet")
   }
   return currentDb
 }
@@ -98,16 +98,16 @@ export function restoreLastOpenedProject(): string | null {
 }
 
 export function readAppSettings(): AppSettings {
-  const settingsPath = path.join(getDataDir(), 'app_settings.json')
+  const settingsPath = path.join(getDataDir(), "app_settings.json")
   try {
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as AppSettings
+    return JSON.parse(fs.readFileSync(settingsPath, "utf8")) as AppSettings
   } catch (_) {
     return { recent: [] }
   }
 }
 
 export function writeAppSettings(s: AppSettings): void {
-  const settingsPath = path.join(getDataDir(), 'app_settings.json')
+  const settingsPath = path.join(getDataDir(), "app_settings.json")
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
   fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2))
 }

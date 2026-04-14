@@ -1,11 +1,11 @@
-import type { Database } from 'better-sqlite3'
+import type { Database } from "better-sqlite3"
 
 export default function migration(db: Database): void {
   // Check if column exists
-  const planCols = (db.pragma('table_info(plan_nodes)') as { name: string }[]).map(c => c.name);
-  if (!planCols.includes('status')) {
+  const planCols = (db.pragma("table_info(plan_nodes)") as { name: string }[]).map((c) => c.name)
+  if (!planCols.includes("status")) {
     // Add status column with default 'EMPTY'
-    db.exec('ALTER TABLE plan_nodes ADD COLUMN status TEXT NOT NULL DEFAULT \'EMPTY\'');
+    db.exec("ALTER TABLE plan_nodes ADD COLUMN status TEXT NOT NULL DEFAULT 'EMPTY'")
   }
 
   // Backfill status based on content
@@ -18,5 +18,5 @@ export default function migration(db: Database): void {
       WHEN content IS NULL OR trim(content) = '' THEN 'EMPTY'
       ELSE 'MANUAL'
     END
-  `);
+  `)
 }

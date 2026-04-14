@@ -1,32 +1,32 @@
-import type { Database } from 'better-sqlite3'
-import fs from 'fs'
-import path from 'path'
+import type { Database } from "better-sqlite3"
+import fs from "fs"
+import path from "path"
 
-import migration001 from './migrations/001.js'
-import migration002 from './migrations/002.js'
-import migration003 from './migrations/003.js'
-import migration004 from './migrations/004.js'
-import migration005 from './migrations/005.js'
-import migration006 from './migrations/006.js'
-import migration007 from './migrations/007.js'
-import migration008 from './migrations/008.js'
-import migration009 from './migrations/009.js'
-import migration010 from './migrations/010.js'
-import migration011 from './migrations/011.js'
-import migration012 from './migrations/012.js'
-import migration013 from './migrations/013.js'
-import migration014 from './migrations/014.js'
-import migration015 from './migrations/015.js'
-import migration016 from './migrations/016.js'
-import migration017 from './migrations/017.js'
-import migration018 from './migrations/018.js'
-import migration019 from './migrations/019.js'
-import migration020 from './migrations/020.js'
-import migration021 from './migrations/021.js'
-import migration022 from './migrations/022.js'
-import migration023 from './migrations/023.js'
-import migration024 from './migrations/024.js'
-import migration025 from './migrations/025.js'
+import migration001 from "./migrations/001.js"
+import migration002 from "./migrations/002.js"
+import migration003 from "./migrations/003.js"
+import migration004 from "./migrations/004.js"
+import migration005 from "./migrations/005.js"
+import migration006 from "./migrations/006.js"
+import migration007 from "./migrations/007.js"
+import migration008 from "./migrations/008.js"
+import migration009 from "./migrations/009.js"
+import migration010 from "./migrations/010.js"
+import migration011 from "./migrations/011.js"
+import migration012 from "./migrations/012.js"
+import migration013 from "./migrations/013.js"
+import migration014 from "./migrations/014.js"
+import migration015 from "./migrations/015.js"
+import migration016 from "./migrations/016.js"
+import migration017 from "./migrations/017.js"
+import migration018 from "./migrations/018.js"
+import migration019 from "./migrations/019.js"
+import migration020 from "./migrations/020.js"
+import migration021 from "./migrations/021.js"
+import migration022 from "./migrations/022.js"
+import migration023 from "./migrations/023.js"
+import migration024 from "./migrations/024.js"
+import migration025 from "./migrations/025.js"
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -86,8 +86,8 @@ const MIGRATIONS: Array<(db: Database) => void> = [
 export const CURRENT_VERSION = 25
 
 function loadSchemaFromFile(db: Database): void {
-  const schemaPath = path.join(__dirname, 'db', 'schema.sql')
-  const sql = fs.readFileSync(schemaPath, 'utf-8')
+  const schemaPath = path.join(__dirname, "db", "schema.sql")
+  const sql = fs.readFileSync(schemaPath, "utf-8")
   db.exec(sql)
 }
 
@@ -99,15 +99,15 @@ function loadSchemaFromFile(db: Database): void {
  *                          instead of loading schema.sql. Useful for generating schema.
  */
 export function migrateDatabase(db: Database, enforceMigrations = false): void {
-  db.pragma('foreign_keys = OFF')
-  const fromVersion = db.pragma('user_version', { simple: true }) as number
+  db.pragma("foreign_keys = OFF")
+  const fromVersion = db.pragma("user_version", { simple: true }) as number
 
   // Fresh database – load schema.sql and set version to CURRENT_VERSION
   if (fromVersion === 0 && !enforceMigrations) {
     console.log(`[db] creating fresh database from schema.sql (version ${CURRENT_VERSION})`)
     loadSchemaFromFile(db)
     db.pragma(`user_version = ${CURRENT_VERSION}`)
-    db.pragma('foreign_keys = ON')
+    db.pragma("foreign_keys = ON")
     return
   }
 
@@ -120,5 +120,5 @@ export function migrateDatabase(db: Database, enforceMigrations = false): void {
     console.log(`[db] migrated schema: ${v} → ${v + 1}`)
   }
 
-  db.pragma('foreign_keys = ON')
+  db.pragma("foreign_keys = ON")
 }

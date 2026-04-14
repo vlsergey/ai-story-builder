@@ -1,18 +1,18 @@
-import OpenAI from 'openai'
-import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js'
-import { makeLoggingFetch, isVerboseLogging } from './ai-logging.js'
-import lastAiGenerationEventManager from '../ai/last-ai-generation-event-manager.js'
+import OpenAI from "openai"
+import type { ResponseCreateParamsStreaming } from "openai/resources/responses/responses.js"
+import { makeLoggingFetch, isVerboseLogging } from "./ai-logging.js"
+import lastAiGenerationEventManager from "../ai/last-ai-generation-event-manager.js"
 
-const GROK_BASE = 'https://api.x.ai/v1'
+const GROK_BASE = "https://api.x.ai/v1"
 
 /** Creates an OpenAI-compatible client pointed at the xAI Grok API with request/response logging. */
 export function createGrokClient(apiKey: string): OpenAI {
   return new OpenAI({
     apiKey,
     baseURL: GROK_BASE,
-    fetch: makeLoggingFetch('Grok', GROK_BASE),
+    fetch: makeLoggingFetch("Grok", GROK_BASE),
     timeout: 5 * 60 * 1000, // 5 minutes — Grok reasoning models can be slow
-    maxRetries: 0,           // disable automatic retries — Grok requests are expensive and slow
+    maxRetries: 0, // disable automatic retries — Grok requests are expensive and slow
   })
 }
 
@@ -23,7 +23,7 @@ export function createGrokClient(apiKey: string): OpenAI {
  */
 export async function grokGenerate(
   apiKey: string,
-  params: Omit<ResponseCreateParamsStreaming, 'stream'>,
+  params: Omit<ResponseCreateParamsStreaming, "stream">,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string> {
   const client = createGrokClient(apiKey)
@@ -33,7 +33,7 @@ export async function grokGenerate(
     stream: true,
   } as ResponseCreateParamsStreaming)
 
-  let text = ''
+  let text = ""
 
   for await (const event of stream) {
     if (isVerboseLogging()) {
@@ -44,20 +44,26 @@ export async function grokGenerate(
     onEvent?.(event)
 
     switch (event.type) {
-      case 'response.output_text.delta':
+      case "response.output_text.delta":
         text += event.delta
         break
 
-      case 'response.completed':
-        lastAiGenerationEventManager.onAiGenerationEvent({...event.response?.usage})
+      case "response.completed":
+        lastAiGenerationEventManager.onAiGenerationEvent({ ...event.response?.usage })
         break
 
-      case 'response.failed':
+      case "response.failed":
         throw new Error(`Grok response failed: ${JSON.stringify((event.response as { error?: unknown }).error ?? {})}`)
 
-      case 'response.incomplete':
-        console.warn('[Grok] response incomplete:', JSON.stringify((event.response as { incomplete_details?: unknown }).incomplete_details ?? {}))
-        throw new Error('[Grok] response incomplete: ' + JSON.stringify((event.response as { incomplete_details?: unknown }).incomplete_details ?? {}))
+      case "response.incomplete":
+        console.warn(
+          "[Grok] response incomplete:",
+          JSON.stringify((event.response as { incomplete_details?: unknown }).incomplete_details ?? {}),
+        )
+        throw new Error(
+          "[Grok] response incomplete: " +
+            JSON.stringify((event.response as { incomplete_details?: unknown }).incomplete_details ?? {}),
+        )
     }
   }
 

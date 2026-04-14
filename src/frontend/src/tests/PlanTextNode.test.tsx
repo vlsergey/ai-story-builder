@@ -1,45 +1,45 @@
-import React from 'react'
-import { render, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { OPEN_PLAN_NODE_EDITOR_EVENT } from '../lib/plan-graph-events'
+import React from "react"
+import { render, fireEvent } from "@testing-library/react"
+import { describe, it, expect, vi, afterEach } from "vitest"
+import { OPEN_PLAN_NODE_EDITOR_EVENT } from "../lib/plan-graph-events"
 
 // Mock @xyflow/react synchronously
-vi.mock('@xyflow/react', () => ({
+vi.mock("@xyflow/react", () => ({
   Handle: () => null,
   NodeResizer: () => null,
-  Position: { Left: 'left', Right: 'right' },
+  Position: { Left: "left", Right: "right" },
 }))
 
-vi.mock('../lib/locale', () => ({
-  useLocale: () => ({ locale: 'en', t: (key: string) => key }),
+vi.mock("../lib/locale", () => ({
+  useLocale: () => ({ locale: "en", t: (key: string) => key }),
 }))
 
 // Mock NodeTypeEditors to ensure text editor exists
-vi.mock('../plan/editors/NodeTypeEditors', () => ({
+vi.mock("../plan/editors/NodeTypeEditors", () => ({
   NodeTypeEditors: {
-    'text': () => null,
+    text: () => null,
   },
 }))
 
 // Mock getNodeTypeDefinition
-vi.mock('@shared/node-edge-dictionary', () => ({
+vi.mock("@shared/node-edge-dictionary", () => ({
   getNodeTypeDefinition: vi.fn(() => ({
     allowedIncomingEdgeTypes: [],
     allowedOutgoingEdgeTypes: [],
   })),
 }))
 
-describe('PlanTextNode double-click', () => {
+describe("PlanTextNode double-click", () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('double-clicking the node div dispatches open-plan-node-editor', async () => {
-    const { default: PlanTextNode } = await import('../plan/plan-graph/SimpleNode')
+  it("double-clicking the node div dispatches open-plan-node-editor", async () => {
+    const { default: PlanTextNode } = await import("../plan/plan-graph/SimpleNode")
 
     const dispatched: number[] = []
     const originalDispatch = window.dispatchEvent.bind(window)
-    vi.spyOn(window, 'dispatchEvent').mockImplementation((event) => {
+    vi.spyOn(window, "dispatchEvent").mockImplementation((event) => {
       if (event instanceof CustomEvent && event.type === OPEN_PLAN_NODE_EDITOR_EVENT) {
         dispatched.push((event as CustomEvent<{ node: { id: number } }>).detail.node.id)
       }
@@ -48,12 +48,12 @@ describe('PlanTextNode double-click', () => {
 
     const mockData = {
       id: 5,
-      title: 'Scene 1',
-      type: 'text' as const,
+      title: "Scene 1",
+      type: "text" as const,
       word_count: 100,
       summary: null,
       changes_status: null,
-      status: 'EMPTY' as const,
+      status: "EMPTY" as const,
       onDelete: () => {},
     }
 
@@ -71,10 +71,10 @@ describe('PlanTextNode double-click', () => {
         positionAbsoluteY={0}
         zIndex={1}
         dragging={false}
-      />
+      />,
     )
 
-    const nodeDiv = container.querySelector('div')
+    const nodeDiv = container.querySelector("div")
     expect(nodeDiv).not.toBeNull()
     fireEvent.doubleClick(nodeDiv!)
 

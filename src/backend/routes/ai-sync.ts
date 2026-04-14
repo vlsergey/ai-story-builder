@@ -1,14 +1,14 @@
-import path from 'path'
-import OpenAI, { toFile } from 'openai'
-import { getCurrentDbPath } from '../db/state.js'
-import { BUILTIN_ENGINES } from '../../shared/ai-engines.js'
-import { createYandexClient, makeLoggingFetch } from '../lib/yandex-client.js'
-import { createGrokClient } from '../lib/grok-client.js'
-import { collapseLoreTree } from '../lib/lore-tree.js'
-import { SettingsRepository } from '../settings/settings-repository.js'
-import { LoreNodeRepository } from '../lore/lore-node-repository.js'
-import { YandexEngineConfig } from '../../shared/ai-engine-config.js'
-import { LoreNodeRow } from '../../shared/lore-node.js'
+import path from "path"
+import OpenAI, { toFile } from "openai"
+import { getCurrentDbPath } from "../db/state.js"
+import { BUILTIN_ENGINES } from "../../shared/ai-engines.js"
+import { createYandexClient, makeLoggingFetch } from "../lib/yandex-client.js"
+import { createGrokClient } from "../lib/grok-client.js"
+import { collapseLoreTree } from "../lib/lore-tree.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
+import { LoreNodeRepository } from "../lore/lore-node-repository.js"
+import { YandexEngineConfig } from "../../shared/ai-engine-config.js"
+import { LoreNodeRow } from "../../shared/lore-node.js"
 
 // Exported so tests can override without fake timers
 export const POLL_CONFIG = {
@@ -37,7 +37,7 @@ interface AiEngineSyncRecord {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildPathMap(rows: LoreNodeRow[]): Map<number, string> {
-  const idToRow = new Map(rows.map(r => [r.id, r]))
+  const idToRow = new Map(rows.map((r) => [r.id, r]))
   const paths = new Map<number, string>()
 
   function getPath(id: number): string {
@@ -64,28 +64,28 @@ function buildFileContent(
   idToRow: Map<number, LoreNodeRow>,
 ): string {
   const nodePath = pathMap.get(row.id) ?? `/${row.title}`
-  const parentName = row.parent_id ? (idToRow.get(row.parent_id)?.title ?? '') : ''
+  const parentName = row.parent_id ? (idToRow.get(row.parent_id)?.title ?? "") : ""
 
   const frontmatter = [
-    '---',
+    "---",
     `project: ${projectName}`,
     `path: ${nodePath}`,
     ...(parentName ? [`parent: ${parentName}`] : []),
-    '---',
-    '',
-  ].join('\n')
+    "---",
+    "",
+  ].join("\n")
 
-  const segments = nodePath.split('/').filter(Boolean)
+  const segments = nodePath.split("/").filter(Boolean)
   const depth = segments.length - 1
   const headingLevel = Math.max(1, depth)
-  const hashes = '#'.repeat(headingLevel)
-  const headingText = depth >= 2 ? segments.slice(1).join(' / ') : row.title
+  const hashes = "#".repeat(headingLevel)
+  const headingText = depth >= 2 ? segments.slice(1).join(" / ") : row.title
 
-  return frontmatter + `${hashes} ${headingText}\n\n` + (row.content ?? '')
+  return frontmatter + `${hashes} ${headingText}\n\n` + (row.content ?? "")
 }
 
 function formatApiError(e: unknown): string {
-  if (e != null && typeof e === 'object' && 'status' in e && 'message' in e) {
+  if (e != null && typeof e === "object" && "status" in e && "message" in e) {
     const apiErr = e as { status: number; message: string; error?: unknown; headers?: unknown }
 
     let requestMethod: string | undefined
@@ -94,32 +94,32 @@ function formatApiError(e: unknown): string {
 
     if (apiErr.headers) {
       const h = apiErr.headers as Record<string, string> & { entries?: () => Iterable<[string, string]> }
-      if (typeof h.entries === 'function') {
+      if (typeof h.entries === "function") {
         for (const [k, v] of h.entries()) allHeaderEntries.push([k, v])
       } else {
-        allHeaderEntries.push(...Object.entries(h) as [string, string][])
+        allHeaderEntries.push(...(Object.entries(h) as [string, string][]))
       }
-      requestMethod = allHeaderEntries.find(([k]) => k.toLowerCase() === 'x-request-method')?.[1]
-      requestUrl = allHeaderEntries.find(([k]) => k.toLowerCase() === 'x-request-url')?.[1]
+      requestMethod = allHeaderEntries.find(([k]) => k.toLowerCase() === "x-request-method")?.[1]
+      requestUrl = allHeaderEntries.find(([k]) => k.toLowerCase() === "x-request-url")?.[1]
     }
 
-    const prefix = requestMethod && requestUrl ? `${requestMethod} ${requestUrl}\n` : ''
+    const prefix = requestMethod && requestUrl ? `${requestMethod} ${requestUrl}\n` : ""
     const parts: string[] = [`${prefix}HTTP ${apiErr.status} ${apiErr.message}`]
 
-    const hiddenHeaders = new Set(['authorization', 'api-key', 'x-api-key', 'x-request-url', 'x-request-method'])
+    const hiddenHeaders = new Set(["authorization", "api-key", "x-api-key", "x-request-url", "x-request-method"])
     const safeHeaders = allHeaderEntries
       .filter(([k]) => !hiddenHeaders.has(k.toLowerCase()))
       .map(([k, v]) => `  ${k}: ${v}`)
-      .join('\n')
+      .join("\n")
     if (safeHeaders) parts.push(`Response headers:\n${safeHeaders}`)
 
     if (apiErr.error != null) {
-      parts.push(`Body: ${typeof apiErr.error === 'string' ? apiErr.error : JSON.stringify(apiErr.error, null, 2)}`)
+      parts.push(`Body: ${typeof apiErr.error === "string" ? apiErr.error : JSON.stringify(apiErr.error, null, 2)}`)
     } else {
-      parts.push('Body: (empty)')
+      parts.push("Body: (empty)")
     }
 
-    return parts.join('\n')
+    return parts.join("\n")
   }
   return String(e)
 }
@@ -128,7 +128,7 @@ function parseYandexSync(aiSyncInfoJson: string | null): AiEngineSyncRecord | un
   if (!aiSyncInfoJson) return undefined
   try {
     const parsed = JSON.parse(aiSyncInfoJson) as Record<string, AiEngineSyncRecord>
-    return parsed['yandex']
+    return parsed["yandex"]
   } catch {
     return undefined
   }
@@ -143,17 +143,14 @@ function parseAiSyncInfoMap(aiSyncInfoJson: string | null): Record<string, AiEng
   }
 }
 
-function grokGroupNeedsReupload(
-  l2GrokSync: AiEngineSyncRecord | undefined,
-  groupRows: LoreNodeRow[],
-): boolean {
+function grokGroupNeedsReupload(l2GrokSync: AiEngineSyncRecord | undefined, groupRows: LoreNodeRow[]): boolean {
   if (!l2GrokSync?.file_id) return true
 
   const lastSynced = l2GrokSync.last_synced_at
 
   for (const row of groupRows) {
     const syncMap = parseAiSyncInfoMap(row.ai_sync_info)
-    const rowGrokSync = syncMap['grok']
+    const rowGrokSync = syncMap["grok"]
 
     if (row.to_be_deleted === 1) {
       if (rowGrokSync?.merged_into_parent || rowGrokSync?.file_id) return true
@@ -179,28 +176,29 @@ async function deleteFileIfExists(client: OpenAI, fileId: string, context: strin
       try {
         const fileInfo = await client.files.retrieve(fileId)
         console.warn(`[AI Sync] DELETE ${fileId} returned 405 but file still exists: ${JSON.stringify(fileInfo)}`)
-        throw new Error(`Delete file ${fileId} failed (HTTP 405, file still present):\n${context}\n${formatApiError(e)}`)
+        throw new Error(
+          `Delete file ${fileId} failed (HTTP 405, file still present):\n${context}\n${formatApiError(e)}`,
+        )
       } catch (retrieveErr: unknown) {
         if ((retrieveErr as { status?: number })?.status === 404) return
-        throw new Error(`Delete file ${fileId} failed (HTTP 405, retrieve check also failed):\n${context}\n${formatApiError(e)}`)
+        throw new Error(
+          `Delete file ${fileId} failed (HTTP 405, retrieve check also failed):\n${context}\n${formatApiError(e)}`,
+        )
       }
     }
     throw new Error(`Delete file ${fileId} failed:\n${context}\n${formatApiError(e)}`)
   }
 }
 
-async function waitForVectorStore(
-  client: OpenAI,
-  storeId: string,
-): Promise<OpenAI.VectorStore> {
+async function waitForVectorStore(client: OpenAI, storeId: string): Promise<OpenAI.VectorStore> {
   const start = Date.now()
   while (Date.now() - start < POLL_CONFIG.timeoutMs) {
     const store = await client.vectorStores.retrieve(storeId)
-    if (store.status === 'completed') return store
-    if ((store.status as string) === 'failed' || store.status === 'expired') {
+    if (store.status === "completed") return store
+    if ((store.status as string) === "failed" || store.status === "expired") {
       throw new Error(`VectorStore ${storeId} reached status '${store.status}'`)
     }
-    await new Promise(resolve => setTimeout(resolve, POLL_CONFIG.intervalMs))
+    await new Promise((resolve) => setTimeout(resolve, POLL_CONFIG.intervalMs))
   }
   throw new Error(`VectorStore creation timed out after ${POLL_CONFIG.timeoutMs / 1000}s (id=${storeId})`)
 }
@@ -219,33 +217,33 @@ export async function syncLore(): Promise<{
 }> {
   // Step 1 — load settings and nodes
   const dbPath = getCurrentDbPath()
-  if (!dbPath) throw makeError('no project open', 400)
+  if (!dbPath) throw makeError("no project open", 400)
   const currentEngine = SettingsRepository.getCurrentBackend()
   const config = SettingsRepository.getAllAiEnginesConfig()
   const repo = new LoreNodeRepository()
   const rows = repo.findAll()
 
   if (!currentEngine) {
-    throw makeError('no AI engine configured', 400)
+    throw makeError("no AI engine configured", 400)
   }
 
-  const engineDef = BUILTIN_ENGINES.find(e => e.id === currentEngine)
+  const engineDef = BUILTIN_ENGINES.find((e) => e.id === currentEngine)
   if (!engineDef) {
     throw makeError(`Lore sync is not supported for engine '${currentEngine}'`, 400)
   }
 
   // ── Grok sync (collapsed tree, file attachment, no vector store) ──────────
 
-  if (currentEngine === 'grok') {
+  if (currentEngine === "grok") {
     const apiKey = config.grok?.api_key?.trim()
     if (!apiKey) {
-      throw makeError('Grok api_key is required', 400)
+      throw makeError("Grok api_key is required", 400)
     }
 
     const maxFiles = engineDef.maxFilesPerRequest ?? 10
     const collapseResult = collapseLoreTree(rows, maxFiles)
 
-    if ('error' in collapseResult) {
+    if ("error" in collapseResult) {
       throw makeError(collapseResult.error, 400)
     }
 
@@ -253,11 +251,11 @@ export async function syncLore(): Promise<{
     const client = createGrokClient(apiKey)
     const now = new Date().toISOString()
 
-    const idToRow = new Map(rows.map(r => [r.id, r]))
+    const idToRow = new Map(rows.map((r) => [r.id, r]))
 
     interface GrokGroupResult {
-      group: typeof groups[number]
-      action: 'upload' | 'delete' | 'unchanged'
+      group: (typeof groups)[number]
+      action: "upload" | "delete" | "unchanged"
       newFileId?: string
     }
 
@@ -266,18 +264,18 @@ export async function syncLore(): Promise<{
     for (const group of groups) {
       const l2Row = idToRow.get(group.level2NodeId)!
       const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
-      const l2GrokSync = l2SyncMap['grok']
-      const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
+      const l2GrokSync = l2SyncMap["grok"]
+      const groupRows = group.allNodeIds.map((id) => idToRow.get(id)!).filter(Boolean)
 
       if (!group.hasContent) {
-        results.push({ group, action: 'delete' })
+        results.push({ group, action: "delete" })
         continue
       }
 
       if (grokGroupNeedsReupload(l2GrokSync, groupRows)) {
-        results.push({ group, action: 'upload' })
+        results.push({ group, action: "upload" })
       } else {
-        results.push({ group, action: 'unchanged' })
+        results.push({ group, action: "unchanged" })
       }
     }
 
@@ -286,28 +284,28 @@ export async function syncLore(): Promise<{
       const { group } = result
       const l2Row = idToRow.get(group.level2NodeId)!
       const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
-      const oldFileId = l2SyncMap['grok']?.file_id
+      const oldFileId = l2SyncMap["grok"]?.file_id
 
-      if (result.action === 'delete') {
+      if (result.action === "delete") {
         if (oldFileId && engineDef.capabilities.fileDeletion) {
           await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeTitle}"`)
         }
-      } else if (result.action === 'upload') {
+      } else if (result.action === "upload") {
         if (oldFileId && engineDef.capabilities.fileDeletion) {
           await deleteFileIfExists(client, oldFileId, `Grok group "${group.level2NodeTitle}" (pre-upload cleanup)`)
         }
         try {
           const uploaded = await client.files.create({
-            file: await toFile(
-              Buffer.from(group.content, 'utf-8'),
-              `lore-group-${group.level2NodeId}.md`,
-              { type: 'text/plain' },
-            ),
-            purpose: 'assistants',
+            file: await toFile(Buffer.from(group.content, "utf-8"), `lore-group-${group.level2NodeId}.md`, {
+              type: "text/plain",
+            }),
+            purpose: "assistants",
           })
           result.newFileId = uploaded.id
         } catch (e) {
-          throw new Error(`Upload failed for Grok group "${group.level2NodeTitle}" (id=${group.level2NodeId}):\n${formatApiError(e)}`)
+          throw new Error(
+            `Upload failed for Grok group "${group.level2NodeTitle}" (id=${group.level2NodeId}):\n${formatApiError(e)}`,
+          )
         }
       }
     }
@@ -315,24 +313,24 @@ export async function syncLore(): Promise<{
     // Commit to DB
     for (const result of results) {
       const { group, action, newFileId } = result
-      const groupRows = group.allNodeIds.map(id => idToRow.get(id)!).filter(Boolean)
+      const groupRows = group.allNodeIds.map((id) => idToRow.get(id)!).filter(Boolean)
 
-      if (action === 'delete') {
+      if (action === "delete") {
         for (const row of groupRows) {
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
-          delete existing['grok']
+          delete existing["grok"]
           repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
         }
-      } else if (action === 'upload' && newFileId) {
+      } else if (action === "upload" && newFileId) {
         const l2Row = idToRow.get(group.level2NodeId)!
         const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
-        existing['grok'] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
+        existing["grok"] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
         repo.updateAiSyncInfo(group.level2NodeId, JSON.stringify(existing))
 
         for (const row of groupRows) {
           if (row.id === group.level2NodeId) continue
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
-          existing['grok'] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
+          existing["grok"] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
           repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
         }
       }
@@ -340,16 +338,16 @@ export async function syncLore(): Promise<{
 
     repo.deleteMarkedForDeletion()
 
-    const uploaded = results.filter(r => r.action === 'upload').length
-    const deleted = results.filter(r => r.action === 'delete').length
-    const unchanged = results.filter(r => r.action === 'unchanged').length
+    const uploaded = results.filter((r) => r.action === "upload").length
+    const deleted = results.filter((r) => r.action === "delete").length
+    const unchanged = results.filter((r) => r.action === "unchanged").length
 
     return { ok: true, uploaded, deleted, unchanged, search_index_id: null }
   }
 
   // ── Yandex sync (individual file upload + VectorStore) ────────────────────
 
-  if (currentEngine !== 'yandex') {
+  if (currentEngine !== "yandex") {
     throw makeError(`Lore sync is not supported for engine '${currentEngine}'`, 400)
   }
   const yandexEngineConfig = config.yandex as YandexEngineConfig
@@ -357,13 +355,13 @@ export async function syncLore(): Promise<{
   const apiKey = yandexEngineConfig?.api_key?.trim()
   const folderId = yandexEngineConfig?.folder_id?.trim()
   if (!apiKey || !folderId) {
-    throw makeError('Yandex api_key and folder_id are required', 400)
+    throw makeError("Yandex api_key and folder_id are required", 400)
   }
 
-  const projectName = path.basename(dbPath).replace(/\.[^.]+$/, '')
+  const projectName = path.basename(dbPath).replace(/\.[^.]+$/, "")
   const client = createYandexClient(apiKey, folderId)
 
-  const idToRow = new Map(rows.map(r => [r.id, r]))
+  const idToRow = new Map(rows.map((r) => [r.id, r]))
   const pathMap = buildPathMap(rows)
 
   const toUpload: LoreNodeRow[] = []
@@ -375,10 +373,10 @@ export async function syncLore(): Promise<{
     const info: LoreNodeRow = row
 
     const needsDelete = !!(yandexSync?.file_id && (row.to_be_deleted === 1 || row.word_count === 0))
-    const needsUpload = row.to_be_deleted === 0 && row.word_count > 0 && (
-      !yandexSync ||
-      !!(yandexSync.content_updated_at && yandexSync.content_updated_at > yandexSync.last_synced_at)
-    )
+    const needsUpload =
+      row.to_be_deleted === 0 &&
+      row.word_count > 0 &&
+      (!yandexSync || !!(yandexSync.content_updated_at && yandexSync.content_updated_at > yandexSync.last_synced_at))
 
     if (needsDelete) {
       toDelete.push(info)
@@ -395,14 +393,18 @@ export async function syncLore(): Promise<{
     const yandexSync = parseYandexSync(node.ai_sync_info)
 
     if (yandexSync?.file_id) {
-      await deleteFileIfExists(client, yandexSync.file_id, `Yandex node "${node.title}" (id=${node.id}, pre-upload cleanup)`)
+      await deleteFileIfExists(
+        client,
+        yandexSync.file_id,
+        `Yandex node "${node.title}" (id=${node.id}, pre-upload cleanup)`,
+      )
     }
 
     try {
       const fileContent = buildFileContent(row, projectName, pathMap, idToRow)
       const uploaded = await client.files.create({
-        file: await toFile(Buffer.from(fileContent, 'utf-8'), `lore-${node.id}.md`, { type: 'text/plain' }),
-        purpose: 'assistants',
+        file: await toFile(Buffer.from(fileContent, "utf-8"), `lore-${node.id}.md`, { type: "text/plain" }),
+        purpose: "assistants",
       })
       newFileIds.set(node.id, uploaded.id)
     } catch (e) {
@@ -417,7 +419,7 @@ export async function syncLore(): Promise<{
     }
   }
 
-  const deleteNodeIds = new Set(toDelete.map(n => n.id))
+  const deleteNodeIds = new Set(toDelete.map((n) => n.id))
   const allFileIds: string[] = []
 
   for (const row of rows) {
@@ -452,28 +454,26 @@ export async function syncLore(): Promise<{
       name: `story-lore-${Date.now()}`,
       file_ids: allFileIds,
     })
-    const completed = store.status === 'completed'
-      ? store
-      : await waitForVectorStore(client, store.id)
+    const completed = store.status === "completed" ? store : await waitForVectorStore(client, store.id)
     newSearchIndexId = completed.id
   }
 
   const now = new Date().toISOString()
 
   for (const [nodeId, fileId] of newFileIds.entries()) {
-    const nodeRow = rows.find(r => r.id === nodeId)
+    const nodeRow = rows.find((r) => r.id === nodeId)
     const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
-    existing['yandex'] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
+    existing["yandex"] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
     repo.updateAiSyncInfo(nodeId, JSON.stringify(existing))
   }
 
   for (const node of toDelete) {
-    const nodeRow = rows.find(r => r.id === node.id)
+    const nodeRow = rows.find((r) => r.id === node.id)
     const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
     if (node.to_be_deleted === 1) {
-      delete existing['yandex']
+      delete existing["yandex"]
     } else {
-      existing['yandex'] = { last_synced_at: now }
+      existing["yandex"] = { last_synced_at: now }
     }
     repo.updateAiSyncInfo(node.id, JSON.stringify(existing))
   }

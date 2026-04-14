@@ -3,14 +3,14 @@
  * Used for building models, dialogs, and backend validation.
  */
 
-import type { PlanNodeType, PlanEdgeType, PlanContainerNodeType } from './plan-graph.js'
+import type { PlanNodeType, PlanEdgeType, PlanContainerNodeType } from "./plan-graph.js"
 
-export type PlanNodeParentContainerType = PlanContainerNodeType | 'root'
+export type PlanNodeParentContainerType = PlanContainerNodeType | "root"
 
 export interface NodeTypeDefinition {
   id: PlanNodeType
   /** Where node can be placed (manually) */
-  allowedContainers?: PlanNodeParentContainerType[],
+  allowedContainers?: PlanNodeParentContainerType[]
   /** Edge types that can originate from this node */
   allowedOutgoingEdgeTypes: PlanEdgeType[]
   /** Edge types that can target this node */
@@ -37,70 +37,70 @@ export interface EdgeTypeDefinition {
 // Node type definitions
 export const NODE_TYPES: NodeTypeDefinition[] = [
   {
-    id: 'text',
-    allowedOutgoingEdgeTypes: ['text'],
-    allowedIncomingEdgeTypes: ['text'],
+    id: "text",
+    allowedOutgoingEdgeTypes: ["text"],
+    allowedIncomingEdgeTypes: ["text"],
     canCreate: true,
     canDelete: true,
     canRegenerate: true,
   },
   {
-    id: 'lore',
-    allowedOutgoingEdgeTypes: ['text'],
-    allowedIncomingEdgeTypes: ['text'],
+    id: "lore",
+    allowedOutgoingEdgeTypes: ["text"],
+    allowedIncomingEdgeTypes: ["text"],
     canCreate: true,
     canDelete: true,
   },
   {
-    id: 'merge',
-    allowedOutgoingEdgeTypes: ['text'],
-    allowedIncomingEdgeTypes: ['text', 'textArray'],
-    canCreate: true,
-    canDelete: true,
-    canRegenerate: true,
-  },
-  {
-    id: 'split',
-    allowedOutgoingEdgeTypes: ['textArray'],
-    allowedIncomingEdgeTypes: ['text'],
+    id: "merge",
+    allowedOutgoingEdgeTypes: ["text"],
+    allowedIncomingEdgeTypes: ["text", "textArray"],
     canCreate: true,
     canDelete: true,
     canRegenerate: true,
   },
   {
-    id: 'for-each',
-    allowedOutgoingEdgeTypes: ['textArray'],
-    allowedIncomingEdgeTypes: ['textArray'],
+    id: "split",
+    allowedOutgoingEdgeTypes: ["textArray"],
+    allowedIncomingEdgeTypes: ["text"],
+    canCreate: true,
+    canDelete: true,
+    canRegenerate: true,
+  },
+  {
+    id: "for-each",
+    allowedOutgoingEdgeTypes: ["textArray"],
+    allowedIncomingEdgeTypes: ["textArray"],
     canCreate: true,
     canDelete: true,
     isGroup: true,
     canRegenerate: true,
   },
   {
-    id: 'for-each-input',
-    allowedContainers: ['for-each'],
+    id: "for-each-input",
+    allowedContainers: ["for-each"],
     allowedIncomingEdgeTypes: [],
-    allowedOutgoingEdgeTypes: ['text'],
+    allowedOutgoingEdgeTypes: ["text"],
     canCreate: false,
     canDelete: false,
     confined: true,
     canRegenerate: false,
   },
   {
-    id: 'for-each-output',
-    allowedContainers: ['for-each'],
+    id: "for-each-output",
+    allowedContainers: ["for-each"],
     allowedOutgoingEdgeTypes: [],
-    allowedIncomingEdgeTypes: ['text'],
+    allowedIncomingEdgeTypes: ["text"],
     canCreate: false,
     canDelete: false,
     confined: true,
     canRegenerate: true,
   },
   {
-    id: 'for-each-prev-outputs',
-    allowedContainers: ['for-each'],
+    id: "for-each-prev-outputs",
+    allowedContainers: ["for-each"],
     allowedIncomingEdgeTypes: [],
-    allowedOutgoingEdgeTypes: ['textArray'],
+    allowedOutgoingEdgeTypes: ["textArray"],
     canCreate: true,
     canDelete: true,
     confined: true,
@@ -109,27 +109,27 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
 ] as const
 
 // Edge type definitions
-export const EDGE_TYPES = (['text', 'textArray'] as PlanEdgeType[]).map( edgeType => ({
+export const EDGE_TYPES = (["text", "textArray"] as PlanEdgeType[]).map((edgeType) => ({
   id: edgeType,
-  allowedSourceNodeTypes: NODE_TYPES.filter(t => t.allowedOutgoingEdgeTypes.includes(edgeType)).map(t => t.id),
-  allowedTargetNodeTypes: NODE_TYPES.filter(t => t.allowedIncomingEdgeTypes.includes(edgeType)).map(t => t.id),
+  allowedSourceNodeTypes: NODE_TYPES.filter((t) => t.allowedOutgoingEdgeTypes.includes(edgeType)).map((t) => t.id),
+  allowedTargetNodeTypes: NODE_TYPES.filter((t) => t.allowedIncomingEdgeTypes.includes(edgeType)).map((t) => t.id),
 }))
 
 // Helper functions
 export function isValidNodeType(type: string): type is PlanNodeType {
-  return NODE_TYPES.some(nt => nt.id === type)
+  return NODE_TYPES.some((nt) => nt.id === type)
 }
 
 export function isValidEdgeType(type: string): type is PlanEdgeType {
-  return EDGE_TYPES.some(et => et.id === type)
+  return EDGE_TYPES.some((et) => et.id === type)
 }
 
 export function canCreateEdge(
   sourceNodeType: PlanNodeType,
   targetNodeType: PlanNodeType,
-  edgeType: PlanEdgeType
+  edgeType: PlanEdgeType,
 ): boolean {
-  const edgeDef = EDGE_TYPES.find(et => et.id === edgeType)
+  const edgeDef = EDGE_TYPES.find((et) => et.id === edgeType)
   if (!edgeDef) return false
   if (!edgeDef.allowedSourceNodeTypes.includes(sourceNodeType)) return false
   if (!edgeDef.allowedTargetNodeTypes.includes(targetNodeType)) return false
@@ -137,16 +137,15 @@ export function canCreateEdge(
 }
 
 export function getNodeTypeDefinition(type: PlanNodeType): NodeTypeDefinition | undefined {
-  return NODE_TYPES.find(nt => nt.id === type)
+  return NODE_TYPES.find((nt) => nt.id === type)
 }
 
 export function getEdgeTypeDefinition(type: PlanEdgeType): EdgeTypeDefinition | undefined {
-  return EDGE_TYPES.find(et => et.id === type)
+  return EDGE_TYPES.find((et) => et.id === type)
 }
 
 export function getCreatableNodeTypes(containerType: PlanNodeParentContainerType): PlanNodeType[] {
-  return NODE_TYPES
-    .filter(def => def.canCreate !== false)
-    .filter( def => def.allowedContainers === undefined || def.allowedContainers.includes(containerType) )
-    .map(def => def.id)
+  return NODE_TYPES.filter((def) => def.canCreate !== false)
+    .filter((def) => def.allowedContainers === undefined || def.allowedContainers.includes(containerType))
+    .map((def) => def.id)
 }

@@ -1,5 +1,5 @@
-import { getCurrentDb } from './state.js'
-import { Database } from 'better-sqlite3'
+import { getCurrentDb } from "./state.js"
+import { Database } from "better-sqlite3"
 
 /**
  * Executes a block with a database connection.
@@ -7,10 +7,7 @@ import { Database } from 'better-sqlite3'
  * @param block - callback that receives the Database instance and returns a result
  * @returns the result of the block
  */
-export function withDb<T>(
-  readonly: boolean,
-  block: (db: Database) => T
-): T {
+export function withDb<T>(readonly: boolean, block: (db: Database) => T): T {
   return block(getCurrentDb())
 }
 

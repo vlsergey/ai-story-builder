@@ -1,18 +1,14 @@
-import { initTRPC } from '@trpc/server';
-import { SettingsRepository } from './settings/settings-repository.js';
-import { z } from 'zod';
+import { initTRPC } from "@trpc/server"
+import { SettingsRepository } from "./settings/settings-repository.js"
+import { z } from "zod"
 
-import { getAiBilling } from './routes/ai-billing.js';
-import { planNodeEventManager } from './plan/nodes/plan-node-event-manager.js';
-import { planEdgeEventManager } from './plan/edges/plan-edge-event-manager.js';
-import { loreEventManager } from './lore/lore-event-manager.js';
+import { getAiBilling } from "./routes/ai-billing.js"
+import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
+import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
+import { loreEventManager } from "./lore/lore-event-manager.js"
 
 // Project functions
-import {
-  refreshEngineModels,
-  setCurrentEngine,
-  testEngineConnection,
-} from './routes/ai-config.js';
+import { refreshEngineModels, setCurrentEngine, testEngineConnection } from "./routes/ai-config.js"
 
 // Project functions
 import {
@@ -24,7 +20,7 @@ import {
   listProjectFiles,
   openProjectFolder,
   createProject,
-} from './routes/projects.js';
+} from "./routes/projects.js"
 
 // Lore functions
 import {
@@ -39,65 +35,65 @@ import {
   sortLoreChildren,
   reorderLoreChildren,
   restoreLoreNode,
-} from './lore/lore-routes.js';
+} from "./lore/lore-routes.js"
 
+import { createGraphEdge, patchGraphEdge, deleteGraphEdge } from "./plan/edges/plan-edge-routes.js"
+
+import { syncLore } from "./routes/ai-sync.js"
+import { AiEngineConfig, AllAiEnginesConfig } from "../shared/ai-engine-config.js"
+import { PlanNodeUpdate } from "../shared/plan-graph.js"
+import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
+import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
+import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
+import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
+import { RegenerateOptions } from "../shared/RegenerateOptions.js"
+import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from "./plan/nodes/plan-node-routes.js"
 import {
-  createGraphEdge,
-  patchGraphEdge,
-  deleteGraphEdge,
-} from './plan/edges/plan-edge-routes.js';
-
-import { syncLore } from './routes/ai-sync.js'
-import { AiEngineConfig, AllAiEnginesConfig } from '../shared/ai-engine-config.js';
-import { PlanNodeUpdate } from '../shared/plan-graph.js';
-import { PlanNodeService } from './plan/nodes/plan-node-service.js';
-import lastAiGenerationEventManager from './ai/last-ai-generation-event-manager.js';
-import { PlanEdgeRepository } from './plan/edges/plan-edge-repository.js';
-import { PlanNodeRepository } from './plan/nodes/plan-node-repository.js';
-import { RegenerateOptions } from '../shared/RegenerateOptions.js';
-import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from './plan/nodes/plan-node-routes.js';
-import { regenerateTreeNodesContents, subscribeToRegenerateTreeNodesContentsProgress, regenerateTreeNodesContentsStop } from './plan/nodes/generate/regenerateTreeNodesContents.js';
-import { THEME_PREFERENCE_VALUES } from '../shared/themes.js';
+  regenerateTreeNodesContents,
+  subscribeToRegenerateTreeNodesContentsProgress,
+  regenerateTreeNodesContentsStop,
+} from "./plan/nodes/generate/regenerateTreeNodesContents.js"
+import { THEME_PREFERENCE_VALUES } from "../shared/themes.js"
 
 const t = initTRPC.create({
   // transformer: superjson,
   errorFormatter({ shape, error }) {
     // Это выведется в терминале Электрона при ЛЮБОЙ ошибке в процедурах
-    console.error('❌ tRPC Error:', error.message, error.cause);
+    console.error("❌ tRPC Error:", error.message, error.cause)
     return {
       ...shape,
       data: {
         ...shape.data,
         // Добавляем стек для дебага, чтобы видеть, откуда прилетает "путь к файлу"
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       },
-    };
+    }
   },
-});
+})
 
 const dbGuardMiddleware = t.middleware(async ({ next, path }) => {
-  const result = await next();
+  const result = await next()
 
   // Проверяем, что вернула процедура (в ключе 'data')
   if (result.ok && result.data) {
-    const data = result.data;
+    const data = result.data
 
     // Ищем признаки объекта SQLite (isOpen, path, name, или конструктор)
-    const isDatabase = data && (
-      data.constructor?.name === 'Database' || 
-      (typeof data === 'object' && 'isOpen' in data && 'name' in data) ||
-      (typeof data === 'object' && 'isOpen' in data && 'path' in data)
-    );
+    const isDatabase =
+      data &&
+      (data.constructor?.name === "Database" ||
+        (typeof data === "object" && "isOpen" in data && "name" in data) ||
+        (typeof data === "object" && "isOpen" in data && "path" in data))
 
     if (isDatabase) {
-      console.error(`🚨 КРИТИЧЕСКАЯ ОШИБКА: Процедура "${path}" вернула объект базы данных вместо данных!`);
+      console.error(`🚨 КРИТИЧЕСКАЯ ОШИБКА: Процедура "${path}" вернула объект базы данных вместо данных!`)
       // Вместо базы возвращаем ошибку или пустой массив, чтобы фронтенд не падал
-      throw new Error(`Security Leak: Procedure ${path} tried to return DB instance`);
+      throw new Error(`Security Leak: Procedure ${path} tried to return DB instance`)
     }
   }
 
-  return result;
-});
+  return result
+})
 
 export const appRouter = t.router({
   ai: t.router({
@@ -109,8 +105,8 @@ export const appRouter = t.router({
       get: t.procedure.query(() => getAiBilling()),
     }),
     test: t.procedure
-      .input((val: unknown) => val as { engineId: string, aiEngineConfig: AiEngineConfig })
-      .mutation(({input}) => testEngineConnection(input.engineId, input.aiEngineConfig)),
+      .input((val: unknown) => val as { engineId: string; aiEngineConfig: AiEngineConfig })
+      .mutation(({ input }) => testEngineConnection(input.engineId, input.aiEngineConfig)),
     syncLore: t.procedure.mutation(() => syncLore()),
   }),
 
@@ -152,42 +148,36 @@ export const appRouter = t.router({
 
   plan: t.router({
     nodes: t.router({
-      acceptReview: t.procedure
-        .input(z.int())
-        .mutation(({ input }) => new PlanNodeService().acceptReview(input)),
+      acceptReview: t.procedure.input(z.int()).mutation(({ input }) => new PlanNodeService().acceptReview(input)),
       aiGenerateOnly: t.procedure
-        .input((v) => v as ({id: number, options: RegenerateOptions}))
+        .input((v) => v as { id: number; options: RegenerateOptions })
         .mutation(({ input }) => aiRegenerateNodeContentOnly(input.id, input.options)),
       aiGenerateWatchAndReview: t.procedure
-        .input((v) => v as ({id: number, options: RegenerateOptions}))
+        .input((v) => v as { id: number; options: RegenerateOptions })
         .subscription(({ input }) => aiRegenerateNodeContentWatchAndReview(input.id, input.options)),
       aiGenerateSummary: t.procedure
         .input(z.int())
         .mutation(({ input }) => new PlanNodeService().aiGenerateSummary(input)),
-      aiImprove: t.procedure
-        .input(z.int())
-        .subscription(({ input }) => new PlanNodeService().aiImprove(input)),
+      aiImprove: t.procedure.input(z.int()).subscription(({ input }) => new PlanNodeService().aiImprove(input)),
       // TODO: optimize via patchPlanNode vectorization
       batchPatch: t.procedure
-        .input((v) => v as ({id: number, data: PlanNodeUpdate}[]))
-        .mutation(({ input }) => input.forEach( ({ id, data }) => new PlanNodeService().patch(id, false, data))),
+        .input((v) => v as { id: number; data: PlanNodeUpdate }[])
+        .mutation(({ input }) => input.forEach(({ id, data }) => new PlanNodeService().patch(id, false, data))),
       create: t.procedure.input(z.any()).mutation(({ input }) => new PlanNodeService().create(input)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => new PlanNodeService().delete(input)),
       findAll: t.procedure.use(dbGuardMiddleware).query(() => new PlanNodeRepository().findAll()),
       getById: t.procedure.input(z.int()).query(({ input }) => new PlanNodeService().getById(input)),
-      getByIds: t.procedure
-        .input(z.array(z.int()))
-        .query(({ input }) => new PlanNodeService().getByIds(input)),
+      getByIds: t.procedure.input(z.array(z.int())).query(({ input }) => new PlanNodeService().getByIds(input)),
       patch: t.procedure
-        .input((v) => v as ({id: number, manual: boolean, data: PlanNodeUpdate}))
+        .input((v) => v as { id: number; manual: boolean; data: PlanNodeUpdate })
         .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
       regenerateTreeNodesContents: t.procedure
         .input((v) => v as RegenerateOptions)
         .mutation(({ input }) => regenerateTreeNodesContents(input)),
-      regenerateTreeNodesContentsProgress: t.procedure
-        .subscription(() => subscribeToRegenerateTreeNodesContentsProgress()),
-      regenerateTreeNodesContentsStop: t.procedure
-        .mutation(() => regenerateTreeNodesContentsStop()),
+      regenerateTreeNodesContentsProgress: t.procedure.subscription(() =>
+        subscribeToRegenerateTreeNodesContentsProgress(),
+      ),
+      regenerateTreeNodesContentsStop: t.procedure.mutation(() => regenerateTreeNodesContentsStop()),
       startReview: t.procedure
         .input(z.object({ id: z.number(), options: z.any().optional() }))
         .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
@@ -195,17 +185,15 @@ export const appRouter = t.router({
       forEachNodes: t.router({
         changePage: t.procedure
           .input(z.object({ nodeId: z.int(), page: z.int32() }))
-          .mutation(({ input: {nodeId, page} }) => new PlanNodeService().changeForEachNodePage(nodeId, page)),
+          .mutation(({ input: { nodeId, page } }) => new PlanNodeService().changeForEachNodePage(nodeId, page)),
       }),
     }),
     edges: t.router({
-      findAll: t.procedure
-        .query(() => new PlanEdgeRepository().findAll()),
-      findByTarget: t.procedure
-        .input(z.int())  
-        .query(({input}) => new PlanEdgeRepository().findByToNodeId(input)),
+      findAll: t.procedure.query(() => new PlanEdgeRepository().findAll()),
+      findByTarget: t.procedure.input(z.int()).query(({ input }) => new PlanEdgeRepository().findByToNodeId(input)),
       create: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),
-      patch: t.procedure.input(z.object({ id: z.number(), data: z.any() }))
+      patch: t.procedure
+        .input(z.object({ id: z.number(), data: z.any() }))
         .mutation(({ input }) => patchGraphEdge(input.id, input.data)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => deleteGraphEdge(input)),
       subscribe: t.procedure.subscription(() => planEdgeEventManager.asSubscription()),
@@ -214,7 +202,9 @@ export const appRouter = t.router({
 
   settings: t.router({
     get: t.procedure.input(z.string()).query(({ input }) => SettingsRepository.get(input)),
-    set: t.procedure.input(z.tuple([z.string(), z.any()])).mutation(({ input }) => SettingsRepository.set(input[0], input[1])),
+    set: t.procedure
+      .input(z.tuple([z.string(), z.any()]))
+      .mutation(({ input }) => SettingsRepository.set(input[0], input[1])),
 
     autoGenerateSummary: t.router({
       get: t.procedure.query(() => SettingsRepository.getAutoGenerateSummary()),
@@ -250,9 +240,7 @@ export const appRouter = t.router({
         .mutation(({ input }) => SettingsRepository.saveAllAiEnginesConfig(input)),
       currentEngine: t.router({
         get: t.procedure.query(() => SettingsRepository.getCurrentBackend()),
-        set: t.procedure
-          .input(z.string().nullable())
-          .mutation(({input}) => setCurrentEngine( input )),
+        set: t.procedure.input(z.string().nullable()).mutation(({ input }) => setCurrentEngine(input)),
         availableModels: t.router({
           get: t.procedure.query(() => SettingsRepository.getCurrentEngineAvailableModels()),
         }),
@@ -263,12 +251,9 @@ export const appRouter = t.router({
           get: t.procedure.query(() => SettingsRepository.getCurrentEngineSummaryAiGenerationSettings()),
         }),
       }),
-      refreshEngineModels: t.procedure
-        .input(z.string())
-        .mutation(({input}) => refreshEngineModels(input))
+      refreshEngineModels: t.procedure.input(z.string()).mutation(({ input }) => refreshEngineModels(input)),
     }),
   }),
-});
+})
 
-export type AppRouter = typeof appRouter;
-
+export type AppRouter = typeof appRouter

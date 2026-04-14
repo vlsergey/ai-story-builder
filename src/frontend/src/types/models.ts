@@ -10,7 +10,7 @@ export interface AiEngineSyncRecord {
 }
 
 /** Which statistic to show per node in the lore tree */
-export type LoreStatMode = 'none' | 'words' | 'chars' | 'bytes'
+export type LoreStatMode = "none" | "words" | "chars" | "bytes"
 
 export interface ProjectData {
   path: string

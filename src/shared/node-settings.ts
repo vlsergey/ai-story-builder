@@ -45,13 +45,12 @@ export type NodeTypeSettingsMap = {
   merge: MergeSettings
   text: TextSettings
   lore: LoreSettings
-  'for-each': ForEachSettings
-  'for-each-input': ForEachInputSettings
-  'for-each-output': ForEachOutputSettings
+  "for-each": ForEachSettings
+  "for-each-input": ForEachInputSettings
+  "for-each-output": ForEachOutputSettings
 }
 
-export type NodeTypeSettings<T extends keyof NodeTypeSettingsMap = keyof NodeTypeSettingsMap> =
-  NodeTypeSettingsMap[T]
+export type NodeTypeSettings<T extends keyof NodeTypeSettingsMap = keyof NodeTypeSettingsMap> = NodeTypeSettingsMap[T]
 
 /** Partial (optional) versions for API input/output */
 export type SplitSettingsPartial = Partial<SplitSettings>
@@ -67,40 +66,38 @@ export type NodeTypeSettingsPartialMap = {
   merge: MergeSettingsPartial
   text: TextSettingsPartial
   lore: LoreSettingsPartial
-  'for-each': ForEachSettingsPartial
-  'for-each-input': ForEachInputSettingsPartial
-  'for-each-output': ForEachOutputSettingsPartial
+  "for-each": ForEachSettingsPartial
+  "for-each-input": ForEachInputSettingsPartial
+  "for-each-output": ForEachOutputSettingsPartial
 }
 
 export type NodeTypeSettingsPartial<T extends keyof NodeTypeSettingsPartialMap = keyof NodeTypeSettingsPartialMap> =
   NodeTypeSettingsPartialMap[T]
 
 /** Helper to get default settings for a node type */
-export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(
-  nodeType: T
-): NodeTypeSettingsMap[T] {
+export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(nodeType: T): NodeTypeSettingsMap[T] {
   switch (nodeType) {
-    case 'split':
+    case "split":
       return {
-        separator: '',
+        separator: "",
         dropFirst: 0,
         dropLast: 0,
         autoUpdate: false,
       } as NodeTypeSettingsMap[T]
-    case 'merge':
+    case "merge":
       return {
         includeNodeTitle: false,
         includeInputTitles: false,
         fixHeaders: false,
         autoUpdate: false,
       } as NodeTypeSettingsMap[T]
-    case 'text':
-    case 'lore':
+    case "text":
+    case "lore":
       return {} as NodeTypeSettingsMap[T]
-    case 'for-each':
+    case "for-each":
       return {} as NodeTypeSettingsMap[T]
-    case 'for-each-input':
-    case 'for-each-output':
+    case "for-each-input":
+    case "for-each-output":
       return {} as NodeTypeSettingsMap[T]
     default: {
       const exhaustiveCheck: never = nodeType

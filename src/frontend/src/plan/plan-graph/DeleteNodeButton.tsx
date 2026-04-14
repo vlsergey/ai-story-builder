@@ -1,20 +1,20 @@
-import React from 'react'
-import { X } from 'lucide-react'
-import { Button } from '@/ui-components/button'
-import { useLocale } from '@/lib/locale'
+import React from "react"
+import { X } from "lucide-react"
+import { Button } from "@/ui-components/button"
+import { useLocale } from "@/lib/locale"
 
 interface DeleteNodeButtonProps {
   onDelete: (e: React.MouseEvent) => void
   className?: string
-  size?: 'icon-xs' | 'icon-sm' | 'icon'
-  variant?: 'ghost' | 'outline' | 'destructive'
+  size?: "icon-xs" | "icon-sm" | "icon"
+  variant?: "ghost" | "outline" | "destructive"
 }
 
 export default function DeleteNodeButton({
   onDelete,
-  className = '',
-  size = 'icon-xs',
-  variant = 'ghost',
+  className = "",
+  size = "icon-xs",
+  variant = "ghost",
 }: DeleteNodeButtonProps) {
   const { t } = useLocale()
 
@@ -23,7 +23,7 @@ export default function DeleteNodeButton({
       variant={variant}
       size={size}
       onClick={onDelete}
-      aria-label={t('planGraph.deleteNode', 'Delete node')}
+      aria-label={t("planGraph.deleteNode", "Delete node")}
       className={`hover:!bg-destructive hover:!text-destructive-foreground ${className}`}
     >
       <X />

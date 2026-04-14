@@ -1,6 +1,6 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow, PlanNodeType } from '../../../shared/plan-graph.js'
-import { withDbWrite, withDbRead } from '../../db/connection.js'
-import { NodeOverride } from '../../../shared/for-each-plan-node.js'
+import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow, PlanNodeType } from "../../../shared/plan-graph.js"
+import { withDbWrite, withDbRead } from "../../db/connection.js"
+import { NodeOverride } from "../../../shared/for-each-plan-node.js"
 
 /**
  * Repository for plan_nodes table operations.
@@ -8,9 +8,8 @@ import { NodeOverride } from '../../../shared/for-each-plan-node.js'
  * Manages its own database connections.
  */
 export class PlanNodeRepository {
-
   applyForEachNodeIterationToChildren(forEachNodeId: number, overrides: Record<string, NodeOverride>) {
-    return withDbWrite(db => {
+    return withDbWrite((db) => {
       db.prepare(`UPDATE plan_nodes
         SET 
             content    = data.content,
@@ -36,9 +35,10 @@ export class PlanNodeRepository {
     })
   }
 
-  collectForEachNodeIterationContentFromChildren(forEachNodeId: number) : Record<string, NodeOverride> {
-    return withDbRead(db => {
-        const dbResult = db.prepare<number, {overrides_map: string}>(`SELECT json_group_object(
+  collectForEachNodeIterationContentFromChildren(forEachNodeId: number): Record<string, NodeOverride> {
+    return withDbRead((db) => {
+      const dbResult = db
+        .prepare<number, { overrides_map: string }>(`SELECT json_group_object(
               id, 
               json_object(
                   'content', content,
@@ -50,33 +50,29 @@ export class PlanNodeRepository {
               )
           ) AS overrides_map
           FROM plan_nodes
-          WHERE parent_id = ?`).get(forEachNodeId)
-        return JSON.parse(dbResult?.overrides_map || '{}') as Record<string, NodeOverride>
-      }
-    )
+          WHERE parent_id = ?`)
+        .get(forEachNodeId)
+      return JSON.parse(dbResult?.overrides_map || "{}") as Record<string, NodeOverride>
+    })
   }
 
   /**
    * Get all nodes (full rows) ordered by position, id.
    */
   findAll(): PlanNodeRow[] {
-    return withDbRead(db =>
-      db.prepare('SELECT * FROM plan_nodes ORDER BY position, id').all() as PlanNodeRow[]
-    )
+    return withDbRead((db) => db.prepare("SELECT * FROM plan_nodes ORDER BY position, id").all() as PlanNodeRow[])
   }
 
   /**
    * Get a single node by ID, or undefined if not found.
    */
   findById(id: number): PlanNodeRow | undefined {
-    return withDbRead(db =>
-      db.prepare('SELECT * FROM plan_nodes WHERE id = ?').get(id) as PlanNodeRow | undefined
-    )
+    return withDbRead((db) => db.prepare("SELECT * FROM plan_nodes WHERE id = ?").get(id) as PlanNodeRow | undefined)
   }
 
   findByIds(ids: number[]): (PlanNodeRow | undefined)[] {
-    return withDbRead(db =>
-      ids.map(id => db.prepare('SELECT * FROM plan_nodes WHERE id = ?').get(id) as PlanNodeRow | undefined)
+    return withDbRead((db) =>
+      ids.map((id) => db.prepare("SELECT * FROM plan_nodes WHERE id = ?").get(id) as PlanNodeRow | undefined),
     )
   }
 
@@ -84,10 +80,11 @@ export class PlanNodeRepository {
    * Get nodes by parent ID (for tree building).
    */
   findByParentId(parentId: number | null): PlanNodeRow[] {
-    return withDbRead(db =>
-      db
-        .prepare('SELECT * FROM plan_nodes WHERE parent_id IS ? ORDER BY position, id')
-        .all(parentId) as PlanNodeRow[]
+    return withDbRead(
+      (db) =>
+        db
+          .prepare("SELECT * FROM plan_nodes WHERE parent_id IS ? ORDER BY position, id")
+          .all(parentId) as PlanNodeRow[],
     )
   }
 
@@ -95,10 +92,11 @@ export class PlanNodeRepository {
    * Get nodes by parent ID (for tree building).
    */
   findByParentIdAndType(parentId: number | null, type: PlanNodeType): PlanNodeRow[] {
-    return withDbRead(db =>
-      db
-        .prepare('SELECT * FROM plan_nodes WHERE parent_id IS ? AND type IS ? ORDER BY position, id')
-        .all(parentId, type) as PlanNodeRow[]
+    return withDbRead(
+      (db) =>
+        db
+          .prepare("SELECT * FROM plan_nodes WHERE parent_id IS ? AND type IS ? ORDER BY position, id")
+          .all(parentId, type) as PlanNodeRow[],
     )
   }
 
@@ -106,9 +104,9 @@ export class PlanNodeRepository {
    * Get the maximum position among children of a given parent.
    * Internal helper that expects a database connection.
    */
-  private getMaxPosition(db: import('better-sqlite3').Database, parentId: number | null): number {
+  private getMaxPosition(db: import("better-sqlite3").Database, parentId: number | null): number {
     const row = db
-      .prepare('SELECT COALESCE(MAX(position), -1) AS max FROM plan_nodes WHERE parent_id IS ?')
+      .prepare("SELECT COALESCE(MAX(position), -1) AS max FROM plan_nodes WHERE parent_id IS ?")
       .get(parentId) as { max: number } | undefined
     return row?.max ?? -1
   }
@@ -117,8 +115,8 @@ export class PlanNodeRepository {
    * Count total nodes.
    */
   count(): number {
-    return withDbRead(db => {
-      const row = db.prepare('SELECT COUNT(*) AS c FROM plan_nodes').get() as { c: number }
+    return withDbRead((db) => {
+      const row = db.prepare("SELECT COUNT(*) AS c FROM plan_nodes").get() as { c: number }
       return row.c
     })
   }
@@ -130,10 +128,10 @@ export class PlanNodeRepository {
    * Returns the inserted row's ID.
    */
   insert(data: PlanNodeCreate): number {
-    return withDbWrite(db => {
+    return withDbWrite((db) => {
       const parentId = data.parent_id ?? null
-      const position = data.position ?? (this.getMaxPosition(db, parentId) + 1)
-      const type = data.type ?? 'text'
+      const position = data.position ?? this.getMaxPosition(db, parentId) + 1
+      const type = data.type ?? "text"
       const x = data.x ?? 0
       const y = data.y ?? 0
       const content = data.content ?? null
@@ -146,7 +144,7 @@ export class PlanNodeRepository {
       const wordCount = data.word_count ?? 0
       const charCount = data.char_count ?? 0
       const byteCount = data.byte_count ?? 0
-      const status = data.status ?? 'EMPTY'
+      const status = data.status ?? "EMPTY"
       const inReview = data.in_review ?? 0
       const reviewBaseContent = data.review_base_content ?? null
       const aiImproveInstruction = data.ai_improve_instruction ?? null
@@ -182,7 +180,7 @@ export class PlanNodeRepository {
         status,
         inReview,
         reviewBaseContent,
-        aiImproveInstruction
+        aiImproveInstruction,
       )
       return Number(info.lastInsertRowid)
     })
@@ -196,12 +194,12 @@ export class PlanNodeRepository {
    * Returns updated object.
    */
   patch(id: number, fields: PlanNodeUpdate): PlanNodeRow {
-    return withDbWrite(db => {
+    return withDbWrite((db) => {
       const keys = Object.keys(fields) as (keyof typeof fields)[]
-      if (keys.length === 0) throw Error('Need at least one updated field')
+      if (keys.length === 0) throw Error("Need at least one updated field")
 
-      const setClause = keys.map(k => `${k} = ?`).join(', ')
-      const values = keys.map(k => fields[k])
+      const setClause = keys.map((k) => `${k} = ?`).join(", ")
+      const values = keys.map((k) => fields[k])
       const stmt = db.prepare(`UPDATE plan_nodes SET ${setClause} WHERE id = ? RETURNING *`)
       return stmt.get(...values, id) as PlanNodeRow
     })
@@ -211,8 +209,8 @@ export class PlanNodeRepository {
    * Delete a node by ID (cascades to edges via foreign key, children via parent_id).
    */
   delete(id: number): void {
-    return withDbWrite(db => {
-      db.prepare('DELETE FROM plan_nodes WHERE id = ?').run(id)
+    return withDbWrite((db) => {
+      db.prepare("DELETE FROM plan_nodes WHERE id = ?").run(id)
     })
   }
 }

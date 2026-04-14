@@ -1,9 +1,9 @@
-import { PlanNodeService } from '../plan-node-service.js'
-import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeStatus, PlanNodeRow, PlanNodeUpdate } from '../../../../shared/plan-graph.js'
-import type { TextSettings } from '../../../../shared/node-settings.js'
-import { generatePlanNodeTextContent } from '../../../routes/generate-plan-node-text-content.js'
-import { RegenerationNodeContext } from '../generate/RegenerationContext.js'
+import { PlanNodeService } from "../plan-node-service.js"
+import type { NodeProcessor } from "./node-processor.js"
+import type { PlanNodeStatus, PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { TextSettings } from "../../../../shared/node-settings.js"
+import { generatePlanNodeTextContent } from "../../../routes/generate-plan-node-text-content.js"
+import { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**
  * Processor for 'text' nodes.
@@ -12,14 +12,14 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
   readonly defaultSettings: TextSettings = {}
 
   getOutput(context: PlanNodeService, nodeData: PlanNodeRow): unknown {
-    return nodeData.content ?? ''
+    return nodeData.content ?? ""
   }
 
   async onInputContentChange(
     service: PlanNodeService,
     data: PlanNodeRow,
     changedInputNodeId: number,
-    settings: TextSettings
+    settings: TextSettings,
   ): Promise<PlanNodeUpdate | null> {
     // Check if the changed input is referenced in ai_instructions via template
     const changedNode = service.getById(changedInputNodeId)
@@ -40,10 +40,10 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     }
 
     // If node status is GENERATED, mark it as OUTDATED
-    if (data.status === 'GENERATED') {
+    if (data.status === "GENERATED") {
       console.log(`[TextProcessor] node ${data.id} depends on changed input ${changedInputNodeId}, marking OUTDATED`)
       return {
-        status: 'OUTDATED' as PlanNodeStatus,
+        status: "OUTDATED" as PlanNodeStatus,
       }
     }
 
@@ -55,12 +55,12 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     service: PlanNodeService,
     context: RegenerationNodeContext,
     node: PlanNodeRow,
-    settings: TextSettings
+    settings: TextSettings,
   ): Promise<PlanNodeUpdate | null> {
     // Generate content using AI for text nodes
     console.log(`[TextProcessor] regenerating node ${node.id} (title: ${node.title})`)
     const content = await generatePlanNodeTextContent(node, (event) => context.onEvent(event))
-    console.log(`[TextProcessor] generated content length: ${content?.length ?? 'null'}`)
+    console.log(`[TextProcessor] generated content length: ${content?.length ?? "null"}`)
     if (content == node.content) return null
     return { content }
   }

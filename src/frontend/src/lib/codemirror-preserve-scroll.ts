@@ -1,5 +1,5 @@
-import { Transaction } from '@codemirror/state'
-import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view'
+import { Transaction } from "@codemirror/state"
+import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view"
 
 /**
  * CodeMirror extension that preserves the scroll position when the document
@@ -15,21 +15,20 @@ export const preserveScrollOnExternalUpdate = ViewPlugin.fromClass(
     declare view: EditorView
 
     update(update: ViewUpdate) {
-      if (
-        update.docChanged &&
-        update.transactions.some(tr => tr.annotation(Transaction.remote))
-      ) {
+      if (update.docChanged && update.transactions.some((tr) => tr.annotation(Transaction.remote))) {
         const dom = update.view.scrollDOM
         const saved = this.scrollTop
-        requestAnimationFrame(() => { dom.scrollTop = saved })
+        requestAnimationFrame(() => {
+          dom.scrollTop = saved
+        })
       }
     }
   },
   {
     eventHandlers: {
       scroll(_e: Event, self) {
-        (self as any).scrollTop = (self as any).view.scrollDOM.scrollTop
+        ;(self as any).scrollTop = (self as any).view.scrollDOM.scrollTop
       },
     },
-  }
+  },
 )

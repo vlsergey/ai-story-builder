@@ -1,7 +1,7 @@
-import { PlanNodeService } from '../plan-node-service.js'
-import type { NodeProcessor } from './node-processor.js'
-import type { PlanNodeRow } from '../../../../shared/plan-graph.js'
-import { ForEachNodeContent } from '../../../../shared/for-each-plan-node.js'
+import { PlanNodeService } from "../plan-node-service.js"
+import type { NodeProcessor } from "./node-processor.js"
+import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
+import { ForEachNodeContent } from "../../../../shared/for-each-plan-node.js"
 
 export class ForEachPrevOutputsProcessor implements NodeProcessor<unknown> {
   readonly defaultSettings = {}
@@ -12,15 +12,17 @@ export class ForEachPrevOutputsProcessor implements NodeProcessor<unknown> {
 
     const parentId = node.parent_id
     if (parentId === null) {
-      throw new Error('For-each-prev-outputs node must be a child of a for-each node, but current parent is null')
+      throw new Error("For-each-prev-outputs node must be a child of a for-each node, but current parent is null")
     }
     const parent = service.getById(parentId)
-    if (parent.type !== 'for-each') {
-      throw new Error('For-each-prev-outputs node must be a child of a for-each node, but current parent has type ' + parent.type)
+    if (parent.type !== "for-each") {
+      throw new Error(
+        "For-each-prev-outputs node must be a child of a for-each node, but current parent has type " + parent.type,
+      )
     }
     console.log("[ForEachPrevOutputsProcessor] parent", parent)
 
-    const parsedParentContent = JSON.parse(parent.content || '{}') as ForEachNodeContent
+    const parsedParentContent = JSON.parse(parent.content || "{}") as ForEachNodeContent
     console.log("[ForEachPrevOutputsProcessor] parsedParentContent", parsedParentContent)
 
     const currentIndex = parsedParentContent.currentIndex ?? 0
@@ -29,15 +31,19 @@ export class ForEachPrevOutputsProcessor implements NodeProcessor<unknown> {
       return []
     }
 
-    const outputNodes = service.repo.findByParentIdAndType(parentId, 'for-each-output')
+    const outputNodes = service.repo.findByParentIdAndType(parentId, "for-each-output")
     if (outputNodes.length !== 1) {
-      throw new Error('For-each-prev-outputs node must be a child of a for-each node with exactly single for-each-output node, '
-        + 'but current parent has ' + outputNodes.length + ' for-each-output nodes')
+      throw new Error(
+        "For-each-prev-outputs node must be a child of a for-each node with exactly single for-each-output node, " +
+          "but current parent has " +
+          outputNodes.length +
+          " for-each-output nodes",
+      )
     }
     const outputNodeId = outputNodes[0].id
     console.log("[ForEachPrevOutputsProcessor] outputNodeId", outputNodeId)
 
-    const results : string[] = []
+    const results: string[] = []
     for (let index = 0; index < currentIndex; index++) {
       const iterationOverrides = (parsedParentContent.overrides || [])[index] || {}
       console.log("[ForEachPrevOutputsProcessor]", index, "iterationOverrides", iterationOverrides)
@@ -45,7 +51,7 @@ export class ForEachPrevOutputsProcessor implements NodeProcessor<unknown> {
       const outputOverrides = iterationOverrides[`${outputNodeId}`] || {}
       console.log("[ForEachPrevOutputsProcessor]", index, "outputOverrides", outputOverrides)
 
-      const outputOutput = outputOverrides.content ?? ''
+      const outputOutput = outputOverrides.content ?? ""
       console.log("[ForEachPrevOutputsProcessor]", index, "outputOutput", outputOutput)
       results.push(outputOutput)
     }
