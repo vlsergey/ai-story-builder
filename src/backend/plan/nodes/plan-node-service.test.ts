@@ -12,7 +12,7 @@ vi.mock("../../routes/generate-plan-node-text-content.js", () => ({
   generatePlanNodeTextContent: vi.fn(),
 }))
 
-vi.mock("../../routes/generate-summary.js", () => ({
+vi.mock("../../ai/generate-summary.js", () => ({
   generateSummary: vi.fn(),
 }))
 
@@ -57,7 +57,7 @@ describe("PlanNodeService — full plan content generation", () => {
       }
       return ""
     })
-    ;(generateSummary as any).mockImplementation(async (content: string) => {
+    ;(generateSummary as any).mockImplementation(async (promptCacheKeys: string[], content: string) => {
       console.log(`[MOCK] generateSummary called for content length ${content.length}`)
       return `Summary: ${content.substring(0, 30)}...`
     })

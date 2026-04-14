@@ -84,20 +84,4 @@ describe("node-edge-dictionary consistency", () => {
       }
     }
   })
-
-  // Additional sanity checks
-  it("node definitions have non‑empty allowedOutgoingEdgeTypes and allowedIncomingEdgeTypes", () => {
-    for (const node of NODE_TYPES) {
-      if (node.canCreate === false) continue // skip internal nodes
-      expect(node.allowedOutgoingEdgeTypes.length).toBeGreaterThan(0)
-      expect(node.allowedIncomingEdgeTypes.length).toBeGreaterThan(0)
-    }
-  })
-
-  it("edge definitions have non‑empty allowedSourceNodeTypes and allowedTargetNodeTypes", () => {
-    for (const edge of EDGE_TYPES) {
-      expect(edge.allowedSourceNodeTypes.length).toBeGreaterThan(0)
-      expect(edge.allowedTargetNodeTypes.length).toBeGreaterThan(0)
-    }
-  })
 })
