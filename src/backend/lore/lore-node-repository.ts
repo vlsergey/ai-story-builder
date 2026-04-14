@@ -1,5 +1,6 @@
 import { withDbRead, withDbWrite } from "../db/connection.js"
 import type { LoreNodeCreate, LoreNodeRow, LoreNodeUpdate } from "../../shared/lore-node.js"
+import type { RunResult } from "better-sqlite3"
 
 /**
  * Repository for lore_nodes table operations.
@@ -201,7 +202,7 @@ export class LoreNodeRepository {
       let n = 2
       while (usedNames.has(newName)) newName = `${baseName} ${n++}`
 
-      let info
+      let info: RunResult
       if (src.content) {
         const wordCount = (src.content.match(/\S+/g) || []).length
         const charCount = [...src.content].length
