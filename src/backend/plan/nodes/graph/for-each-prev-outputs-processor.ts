@@ -17,7 +17,7 @@ export class ForEachPrevOutputsProcessor implements NodeProcessor<unknown> {
     const parent = service.getById(parentId)
     if (parent.type !== "for-each") {
       throw new Error(
-        "For-each-prev-outputs node must be a child of a for-each node, but current parent has type " + parent.type,
+        `For-each-prev-outputs node must be a child of a for-each node, but current parent has type ${parent.type}`,
       )
     }
     console.log("[ForEachPrevOutputsProcessor] parent", parent)

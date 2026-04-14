@@ -29,7 +29,7 @@ export async function generateSummary(promptCacheKeys: string[], nodeOutput: unk
     if (!engine) throw makeErrorWithStatus("no AI engine configured", 400)
   } catch (e: any) {
     if (e.status) throw e
-    throw makeErrorWithStatus("failed to read project settings: " + String(e), 500)
+    throw makeErrorWithStatus(`failed to read project settings: ${String(e)}`, 500)
   }
 
   const engineDef = BUILTIN_ENGINES.find((e) => e.id === engine)
@@ -49,7 +49,7 @@ export async function generateSummary(promptCacheKeys: string[], nodeOutput: unk
     )
   }
 
-  const userPrompt = generateSummaryInstructions.trim() + "\n\n" + content.trim()
+  const userPrompt = `${generateSummaryInstructions.trim()}\n\n${content.trim()}`
 
   return await adapter.generateResponse({
     userPrompt,

@@ -89,7 +89,7 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
     }
   } catch (e) {
     console.error(e)
-    throw makeError("failed to open database: " + String(e), 500)
+    throw makeError(`failed to open database: ${String(e)}`, 500)
   }
 
   applyRuntimeSettings(dbPath)

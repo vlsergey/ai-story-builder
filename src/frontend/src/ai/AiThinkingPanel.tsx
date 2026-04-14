@@ -50,7 +50,7 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
         .filter((item) => item.type != "message")
         .slice(-3)
         .map((item, index) => {
-          const Icon = icons[item.type] ?? icons[item.type + "." + (item as any).name]
+          const Icon = icons[item.type] ?? icons[`${item.type}.${(item as any).name}`]
           const icon = Icon ? <Icon className="w-3 h-3" /> : <WrenchIcon className="w-3 h-3" />
 
           let className = "flex items-center"
@@ -67,7 +67,7 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
                 <div>{icon && icon}</div>
                 <div className="flex-1 ml-1 text-xs">
                   <span>
-                    {t(`aiThinking.${item.type}${(item as any)?.action?.type ? "." + (item as any).action.type : ""}`)}
+                    {t(`aiThinking.${item.type}${(item as any)?.action?.type ? `.${(item as any).action.type}` : ""}`)}
                   </span>
 
                   {item.type === "custom_tool_call" && (
@@ -90,7 +90,7 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
                     </span>
                   )}
                   {item.type === "web_search_call" && item.action.type == "find_in_page" && (
-                    <span>{": " + item.action.pattern + " @ " + item.action.url}</span>
+                    <span>{`: ${item.action.pattern} @ ${item.action.url}`}</span>
                   )}
                   {item.type === "web_search_call" && item.action.type == "search" && (
                     <span>

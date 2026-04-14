@@ -58,7 +58,7 @@ export function makeLoggingFetch(providerName: string, baseUrl: string): typeof 
     init?: Parameters<typeof fetch>[1],
   ): Promise<Response> {
     const method = (init?.method ?? "GET").padEnd(6)
-    const shortUrl = String(url).replace(baseUrl + "/", "")
+    const shortUrl = String(url).replace(`${baseUrl}/`, "")
     const start = Date.now()
 
     let reqSize = ""

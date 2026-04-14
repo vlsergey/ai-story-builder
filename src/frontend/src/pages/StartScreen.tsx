@@ -31,7 +31,7 @@ function CreateNewForm() {
     try {
       await createProject.mutateAsync({ name, text_language: textLanguage })
     } catch (err) {
-      setCreateError("Create failed: " + (err as Error).message)
+      setCreateError(`Create failed: ${(err as Error).message}`)
     } finally {
       setBusy(false)
     }

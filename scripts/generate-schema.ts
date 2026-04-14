@@ -31,7 +31,7 @@ function getSchema(db: Database.Database): string {
   }
 
   // Add a blank line between statements for readability
-  return statements.join("\n\n") + "\n"
+  return `${statements.join("\n\n")}\n`
 }
 
 function ensureSchemaFile() {

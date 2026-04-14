@@ -101,7 +101,7 @@ export default function PlanEdge({
             <div
               className="px-1.5 py-0.5 rounded text-[10px] font-medium select-none"
               style={{
-                background: color + "22",
+                background: `${color}22`,
                 border: `1px solid ${color}66`,
                 color,
               }}

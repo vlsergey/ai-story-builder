@@ -188,7 +188,7 @@ export class LoreNodeRepository {
         | undefined
       if (!src) throw new Error("Node not found")
 
-      const baseName = src.name + " copy"
+      const baseName = `${src.name} copy`
       const existing = db
         .prepare("SELECT name FROM lore_nodes WHERE parent_id IS ? AND name LIKE ? || '%'")
         .all(src.parent_id, baseName) as { name: string }[]

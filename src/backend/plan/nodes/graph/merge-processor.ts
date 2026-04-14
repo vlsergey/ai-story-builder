@@ -98,7 +98,7 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
           inputContent = this.fixHeaders(inputContent)
         }
 
-        content += inputContent + "\n\n"
+        content += `${inputContent}\n\n`
       }
     }
 

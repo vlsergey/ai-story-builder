@@ -82,7 +82,7 @@ function buildFileContent(
   const hashes = "#".repeat(headingLevel)
   const headingText = depth >= 2 ? segments.slice(1).join(" / ") : row.title
 
-  return frontmatter + `${hashes} ${headingText}\n\n` + (row.content ?? "")
+  return `${frontmatter}${hashes} ${headingText}\n\n${row.content ?? ""}`
 }
 
 function formatApiError(e: unknown): string {

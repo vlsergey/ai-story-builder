@@ -42,8 +42,7 @@
         "noUnusedVariables": "off"
       },
       "style": {
-        "noNonNullAssertion": "off",
-        "useTemplate": "off"
+        "noNonNullAssertion": "off"
       },
       "suspicious": {
         "noArrayIndexKey": "off",

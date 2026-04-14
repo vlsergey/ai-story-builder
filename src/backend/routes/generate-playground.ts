@@ -40,7 +40,7 @@ export async function generatePlayground(
     }
   } catch (e: any) {
     if (e.status) throw e
-    throw makeError("failed to read project settings: " + String(e), 500)
+    throw makeError(`failed to read project settings: ${String(e)}`, 500)
   }
 
   const adapter = getEngineAdapter(engine)

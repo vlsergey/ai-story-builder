@@ -322,7 +322,7 @@ export class PlanNodeService {
     let update = { ...data }
 
     if (data.status !== undefined) {
-      console.log("In patch there is a requirement to change status to " + data.status + "")
+      console.log(`In patch there is a requirement to change status to ${data.status}`)
     } else {
       if (update.content !== undefined) {
         if (!update.content) {
@@ -352,7 +352,7 @@ export class PlanNodeService {
     if (!updated) throw makeErrorWithStatus("node not found", 404)
 
     // Emit event to frontend
-    planNodeEventManager.emitUpdate(nodeId, "patched keys: " + Object.keys(data).join(", ") + "")
+    planNodeEventManager.emitUpdate(nodeId, `patched keys: ${Object.keys(data).join(", ")}`)
 
     // If content changed, notify downstream nodes
     if (update.content !== undefined) {
@@ -423,7 +423,7 @@ export class PlanNodeService {
             console.error(e)
             patch = {
               ...patch,
-              summary: "(error): " + e + "",
+              summary: `(error): ${e}`,
               status: "GENERATED",
             }
           }

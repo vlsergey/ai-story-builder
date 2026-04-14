@@ -36,10 +36,10 @@ export class EventManager extends EventEmitter<PlanEvents> {
    */
   emitUpdate(payload: number, reason?: string): void {
     if (typeof payload !== "number") {
-      console.error("Payload must be a number: " + typeof payload, payload)
-      throw Error("Payload must be a number: " + typeof payload)
+      console.error(`Payload must be a number: ${typeof payload}`, payload)
+      throw Error(`Payload must be a number: ${typeof payload}`)
     }
-    console.info(`Emit event ${this.path}: ${JSON.stringify(payload)}` + (reason ? ` (${reason})` : ""))
+    console.info(`Emit event ${this.path}: ${JSON.stringify(payload)}${reason ? ` (${reason})` : ""}`)
     this.events.emit("update", payload)
   }
 }

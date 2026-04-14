@@ -34,7 +34,7 @@ export function createBackup(dbPath: string): string {
  */
 export function trimBackups(filename: string, backupsDir: string): void {
   try {
-    const all = fs.readdirSync(backupsDir).filter((f) => f.startsWith(filename + "."))
+    const all = fs.readdirSync(backupsDir).filter((f) => f.startsWith(`${filename}.`))
     all.sort()
     while (all.length > 7) {
       const rm = all.shift()
@@ -60,7 +60,7 @@ export function getLatestBackup(dbPath: string): string | null {
 
   const filename = path.basename(dbPath)
   try {
-    const all = fs.readdirSync(backupsDir).filter((f) => f.startsWith(filename + "."))
+    const all = fs.readdirSync(backupsDir).filter((f) => f.startsWith(`${filename}.`))
     if (all.length === 0) return null
 
     all.sort()

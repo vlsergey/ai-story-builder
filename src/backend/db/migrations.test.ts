@@ -80,14 +80,13 @@ describe("migrateDatabase", () => {
     `)
       .all() as Array<{ type: string; name: string; sql: string }>
 
-    let generated =
-      rows
-        .map((row) => {
-          let sql = row.sql.trim()
-          if (!sql.endsWith(";")) sql += ";"
-          return sql
-        })
-        .join("\n\n") + "\n"
+    let generated = `${rows
+      .map((row) => {
+        let sql = row.sql.trim()
+        if (!sql.endsWith(";")) sql += ";"
+        return sql
+      })
+      .join("\n\n")}\n`
     // Normalize line endings to \n for consistent comparison
     generated = generated.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
 
@@ -96,7 +95,7 @@ describe("migrateDatabase", () => {
     const stored = fs.readFileSync(schemaPath, "utf-8")
     // Remove the header comment (first three lines)
     // Support both \n and \r\n line endings
-    let storedSchema = stored.replace(/^--.*\r?\n/gm, "").trim() + "\n"
+    let storedSchema = `${stored.replace(/^--.*\r?\n/gm, "").trim()}\n`
     // Normalize line endings to \n for consistent comparison
     storedSchema = storedSchema.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
 

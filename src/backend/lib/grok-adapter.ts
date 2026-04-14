@@ -36,7 +36,7 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     //   // userContent.push({ type: 'input_text', text: req.userPrompt })
     // }
 
-    const uuidV4PromptCacheKey = generateDeterministicV4(getCurrentDbPath() + "/" + req.promptCacheKeys.join("/"))
+    const uuidV4PromptCacheKey = generateDeterministicV4(`${getCurrentDbPath()}/${req.promptCacheKeys.join("/")}`)
 
     const requestParams: Omit<ResponseCreateParamsStreaming, "stream"> = {
       model: actualAiSettings.model,
@@ -88,7 +88,7 @@ function generateDeterministicV4(seed: string): string {
   return [
     hash.substring(0, 8),
     hash.substring(8, 12),
-    "4" + hash.substring(13, 16), // v4
+    `4${hash.substring(13, 16)}`, // v4
     ((parseInt(hash.substring(16, 17), 16) & 0x3) | 0x8).toString(16) + hash.substring(17, 20), // Вариант RFC4122
     hash.substring(20, 32),
   ].join("-")

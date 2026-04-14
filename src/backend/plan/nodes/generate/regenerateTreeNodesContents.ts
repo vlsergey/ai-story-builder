@@ -157,7 +157,7 @@ export async function regenerateSubtreeNodesContents(
   context: RegenerationContainerContext,
   parentId: number | null,
 ): Promise<void> {
-  console.info("[regenerateSubtreeNodesContents] Starting regeneration for parentId=" + parentId + "")
+  console.info(`[regenerateSubtreeNodesContents] Starting regeneration for parentId=${parentId}`)
 
   const planEdgeRepository = new PlanEdgeRepository()
   const planNodeService = new PlanNodeService()

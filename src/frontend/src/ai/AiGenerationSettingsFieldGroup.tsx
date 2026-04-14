@@ -38,7 +38,7 @@ export default function AiGenerationSettingsFieldGroup({
   return (
     <FieldGroup className={className}>
       <Controller
-        name={formFieldNamePrefix + "model"}
+        name={`${formFieldNamePrefix}model`}
         control={formControl}
         render={({ field: { name, value, onChange } }) => (
           <Field orientation="horizontal" className="w-fit">
