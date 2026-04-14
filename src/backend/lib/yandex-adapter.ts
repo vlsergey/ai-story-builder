@@ -41,7 +41,7 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
     }
 
     if (req.responseSchema && req.stringFormat !== false) {
-      ;(requestParams as unknown as Record<string, unknown>)["response_format"] = {
+      ;(requestParams as unknown as Record<string, unknown>).response_format = {
         type: "json_schema",
         json_schema: {
           name: req.responseSchema.name,
@@ -60,7 +60,7 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
       tools.push({ type: "web_search", web_search: { search_context_size: actualAiSettings.webSearch } })
     }
     if (tools.length > 0) {
-      ;(requestParams as unknown as Record<string, unknown>)["tools"] = tools
+      ;(requestParams as unknown as Record<string, unknown>).tools = tools
     }
 
     const completion = await client.chat.completions.create(requestParams)

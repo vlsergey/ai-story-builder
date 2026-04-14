@@ -10,7 +10,7 @@ export default function migration(db: Database): void {
     try {
       const info = JSON.parse(row.ai_sync_info) as Record<string, unknown>
       if (!("grok" in info)) continue
-      delete info["grok"]
+      delete info.grok
       const newValue = Object.keys(info).length > 0 ? JSON.stringify(info) : null
       update.run(newValue, row.id)
     } catch {

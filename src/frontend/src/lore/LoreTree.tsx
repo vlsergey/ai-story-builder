@@ -135,7 +135,7 @@ function buildItemsMap(
   childrenByParentId: Map<number | null, number[]>,
 ): Record<TreeItemIndex, TreeItem<ItemData>> {
   const items: Record<TreeItemIndex, TreeItem<ItemData>> = {}
-  items["root"] = {
+  items.root = {
     index: "root",
     isFolder: true,
     children: roots,

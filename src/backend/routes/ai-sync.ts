@@ -128,7 +128,7 @@ function parseYandexSync(aiSyncInfoJson: string | null): AiEngineSyncRecord | un
   if (!aiSyncInfoJson) return undefined
   try {
     const parsed = JSON.parse(aiSyncInfoJson) as Record<string, AiEngineSyncRecord>
-    return parsed["yandex"]
+    return parsed.yandex
   } catch {
     return undefined
   }
@@ -150,7 +150,7 @@ function grokGroupNeedsReupload(l2GrokSync: AiEngineSyncRecord | undefined, grou
 
   for (const row of groupRows) {
     const syncMap = parseAiSyncInfoMap(row.ai_sync_info)
-    const rowGrokSync = syncMap["grok"]
+    const rowGrokSync = syncMap.grok
 
     if (row.to_be_deleted === 1) {
       if (rowGrokSync?.merged_into_parent || rowGrokSync?.file_id) return true
@@ -264,7 +264,7 @@ export async function syncLore(): Promise<{
     for (const group of groups) {
       const l2Row = idToRow.get(group.level2NodeId)!
       const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
-      const l2GrokSync = l2SyncMap["grok"]
+      const l2GrokSync = l2SyncMap.grok
       const groupRows = group.allNodeIds.map((id) => idToRow.get(id)!).filter(Boolean)
 
       if (!group.hasContent) {
@@ -284,7 +284,7 @@ export async function syncLore(): Promise<{
       const { group } = result
       const l2Row = idToRow.get(group.level2NodeId)!
       const l2SyncMap = parseAiSyncInfoMap(l2Row.ai_sync_info)
-      const oldFileId = l2SyncMap["grok"]?.file_id
+      const oldFileId = l2SyncMap.grok?.file_id
 
       if (result.action === "delete") {
         if (oldFileId && engineDef.capabilities.fileDeletion) {
@@ -318,19 +318,19 @@ export async function syncLore(): Promise<{
       if (action === "delete") {
         for (const row of groupRows) {
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
-          delete existing["grok"]
+          delete existing.grok
           repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
         }
       } else if (action === "upload" && newFileId) {
         const l2Row = idToRow.get(group.level2NodeId)!
         const existing = parseAiSyncInfoMap(l2Row.ai_sync_info)
-        existing["grok"] = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
+        existing.grok = { last_synced_at: now, file_id: newFileId, content_updated_at: now }
         repo.updateAiSyncInfo(group.level2NodeId, JSON.stringify(existing))
 
         for (const row of groupRows) {
           if (row.id === group.level2NodeId) continue
           const existing = parseAiSyncInfoMap(row.ai_sync_info)
-          existing["grok"] = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
+          existing.grok = { last_synced_at: now, merged_into_parent: true, content_updated_at: now }
           repo.updateAiSyncInfo(row.id, JSON.stringify(existing))
         }
       }
@@ -463,7 +463,7 @@ export async function syncLore(): Promise<{
   for (const [nodeId, fileId] of newFileIds.entries()) {
     const nodeRow = rows.find((r) => r.id === nodeId)
     const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
-    existing["yandex"] = { last_synced_at: now, file_id: fileId, content_updated_at: now }
+    existing.yandex = { last_synced_at: now, file_id: fileId, content_updated_at: now }
     repo.updateAiSyncInfo(nodeId, JSON.stringify(existing))
   }
 
@@ -471,9 +471,9 @@ export async function syncLore(): Promise<{
     const nodeRow = rows.find((r) => r.id === node.id)
     const existing = parseAiSyncInfoMap(nodeRow?.ai_sync_info ?? null)
     if (node.to_be_deleted === 1) {
-      delete existing["yandex"]
+      delete existing.yandex
     } else {
-      existing["yandex"] = { last_synced_at: now }
+      existing.yandex = { last_synced_at: now }
     }
     repo.updateAiSyncInfo(node.id, JSON.stringify(existing))
   }

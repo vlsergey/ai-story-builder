@@ -46,7 +46,7 @@ export async function refreshEngineModels(engine: string) {
   let models: string[] = []
 
   if (engine === "yandex") {
-    const engineConfig = config["yandex"] as YandexEngineConfig | undefined
+    const engineConfig = config.yandex as YandexEngineConfig | undefined
     const apiKey = engineConfig?.api_key?.trim()
     const folderId = engineConfig?.folder_id?.trim()
     if (!apiKey || !folderId) {
@@ -66,7 +66,7 @@ export async function refreshEngineModels(engine: string) {
     models = (data.data ?? []).map((m) => m.id).filter((id) => id.startsWith("gpt://"))
     config.yandex = { ...engineConfig, available_models: models }
   } else if (engine === "grok") {
-    const engineConfig = config["grok"] as GrokEngineConfig | undefined
+    const engineConfig = config.grok as GrokEngineConfig | undefined
     const apiKey = engineConfig?.api_key?.trim()
     if (!apiKey) throw makeError("Grok api_key is required", 400)
     const r = await fetch("https://api.x.ai/v1/models", {
@@ -92,7 +92,7 @@ export async function testEngineConnection(
 ): Promise<{ ok: boolean; detail?: string; error?: string }> {
   try {
     if (engineId === "grok") {
-      const apiKey = creds["api_key"]?.trim()
+      const apiKey = creds.api_key?.trim()
       if (!apiKey) throw makeError("api_key is required", 400)
 
       const r = await fetch("https://api.x.ai/v1/models", {
@@ -107,8 +107,8 @@ export async function testEngineConnection(
         return { ok: false, error: `HTTP ${r.status}: ${body}` }
       }
     } else if (engineId === "yandex") {
-      const apiKey = creds["api_key"]?.trim()
-      const folderId = creds["folder_id"]?.trim()
+      const apiKey = creds.api_key?.trim()
+      const folderId = creds.folder_id?.trim()
       if (!apiKey) throw makeError("api_key is required", 400)
       if (!folderId) throw makeError("folder_id is required", 400)
 

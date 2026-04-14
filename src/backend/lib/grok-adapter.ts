@@ -60,7 +60,7 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     }
 
     if (req.responseSchema && req.stringFormat !== false) {
-      requestParams["text"] = {
+      requestParams.text = {
         format: {
           type: "json_schema",
           name: req.responseSchema.name,

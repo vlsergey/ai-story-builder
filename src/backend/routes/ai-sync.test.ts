@@ -60,13 +60,13 @@ function setupDb(opts?: {
   const aiConfig: AllAiEnginesConfig = {}
   if (opts?.apiKey || opts?.folderId) {
     const yandex: Record<string, string> = {}
-    if (opts.apiKey) yandex["api_key"] = opts.apiKey
-    if (opts.folderId) yandex["folder_id"] = opts.folderId
-    if (opts.searchIndexId) yandex["search_index_id"] = opts.searchIndexId
-    aiConfig["yandex"] = yandex
+    if (opts.apiKey) yandex.api_key = opts.apiKey
+    if (opts.folderId) yandex.folder_id = opts.folderId
+    if (opts.searchIndexId) yandex.search_index_id = opts.searchIndexId
+    aiConfig.yandex = yandex
   }
   if (opts?.grokApiKey) {
-    aiConfig["grok"] = { api_key: opts.grokApiKey }
+    aiConfig.grok = { api_key: opts.grokApiKey }
   }
   if (Object.keys(aiConfig).length > 0) {
     SettingsRepository.saveAllAiEnginesConfig(aiConfig)
