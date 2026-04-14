@@ -306,6 +306,15 @@ html, body {
   display: block;
 }
 
+.react-flow__node .create-node-button-group,
+  .react-flow__node .for-each-plan-node-footer {
+  visibility: hidden;
+}
+.react-flow__node:hover .create-node-button-group,
+  .react-flow__node:hover .for-each-plan-node-footer {
+  visibility: visible;
+}
+
 @keyframes rotate {
   from {
     transform: rotate(0deg);

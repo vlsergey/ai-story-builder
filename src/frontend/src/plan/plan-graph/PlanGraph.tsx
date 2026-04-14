@@ -19,7 +19,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { useLocale } from '../../lib/locale'
 import { type PlanNodeType, PlanNodeUpdate, type PlanEdgeRow, PlanEdgeType } from '@shared/plan-graph'
-import { EDGE_TYPES, canCreateEdge, getCreatableNodeTypes, getNodeTypeDefinition } from '@shared/node-edge-dictionary'
+import { EDGE_TYPES, canCreateEdge, getNodeTypeDefinition } from '@shared/node-edge-dictionary'
 import { applyHierarchicalLayout } from './hierarchical-layout'
 import PlanEdgeComponent from './PlanEdge'
 import { trpc } from '../../ipcClient'
@@ -33,7 +33,6 @@ import { sortByHierarchy } from '@/lib/sortByHierarchy'
 import Toolbar from './Toolbar'
 import ContextMenuContent from './ContextMenuContent'
 import EdgeTypeSelectionDialog from './EdgeTypeSelectionDialog'
-import AddNodeDialog from './AddNodeDialog'
 import SimpleNode from './SimpleNode'
 import GroupNode from './GroupNode'
 import { EdgeImpl, NodeImpl } from './Types'
@@ -152,7 +151,6 @@ export default function PlanGraph() {
     catch { return true }
   })
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
-  const [addDialog, setAddDialog] = useState<{ type: PlanNodeType } | null>(null)
   const reactFlowInstance = useRef<ReactFlowInstance<NodeImpl, Edge>>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
   const hasFitted = useRef(false)
@@ -164,21 +162,6 @@ export default function PlanGraph() {
       hasFitted.current = true
     }
   }, [nodes])
-
-  function openAddDialog(type: PlanNodeType) {
-    setAddDialog({ type })
-  }
-
-  const addNode = trpc.plan.nodes.create.useMutation().mutate
-
-  async function confirmAddNode(title: string) {
-    if (!addDialog) return
-    const type = addDialog.type
-    setAddDialog(null)
-    const centerX = 100 + Math.random() * 200
-    const centerY = 100 + Math.random() * 200
-    addNode({ type, title, x: centerX, y: centerY })
-  }
 
   const patchNode = trpc.plan.nodes.patch.useMutation().mutateAsync
   const regenerateNode = trpc.plan.nodes.aiGenerateOnly.useMutation().mutateAsync
@@ -311,9 +294,6 @@ export default function PlanGraph() {
     debouncedSaveNodes()
   }
 
-  // Filter node types that can be created manually
-  const creatableNodeTypes = getCreatableNodeTypes()
-
   // Compute allowed edge types for the dialog
   const allowedEdgeTypes = showConnectDialog ? (() => {
     const sourceNode = nodes.find(n => n.id === showConnectDialog.source)
@@ -336,8 +316,7 @@ export default function PlanGraph() {
   return (
     <div className="relative h-full w-full">
       <Toolbar
-        creatableNodeTypes={creatableNodeTypes}
-        openAddDialog={openAddDialog}
+        className="absolute top-2 left-2 z-10"
         autoLayout={autoLayout}
         toggleAutoLayout={toggleAutoLayout}
         applyLayout={applyLayout}
@@ -371,12 +350,6 @@ export default function PlanGraph() {
         allowedEdgeTypes={allowedEdgeTypes}
         confirmConnect={confirmConnect}
         setShowConnectDialog={setShowConnectDialog}
-      />
-
-      <AddNodeDialog
-        addDialog={addDialog}
-        confirmAddNode={confirmAddNode}
-        setAddDialog={setAddDialog}
       />
 
       <ContextMenu>

@@ -1,4 +1,8 @@
-export const NODE_TYPES = ['text', 'lore', 'merge', 'split', 'for-each', 'for-each-input', 'for-each-output'] as const
+export const CONTAINER_NODE_TYPES = ['for-each'] as const
+export const NON_CONTAINER_NODE_TYPES = ['text', 'lore', 'merge', 'split', 'for-each-input', 'for-each-output', 'for-each-prev-outputs'] as const
+
+export const NODE_TYPES = [ ...CONTAINER_NODE_TYPES, ...NON_CONTAINER_NODE_TYPES] as const
+export type PlanContainerNodeType = typeof CONTAINER_NODE_TYPES[number]
 export type PlanNodeType = typeof NODE_TYPES[number]
 
 export const PLAN_NODE_STATUSES = ['EMPTY', 'GENERATING', 'GENERATED', 'MANUAL', 'OUTDATED', 'ERROR'] as const

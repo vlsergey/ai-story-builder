@@ -54,6 +54,7 @@ export async function improvePlanNodeContent(
       systemPrompt,
       aiGenerationSettings: actualAiSettings,
       // TODO: fix at some moment, this is very nice to have feature
+      promptCacheKeys: ["improve-plan-node-content", String(nodeId)],
       includeExistingLore: false,
       engineFileIds: [],
     },

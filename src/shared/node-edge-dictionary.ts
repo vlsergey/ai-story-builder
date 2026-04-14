@@ -3,10 +3,14 @@
  * Used for building models, dialogs, and backend validation.
  */
 
-import type { PlanNodeType, PlanEdgeType } from './plan-graph.js'
+import type { PlanNodeType, PlanEdgeType, PlanContainerNodeType } from './plan-graph.js'
+
+export type PlanNodeParentContainerType = PlanContainerNodeType | 'root'
 
 export interface NodeTypeDefinition {
   id: PlanNodeType
+  /** Where node can be placed (manually) */
+  allowedContainers?: PlanNodeParentContainerType[],
   /** Edge types that can originate from this node */
   allowedOutgoingEdgeTypes: PlanEdgeType[]
   /** Edge types that can target this node */
@@ -74,8 +78,9 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
   },
   {
     id: 'for-each-input',
-    allowedOutgoingEdgeTypes: ['text'],
+    allowedContainers: ['for-each'],
     allowedIncomingEdgeTypes: [],
+    allowedOutgoingEdgeTypes: ['text'],
     canCreate: false,
     canDelete: false,
     confined: true,
@@ -83,6 +88,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
   },
   {
     id: 'for-each-output',
+    allowedContainers: ['for-each'],
     allowedOutgoingEdgeTypes: [],
     allowedIncomingEdgeTypes: ['text'],
     canCreate: false,
@@ -90,7 +96,17 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     confined: true,
     canRegenerate: true,
   },
-]
+  {
+    id: 'for-each-prev-outputs',
+    allowedContainers: ['for-each'],
+    allowedIncomingEdgeTypes: [],
+    allowedOutgoingEdgeTypes: ['textArray'],
+    canCreate: true,
+    canDelete: true,
+    confined: true,
+    canRegenerate: true,
+  },
+] as const
 
 // Edge type definitions
 export const EDGE_TYPES = (['text', 'textArray'] as PlanEdgeType[]).map( edgeType => ({
@@ -128,6 +144,9 @@ export function getEdgeTypeDefinition(type: PlanEdgeType): EdgeTypeDefinition | 
   return EDGE_TYPES.find(et => et.id === type)
 }
 
-export function getCreatableNodeTypes(): PlanNodeType[] {
-  return NODE_TYPES.filter(def => def.canCreate !== false).map(def => def.id)
+export function getCreatableNodeTypes(containerType: PlanNodeParentContainerType): PlanNodeType[] {
+  return NODE_TYPES
+    .filter(def => def.canCreate !== false)
+    .filter( def => def.allowedContainers === undefined || def.allowedContainers.includes(containerType) )
+    .map(def => def.id)
 }

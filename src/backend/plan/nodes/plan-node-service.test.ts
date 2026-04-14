@@ -3,7 +3,7 @@ import { PlanNodeService } from './plan-node-service.js'
 import { PlanEdgeRepository } from '../edges/plan-edge-repository.js'
 import { SettingsRepository } from '../../settings/settings-repository.js'
 import { generatePlanNodeTextContent } from '../../routes/generate-plan-node-text-content.js'
-import { generateSummary } from '../../routes/generate-summary.js'
+import { generateSummary } from '../../ai/generate-summary.js'
 import { setUpTestDb, tearDownTestDb } from '../../db/test-db-utils.js'
 
 // ─── Mock AI generation ──────────────────────────────────────────────────────

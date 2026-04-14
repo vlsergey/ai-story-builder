@@ -19,6 +19,8 @@ export interface GenerateResponseRequest<S extends AiGenerationSettings = AiGene
   engineFileIds: string[]
   /** AI settings specific to the engine (model, webSearch, maxTokens, etc.), including settings from current node or UI */
   aiGenerationSettings?: S
+  /** Routing keys (to increase cache hit) */
+  promptCacheKeys: string[]
   /** When provided, adapters request structured JSON output; route emits partial_json SSE events. */
   responseSchema?: JsonSchemaSpec
   /**

@@ -48,7 +48,6 @@ import {
 } from './plan/edges/plan-edge-routes.js';
 
 import { syncLore } from './routes/ai-sync.js'
-import { updateSummary } from './routes/generate-summary.js'
 import { AiEngineConfig, AllAiEnginesConfig } from '../shared/ai-engine-config.js';
 import { PlanNodeUpdate } from '../shared/plan-graph.js';
 import { PlanNodeService } from './plan/nodes/plan-node-service.js';
@@ -112,9 +111,6 @@ export const appRouter = t.router({
     test: t.procedure
       .input((val: unknown) => val as { engineId: string, aiEngineConfig: AiEngineConfig })
       .mutation(({input}) => testEngineConnection(input.engineId, input.aiEngineConfig)),
-    generateSummary: t.procedure
-      .input(z.int())
-      .mutation(({ input }) => updateSummary(input)),
     syncLore: t.procedure.mutation(() => syncLore()),
   }),
 

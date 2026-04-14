@@ -69,6 +69,7 @@ export async function generatePlanNodeTextContent(
       // TODO: fix at some moment, this is very nice to have feature
       includeExistingLore: false,
       aiGenerationSettings: actualAiSettings,
+      promptCacheKeys: ["generate-plan-node-text-content", String(node.id)],
       engineFileIds,
     },
     onEvent,

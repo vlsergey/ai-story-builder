@@ -6,6 +6,8 @@ import { RepeatIcon } from 'lucide-react'
 import { NodeImpl } from './Types'
 import { getNodeTypeDefinition } from '@shared/node-edge-dictionary'
 import ForEachPlanNodeFooter from './ForEachPlanNodeFooter'
+import CreateNodeButtonGroup from './CreateNodeButtonGroup'
+import { PlanContainerNodeType } from '@shared/plan-graph'
 
 export default function GroupNode({ data }: NodeProps<NodeImpl>) {
   const nodeType = useMemo( () => getNodeTypeDefinition(data.type), [data.type] )
@@ -30,6 +32,9 @@ export default function GroupNode({ data }: NodeProps<NodeImpl>) {
             <DeleteNodeButton onDelete={handleDelete} />
           </div>
         </div>
+        <CreateNodeButtonGroup
+          compact
+          parentNode={{ id: Number(data.id), type: data.type as PlanContainerNodeType }} />
         <div className="flex-1" />
         { nodeType?.id === "for-each" &&
           <div className="shrink-0">

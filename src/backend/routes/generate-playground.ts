@@ -50,6 +50,7 @@ export async function generatePlayground(
       systemPrompt: null,
       includeExistingLore,
       aiGenerationSettings: settings,
+      promptCacheKeys: ["generate-playgroup"],
       engineFileIds,
     },
     onError,

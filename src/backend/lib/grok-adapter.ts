@@ -4,6 +4,8 @@ import { grokGenerate } from './grok-client.js'
 import { SettingsRepository } from '../settings/settings-repository.js';
 import OpenAI from 'openai';
 import { ResponseCreateParamsStreaming, Tool } from 'openai/resources/responses/responses.js';
+import { createHash } from 'node:crypto';
+import { getCurrentDbPath } from '../db/state.js';
 
 export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
   async generateResponse(
@@ -34,10 +36,13 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     //   // userContent.push({ type: 'input_text', text: req.userPrompt })
     // }
 
+    const uuidV4PromptCacheKey = generateDeterministicV4(getCurrentDbPath() + "/" + req.promptCacheKeys.join('/'))
+
     const requestParams : Omit<ResponseCreateParamsStreaming, 'stream'> = {
       model: actualAiSettings.model,
       instructions: req.systemPrompt ?? '',
       input: req.userPrompt || '',
+      prompt_cache_key: uuidV4PromptCacheKey,
       max_output_tokens: onlyIfPositiveNumber(actualAiSettings.max_output_tokens),
       temperature: onlyIfPositiveNumber(actualAiSettings.temperature),
       top_p: onlyIfPositiveNumber(actualAiSettings.top_p),
@@ -76,4 +81,15 @@ function onlyIfPositiveNumber(value: unknown): number | undefined {
   } else {
     return undefined
   }
+}
+
+function generateDeterministicV4(seed: string): string {
+  const hash = createHash('sha256').update(seed).digest('hex');
+  return [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    '4' + hash.substring(13, 16), // v4
+    ((parseInt(hash.substring(16, 17), 16) & 0x3) | 0x8).toString(16) + hash.substring(17, 20), // Вариант RFC4122
+    hash.substring(20, 32)
+  ].join('-');
 }

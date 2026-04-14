@@ -18,11 +18,11 @@ export default function ForEachPlanNodeFooter({
     changePage.mutateAsync({nodeId: node.id, page: value})
   }, [changePage, node.id])
 
-  return (
+  return ( <div className="for-each-plan-node-footer">
     <PaginationWrapper
       disabled={changePage.isPending || node.status == 'GENERATING'}
       page={parsedContent.currentIndex || 0}
       onPageChange={handlePageChange}
       totalPages={parsedContent.length || 0}/>
-  )
+  </div> )
 }

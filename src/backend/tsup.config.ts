@@ -2,7 +2,7 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig([
   {
-    entry: ['**/*.ts'],
+    entry: ['**/*.ts', '**/db/*.sql', 'icons/**/*.{icns,ico,png}'],
     format: ['esm'],
     target: 'node16',
     platform: 'node',
@@ -22,6 +22,12 @@ export default defineConfig([
         js: '.js',
       }
     },
+    loader: {
+      '.icns': 'copy',
+      '.ico': 'copy',
+      '.png': 'copy',
+      '.sql': 'copy'
+    }
   },
   {
     entry: ['../shared/**/*.ts'],

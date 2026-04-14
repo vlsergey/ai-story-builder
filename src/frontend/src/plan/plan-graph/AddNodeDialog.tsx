@@ -1,67 +1,103 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { type PlanNodeType } from '@shared/plan-graph';
 import { useLocale } from '@/lib/locale';
 import { Button } from '@/ui-components/button';
 import { Input } from '@/ui-components/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/ui-components/dialog';
 
 interface AddNodeDialogProps {
-  addDialog: { type: PlanNodeType } | null;
-  confirmAddNode: (title: string) => void;
-  setAddDialog: (dialog: { type: PlanNodeType } | null) => void;
+  nodeType?: PlanNodeType,
+  open: boolean
+  onClose: () => void
+  onConfirm: (title: string) => void
 }
 
 export default function AddNodeDialog({
-  addDialog,
-  confirmAddNode,
-  setAddDialog,
+  nodeType,
+  open,
+  onClose,
+  onConfirm,
 }: AddNodeDialogProps) {
-  const { t } = useLocale()
-  const [title, setTitle] = useState('')
-  const addTitleInputRef = useRef<HTMLInputElement>(null)
+  const { t } = useLocale();
+  const [title, setTitle] = useState('');
+  const addTitleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (addDialog) {
+    if (open) {
       // focus the input on next paint
-      setTimeout(() => addTitleInputRef.current?.focus(), 0)
+      setTimeout(() => addTitleInputRef.current?.focus(), 0);
+    } else {
+      // reset title when dialog closes
+      setTitle('');
     }
-  }, [addDialog])
+  }, [open]);
 
-  if (!addDialog) return null;
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  }, [onClose])
+
+  const handleConfirm = useCallback(() => {
+    if (!title.trim()) return;
+    onConfirm(title);
+    setTitle('');
+  }, [onConfirm, setTitle, title])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onConfirm(title);
+    }
+    if (e.key === 'Escape') {
+      if (open) {
+        onClose();
+        setTitle('');
+      }
+    }
+  }, [onClose, onConfirm, open, title])
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-background border border-border rounded-lg shadow-xl p-4 w-72">
-        <h3 className="text-sm font-semibold mb-3">
-          {t(`planGraph.add${addDialog.type.charAt(0).toUpperCase() + addDialog.type.slice(1)}Node`)}
-        </h3>
-        <Input
-          ref={addTitleInputRef}
-          type="text"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') void confirmAddNode(title);
-            if (e.key === 'Escape') { setAddDialog(null); setTitle(''); }
-          }}
-          placeholder={t('planGraph.nodeTitle')}
-          className="w-full px-3 py-1.5 text-sm border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-ring mb-3"
-        />
-        <div className="flex gap-2 justify-end">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent showCloseButton={false} className="max-w-xs">
+        <DialogHeader>
+          <DialogTitle>
+            {nodeType && t(`planGraph.addNode.${nodeType}`)}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-3">
+          <Input
+            ref={addTitleInputRef}
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t('planGraph.nodeTitle')}
+            className="w-full"
+          />
+        </div>
+        <DialogFooter>
           <Button
             variant="secondary"
-            onClick={() => { setAddDialog(null); setTitle(''); }}
+            onClick={() => { onClose(); }}
           >
             {t('common.cancel')}
           </Button>
           <Button
             variant="default"
-            onClick={() => { confirmAddNode(title); setTitle(''); }}
+            onClick={handleConfirm}
             disabled={!title.trim()}
           >
             {t('common.add')}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -14,12 +14,13 @@ import { DataOrEventEvent, toObservable } from '../../lib/event-manager.js'
 import { improvePlanNodeContent } from '../../routes/improve-plan-node-content.js'
 import { ResponseStreamEvent } from 'openai/resources/responses/responses.js'
 import { Observable } from '@trpc/server/observable'
-import { generateSummary } from '../../routes/generate-summary.js'
+import { generateSummary } from '../../ai/generate-summary.js'
 import { makeErrorWithStatus } from '../../lib/make-errors.js'
 import { ForEachNodeContent } from '../../../shared/for-each-plan-node.js'
 import { SettingsRepository } from '../../settings/settings-repository.js'
 import { ForEachOutputProcessor } from './graph/for-each-output-processor.js'
 import { ForEachInputProcessor } from './graph/for-each-input-processor.js'
+import { ForEachPrevOutputsProcessor } from './graph/for-each-prev-outputs-processor.js'
 import { RegenerationNodeContext } from './generate/RegenerationContext.js'
 
 export type NodeUpdateEvent = {
@@ -31,6 +32,7 @@ export const NODE_PROCESSORS : Record<PlanNodeType, NodeProcessor> = {
   'for-each': new ForEachProcessor(),
   'for-each-input': new ForEachInputProcessor(),
   'for-each-output': new ForEachOutputProcessor(),
+  'for-each-prev-outputs': new ForEachPrevOutputsProcessor(),
   'text': new TextProcessor(),
   'lore': new LoreProcessor(),
   'split': new SplitProcessor(),
@@ -42,7 +44,7 @@ export const NODE_PROCESSORS : Record<PlanNodeType, NodeProcessor> = {
  * Encapsulates business logic and emits events on changes.
  */
 export class PlanNodeService {
-  private readonly repo: PlanNodeRepository = new PlanNodeRepository()
+  readonly repo: PlanNodeRepository = new PlanNodeRepository()
 
   getById(id: number): PlanNodeRow {
     const result =  this.repo.findById(id)
@@ -397,12 +399,17 @@ export class PlanNodeService {
       let patch = await nodeProcessor.regenerate(this, context, node, settings)
       if (!patch) return node
 
+      const patchedContent = nodeProcessor.getOutput(this, {
+        ...node,
+        ...patch
+      })
+
       if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
-        if (patch.content) {
+        if (patchedContent) {
           try {
             patch = {
               ...patch,
-              summary: await generateSummary( patch.content ) || '',
+              summary: await generateSummary( ['plan-node-summary', `${nodeId}`], patchedContent ) || '',
               status: 'GENERATED',
             }
           } catch (e) {
@@ -424,7 +431,7 @@ export class PlanNodeService {
         patch = {
           ...patch,
           summary: patch.summary || null,
-          status: patch.content ? 'GENERATED' : 'EMPTY',
+          status: patchedContent ? 'GENERATED' : 'EMPTY',
         }
       }
 
@@ -541,9 +548,12 @@ export class PlanNodeService {
     const node = this.getById(nodeId);
     if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404);
 
+    const nodeProcessor = this.getProcessor(node.type) as NodeProcessor
+    const nodeContent = nodeProcessor.getOutput(this, node)
+
     return await this.patch(nodeId, false, {
-      summary: node.content
-        ? await generateSummary(node.content)
+      summary: nodeContent
+        ? await generateSummary(['plan-node-summary', `${nodeId}`], nodeContent)
         : '',
     });
   }

@@ -91,6 +91,7 @@ export async function generateLore(
       // TODO: fix and implement it it
       includeExistingLore: false,
       aiGenerationSettings,
+      promptCacheKeys: ["generate-lore", String(nodeId)],
       // TODO: fix and implement it it
       engineFileIds: [],
       responseSchema,

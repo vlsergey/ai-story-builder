@@ -7,6 +7,7 @@ export interface HierarchicalLayoutOptions {
   edgesep?: number
   groupPadding?: number
   groupTopPadding?: number
+  groupBottomPadding?: number,
   defaultNodeWidth?: number
   defaultNodeHeight?: number
   defaultGroupNodeWidth?: number
@@ -18,7 +19,8 @@ export const defaultOptions: Required<HierarchicalLayoutOptions> = {
   ranksep: 120,
   edgesep: 120,
   groupPadding: 40,
-  groupTopPadding: 80,
+  groupTopPadding: 120,
+  groupBottomPadding: 80,
   defaultNodeWidth: 200,
   defaultNodeHeight: 80,
   defaultGroupNodeWidth: 400,
@@ -183,8 +185,12 @@ export function applyHierarchicalLayout<N extends Node>(
     })
     
     // Compute bounding box for the group (this will shift node positions)
-    const bbox = computeBoundingBox(allChildren, groupSizes, opts.groupPadding, opts.groupTopPadding, opts.defaultNodeWidth, opts.defaultNodeHeight)
-    
+    const bbox = computeBoundingBox(
+      allChildren, groupSizes,
+      opts.groupPadding, opts.groupTopPadding, opts.groupBottomPadding,
+      opts.defaultNodeWidth, opts.defaultNodeHeight
+    )
+
     // After computeBoundingBox, node positions have been shifted
     // Update nodeMap with the new positions
     allChildren.forEach(child => {
@@ -289,6 +295,7 @@ function computeBoundingBox(
   sizeMap: Map<string, { width: number, height: number }>,
   padding: number,
   topPadding?: number,
+  bottomPadding?: number,
   defaultNodeWidth: number = 200,
   defaultNodeHeight: number = 80
 ): { width: number, height: number } {
@@ -313,7 +320,7 @@ function computeBoundingBox(
   }
   
   const paddingTop = topPadding ?? padding
-  const paddingBottom = padding
+  const paddingBottom = bottomPadding ?? padding
   const paddingLeft = padding
   const paddingRight = padding
   

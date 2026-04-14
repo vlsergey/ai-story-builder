@@ -15,9 +15,10 @@ import { SettingsRepository } from '../settings/settings-repository.js'
 import { PlanNodeRepository } from '../plan/nodes/plan-node-repository.js'
 import { LoreNodeRepository } from '../lore/lore-node-repository.js'
 import electron from 'electron'
-const { shell } = electron
 import { exec } from 'child_process'
 import { openProjectDatabase } from '../db/index.js'
+
+const { shell } = electron
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 
@@ -176,7 +177,7 @@ export function createProject(data: { name?: string; text_language?: string }): 
   }
 
   try {
-    const db: import('better-sqlite3').Database = openProjectDatabase(dbPath)
+    const db = openProjectDatabase(dbPath)
 
     // Create default lore nodes using repository
     setCurrentDbPath(dbPath) // temporary for repositories
