@@ -38,7 +38,6 @@
         "noStaticOnlyClass": "off"
       },
       "correctness": {
-        "noUnreachable": "off",
         "noUnusedFunctionParameters": "off",
         "noUnusedVariables": "off",
         "noVoidTypeReturn": "off",

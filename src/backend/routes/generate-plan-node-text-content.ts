@@ -27,7 +27,7 @@ export async function generatePlanNodeTextContent(
   const finalSystemPrompt = replaceTemplates(aiSystemPrompt, edges)
 
   const engineFileIds: string[] = []
-  try {
+  // try {
     // if (includeExistingLore && engine) {
     //   const loreRepo = new LoreNodeRepository()
     //   const nodes = loreRepo.getAllWithAiSyncInfo()
@@ -40,10 +40,10 @@ export async function generatePlanNodeTextContent(
     //   }
     // }
     // if (!textLanguage) throw makeError('text_language is not configured', 400)
-  } catch (e: any) {
-    if (e.status) throw e
-    throw makeError("failed to read project settings: " + String(e), 500)
-  }
+  // } catch (e: any) {
+  //   if (e.status) throw e
+  //   throw makeError("failed to read project settings: " + String(e), 500)
+  // }
 
   const engineId = SettingsRepository.getCurrentBackend()
   if (!engineId) throw makeError("no AI engine configured", 400)
