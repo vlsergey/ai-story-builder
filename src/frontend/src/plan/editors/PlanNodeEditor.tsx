@@ -69,10 +69,10 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue } : PlanNodeEditorWrapperP
 
   const patchMutation = trpc.plan.nodes.patch.useMutation().mutateAsync
 
-  const saveImpl = useCallback(async (manual: boolean, value: PlanNodeRow) => {
+  const saveImpl = useCallback(async (manual: boolean, valueToSave: PlanNodeRow) => {
     setStatus('SAVING')
 
-    const diff = getDifference(lastSaved, value)
+    const diff = getDifference(lastSaved, valueToSave)
     if (Object.keys(diff).length === 0) {
       setStatus('SAVED')
       return
@@ -80,8 +80,14 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue } : PlanNodeEditorWrapperP
 
     const newValue = await patchMutation({id: nodeId, manual, data: diff})
     setLastSaved(newValue)
+
+    // Check on-backend changes (such as status and updated timestamps)
+    // and apply them to value
+    const diffBetweenLastSavedAndCurrent = getDifference(lastSaved, newValue)
+    setValue((value) => ({ ...value, ...diffBetweenLastSavedAndCurrent, }))
+
     setStatus('SAVED')
-  }, [lastSaved, nodeId, patchMutation, setLastSaved, setStatus])
+  }, [lastSaved, nodeId, patchMutation, setLastSaved, setStatus, setValue])
 
   const debounceSave = useDebouncedCallback(saveImpl, 1000)
 

@@ -328,6 +328,9 @@ export class PlanNodeService {
           }
         }
       }
+      if (update.status === undefined && (update.ai_user_prompt !== undefined || update.ai_user_prompt !== undefined)) {
+        update.status = 'OUTDATED'
+      }
     }
 
     update = {
