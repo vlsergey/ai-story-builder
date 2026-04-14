@@ -101,7 +101,7 @@ export function patchLoreNode(
   byte_count?: number | null
   ai_sync_info?: Record<string, Record<string, unknown>> | null
 } {
-  const { title: title, content, start_review, accept_review, ai_user_prompt, ai_system_prompt, ai_settings } = data
+  const { title, content, start_review, accept_review, ai_user_prompt, ai_system_prompt, ai_settings } = data
   const hasName = typeof title === "string" && title.trim().length > 0
   const hasContent = content !== undefined
   const hasAiUserPrompt = ai_user_prompt !== undefined
