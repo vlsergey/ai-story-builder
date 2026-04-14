@@ -50,7 +50,7 @@ export default function TextNodeEditor({
       enabled: generationStarted,
       onData: (event) => {
         switch (event.type) {
-          case "event":
+          case "event": {
             const streamEvent = event.event as ResponseStreamEvent
             switch (streamEvent.type) {
               case "response.output_text.delta":
@@ -61,6 +61,7 @@ export default function TextNodeEditor({
                 aiThinkinPanelRef?.current?.onEvent(streamEvent)
             }
             break
+          }
           case "data":
             onExternalUpdate(event.data)
             setTempContent(null)
@@ -93,7 +94,7 @@ export default function TextNodeEditor({
     enabled: improvingStarted,
     onData: (event) => {
       switch (event.type) {
-        case "event":
+        case "event": {
           const streamEvent = event.event as ResponseStreamEvent
           switch (streamEvent.type) {
             case "response.output_text.delta":
@@ -104,6 +105,7 @@ export default function TextNodeEditor({
               aiThinkinPanelRef?.current?.onEvent(streamEvent)
           }
           break
+        }
         case "data":
           onExternalUpdate(event.data)
           break

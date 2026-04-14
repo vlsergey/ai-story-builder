@@ -126,7 +126,7 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
             content: nodeInput.input as string,
           })
           break
-        case "textArray":
+        case "textArray": {
           const parts = nodeInput.input as string[]
           parts.forEach((part, index) => {
             inputs.push({
@@ -135,6 +135,7 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
             })
           })
           break
+        }
       }
     }
     return inputs
