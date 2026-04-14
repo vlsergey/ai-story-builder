@@ -142,7 +142,9 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
           break
         case "textArray": {
           const parts = nodeInput.input as string[]
-          parts.forEach((part) => inputs.push(part))
+          parts.forEach((part) => {
+            inputs.push(part)
+          })
           break
         }
       }

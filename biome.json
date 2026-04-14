@@ -48,7 +48,6 @@
         "noArrayIndexKey": "off",
         "noExplicitAny": "off",
         "noImplicitAnyLet": "off",
-        "useIterableCallbackReturn": "off",
         "noControlCharactersInRegex": "off"
       }
     }

@@ -40,7 +40,9 @@ export function sortByHierarchy<T>(
   }
 
   // Pre-calculate depths for all items
-  items.forEach((item) => getDepth(item))
+  items.forEach((item) => {
+    getDepth(item)
+  })
 
   // Sort: lower depth (parents) comes first
   return [...items].sort((a, b) => {

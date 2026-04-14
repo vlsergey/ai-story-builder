@@ -77,7 +77,9 @@ export class LoreNodeRepository {
     withDbWrite((db) => {
       const update = db.prepare("UPDATE lore_nodes SET position = ? WHERE id = ?")
       db.transaction(() => {
-        childIds.forEach((id, i) => update.run(i, id))
+        childIds.forEach((id, i) => {
+          update.run(i, id)
+        })
       })()
     })
   }
@@ -129,7 +131,9 @@ export class LoreNodeRepository {
         .all(parentId) as { id: number }[]
       const update = db.prepare("UPDATE lore_nodes SET position = ? WHERE id = ?")
       db.transaction(() => {
-        children.forEach((c, i) => update.run(i, c.id))
+        children.forEach((c, i) => {
+          update.run(i, c.id)
+        })
       })()
       return children.length
     })

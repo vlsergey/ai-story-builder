@@ -72,7 +72,9 @@ export function reorderLoreChildren(child_ids: number[]): { ok: boolean } {
   if (!Array.isArray(child_ids)) throw makeError("child_ids must be an array", 400)
   const repo = new LoreNodeRepository()
   repo.reorderChildren(child_ids)
-  child_ids.forEach((id) => loreEventManager.emitUpdate(id))
+  child_ids.forEach((id) => {
+    loreEventManager.emitUpdate(id)
+  })
   return { ok: true }
 }
 

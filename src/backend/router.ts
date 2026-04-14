@@ -162,7 +162,11 @@ export const appRouter = t.router({
       // TODO: optimize via patchPlanNode vectorization
       batchPatch: t.procedure
         .input((v) => v as { id: number; data: PlanNodeUpdate }[])
-        .mutation(({ input }) => input.forEach(({ id, data }) => new PlanNodeService().patch(id, false, data))),
+        .mutation(({ input }) =>
+          input.forEach(({ id, data }) => {
+            new PlanNodeService().patch(id, false, data)
+          }),
+        ),
       create: t.procedure.input(z.any()).mutation(({ input }) => new PlanNodeService().create(input)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => new PlanNodeService().delete(input)),
       findAll: t.procedure.use(dbGuardMiddleware).query(() => new PlanNodeRepository().findAll()),
