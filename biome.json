@@ -47,7 +47,6 @@
       "suspicious": {
         "noArrayIndexKey": "off",
         "noExplicitAny": "off",
-        "noGlobalIsNan": "off",
         "noImplicitAnyLet": "off",
         "useIterableCallbackReturn": "off",
         "noControlCharactersInRegex": "off"

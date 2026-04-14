@@ -29,7 +29,7 @@ export default function migration(db: Database): void {
 
   for (const row of settingsRows) {
     const nodeId = parseInt(row.key.replace("merge_node_", ""), 10)
-    if (!isNaN(nodeId)) {
+    if (!Number.isNaN(nodeId)) {
       try {
         // Parse the settings and store in merge_settings column
         const settings = JSON.parse(row.value)
