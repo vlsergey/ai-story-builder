@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import { useState } from "react"
 import { getSmoothStepPath, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react"
 import { useLocale } from "../../lib/locale"
 import { EdgeImpl } from "./Types"

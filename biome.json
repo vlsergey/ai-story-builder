@@ -45,7 +45,6 @@
         "noSwitchDeclarations": "off",
         "noUnreachable": "off",
         "noUnusedFunctionParameters": "off",
-        "noUnusedImports": "off",
         "noUnusedVariables": "off",
         "noVoidTypeReturn": "off",
         "useExhaustiveDependencies": "off",

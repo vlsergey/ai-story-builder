@@ -1,5 +1,3 @@
-import React from "react"
-
 interface LoreEditorProps {
   nodeId: number
   panelApi?: { setTitle: (title: string) => void }

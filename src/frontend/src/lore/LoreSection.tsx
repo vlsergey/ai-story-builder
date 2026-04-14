@@ -1,4 +1,3 @@
-import React from "react"
 import LoreTree from "./LoreTree"
 import type { LoreNodeRow } from "../../../shared/lore-node.js"
 

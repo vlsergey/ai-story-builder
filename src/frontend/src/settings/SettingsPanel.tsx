@@ -1,4 +1,4 @@
-import React, { useCallback, useId, useState } from "react"
+import { useCallback, useId, useState } from "react"
 import { BUILTIN_ENGINES } from "../lib/ai-engines"
 import { useLocale } from "../lib/locale"
 import { useTheme } from "../lib/theme/theme-provider"

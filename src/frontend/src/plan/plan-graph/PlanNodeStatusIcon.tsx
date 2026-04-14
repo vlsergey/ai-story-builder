@@ -1,4 +1,3 @@
-import React from "react"
 import { FileText, CheckCircle2, Edit, AlertTriangle, XCircle, RefreshCwIcon } from "lucide-react"
 import type { PlanNodeStatus } from "../../../../shared/plan-graph.js"
 

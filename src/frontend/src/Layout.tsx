@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react"
+import { useRef, useEffect, useCallback } from "react"
 import { DockviewReact, DockviewDefaultTab, DockviewReadyEvent, DockviewApi, DockviewPanelApi } from "dockview"
 import { trpc } from "./ipcClient"
 import LoreSection from "./lore/LoreSection"

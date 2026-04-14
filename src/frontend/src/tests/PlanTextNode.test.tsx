@@ -1,4 +1,3 @@
-import React from "react"
 import { render, fireEvent } from "@testing-library/react"
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { OPEN_PLAN_NODE_EDITOR_EVENT } from "../lib/plan-graph-events"
