@@ -20,25 +20,12 @@ export interface MergeSettings {
   autoUpdate: boolean
 }
 
-export interface TextSettings {
-  // No specific settings for plain text nodes
-}
-
-export interface LoreSettings {
-  // No specific settings for lore nodes (AI generation settings are elsewhere)
-}
-
-export interface ForEachSettings {
-  // No settings needed for for-each nodes
-}
-
-export interface ForEachInputSettings {
-  // No settings
-}
-
-export interface ForEachOutputSettings {
-  // No settings
-}
+// No settings so far
+export type TextSettings = unknown
+export type LoreSettings = unknown
+export type ForEachSettings = unknown
+export type ForEachInputSettings = unknown
+export type ForEachOutputSettings = unknown
 
 export type NodeTypeSettingsMap = {
   split: SplitSettings
