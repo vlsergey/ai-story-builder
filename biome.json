@@ -36,7 +36,6 @@
       "complexity": {
         "noImportantStyles": "off",
         "noStaticOnlyClass": "off",
-        "useArrowFunction": "off",
         "useLiteralKeys": "off",
         "useOptionalChain": "off"
       },

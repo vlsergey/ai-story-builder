@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 // Must mock before importing grok-client
 const mockCreate = vi.fn()
 vi.mock("openai", () => ({
-  // Use a regular function (not arrow) so it can be used as a constructor with `new`
+  // biome-ignore lint/complexity/useArrowFunction: Use a regular function (not arrow) so it can be used as a constructor with `new`
   default: vi.fn().mockImplementation(function () {
     return { responses: { create: mockCreate } }
   }),

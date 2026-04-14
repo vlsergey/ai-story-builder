@@ -1,8 +1,8 @@
 import type { Database } from "better-sqlite3"
 import fs from "fs"
 import path from "path"
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { fileURLToPath } from "node:url"
+import { dirname } from "node:path"
 
 import migration001 from "./migrations/001.js"
 import migration002 from "./migrations/002.js"
@@ -88,7 +88,7 @@ const MIGRATIONS: Array<(db: Database) => void> = [
 export const CURRENT_VERSION = 25
 
 function loadSchemaFromFile(db: Database): void {
-  const backendDir = dirname(fileURLToPath(import.meta.url));
+  const backendDir = dirname(fileURLToPath(import.meta.url))
   const schemaPath = path.join(__dirname, "schema.sql")
   const sql = fs.readFileSync(schemaPath, "utf-8")
   db.exec(sql)
