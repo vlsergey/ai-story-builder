@@ -52,15 +52,25 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
       <div className="mt-4">
         <div className="text-xs text-muted-foreground mb-2">{t("regeneration.current_nodes")}</div>
         <div className="space-y-1">
-          {event.currentRegenerationStack.map((stackItem, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary/60"></div>
-              {stackItem.type === "node" && <StackItemNode item={stackItem as RegenerationStackItemNode} />}
-              {stackItem.type === "iteration" && (
-                <StackItemIteration item={stackItem as RegenerationStackItemIteration} />
-              )}
-            </div>
-          ))}
+          {event.currentRegenerationStack.map((stackItem, idx, arr) => {
+            const hasNext = arr.length > idx + 1
+            const next = hasNext ? arr[idx + 1] : undefined
+
+            // Do not displya container processing in stack if next stack item is container iteration processing
+            if (stackItem.type === "node" && next?.type === "iteration" && next.container === stackItem.node) {
+              return null
+            }
+
+            return (
+              <div key={idx} className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary/60"></div>
+                {stackItem.type === "node" && <StackItemNode item={stackItem as RegenerationStackItemNode} />}
+                {stackItem.type === "iteration" && (
+                  <StackItemIteration item={stackItem as RegenerationStackItemIteration} />
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     )
