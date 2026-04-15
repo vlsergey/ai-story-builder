@@ -159,12 +159,18 @@
   "planGraph.contextMenu.delete": "Delete node",
   "planGraph.contextMenu.moveTo": "Move to…",
   "planGraph.contextMenu.moveToRoot": "Move to Root",
+  "planGraph.contextMenu.saveToFile": "Save to file",
+  "planGraph.saveToFile.emptyContent": "Node content is empty, nothing to save",
 
   "planGraph.edge.text": "Text",
   "planGraph.edge.textArray": "Text array",
   "planGraph.deleteNode": "Delete node",
   "planGraph.selectEdgeType": "Select edge type",
   "planGraph.deleteConfirmation": "Delete this node and all connected edges?",
+
+  "fileFilterName.*": "All files",
+  "fileFilterName.md": "Markdown files",
+  "fileFilterName.txt": "Text files",
 
   "lore.generate": "Generate",
   "lore.regenerate": "Regenerate",

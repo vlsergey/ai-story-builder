@@ -12,7 +12,7 @@ import type { PlanNodeRow } from "@shared/plan-graph"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import { useLocale } from "@/lib/locale"
 import NodeTypeIcons from "./NodeTypeIcons"
-import { ExternalLink, TrashIcon } from "lucide-react"
+import { ExternalLink, TrashIcon, SaveIcon } from "lucide-react"
 
 interface ContextMenuContentProps {
   contextMenuNodeId: number
@@ -21,6 +21,7 @@ interface ContextMenuContentProps {
   deleteNode: (nodeId: number) => void
   moveNode: (nodeId: number, parentId: number | null) => void
   regenerateNode: (nodeId: number) => void
+  saveToFile: (nodeId: number) => void
 }
 
 export default function ContextMenuContent({
@@ -30,6 +31,7 @@ export default function ContextMenuContent({
   deleteNode,
   moveNode,
   regenerateNode,
+  saveToFile,
 }: ContextMenuContentProps) {
   const { t } = useLocale()
   const contextMenuNode = useMemo(
@@ -57,6 +59,16 @@ export default function ContextMenuContent({
       >
         {t("planGraph.contextMenu.aiGenerateSummary")}
       </ContextMenuItem>
+      {nodeDef?.canSaveToFile && (
+        <ContextMenuItem
+          onSelect={() => {
+            saveToFile(contextMenuNodeId)
+          }}
+        >
+          <SaveIcon />
+          {t("planGraph.contextMenu.saveToFile")}
+        </ContextMenuItem>
+      )}
       <ContextMenuSeparator />
       <ContextMenuGroup>
         {!nodeDef?.confined && (

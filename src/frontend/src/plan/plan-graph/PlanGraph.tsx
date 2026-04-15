@@ -110,6 +110,8 @@ export default function PlanGraph() {
   const deleteEdge = trpc.plan.edges.delete.useMutation().mutate
   const deleteNodeMutation = trpc.plan.nodes.delete.useMutation().mutate
   const aiGenerateSummary = trpc.plan.nodes.aiGenerateSummary.useMutation().mutate
+  const saveToFileMutation = trpc.plan.nodes.saveContentToFile.useMutation().mutateAsync
+  const saveFileDialogMutation = trpc.native.saveFileDialog.useMutation().mutateAsync
 
   const deleteNode = useCallback(
     async (nodeId: number) => {
@@ -119,6 +121,33 @@ export default function PlanGraph() {
       deleteNodeMutation(nodeId)
     },
     [deleteNodeMutation, t],
+  )
+
+  const saveToFile = useCallback(
+    async (nodeId: number) => {
+      const node = findAllNodes.data?.find((n) => n.id === nodeId)
+      if (!node) {
+        console.error("Node not found", nodeId)
+        return
+      }
+      const filters = [
+        { name: t("fileFilterName.txt"), extensions: ["txt"] },
+        { name: t("fileFilterName.md"), extensions: ["md"] },
+        { name: t("fileFilterName.*"), extensions: ["*"] },
+      ]
+      const defaultPath = `${node.title.replace(/[\\/:*?"<>|\x00]/g, "_")}.txt`
+      const filePath = await saveFileDialogMutation({ defaultPath, filters })
+      if (!filePath) {
+        // User cancelled
+        return
+      }
+      try {
+        await saveToFileMutation({ nodeId, filePath })
+      } catch (error) {
+        window.electronAPI.alert(`Failed to save file: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    },
+    [findAllNodes.data, saveFileDialogMutation, saveToFileMutation, t],
   )
 
   // replace local cache with server data
@@ -406,6 +435,7 @@ export default function PlanGraph() {
               patchNode({ id: nodeId, manual: true, data: { parent_id: newParentId } })
             }
             regenerateNode={(nodeId) => regenerateNode({ id: nodeId, options: { regenerateManual: true } })}
+            saveToFile={saveToFile}
           />
         )}
       </ContextMenu>

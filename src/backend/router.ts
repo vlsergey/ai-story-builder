@@ -54,6 +54,7 @@ import {
   regenerateTreeNodesContentsStop,
 } from "./plan/nodes/generate/regenerateTreeNodesContents.js"
 import { THEME_PREFERENCE_VALUES } from "../shared/themes.js"
+import { saveFileDialog } from "./native-routes.js"
 
 const t = initTRPC.create({
   // transformer: superjson,
@@ -182,6 +183,9 @@ export const appRouter = t.router({
         subscribeToRegenerateTreeNodesContentsProgress(),
       ),
       regenerateTreeNodesContentsStop: t.procedure.mutation(() => regenerateTreeNodesContentsStop()),
+      saveContentToFile: t.procedure
+        .input(z.object({ nodeId: z.int(), filePath: z.string() }))
+        .mutation(({ input }) => new PlanNodeService().saveContentToFile(input.nodeId, input.filePath)),
       startReview: t.procedure
         .input(z.object({ id: z.number(), options: z.any().optional() }))
         .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
@@ -257,6 +261,24 @@ export const appRouter = t.router({
       }),
       refreshEngineModels: t.procedure.input(z.string()).mutation(({ input }) => refreshEngineModels(input)),
     }),
+  }),
+
+  native: t.router({
+    saveFileDialog: t.procedure
+      .input(
+        z.object({
+          defaultPath: z.string().optional(),
+          filters: z
+            .array(
+              z.object({
+                name: z.string(),
+                extensions: z.array(z.string()),
+              }),
+            )
+            .optional(),
+        }),
+      )
+      .mutation(async ({ input }) => saveFileDialog(input.defaultPath ?? "", input.filters ?? [])),
   }),
 })
 

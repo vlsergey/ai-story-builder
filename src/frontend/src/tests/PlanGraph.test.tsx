@@ -42,12 +42,16 @@ vi.mock("../ipcClient", () => ({
         batchPatch: { useMutation: mockUseMutation },
         aiGenerateSummary: { useMutation: mockUseMutation },
         aiGenerateOnly: { useMutation: mockUseMutation },
+        saveContentToFile: { useMutation: mockUseMutation },
       },
       edges: {
         findAll: { useQuery: mockUseQuery },
         delete: { useMutation: mockUseMutation },
         create: { useMutation: mockUseMutation },
       },
+    },
+    native: {
+      saveFileDialog: { useMutation: mockUseMutation },
     },
   },
 }))

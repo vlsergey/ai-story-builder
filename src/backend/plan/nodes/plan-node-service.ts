@@ -29,7 +29,7 @@ import { ForEachOutputProcessor } from "./graph/for-each-output-processor.js"
 import { ForEachInputProcessor } from "./graph/for-each-input-processor.js"
 import { ForEachPrevOutputsProcessor } from "./graph/for-each-prev-outputs-processor.js"
 import type { RegenerationNodeContext } from "./generate/RegenerationContext.js"
-
+import { promises as fs } from "node:fs"
 export type NodeUpdateEvent = {
   nodeId: number
   updatedFields: Partial<PlanNodeRow>
@@ -588,6 +588,13 @@ export class PlanNodeService {
       emit.next({ type: "data", data: newNode })
       emit.next({ type: "completed" })
     })
+  }
+
+  async saveContentToFile(nodeId: number, filePath: string): Promise<void> {
+    const node = this.getById(nodeId)
+    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404)
+
+    await fs.writeFile(filePath, node.content || "", "utf8")
   }
 }
 

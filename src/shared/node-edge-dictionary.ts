@@ -20,6 +20,8 @@ export interface NodeTypeDefinition {
   /** Whether this node type can be deleted manually by user (default true) */
   canDelete?: boolean
   canRegenerate?: boolean
+  /** Whether this node type can be saved to file (default false) */
+  canSaveToFile?: boolean
   /** Whether this node type is a group node (rendered as React Flow group) */
   isGroup?: boolean
   /** Whether this node is confined to its parent (cannot be moved outside parent bounds) */
@@ -43,6 +45,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canCreate: true,
     canDelete: true,
     canRegenerate: true,
+    canSaveToFile: true,
   },
   {
     id: "lore",
@@ -58,6 +61,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canCreate: true,
     canDelete: true,
     canRegenerate: true,
+    canSaveToFile: true,
   },
   {
     id: "split",

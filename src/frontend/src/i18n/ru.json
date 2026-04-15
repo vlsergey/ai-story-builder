@@ -158,6 +158,12 @@
   "planGraph.contextMenu.delete": "Удалить узел",
   "planGraph.contextMenu.moveTo": "Переместить в…",
   "planGraph.contextMenu.moveToRoot": "Переместить в корень",
+  "planGraph.contextMenu.saveToFile": "Сохранить в файл",
+  "planGraph.saveToFile.emptyContent": "Контент узла пуст, нечего сохранять",
+
+  "fileFilterName.*": "Все файлы",
+  "fileFilterName.md": "Файлы Markdown",
+  "fileFilterName.txt": "Текстовые файлы",
 
   "planGraph.edge.text": "Текст",
   "planGraph.edge.textArray": "Массив текстов",

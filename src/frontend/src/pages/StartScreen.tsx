@@ -1,6 +1,6 @@
 import React from "react"
 import { trpc } from "../ipcClient"
-import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, X, XIcon } from "lucide-react"
+import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, XIcon } from "lucide-react"
 import { Button } from "../ui-components/button"
 import { Input } from "../ui-components/input"
 import { useLocale } from "../lib/locale"
@@ -129,10 +129,7 @@ export default function StartScreen() {
             <ButtonGroup orientation="vertical" className="w-full">
               {(recent || []).map((r) => (
                 <ButtonGroup key={r} orientation="horizontal" className="w-full group/recent-item">
-                  <Button
-                    className="flex-1 min-w-0"
-                    variant="ghost"
-                    onClick={() => openRecent(r)}>
+                  <Button className="flex-1 min-w-0" variant="ghost" onClick={() => openRecent(r)}>
                     <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
                     <span className="flex-1 truncate text-left">{projectDisplayName(r)}</span>
                     <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity" />
@@ -141,8 +138,9 @@ export default function StartScreen() {
                     variant="destructive"
                     onClick={(e) => removeRecent(e, r)}
                     title="Remove from list"
-                    className="shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity">
-                      <XIcon className="h-3 w-3" />
+                    className="shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity"
+                  >
+                    <XIcon className="h-3 w-3" />
                   </Button>
                 </ButtonGroup>
               ))}
