@@ -17,9 +17,14 @@ export interface RegenerationNodeContext {
   options: RegenerateOptions
   onData(node: PlanNodeRow): void
   onEvent(event: ResponseStreamEvent): void
-  /**
-   * @param multiplier Indicates how many nodes or iterations are living in this container.
-   * Will be used to upgrade expected queue length / time expectations.
-   */
-  asContainer<T>(multiplier: number, block: (context: RegenerationContainerContext) => Promise<T>): Promise<T>
+  asContainer<T>(block: (context: RegenerationContainerContext) => Promise<T>): Promise<T>
+  asCycle<T>(totalIterations: number | undefined, block: (context: RegenerationCycleContext) => Promise<T>): Promise<T>
+}
+
+export interface RegenerationCycleContext {
+  options: RegenerateOptions
+  asContainer<T>(
+    zeroBasedIterationIndex: number,
+    block: (context: RegenerationContainerContext) => Promise<T>,
+  ): Promise<T>
 }

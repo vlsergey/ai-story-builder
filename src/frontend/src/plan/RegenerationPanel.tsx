@@ -10,7 +10,11 @@ import { useForm } from "react-hook-form"
 import type { RegenerateOptions } from "@shared/RegenerateOptions"
 import { zodResolver } from "@hookform/resolvers/zod"
 import RegenerateOptionsForm, { formSchema } from "./RegenerateOptionsForm"
-import type { RegenerateEvent } from "@shared/RegenerateEvent"
+import type {
+  RegenerateEvent,
+  RegenerationStackItemIteration,
+  RegenerationStackItemNode,
+} from "@shared/RegenerateEvent"
 
 export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPanelApi }) {
   const { t } = useLocale()
@@ -42,18 +46,19 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
     [startMutation],
   )
 
-  // Функция для форматирования стека текущих узлов
-  const renderCurrentNodeStack = () => {
-    if (!event?.currentNodeStack?.length) return null
+  const renderCurrentRegenerationStack = () => {
+    if (!event?.currentRegenerationStack?.length) return null
     return (
       <div className="mt-4">
         <div className="text-xs text-muted-foreground mb-2">{t("regeneration.current_nodes")}</div>
         <div className="space-y-1">
-          {event.currentNodeStack.map((node, idx) => (
+          {event.currentRegenerationStack.map((stackItem, idx) => (
             <div key={idx} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-primary/60"></div>
-              <span className="text-xs font-medium truncate">{node.title}</span>
-              <span className="text-xs text-muted-foreground">(ID: {node.id})</span>
+              {stackItem.type === "node" && <StackItemNode item={stackItem as RegenerationStackItemNode} />}
+              {stackItem.type === "iteration" && (
+                <StackItemIteration item={stackItem as RegenerationStackItemIteration} />
+              )}
             </div>
           ))}
         </div>
@@ -149,7 +154,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
       ) : event.inProcess ? (
         <div className="space-y-4">
           {renderStats()}
-          {renderCurrentNodeStack()}
+          {renderCurrentRegenerationStack()}
           {renderError()}
         </div>
       ) : (
@@ -160,5 +165,26 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
         </div>
       )}
     </div>
+  )
+}
+
+function StackItemIteration({ item }: { item: RegenerationStackItemIteration }) {
+  return (
+    <span>
+      <span className="text-xs text-muted-foreground">
+        {item.container.title} (ID: {item.container.id}):{" "}
+      </span>
+      <span className="text-xs font-medium truncate">{item.zeroBasedIterationIndex + 1}</span>
+      {item.totalIterations && <span className="text-xs text-muted-foreground"> / {item.totalIterations}</span>}
+    </span>
+  )
+}
+
+function StackItemNode({ item }: { item: RegenerationStackItemNode }) {
+  return (
+    <span>
+      <span className="text-xs font-medium truncate">{item.node.title}</span>
+      <span className="text-xs text-muted-foreground"> (ID: {item.node.id})</span>
+    </span>
   )
 }

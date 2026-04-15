@@ -112,18 +112,20 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     const oldPage = parsedContent.currentIndex || 0
 
     // Wait for all iterations to complete
-    await context.asContainer(totalIterations, async (childContext) => {
+    await context.asCycle(totalIterations, async (cycleContext) => {
       for (let iteration: number = 0; iteration < totalIterations; iteration++) {
-        console.info(
-          `Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}...`,
-        )
-        service.changeForEachNodePage(node.id, iteration)
-        await regenerateSubtreeNodesContents(childContext, node.id)
-        // After regenerating child nodes, save their content into overrides for this iteration
-        service.changeForEachNodePage(node.id, iteration)
-        console.info(
-          `Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`,
-        )
+        await cycleContext.asContainer(iteration, async (childContext) => {
+          console.info(
+            `Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}...`,
+          )
+          service.changeForEachNodePage(node.id, iteration)
+          await regenerateSubtreeNodesContents(childContext, node.id)
+          // After regenerating child nodes, save their content into overrides for this iteration
+          service.changeForEachNodePage(node.id, iteration)
+          console.info(
+            `Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`,
+          )
+        })
       }
     })
 

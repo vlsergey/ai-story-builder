@@ -9,6 +9,7 @@ import type {
   RegenerationContainerContext,
   RegenerationNodeContext,
   PlanNodeAiGenerationStatus,
+  RegenerationCycleContext,
 } from "./generate/RegenerationContext.js"
 import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
 
@@ -20,8 +21,17 @@ export function aiRegenerateNodeContentWatchAndReview(
   const oldNode = service.getById(nodeId)
 
   return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
+    const asCycle: RegenerationNodeContext["asCycle"] = async <T>(
+      _totalIterations: number | undefined,
+      block: (context: RegenerationCycleContext) => Promise<T>,
+    ) => {
+      return await block({
+        options,
+        asContainer: (_iteration, block) => asContainer(block),
+      })
+    }
+
     const asContainer: RegenerationNodeContext["asContainer"] = async <T>(
-      multiplier: number,
       block: (context: RegenerationContainerContext) => Promise<T>,
     ) => {
       return await block({
@@ -41,6 +51,7 @@ export function aiRegenerateNodeContentWatchAndReview(
       onData: () => {},
       onEvent: () => {},
       asContainer,
+      asCycle,
     }
 
     const mainNodeContext: RegenerationNodeContext = {
@@ -53,6 +64,7 @@ export function aiRegenerateNodeContentWatchAndReview(
       onEvent: (event) => {
         emit.next({ type: "event", event })
       },
+      asCycle,
       asContainer,
     }
 
@@ -69,8 +81,16 @@ export function aiRegenerateNodeContentWatchAndReview(
 }
 
 export async function aiRegenerateNodeContentOnly(nodeId: number, options: RegenerateOptions): Promise<PlanNodeRow> {
+  const asCycle: RegenerationNodeContext["asCycle"] = async <T>(
+    _totalIterations: number | undefined,
+    block: (context: RegenerationCycleContext) => Promise<T>,
+  ) => {
+    return await block({
+      options,
+      asContainer: (_iteration, block) => asContainer(block),
+    })
+  }
   const asContainer: RegenerationNodeContext["asContainer"] = async <T>(
-    multiplier: number,
     block: (context: RegenerationContainerContext) => Promise<T>,
   ) => {
     return await block({
@@ -89,6 +109,7 @@ export async function aiRegenerateNodeContentOnly(nodeId: number, options: Regen
     onData: () => {},
     onEvent: () => {},
     asContainer,
+    asCycle,
   }
 
   return await new PlanNodeService().regenerate(nodeContext, nodeId)

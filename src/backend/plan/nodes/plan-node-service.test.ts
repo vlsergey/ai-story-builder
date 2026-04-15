@@ -5,6 +5,7 @@ import { SettingsRepository } from "../../settings/settings-repository.js"
 import { generatePlanNodeTextContent } from "../../routes/generate-plan-node-text-content.js"
 import { generateSummary } from "../../ai/generate-summary.js"
 import { setUpTestDb, tearDownTestDb } from "../../db/test-db-utils.js"
+import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
 
 // ─── Mock AI generation ──────────────────────────────────────────────────────
 
@@ -77,9 +78,9 @@ describe("PlanNodeService — full plan content generation", () => {
     const textNode = service.create({
       type: "text",
       title: "Text Node",
-      content: "Первый абзац.\n\nВторой абзац.",
-      ai_user_prompt: "Сгенерируй текст",
-      ai_system_prompt: "Ты помощник",
+      content: "First par.\n\nSecond par.",
+      ai_user_prompt: "Generate text",
+      ai_system_prompt: "You are AI helper",
       status: "EMPTY",
     })
     expect(textNode).toBeDefined()
@@ -111,11 +112,6 @@ describe("PlanNodeService — full plan content generation", () => {
     const forEachNode = service.create({
       type: "for-each",
       title: "ForEach Node",
-      content: JSON.stringify({
-        length: 0,
-        currentIndex: 0,
-        overrides: [],
-      }),
       status: "EMPTY",
     })
     const forEachNodeId = forEachNode.id
@@ -128,7 +124,6 @@ describe("PlanNodeService — full plan content generation", () => {
     })
 
     // After creating for-each node, internal input and output nodes are automatically created
-    // Wait a bit for them to be created (they are created synchronously in the create method)
     // Get their IDs
     const internalInputNodes = service.findByParentIdAndType(forEachNodeId, "for-each-input")
     const internalOutputNodes = service.findByParentIdAndType(forEachNodeId, "for-each-output")
@@ -142,8 +137,8 @@ describe("PlanNodeService — full plan content generation", () => {
       type: "text",
       title: "Inner Text",
       content: null,
-      ai_user_prompt: "Обработай: {{Input}}",
-      ai_system_prompt: "Ты помощник",
+      ai_user_prompt: "Process input: {{Input}}",
+      ai_system_prompt: "You are AI helper",
       status: "EMPTY",
       parent_id: forEachNodeId,
     })
@@ -190,40 +185,13 @@ describe("PlanNodeService — full plan content generation", () => {
     const splitInputs = service.getNodeInputs(splitNodeId)
     console.log("Split inputs:", splitInputs)
     expect(splitInputs).toHaveLength(1)
-    expect(splitInputs[0].input).toBe("Первый абзац.\n\nВторой абзац.")
+    expect(splitInputs[0].input).toBe("First par.\n\nSecond par.")
+
+    const options: RegenerateOptions = { regenerateManual: false }
 
     // Start regeneration of subtree (all nodes)
-    const { regenerateSubtreeNodesContents } = await import("./generate/regenerateTreeNodesContents.js")
-    const context = {
-      options: { regenerateManual: false },
-      onNodeStart: vi.fn((node, block) => {
-        console.log(`[TEST] onNodeStart called for node ${node.id} ${node.type}`)
-        return block({} as any)
-      }),
-      onNodeSkip: vi.fn((node, skipReason) => {
-        console.log(`[TEST] onNodeSkip called for node ${node.id} ${node.type}: ${skipReason}`)
-      }),
-      onEvent: vi.fn(),
-      asContainer: vi.fn((multiplier, block) => {
-        console.log(`[TEST] asContainer called with multiplier=${multiplier}`)
-        return block({
-          options: { regenerateManual: false },
-          onNodeStart: vi.fn((node, block) => {
-            console.log(`[TEST] child onNodeStart for node ${node.id}`)
-            return block({} as any)
-          }),
-          onNodeSkip: vi.fn((node, skipReason) => {
-            console.log(`[TEST] child onNodeSkip for node ${node.id}: ${skipReason}`)
-          }),
-          onEvent: vi.fn(),
-          asContainer: vi.fn((m, b) => {
-            console.log(`[TEST] nested asContainer`)
-            return b({} as any)
-          }),
-        })
-      }),
-    }
-    await regenerateSubtreeNodesContents(context as any, null) // null means root of the whole project
+    const { regenerateTreeNodesContents } = await import("./generate/regenerateTreeNodesContents.js")
+    await regenerateTreeNodesContents(options)
 
     // Debug output after regeneration
     const updatedSplitNode = service.getById(splitNodeId)
@@ -237,50 +205,8 @@ describe("PlanNodeService — full plan content generation", () => {
     expect(updatedSplitNode.content).toBeTruthy()
     const splitParts = JSON.parse(updatedSplitNode.content!)
     expect(splitParts).toHaveLength(2)
-    expect(splitParts[0]).toBe("Первый абзац.")
-    expect(splitParts[1]).toBe("Второй абзац.")
-
-    // 9. Regeneration of for-each node and its internal nodes
-    // Ensure for-each node has OUTDATED status (after split content changed)
-    await service.patch(forEachNodeId, false, { status: "OUTDATED" })
-    console.log(
-      `[TEST] ForEach node status updated to OUTDATED, calling regenerateSubtreeNodesContents with parentId=${forEachNodeId}`,
-    )
-    // Create context for for-each node regeneration
-    const forEachContext = {
-      options: { regenerateManual: false },
-      onNodeStart: vi.fn((node, block) => {
-        console.log(`[TEST] onNodeStart called for node ${node.id} ${node.type}`)
-        return block({} as any)
-      }),
-      onNodeSkip: vi.fn((node, skipReason) => {
-        console.log(`[TEST] onNodeSkip called for node ${node.id} ${node.type}: ${skipReason}`)
-      }),
-      onEvent: vi.fn(),
-      asContainer: vi.fn((multiplier, block) => {
-        console.log(`[TEST] asContainer called with multiplier=${multiplier}`)
-        return block({
-          options: { regenerateManual: false },
-          onNodeStart: vi.fn((node, block) => {
-            console.log(`[TEST] child onNodeStart for node ${node.id}`)
-            return block({} as any)
-          }),
-          onNodeSkip: vi.fn((node, skipReason) => {
-            console.log(`[TEST] child onNodeSkip for node ${node.id}: ${skipReason}`)
-          }),
-          onEvent: vi.fn(),
-          asContainer: vi.fn((m, b) => {
-            console.log(`[TEST] nested asContainer`)
-            return b({} as any)
-          }),
-        })
-      }),
-    }
-    await regenerateSubtreeNodesContents(forEachContext as any, forEachNodeId)
-    console.log(`[TEST] regenerateSubtreeNodesContents completed`)
-    // Explicitly regenerate for-each node to ensure its overrides are saved
-    await service.regenerate(forEachContext as any, forEachNodeId)
-    console.log(`[TEST] explicit regenerate completed`)
+    expect(splitParts[0]).toBe("First par.")
+    expect(splitParts[1]).toBe("Second par.")
 
     // 10. Check statuses of all nodes after generation
     const textNodeAfter = service.getById(textNodeId)
