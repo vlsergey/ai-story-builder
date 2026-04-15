@@ -37,6 +37,7 @@ import type { LoreStatMode } from "../types/models"
 import type { LoreNodeRow } from "../../../shared/lore-node.js"
 import { useLoreSettings } from "../settings/lore-settings"
 import { engineSupportsFileUpload } from "../lib/ai-engines"
+import useConfirm from "@/native/useConfirm.js"
 
 // ── Command system ────────────────────────────────────────────────────────────
 
@@ -476,6 +477,7 @@ export default function LoreTree({
   }
 
   const loreDelete = trpc.lore.delete.useMutation()
+  const confirm = useConfirm()
 
   async function handleDelete() {
     const toDelete = [...selectedNodeIds].filter((id) => {
@@ -484,7 +486,7 @@ export default function LoreTree({
     })
     if (toDelete.length === 0) return
     const message = `Mark ${toDelete.length} node${toDelete.length > 1 ? "s" : ""} for deletion? All descendants will also be marked.`
-    const confirmed = window.electronAPI.confirm(message)
+    const confirmed = await confirm(message)
     if (!confirmed) return
     await Promise.all(toDelete.map((id) => loreDelete.mutateAsync(id)))
     setViewState((prev) => ({ ...prev, "lore-tree": { ...prev["lore-tree"], selectedItems: [] } }))

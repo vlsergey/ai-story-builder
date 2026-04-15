@@ -27,8 +27,8 @@ const mockUseQuery = vi.fn(() => ({
   refetch: vi.fn(),
 }))
 const mockUseMutation = vi.fn(() => ({
-  mutate: vi.fn(() => Promise.resolve({ ok: true })),
-  mutateAsync: vi.fn(() => Promise.resolve({ ok: true })),
+  mutate: vi.fn(() => Promise.resolve({ ok: true, response: 0 })),
+  mutateAsync: vi.fn(() => Promise.resolve({ ok: true, response: 0 })),
 }))
 
 vi.mock("../ipcClient", () => ({
@@ -52,6 +52,7 @@ vi.mock("../ipcClient", () => ({
     },
     native: {
       saveFileDialog: { useMutation: mockUseMutation },
+      showMessageBox: { useMutation: mockUseMutation },
     },
   },
 }))
@@ -82,8 +83,6 @@ describe("PlanGraph", () => {
     // Ensure localStorage.getItem returns default
     vi.spyOn(Storage.prototype, "getItem").mockImplementation((key) => (key === "planGraph.autoLayout" ? "true" : null))
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {})
-    // Ensure electronAPI.confirm returns true
-    vi.spyOn(window.electronAPI, "confirm").mockReturnValue(true)
   })
 
   afterEach(() => {

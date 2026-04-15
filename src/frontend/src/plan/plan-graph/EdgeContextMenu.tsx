@@ -1,5 +1,6 @@
 import { trpc } from "@/ipcClient"
 import { useLocale } from "@/lib/locale"
+import useConfirm from "@/native/useConfirm"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -25,14 +26,15 @@ export default function EdgeContextMenu({ edgeData, triggerRef }: EdgeContextMen
   const { t } = useLocale()
 
   const deleteMutation = trpc.plan.edges.delete.useMutation()
+  const confirm = useConfirm()
 
   const handleDelete = useCallback(async () => {
     if (edgeData?.edge === undefined) return
 
-    const confirmed = window.electronAPI.confirm(t("planGraph.edgeContextMenu.delete.confirm"))
+    const confirmed = await confirm("planGraph.edgeContextMenu.delete.confirm")
     if (!confirmed) return
     await deleteMutation.mutateAsync(edgeData.edge.id)
-  }, [deleteMutation, edgeData?.edge, t])
+  }, [deleteMutation, confirm, edgeData?.edge])
 
   if (edgeData === null) {
     return null

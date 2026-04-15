@@ -21,10 +21,6 @@ declare global {
       abortStream: (streamId: string) => Promise<{ ok: boolean }>
       /** Subscribe to stream events. Returns an unsubscribe function. */
       onStreamEvent: (callback: (data: StreamEvent) => void) => () => void
-      /** Show a native alert dialog (synchronous). */
-      alert: (text: string) => void
-      /** Show a native confirmation dialog (synchronous). */
-      confirm: (text: string) => boolean
     }
   }
 }

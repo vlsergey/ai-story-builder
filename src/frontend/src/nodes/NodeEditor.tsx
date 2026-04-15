@@ -16,6 +16,7 @@ import { Textarea } from "../ui-components/textarea"
 import { Input } from "@/ui-components/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui-components/tabs"
 import AiThinkingPanel, { type AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
+import useConfirm from "@/native/useConfirm"
 
 export interface NodeSavedPayload {
   nodeId: number
@@ -127,15 +128,15 @@ export default function NodeEditor<N extends Node>({
   )
 
   // ── Mode A: Generate from scratch ─────────────────────────────────────────
-  const handleGenerate = useCallback(() => {
+  const confirm = useConfirm()
+  const handleGenerate = useCallback(async () => {
     if (!node.ai_user_prompt) return
     if (node.content) {
-      const message = tp("overwrite_warning")
-      const confirmed = window.electronAPI.confirm(message)
+      const confirmed = await confirm(`${i18nPrefix}.overwrite_warning`)
       if (!confirmed) return
     }
     onGenerate()
-  }, [node, onGenerate, tp])
+  }, [confirm, i18nPrefix, node, onGenerate])
 
   // ── Mode B→C or D→C: Improve with AI ──────────────────────────────────────
   const handleImprove = useCallback(async () => {

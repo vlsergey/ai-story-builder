@@ -9,6 +9,16 @@
   "start.projects_folder": "Папка проектов",
   "start.no_files": "Файлы проектов не найдены",
 
+  "common.cancel": "Отмена",
+  "common.add": "Добавить",
+  "common.refresh": "Обновить",
+  "common.update": "Обновить",
+
+  "native.alert.title": "Внимание",
+  "native.confirm.title": "Подтверждение",
+  "native.confirm.button.ok": "OK",
+  "native.confirm.button.cancel": "Отмена",
+
   "aiThinking.custom_tool_call": "Вызов инструмента",
   "aiThinking.web_search_call.find_in_page": "Поиск по web-странице",
   "aiThinking.web_search_call.open_page": "Чтение web-страницы",
@@ -136,11 +146,6 @@
   "plan.forEach.rawContent": "Сырой контент (JSON массив)",
   "plan.forEach.rawContentPlaceholder": "Введите JSON массив строк, например, [\"текст1\", \"текст2\"]",
   "plan.forEach.rawContentDescription": "Массив, который будет обработан в цикле. Каждый элемент становится итерацией.",
-
-  "common.cancel": "Отмена",
-  "common.add": "Добавить",
-  "common.refresh": "Обновить",
-  "common.update": "Обновить",
 
   "planGraph.addNode.text": "Добавить текстовый узел",
   "planGraph.addNode.lore": "Добавить узел лора",

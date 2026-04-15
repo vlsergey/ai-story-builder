@@ -297,29 +297,6 @@ ipcMain.handle("show-error-dialog", async (event, { title, message }) => {
   }
 })
 
-// Synchronous alert dialog
-ipcMain.on("alert", (event, text) => {
-  event.returnValue = dialog.showMessageBoxSync({
-    message: text,
-    type: "warning",
-    title: "Alert",
-  })
-})
-
-// Synchronous confirmation dialog
-ipcMain.on("confirm", (event, text) => {
-  event.returnValue =
-    0 ===
-    dialog.showMessageBoxSync({
-      message: text,
-      type: "question",
-      title: "Confirm",
-      buttons: ["OK", "Cancel"],
-      defaultId: 0,
-      cancelId: 1,
-    })
-})
-
 // Renderer sends this to keep menu checkbox/radio in sync with localStorage state
 ipcMain.on("set-menu-state", (_event, { key, value }) => {
   if (key === "word-wrap") {

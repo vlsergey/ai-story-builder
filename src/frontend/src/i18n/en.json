@@ -9,6 +9,16 @@
   "start.projects_folder": "Projects folder",
   "start.no_files": "No project files found",
 
+  "common.cancel": "Cancel",
+  "common.add": "Add",
+  "common.refresh": "Refresh",
+  "common.update": "Update",
+
+  "native.alert.title": "Alert",
+  "native.confirm.title": "Confirm",
+  "native.confirm.button.ok": "OK",
+  "native.confirm.button.cancel": "Cancel",
+
   "aiThinking.custom_tool_call": "Tool call",
   "aiThinking.web_search_call.find_in_page": "Examining web page",
   "aiThinking.web_search_call.open_page": "Reading web page",
@@ -135,11 +145,6 @@
   "plan.forEach.rawContent": "Raw content (JSON array)",
   "plan.forEach.rawContentPlaceholder": "Enter a JSON array of strings, e.g., [\"text1\", \"text2\"]",
   "plan.forEach.rawContentDescription": "The array that will be processed in the loop. Each element becomes an iteration.",
-
-  "common.cancel": "Cancel",
-  "common.add": "Add",
-  "common.refresh": "Refresh",
-  "common.update": "Update",
 
   "planGraph.addNode.text": "Add text node",
   "planGraph.addNode.lore": "Add lore node",

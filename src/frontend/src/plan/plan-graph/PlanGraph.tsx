@@ -33,6 +33,8 @@ import PlanEdgeComponent from "./PlanEdge"
 import SimpleNode from "./SimpleNode"
 import Toolbar from "./Toolbar"
 import type { EdgeImpl, NodeImpl } from "./Types"
+import useConfirm from "@/native/useConfirm"
+import useAlert from "@/native/useAlert"
 
 const nodeTypes: Record<"simple" | "group", React.FC<NodeProps<NodeImpl>>> = {
   simple: SimpleNode,
@@ -108,15 +110,16 @@ export default function PlanGraph() {
   const aiGenerateSummary = trpc.plan.nodes.aiGenerateSummary.useMutation().mutate
   const saveToFileMutation = trpc.plan.nodes.saveContentToFile.useMutation().mutateAsync
   const saveFileDialogMutation = trpc.native.saveFileDialog.useMutation().mutateAsync
+  const alert = useAlert()
+  const confirm = useConfirm()
 
   const deleteNode = useCallback(
     async (nodeId: number) => {
-      const message = t("planGraph.deleteConfirmation")
-      const confirmed = window.electronAPI.confirm(message)
+      const confirmed = await confirm("planGraph.deleteConfirmation")
       if (!confirmed) return
       deleteNodeMutation(nodeId)
     },
-    [deleteNodeMutation, t],
+    [deleteNodeMutation, confirm],
   )
 
   const saveToFile = useCallback(
@@ -140,10 +143,10 @@ export default function PlanGraph() {
       try {
         await saveToFileMutation({ nodeId, filePath })
       } catch (error) {
-        window.electronAPI.alert(`Failed to save file: ${error instanceof Error ? error.message : String(error)}`)
+        await alert(`Failed to save file: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
-    [findAllNodes.data, saveFileDialogMutation, saveToFileMutation, t],
+    [findAllNodes.data, saveFileDialogMutation, saveToFileMutation, alert, t],
   )
 
   // replace local cache with server data

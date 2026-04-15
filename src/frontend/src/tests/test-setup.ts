@@ -20,8 +20,6 @@ window.electronAPI = {
   startStream: vi.fn().mockResolvedValue({ ok: true }),
   abortStream: vi.fn().mockResolvedValue({ ok: true }),
   onStreamEvent: vi.fn().mockReturnValue(() => {}),
-  alert: vi.fn(),
-  confirm: vi.fn().mockReturnValue(true),
 }
 
 // Mock electronTRPC for ipcLink

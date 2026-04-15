@@ -1,7 +1,7 @@
 import { initTRPC } from "@trpc/server"
 import { SettingsRepository } from "./settings/settings-repository.js"
 import { z } from "zod"
-
+import { dialog } from "electron"
 import { getAiBilling } from "./routes/ai-billing.js"
 import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
 import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
@@ -55,6 +55,7 @@ import {
 } from "./plan/nodes/generate/regenerateTreeNodesContents.js"
 import { THEME_PREFERENCE_VALUES } from "../shared/themes.js"
 import { saveFileDialog } from "./native-routes.js"
+import type { MessageBoxOptions } from "electron"
 
 const t = initTRPC.create({
   // transformer: superjson,
@@ -279,6 +280,9 @@ export const appRouter = t.router({
         }),
       )
       .mutation(async ({ input }) => saveFileDialog(input.defaultPath ?? "", input.filters ?? [])),
+    showMessageBox: t.procedure
+      .input((v) => v as MessageBoxOptions)
+      .mutation(async ({ input }) => await dialog.showMessageBox(input)),
   }),
 })
 
