@@ -24,7 +24,8 @@
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "format": "biome format .",
-    "format:fix": "biome format --write ."
+    "format:fix": "biome format --write .",
+    "precommit": "npm run format:fix && npm run lint:fix && npm run test"
   },
   "dependencies": {
     "@trpc/server": "^10.45.4",

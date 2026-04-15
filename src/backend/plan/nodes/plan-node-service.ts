@@ -395,16 +395,15 @@ export class PlanNodeService {
 
     try {
       const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
-      if (!nodeProcessor.regenerate) {
-        return node
+
+      let patch: PlanNodeUpdate = {}
+      if (nodeProcessor.regenerate) {
+        const settings = node.node_type_settings
+          ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
+          : nodeProcessor.defaultSettings
+
+        patch = (await nodeProcessor.regenerate(this, context, node, settings)) || {}
       }
-
-      const settings = node.node_type_settings
-        ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
-        : nodeProcessor.defaultSettings
-
-      let patch = await nodeProcessor.regenerate(this, context, node, settings)
-      if (!patch) return node
 
       const patchedContent = nodeProcessor.getOutput(this, {
         ...node,
