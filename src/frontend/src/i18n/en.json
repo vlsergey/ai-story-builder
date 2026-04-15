@@ -154,12 +154,16 @@
 
   "planGraph.nodeTitle": "Node title",
 
-  "planGraph.contextMenu.regenerate": "Refresh content",
-  "planGraph.contextMenu.aiGenerateSummary": "Refresh summary",
-  "planGraph.contextMenu.delete": "Delete node",
-  "planGraph.contextMenu.moveTo": "Move to…",
-  "planGraph.contextMenu.moveToRoot": "Move to Root",
-  "planGraph.contextMenu.saveToFile": "Save to file",
+  "planGraph.edgeContextMenu.label": "Link #",
+  "planGraph.edgeContextMenu.delete": "Delete link",
+  "planGraph.edgeContextMenu.delete.confirm": "Delete link?",
+
+  "planGraph.nodeContextMenu.regenerate": "Refresh content",
+  "planGraph.nodeContextMenu.aiGenerateSummary": "Refresh summary",
+  "planGraph.nodeContextMenu.delete": "Delete node",
+  "planGraph.nodeContextMenu.moveTo": "Move to…",
+  "planGraph.nodeContextMenu.moveToRoot": "Move to Root",
+  "planGraph.nodeContextMenu.saveToFile": "Save to file",
   "planGraph.saveToFile.emptyContent": "Node content is empty, nothing to save",
 
   "planGraph.edge.text": "Text",

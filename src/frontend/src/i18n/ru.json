@@ -153,12 +153,16 @@
   "planGraph.toolbar.autoLayout": "Авторазмещение",
   "planGraph.toolbar.applyLayout": "Применить раскладку",
 
-  "planGraph.contextMenu.regenerate": "Обновить содержание",
-  "planGraph.contextMenu.aiGenerateSummary": "Обновить резюме",
-  "planGraph.contextMenu.delete": "Удалить узел",
-  "planGraph.contextMenu.moveTo": "Переместить в…",
-  "planGraph.contextMenu.moveToRoot": "Переместить в корень",
-  "planGraph.contextMenu.saveToFile": "Сохранить в файл",
+  "planGraph.edgeContextMenu.label": "Связь #",
+  "planGraph.edgeContextMenu.delete": "Удалить связь",
+  "planGraph.edgeContextMenu.delete.confirm": "Удалить связь?",
+
+  "planGraph.nodeContextMenu.regenerate": "Обновить содержание",
+  "planGraph.nodeContextMenu.aiGenerateSummary": "Обновить резюме",
+  "planGraph.nodeContextMenu.delete": "Удалить узел",
+  "planGraph.nodeContextMenu.moveTo": "Переместить в…",
+  "planGraph.nodeContextMenu.moveToRoot": "Переместить в корень",
+  "planGraph.nodeContextMenu.saveToFile": "Сохранить в файл",
   "planGraph.saveToFile.emptyContent": "Контент узла пуст, нечего сохранять",
 
   "fileFilterName.*": "Все файлы",

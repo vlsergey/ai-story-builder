@@ -1,38 +1,37 @@
-import type React from "react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { sortByHierarchy } from "@/lib/sortByHierarchy"
+import { ContextMenu, ContextMenuTrigger } from "@/ui-components/context-menu"
+import { EDGE_TYPES, canCreateEdge, getNodeTypeDefinition } from "@shared/node-edge-dictionary"
+import type { PlanEdgeRow, PlanEdgeType, PlanNodeRow, PlanNodeType, PlanNodeUpdate } from "@shared/plan-graph"
 import {
-  ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
-  type Node,
-  type Edge,
-  type Connection,
-  type Viewport,
-  BackgroundVariant,
-  useNodesState,
+  ReactFlow,
   useEdgesState,
-  type NodeChange,
-  type ReactFlowInstance,
+  useNodesState,
+  type Connection,
   type EdgeProps,
+  type Node,
+  type NodeChange,
   type NodeProps,
+  type ReactFlowInstance,
+  type Viewport,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { useLocale } from "../../lib/locale"
-import type { PlanNodeType, PlanNodeUpdate, PlanEdgeRow, PlanEdgeType } from "@shared/plan-graph"
-import { EDGE_TYPES, canCreateEdge, getNodeTypeDefinition } from "@shared/node-edge-dictionary"
-import { applyHierarchicalLayout } from "./hierarchical-layout"
-import PlanEdgeComponent from "./PlanEdge"
-import { trpc } from "../../ipcClient"
-import type { PlanNodeRow } from "@shared/plan-graph"
+import type React from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useDebouncedCallback } from "use-debounce"
-import { ContextMenu, ContextMenuTrigger } from "@/ui-components/context-menu"
-import { sortByHierarchy } from "@/lib/sortByHierarchy"
-import Toolbar from "./Toolbar"
-import ContextMenuContent from "./ContextMenuContent"
+import { trpc } from "../../ipcClient"
+import { useLocale } from "../../lib/locale"
+import EdgeContextMenu from "./EdgeContextMenu"
 import EdgeTypeSelectionDialog from "./EdgeTypeSelectionDialog"
-import SimpleNode from "./SimpleNode"
 import GroupNode from "./GroupNode"
+import { applyHierarchicalLayout } from "./hierarchical-layout"
+import ContextMenuContent from "./NodeContextMenuContent"
+import PlanEdgeComponent from "./PlanEdge"
+import SimpleNode from "./SimpleNode"
+import Toolbar from "./Toolbar"
 import type { EdgeImpl, NodeImpl } from "./Types"
 
 const nodeTypes: Record<"simple" | "group", React.FC<NodeProps<NodeImpl>>> = {
@@ -73,22 +72,19 @@ function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => v
 }
 
 function toReactFlowEdges(graphEdges: PlanEdgeRow[], onDeleteEdge: (id: number) => void): EdgeImpl[] {
-  return graphEdges.map(
-    (e) =>
-      ({
-        id: String(e.id),
-        source: String(e.from_node_id),
-        target: String(e.to_node_id),
-        type: e.type,
-        data: { ...e, onDelete: onDeleteEdge },
-      }) as EdgeImpl,
-  )
+  return graphEdges.map((e) => ({
+    id: String(e.id),
+    source: String(e.from_node_id),
+    target: String(e.to_node_id),
+    type: e.type,
+    data: { ...e, onDelete: onDeleteEdge },
+  }))
 }
 
 export default function PlanGraph() {
   const { t } = useLocale()
   const [nodes, setNodes, onNodesChangeImpl] = useNodesState<NodeImpl>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<EdgeImpl>([])
 
   const findAllNodes = trpc.plan.nodes.findAll.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -203,7 +199,7 @@ export default function PlanGraph() {
     }
   })
   const [showConnectDialog, setShowConnectDialog] = useState<Connection | null>(null)
-  const reactFlowInstance = useRef<ReactFlowInstance<NodeImpl, Edge>>(null)
+  const reactFlowInstance = useRef<ReactFlowInstance<NodeImpl, EdgeImpl>>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
   const hasFitted = useRef(false)
 
@@ -322,6 +318,39 @@ export default function PlanGraph() {
     [nodes, createEdge],
   )
 
+  const [edgeContextMenuData, setEdgeContextMenuData] = useState<{
+    edge: PlanEdgeRow
+    source: PlanNodeRow
+    target: PlanNodeRow
+  } | null>(null)
+  const edgeContextMenuTrigger = useRef<HTMLDivElement>(null)
+
+  const onEdgeContextMenu = useCallback(
+    (event: React.MouseEvent, rfEdge: EdgeImpl) => {
+      const edge = rfEdge.data
+      const source = edge?.from_node_id ? findAllNodes.data?.find((n) => n.id === edge?.from_node_id) : undefined
+      const target = edge?.to_node_id ? findAllNodes.data?.find((n) => n.id === edge?.to_node_id) : undefined
+
+      if (edge !== undefined && source !== undefined && target !== undefined) {
+        event.preventDefault()
+
+        console.debug(`[onEdgeContextMenu] Open context menu for ${edge.id}`)
+        setEdgeContextMenuData({ edge, source, target })
+
+        const mouseEvent = new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          // Вот здесь магия: передаем координаты напрямую в событие
+          clientX: event.clientX,
+          clientY: event.clientY,
+        })
+        edgeContextMenuTrigger.current?.dispatchEvent(mouseEvent)
+      }
+    },
+    [findAllNodes.data],
+  )
+
   async function confirmConnect(edgeType: string) {
     if (!showConnectDialog?.source || !showConnectDialog?.target) return
     createEdge({
@@ -389,11 +418,12 @@ export default function PlanGraph() {
         applyLayout={applyLayout}
       />
 
-      <ReactFlow
+      <ReactFlow<NodeImpl, EdgeImpl>
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgeContextMenu={onEdgeContextMenu}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
@@ -439,6 +469,8 @@ export default function PlanGraph() {
           />
         )}
       </ContextMenu>
+
+      <EdgeContextMenu edgeData={edgeContextMenuData} triggerRef={edgeContextMenuTrigger} />
     </div>
   )
 }

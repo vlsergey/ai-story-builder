@@ -14,7 +14,7 @@ import { useLocale } from "@/lib/locale"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { ExternalLink, TrashIcon, SaveIcon } from "lucide-react"
 
-interface ContextMenuContentProps {
+interface NodeContextMenuContentProps {
   contextMenuNodeId: number
   serverNodes: PlanNodeRow[] | undefined
   aiGenerateSummary: (nodeId: number) => void
@@ -24,7 +24,7 @@ interface ContextMenuContentProps {
   saveToFile: (nodeId: number) => void
 }
 
-export default function ContextMenuContent({
+export default function NodeContextMenuContent({
   contextMenuNodeId,
   serverNodes,
   aiGenerateSummary,
@@ -32,7 +32,7 @@ export default function ContextMenuContent({
   moveNode,
   regenerateNode,
   saveToFile,
-}: ContextMenuContentProps) {
+}: NodeContextMenuContentProps) {
   const { t } = useLocale()
   const contextMenuNode = useMemo(
     () => serverNodes?.find((n) => n.id === contextMenuNodeId),
@@ -49,7 +49,7 @@ export default function ContextMenuContent({
             regenerateNode(contextMenuNodeId)
           }}
         >
-          {t("planGraph.contextMenu.regenerate")}
+          {t("planGraph.nodeContextMenu.regenerate")}
         </ContextMenuItem>
       )}
       <ContextMenuItem
@@ -57,7 +57,7 @@ export default function ContextMenuContent({
           aiGenerateSummary(contextMenuNodeId)
         }}
       >
-        {t("planGraph.contextMenu.aiGenerateSummary")}
+        {t("planGraph.nodeContextMenu.aiGenerateSummary")}
       </ContextMenuItem>
       {nodeDef?.canSaveToFile && (
         <ContextMenuItem
@@ -66,7 +66,7 @@ export default function ContextMenuContent({
           }}
         >
           <SaveIcon />
-          {t("planGraph.contextMenu.saveToFile")}
+          {t("planGraph.nodeContextMenu.saveToFile")}
         </ContextMenuItem>
       )}
       <ContextMenuSeparator />
@@ -75,7 +75,7 @@ export default function ContextMenuContent({
           <ContextMenuSub>
             <ContextMenuSubTrigger>
               <ExternalLink />
-              {t("planGraph.contextMenu.moveTo")}
+              {t("planGraph.nodeContextMenu.moveTo")}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent>
               {contextMenuNode?.parent_id != null && (
@@ -85,7 +85,7 @@ export default function ContextMenuContent({
                     moveNode(contextMenuNodeId, null)
                   }}
                 >
-                  {t("planGraph.contextMenu.moveToRoot")}
+                  {t("planGraph.nodeContextMenu.moveToRoot")}
                 </ContextMenuItem>
               )}
               {serverNodes
@@ -114,7 +114,7 @@ export default function ContextMenuContent({
             }}
           >
             <TrashIcon />
-            {t("planGraph.contextMenu.delete")}
+            {t("planGraph.nodeContextMenu.delete")}
           </ContextMenuItem>
         )}
       </ContextMenuGroup>

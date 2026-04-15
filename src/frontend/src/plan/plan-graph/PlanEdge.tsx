@@ -1,6 +1,5 @@
 import { useState } from "react"
-import { getSmoothStepPath, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react"
-import { useLocale } from "../../lib/locale"
+import { getSmoothStepPath, type EdgeProps } from "@xyflow/react"
 import type { EdgeImpl } from "./Types"
 import type { PlanEdgeRow } from "@shared/plan-graph"
 
@@ -10,7 +9,6 @@ const EDGE_COLORS: Record<string, string> = {
 }
 
 export default function PlanEdge({
-  id,
   sourceX,
   sourceY,
   targetX,
@@ -19,13 +17,12 @@ export default function PlanEdge({
   targetPosition,
   data,
 }: EdgeProps<EdgeImpl> & { data: PlanEdgeRow }) {
-  const { t } = useLocale()
   const [hovered, setHovered] = useState(false)
 
   const edgeType = data.type
   const color = EDGE_COLORS[edgeType] ?? EDGE_COLORS.text
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX: sourceX - 20,
     sourceY,
     sourcePosition,
@@ -37,8 +34,6 @@ export default function PlanEdge({
   // Determine offsets based on edge type
   const isArray = edgeType === "textArray"
   const offsets = isArray ? [-4, 4, 0] : [0]
-
-  const label = data?.label ?? t(`planGraph.edge.${edgeType}`)
 
   return (
     <>
@@ -53,8 +48,6 @@ export default function PlanEdge({
         style={{ cursor: "pointer" }}
       />
       {offsets.map((offset) => {
-        // const translateX = normal.x * offset
-        // const translateY = normal.y * offset
         const hasArrow = offset === 0
         const pathD =
           offset === 0
@@ -79,6 +72,7 @@ export default function PlanEdge({
           />
         )
       })}
+
       {/* Arrowhead markers */}
       <defs>
         {Object.entries(EDGE_COLORS).map(([t, c]) => (
@@ -87,40 +81,6 @@ export default function PlanEdge({
           </marker>
         ))}
       </defs>
-      <EdgeLabelRenderer>
-        <div
-          style={{
-            position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: "all",
-          }}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-        >
-          {hovered && (
-            <div
-              className="px-1.5 py-0.5 rounded text-[10px] font-medium select-none"
-              style={{
-                background: `${color}22`,
-                border: `1px solid ${color}66`,
-                color,
-              }}
-            >
-              {label}
-              {data?.onDelete && (
-                <button
-                  type="button"
-                  onClick={() => data.onDelete(Number(id))}
-                  className="ml-1 text-destructive hover:text-destructive/80 font-bold"
-                  title="Delete edge"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </EdgeLabelRenderer>
     </>
   )
 }
