@@ -410,8 +410,7 @@ export class PlanNodeService {
     let node = this.repo.findById(nodeId)
     if (!node) throw makeErrorWithStatus("node not found", 404)
 
-    node = this.repo.patch(nodeId, { status: "GENERATING" })
-    planNodeEventManager.emitUpdate(nodeId, `Starting to generate node ${nodeId}`)
+    node = await this.patch(nodeId, false, { status: "GENERATING" })
 
     try {
       const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
@@ -467,7 +466,7 @@ export class PlanNodeService {
       return await this.patch(nodeId, false, patch)
     } catch (e) {
       console.error(`Unable to regenerate node ${nodeId}`, e)
-      this.repo.patch(nodeId, { status: "ERROR" })
+      node = await this.patch(nodeId, false, { status: "ERROR" })
       throw e
     }
   }
