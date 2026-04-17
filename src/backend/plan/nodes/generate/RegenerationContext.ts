@@ -27,4 +27,5 @@ export interface RegenerationCycleContext {
     zeroBasedIterationIndex: number,
     block: (context: RegenerationContainerContext) => Promise<T>,
   ): Promise<T>
+  asNode<T>(zeroBasedIterationIndex: number, block: (context: RegenerationNodeContext) => Promise<T>): Promise<T>
 }

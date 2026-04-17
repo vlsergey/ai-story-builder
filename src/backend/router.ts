@@ -41,7 +41,7 @@ import { createGraphEdge, patchGraphEdge, deleteGraphEdge } from "./plan/edges/p
 
 import { syncLore } from "./routes/ai-sync.js"
 import type { AiEngineConfig, AllAiEnginesConfig } from "../shared/ai-engine-config.js"
-import type { PlanNodeUpdate } from "../shared/plan-graph.js"
+import { EDGE_TYPES, type PlanNodeUpdate } from "../shared/plan-graph.js"
 import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
@@ -198,9 +198,12 @@ export const appRouter = t.router({
       }),
     }),
     edges: t.router({
-      findAll: t.procedure.query(() => new PlanEdgeRepository().findAll()),
-      findByTarget: t.procedure.input(z.int()).query(({ input }) => new PlanEdgeRepository().findByToNodeId(input)),
       create: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),
+      findAll: t.procedure.query(() => new PlanEdgeRepository().findAll()),
+      findByToNodeId: t.procedure.input(z.int()).query(({ input }) => new PlanEdgeRepository().findByToNodeId(input)),
+      findByToNodeIdAndType: t.procedure
+        .input(z.object({ id: z.int(), type: z.enum(EDGE_TYPES) }))
+        .query(({ input }) => new PlanEdgeRepository().findByToNodeIdAndType(input.id, input.type)),
       patch: t.procedure
         .input(z.object({ id: z.number(), data: z.any() }))
         .mutation(({ input }) => patchGraphEdge(input.id, input.data)),

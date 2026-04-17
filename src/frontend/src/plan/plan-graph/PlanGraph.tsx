@@ -1,6 +1,6 @@
 import { sortByHierarchy } from "@/lib/sortByHierarchy"
 import { ContextMenu, ContextMenuTrigger } from "@/ui-components/context-menu"
-import { EDGE_TYPES, canCreateEdge, getNodeTypeDefinition } from "@shared/node-edge-dictionary"
+import { EDGE_TYPES_DEFS, canCreateEdge, getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import type { PlanEdgeRow, PlanEdgeType, PlanNodeRow, PlanNodeType, PlanNodeUpdate } from "@shared/plan-graph"
 import {
   Background,
@@ -292,7 +292,7 @@ export default function PlanGraph() {
         return
       }
 
-      const allowedEdgeTypes = EDGE_TYPES.filter((edgeDef) =>
+      const allowedEdgeTypes = EDGE_TYPES_DEFS.filter((edgeDef) =>
         canCreateEdge(sourceType as PlanNodeType, targetType as PlanNodeType, edgeDef.id),
       ).map((edgeDef) => edgeDef.id)
 
@@ -395,7 +395,7 @@ export default function PlanGraph() {
         const targetNode = nodes.find((n) => n.id === showConnectDialog.target)
         const sourceType = sourceNode?.data.type as PlanNodeType | undefined
         const targetType = targetNode?.data.type as PlanNodeType | undefined
-        return EDGE_TYPES.filter(
+        return EDGE_TYPES_DEFS.filter(
           (edgeDef) =>
             sourceType &&
             targetType &&

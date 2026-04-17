@@ -115,7 +115,7 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     nodeId: number,
   ): Array<{ title: string; content: string | null }> => {
     // Get incoming edges
-    const nodeInputs = context.getNodeInputs(nodeId)
+    const nodeInputs = context.findNodeInputs(nodeId)
     const inputs: Array<{ title: string; content: string | null }> = []
 
     for (const nodeInput of nodeInputs) {

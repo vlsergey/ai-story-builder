@@ -1,11 +1,13 @@
-import type { FC } from "react"
 import type { PlanNodeType } from "@shared/plan-graph"
+import type { FC } from "react"
+import FixProblemsNodeEditor from "./FixProblemsNodeEditor"
+import MergeNodeEditor from "./MergeNodeEditor"
+import SplitNodeEditor from "./SplitNodeEditor"
 import TextNodeEditor from "./TextNodeEditor"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
-import SplitNodeEditor from "./SplitNodeEditor"
-import MergeNodeEditor from "./MergeNodeEditor"
 
 export const NodeTypeEditors: Partial<Record<PlanNodeType, FC<TypedPlanNodeEditorProps<any>>>> = {
+  "fix-problems": FixProblemsNodeEditor,
   merge: MergeNodeEditor,
   text: TextNodeEditor,
   split: SplitNodeEditor,

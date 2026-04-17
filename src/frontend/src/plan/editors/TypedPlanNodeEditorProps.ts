@@ -3,6 +3,7 @@ import type { RegenerateOptions } from "@shared/RegenerateOptions"
 
 export default interface TypedPlanNodeEditorProps<NodeTypeSettings = unknown> {
   dbValue: PlanNodeRow
+  disabled: boolean
   initialValue: PlanNodeRow
   nodeTypeSettings: NodeTypeSettings
   onChange: (value: PlanNodeRow) => void

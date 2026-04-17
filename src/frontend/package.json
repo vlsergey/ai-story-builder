@@ -60,6 +60,7 @@
     "react": "^18.2.0",
     "react-complex-tree": "^2.6.1",
     "react-dom": "^18.2.0",
+    "react-error-boundary": "^6.1.1",
     "react-hook-form": "^7.72.0",
     "react-router-dom": "^7.13.1",
     "tailwind-merge": "^3.5.0",

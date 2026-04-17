@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { PlanNodeService } from "./plan-node-service.js"
 import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
 import { SettingsRepository } from "../../settings/settings-repository.js"
-import { generatePlanNodeTextContent } from "../../routes/generate-plan-node-text-content.js"
+import { generatePlanNodeTextContent } from "../../ai/generate-plan-node-text-content.js"
 import { generateSummary } from "../../ai/generate-summary.js"
 import { setUpTestDb, tearDownTestDb } from "../../db/test-db-utils.js"
 import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
 
 // ─── Mock AI generation ──────────────────────────────────────────────────────
 
-vi.mock("../../routes/generate-plan-node-text-content.js", () => ({
+vi.mock("../../ai/generate-plan-node-text-content.js", () => ({
   generatePlanNodeTextContent: vi.fn(),
 }))
 
@@ -182,7 +182,7 @@ describe("PlanNodeService — full plan content generation", () => {
 
     // 7. Start regeneration of the whole plan
     // Debug check: ensure split node has input data
-    const splitInputs = service.getNodeInputs(splitNodeId)
+    const splitInputs = service.findNodeInputs(splitNodeId)
     console.log("Split inputs:", splitInputs)
     expect(splitInputs).toHaveLength(1)
     expect(splitInputs[0].input).toBe("First par.\n\nSecond par.")

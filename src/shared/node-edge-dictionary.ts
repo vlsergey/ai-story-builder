@@ -3,7 +3,7 @@
  * Used for building models, dialogs, and backend validation.
  */
 
-import type { PlanNodeType, PlanEdgeType, PlanContainerNodeType } from "./plan-graph.js"
+import { type PlanNodeType, type PlanEdgeType, type PlanContainerNodeType, EDGE_TYPES } from "./plan-graph.js"
 
 export type PlanNodeParentContainerType = PlanContainerNodeType | "root"
 
@@ -72,6 +72,15 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canRegenerate: true,
   },
   {
+    id: "fix-problems",
+    allowedOutgoingEdgeTypes: ["text"],
+    allowedIncomingEdgeTypes: ["text"],
+    canCreate: true,
+    canDelete: true,
+    isGroup: false,
+    canRegenerate: true,
+  },
+  {
     id: "for-each",
     allowedOutgoingEdgeTypes: ["textArray"],
     allowedIncomingEdgeTypes: ["textArray"],
@@ -113,11 +122,16 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
 ] as const
 
 // Edge type definitions
-export const EDGE_TYPES = (["text", "textArray"] as PlanEdgeType[]).map((edgeType) => ({
+export const EDGE_TYPES_DEFS = EDGE_TYPES.map((edgeType) => ({
   id: edgeType,
   allowedSourceNodeTypes: NODE_TYPES.filter((t) => t.allowedOutgoingEdgeTypes.includes(edgeType)).map((t) => t.id),
   allowedTargetNodeTypes: NODE_TYPES.filter((t) => t.allowedIncomingEdgeTypes.includes(edgeType)).map((t) => t.id),
 }))
+
+export interface EdgeTypeToOutputTypeMap {
+  text: string
+  textArray: string[]
+}
 
 // Helper functions
 export function isValidNodeType(type: string): type is PlanNodeType {
@@ -125,7 +139,7 @@ export function isValidNodeType(type: string): type is PlanNodeType {
 }
 
 export function isValidEdgeType(type: string): type is PlanEdgeType {
-  return EDGE_TYPES.some((et) => et.id === type)
+  return EDGE_TYPES_DEFS.some((et) => et.id === type)
 }
 
 export function canCreateEdge(
@@ -133,7 +147,7 @@ export function canCreateEdge(
   targetNodeType: PlanNodeType,
   edgeType: PlanEdgeType,
 ): boolean {
-  const edgeDef = EDGE_TYPES.find((et) => et.id === edgeType)
+  const edgeDef = EDGE_TYPES_DEFS.find((et) => et.id === edgeType)
   if (!edgeDef) return false
   if (!edgeDef.allowedSourceNodeTypes.includes(sourceNodeType)) return false
   if (!edgeDef.allowedTargetNodeTypes.includes(targetNodeType)) return false
@@ -145,7 +159,7 @@ export function getNodeTypeDefinition(type: PlanNodeType): NodeTypeDefinition | 
 }
 
 export function getEdgeTypeDefinition(type: PlanEdgeType): EdgeTypeDefinition | undefined {
-  return EDGE_TYPES.find((et) => et.id === type)
+  return EDGE_TYPES_DEFS.find((et) => et.id === type)
 }
 
 export function getCreatableNodeTypes(containerType: PlanNodeParentContainerType): PlanNodeType[] {

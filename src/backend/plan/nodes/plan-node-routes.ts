@@ -28,6 +28,7 @@ export function aiRegenerateNodeContentWatchAndReview(
       return await block({
         options,
         asContainer: (_iteration, block) => asContainer(block),
+        asNode: async (_iteration, block) => await block(childNodesContext),
       })
     }
 
@@ -88,6 +89,7 @@ export async function aiRegenerateNodeContentOnly(nodeId: number, options: Regen
     return await block({
       options,
       asContainer: (_iteration, block) => asContainer(block),
+      asNode: async (_iteration, block) => await block(nodeContext),
     })
   }
   const asContainer: RegenerationNodeContext["asContainer"] = async <T>(

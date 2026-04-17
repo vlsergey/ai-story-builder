@@ -1,11 +1,15 @@
+import getDifference from "@/lib/getDifference"
+import { Alert, AlertDescription, AlertTitle } from "@/ui-components/alert"
+import type { PlanNodeRow } from "@shared/plan-graph"
+import type { RegenerateOptions } from "@shared/RegenerateOptions"
 import { type FC, useCallback, useEffect, useMemo, useState } from "react"
+import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
+import { useDebouncedCallback } from "use-debounce"
 import { trpc } from "../../ipcClient"
 import { NodeTypeEditors } from "./NodeTypeEditors"
-import type { PlanNodeRow } from "@shared/plan-graph"
-import getDifference from "@/lib/getDifference"
-import { useDebouncedCallback } from "use-debounce"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
-import type { RegenerateOptions } from "@shared/RegenerateOptions"
+import { CircleAlertIcon } from "lucide-react"
+import useAlert from "@/native/useAlert"
 
 export interface PlanNodeEditorProps {
   nodeId: number
@@ -49,7 +53,9 @@ export default function PlanNodeEditor({ nodeId, panelApi }: PlanNodeEditorProps
 
   return (
     <div className="h-full overflow-auto">
-      <PlanNodeEditorWrapper Editor={NodeTypeEditor} initialValue={node} />
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <PlanNodeEditorWrapper Editor={NodeTypeEditor} initialValue={node} />
+      </ErrorBoundary>
     </div>
   )
 }
@@ -132,19 +138,27 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
   )
 
   const regenerateMutation = trpc.plan.nodes.aiGenerateOnly.useMutation()
+  const alert = useAlert()
+
   const handleRegenerate = useCallback(
     async (options: RegenerateOptions) => {
-      await handleSave(value)
-      const result = await regenerateMutation.mutateAsync({ id: value.id, options })
-      setLastSaved(result)
-      setValue(result)
+      try {
+        await handleSave(value)
+        const result = await regenerateMutation.mutateAsync({ id: value.id, options })
+        setLastSaved(result)
+        setValue(result)
+      } catch (e) {
+        console.error(e)
+        alert(`Node regeneration problem: ${e}`)
+      }
     },
-    [regenerateMutation, handleSave, value],
+    [alert, regenerateMutation, handleSave, value],
   )
 
   return (
     <Editor
       dbValue={lastSaved}
+      disabled={regenerateMutation.isPending}
       initialValue={firstInitialValue}
       value={value}
       nodeTypeSettings={nodeTypeSettings}
@@ -155,5 +169,15 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
       onSave={handleSave}
       status={status}
     />
+  )
+}
+
+function ErrorFallback({ error }: FallbackProps) {
+  return (
+    <Alert variant="destructive">
+      <CircleAlertIcon />
+      <AlertTitle>Something wrong happens while rendering an editor</AlertTitle>
+      <AlertDescription>{(error as any).message}</AlertDescription>
+    </Alert>
   )
 }

@@ -49,7 +49,7 @@ export class PlanEdgeRepository {
    * Get edges where the given node is the target and have a specific type.
    * Ordered by position, id.
    */
-  getByToNodeIdAndType(toNodeId: number, type: string): PlanEdgeRow[] {
+  findByToNodeIdAndType(toNodeId: number, type: string): PlanEdgeRow[] {
     return withDbRead(
       (db) =>
         db

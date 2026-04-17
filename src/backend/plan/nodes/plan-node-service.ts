@@ -4,11 +4,16 @@ import type {
   PlanNodeType,
   PlanNodeRow,
   PlanNodeStatus,
-  PlanEdgeRow,
+  PlanEdgeType,
 } from "../../../shared/plan-graph.js"
 import { PlanNodeRepository } from "./plan-node-repository.js"
 import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
-import { isValidNodeType, NODE_TYPES, getNodeTypeDefinition } from "../../../shared/node-edge-dictionary.js"
+import {
+  isValidNodeType,
+  NODE_TYPES,
+  getNodeTypeDefinition,
+  type EdgeTypeToOutputTypeMap,
+} from "../../../shared/node-edge-dictionary.js"
 import { planNodeEventManager } from "./plan-node-event-manager.js"
 import type { NodeProcessor } from "./graph/node-processor.js"
 import { TextProcessor } from "./graph/text-processor.js"
@@ -30,12 +35,15 @@ import { ForEachInputProcessor } from "./graph/for-each-input-processor.js"
 import { ForEachPrevOutputsProcessor } from "./graph/for-each-prev-outputs-processor.js"
 import type { RegenerationNodeContext } from "./generate/RegenerationContext.js"
 import { promises as fs } from "node:fs"
+import { FixProblemsProcessor } from "./graph/fix-problems-processor.js"
+import type { NodeInputs } from "./NodeInput.js"
 export type NodeUpdateEvent = {
   nodeId: number
   updatedFields: Partial<PlanNodeRow>
 }
 
 export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
+  "fix-problems": new FixProblemsProcessor(),
   "for-each": new ForEachProcessor(),
   "for-each-input": new ForEachInputProcessor(),
   "for-each-output": new ForEachOutputProcessor(),
@@ -96,11 +104,7 @@ export class PlanNodeService {
     return mergeNodeSettings(processor.defaultSettings as Record<string, any>, node.node_type_settings)
   }
 
-  getNodeInputs(nodeId: number): Array<{
-    edge: PlanEdgeRow
-    sourceNode: PlanNodeRow
-    input: unknown
-  }> {
+  findNodeInputs(nodeId: number): NodeInputs<unknown> {
     const incomingEdges = new PlanEdgeRepository().findByToNodeId(nodeId)
     const inputs = []
 
@@ -110,6 +114,22 @@ export class PlanNodeService {
       const processor = this.getProcessor(sourceNode.type)
       if (!processor) continue
       const input = processor.getOutput(this, sourceNode)
+      inputs.push({ edge, sourceNode, input })
+    }
+
+    return inputs.sort((a, b) => a.edge.position - b.edge.position)
+  }
+
+  findNodeInputsByType<T extends PlanEdgeType>(nodeId: number, type: T): NodeInputs<EdgeTypeToOutputTypeMap[T]> {
+    const incomingEdges = new PlanEdgeRepository().findByToNodeIdAndType(nodeId, type)
+    const inputs = []
+
+    for (const edge of incomingEdges) {
+      const sourceNode = this.getById(edge.from_node_id)
+      if (!sourceNode) continue
+      const processor = this.getProcessor(sourceNode.type)
+      if (!processor) continue
+      const input = processor.getOutput(this, sourceNode) as EdgeTypeToOutputTypeMap[T]
       inputs.push({ edge, sourceNode, input })
     }
 
@@ -398,9 +418,12 @@ export class PlanNodeService {
 
       let patch: PlanNodeUpdate = {}
       if (nodeProcessor.regenerate) {
-        const settings = node.node_type_settings
-          ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
-          : nodeProcessor.defaultSettings
+        console.debug("[PlanNodeService]", "regenerate", "node.node_type_settings", node.node_type_settings)
+        const settings =
+          node.node_type_settings !== null
+            ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
+            : nodeProcessor.defaultSettings
+        console.debug("[PlanNodeService]", "regenerate", "settings", settings)
 
         patch = (await nodeProcessor.regenerate(this, context, node, settings)) || {}
       }

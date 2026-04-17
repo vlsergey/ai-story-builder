@@ -1,6 +1,7 @@
 import type { PlanNodeType } from "@shared/plan-graph"
 import {
   BookOpenCheckIcon,
+  FileCheck2Icon,
   FileTextIcon,
   type LucideProps,
   MergeIcon,
@@ -16,6 +17,7 @@ const NodeTypeIcons: Record<
   PlanNodeType,
   ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>
 > = {
+  "fix-problems": FileCheck2Icon,
   "for-each": RepeatIcon,
   "for-each-input": SquareArrowRightExitIcon,
   "for-each-output": SquareArrowRightEnterIcon,

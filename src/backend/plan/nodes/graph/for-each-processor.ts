@@ -134,7 +134,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
   }
 
   private getExpandedInputs(context: PlanNodeService, nodeId: number): string[] {
-    const nodeInputs = context.getNodeInputs(nodeId)
+    const nodeInputs = context.findNodeInputs(nodeId)
     const inputs: string[] = []
 
     for (const nodeInput of nodeInputs) {

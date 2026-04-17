@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { NODE_TYPES, EDGE_TYPES } from "../../shared/node-edge-dictionary.js"
+import { NODE_TYPES, EDGE_TYPES_DEFS } from "../../shared/node-edge-dictionary.js"
 import type { PlanNodeType, PlanEdgeType } from "../../shared/plan-graph.js"
 
 describe("node-edge-dictionary consistency", () => {
   // Helper to collect all node/edge IDs
   const nodeIds = NODE_TYPES.map((n) => n.id)
-  const edgeIds = EDGE_TYPES.map((e) => e.id)
+  const edgeIds = EDGE_TYPES_DEFS.map((e) => e.id)
 
   it("has unique node IDs", () => {
     const seen = new Set<PlanNodeType>()
@@ -17,7 +17,7 @@ describe("node-edge-dictionary consistency", () => {
 
   it("has unique edge IDs", () => {
     const seen = new Set<PlanEdgeType>()
-    for (const edge of EDGE_TYPES) {
+    for (const edge of EDGE_TYPES_DEFS) {
       expect(seen.has(edge.id)).toBe(false)
       seen.add(edge.id)
     }
@@ -26,7 +26,7 @@ describe("node-edge-dictionary consistency", () => {
   it("node allowedOutgoingEdgeTypes correspond to edge allowedSourceNodeTypes", () => {
     for (const node of NODE_TYPES) {
       for (const edgeType of node.allowedOutgoingEdgeTypes) {
-        const edge = EDGE_TYPES.find((e) => e.id === edgeType)
+        const edge = EDGE_TYPES_DEFS.find((e) => e.id === edgeType)
         expect(edge, `Edge type ${edgeType} not found`).toBeDefined()
         expect(edge!.allowedSourceNodeTypes).toContain(node.id)
       }
@@ -36,7 +36,7 @@ describe("node-edge-dictionary consistency", () => {
   it("node allowedIncomingEdgeTypes correspond to edge allowedTargetNodeTypes", () => {
     for (const node of NODE_TYPES) {
       for (const edgeType of node.allowedIncomingEdgeTypes) {
-        const edge = EDGE_TYPES.find((e) => e.id === edgeType)
+        const edge = EDGE_TYPES_DEFS.find((e) => e.id === edgeType)
         expect(edge, `Edge type ${edgeType} not found`).toBeDefined()
         expect(edge!.allowedTargetNodeTypes).toContain(node.id)
       }
@@ -44,7 +44,7 @@ describe("node-edge-dictionary consistency", () => {
   })
 
   it("edge allowedSourceNodeTypes correspond to node allowedOutgoingEdgeTypes", () => {
-    for (const edge of EDGE_TYPES) {
+    for (const edge of EDGE_TYPES_DEFS) {
       for (const nodeType of edge.allowedSourceNodeTypes) {
         const node = NODE_TYPES.find((n) => n.id === nodeType)
         expect(node, `Node type ${nodeType} not found`).toBeDefined()
@@ -54,7 +54,7 @@ describe("node-edge-dictionary consistency", () => {
   })
 
   it("edge allowedTargetNodeTypes correspond to node allowedIncomingEdgeTypes", () => {
-    for (const edge of EDGE_TYPES) {
+    for (const edge of EDGE_TYPES_DEFS) {
       for (const nodeType of edge.allowedTargetNodeTypes) {
         const node = NODE_TYPES.find((n) => n.id === nodeType)
         expect(node, `Node type ${nodeType} not found`).toBeDefined()
@@ -64,7 +64,7 @@ describe("node-edge-dictionary consistency", () => {
   })
 
   it("all referenced node types exist", () => {
-    for (const edge of EDGE_TYPES) {
+    for (const edge of EDGE_TYPES_DEFS) {
       for (const nodeType of edge.allowedSourceNodeTypes) {
         expect(nodeIds).toContain(nodeType)
       }

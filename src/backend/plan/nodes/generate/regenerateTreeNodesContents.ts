@@ -110,7 +110,7 @@ export async function regenerateTreeNodesContents(options: RegenerateOptions): P
         currentRegenerationStack.push({ type: "node", node: node })
         emitRegenerateEvent()
         try {
-          const blockResult = await block(childContext(node))
+          const blockResult = await block(nodeContext(node))
           switch (blockResult.status) {
             case "SAME":
               generatedSame++
@@ -139,6 +139,27 @@ export async function regenerateTreeNodesContents(options: RegenerateOptions): P
     function cycleContext(totalIterations: number | undefined, container: PlanNodeRow): RegenerationCycleContext {
       return {
         options,
+        asNode: async <T>(zeroBasedIterationIndex: number, block: (context: RegenerationNodeContext) => Promise<T>) => {
+          if (stopping) throw Error("Stop was required")
+          const stackItem: RegenerationStackItemIteration = {
+            type: "iteration",
+            container,
+            totalIterations,
+            zeroBasedIterationIndex,
+          }
+          currentRegenerationStack.push(stackItem)
+          try {
+            return await block(nodeContext(container))
+          } finally {
+            const popped = currentRegenerationStack.pop()
+            if (popped !== stackItem) {
+              console.error("Stack item mismatch", popped, stackItem)
+              // biome-ignore lint/correctness/noUnsafeFinally: that panic error anyway
+              throw Error("Stack item mismatch")
+            }
+          }
+          return await block(nodeContext(container))
+        },
         asContainer: async <T>(
           zeroBasedIterationIndex: number,
           block: (context: RegenerationContainerContext) => Promise<T>,
@@ -166,7 +187,7 @@ export async function regenerateTreeNodesContents(options: RegenerateOptions): P
       }
     }
 
-    function childContext(node: PlanNodeRow): RegenerationNodeContext {
+    function nodeContext(node: PlanNodeRow): RegenerationNodeContext {
       return {
         options,
         onData: () => {

@@ -5,7 +5,7 @@ import {
   isValidEdgeType,
   canCreateEdge,
   getEdgeTypeDefinition,
-  EDGE_TYPES,
+  EDGE_TYPES_DEFS,
 } from "../../../shared/node-edge-dictionary.js"
 import { planEdgeEventManager } from "./plan-edge-event-manager.js"
 
@@ -18,7 +18,7 @@ function makeError(message: string, status: number): Error {
 }
 
 function makeEdgeTypeError(type: string): Error {
-  const valid = EDGE_TYPES.map((et) => et.id).join(", ")
+  const valid = EDGE_TYPES_DEFS.map((et) => et.id).join(", ")
   return makeError(`Invalid edge type "${type}". Valid types: ${valid}`, 400)
 }
 

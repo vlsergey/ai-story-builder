@@ -12,7 +12,7 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
   }
 
   async onInputContentChange(context: PlanNodeService, node: PlanNodeRow): Promise<PlanNodeUpdate | null> {
-    const nodeInputs = context.getNodeInputs(node.id)
+    const nodeInputs = context.findNodeInputs(node.id)
     let content: string = ""
     for (const { input } of nodeInputs) {
       if (typeof input === "string") {
@@ -36,7 +36,7 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
     node: PlanNodeRow,
     settings: ForEachOutputSettings,
   ): Promise<PlanNodeRow> {
-    const nodeInputs = service.getNodeInputs(node.id)
+    const nodeInputs = service.findNodeInputs(node.id)
     let content: string = ""
     for (const { input } of nodeInputs) {
       if (typeof input === "string") {

@@ -2,7 +2,7 @@ import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
 import type { PlanNodeStatus, PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
 import type { TextSettings } from "../../../../shared/node-settings.js"
-import { generatePlanNodeTextContent } from "../../../routes/generate-plan-node-text-content.js"
+import { generatePlanNodeTextContent } from "../../../ai/generate-plan-node-text-content.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**

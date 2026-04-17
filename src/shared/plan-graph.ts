@@ -4,6 +4,7 @@ export const NON_CONTAINER_NODE_TYPES = [
   "lore",
   "merge",
   "split",
+  "fix-problems",
   "for-each-input",
   "for-each-output",
   "for-each-prev-outputs",

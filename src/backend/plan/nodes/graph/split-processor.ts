@@ -65,7 +65,7 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
   }
 
   private getInputText(service: PlanNodeService, nodeId: number): string | null {
-    const incoming = service.getNodeInputs(nodeId)
+    const incoming = service.findNodeInputs(nodeId)
     return incoming[0]?.input as string
   }
 
