@@ -1,11 +1,11 @@
-import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
-import type { LoreStatMode } from "../types/models"
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react"
+import { trpc } from "@/ipcClient"
+import type { DisplayTextStatMode } from "@shared/DisplayTextStatMode"
 
 const LORE_STAT_KEY = "ai-story-builder-lore-stat"
 
 export interface LoreSettings {
-  statMode: LoreStatMode
+  statMode: DisplayTextStatMode
 }
 
 export const LoreSettingsContext = createContext<LoreSettings>({
@@ -16,27 +16,21 @@ export function useLoreSettings(): LoreSettings {
   return useContext(LoreSettingsContext)
 }
 
-export function LoreSettingsProvider({ children }: { children: React.ReactNode }) {
-  const [statMode, setStatMode] = useState<LoreStatMode>(
-    () => (localStorage.getItem(LORE_STAT_KEY) as LoreStatMode | null) ?? "words",
+export function LoreSettingsProvider({ children }: { children: ReactNode }) {
+  const [statMode, setStatMode] = useState<DisplayTextStatMode>(
+    () => (localStorage.getItem(LORE_STAT_KEY) as DisplayTextStatMode | null) ?? "words",
   )
 
   // Sync statMode to Electron native menu radio on mount/change
+  const setLoreStateMenuState = trpc.native.menuState.loreStat.set.useMutation()
   useEffect(() => {
-    window.electronAPI?.sendMenuState?.("lore-stat", statMode)
-  }, [statMode])
+    setLoreStateMenuState.mutate(statMode)
+  }, [setLoreStateMenuState.mutate, statMode])
 
   // Handle set-lore-stat:* IPC from Electron menu.
-  useEffect(() => {
-    if (!window.electronAPI) return
-    const unsub = window.electronAPI.onMenuAction((action: string) => {
-      if (!action.startsWith("set-lore-stat:")) return
-      const mode = action.slice(14) as LoreStatMode
-      localStorage.setItem(LORE_STAT_KEY, mode)
-      setStatMode(mode)
-    })
-    return unsub
-  }, [])
+  trpc.native.menuState.loreStat.subscribe.useSubscription(undefined, {
+    onData: setStatMode,
+  })
 
   return <LoreSettingsContext.Provider value={{ statMode }}>{children}</LoreSettingsContext.Provider>
 }

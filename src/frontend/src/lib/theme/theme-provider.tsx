@@ -49,9 +49,10 @@ export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
   }, [projectSetting.isFetched, projectSetting.data, localStorageSetting])
 
   // Sync preference to Electron native menu on mount and on change
+  const setMenuStateTheme = trpc.native.menuState.theme.set.useMutation()
   useEffect(() => {
-    window.electronAPI?.sendMenuState?.("theme", actualThemePreference)
-  }, [actualThemePreference])
+    setMenuStateTheme.mutate(actualThemePreference)
+  }, [actualThemePreference, setMenuStateTheme])
 
   const actualResolvedTheme = useMemo<ResolvedTheme>(() => {
     if (actualThemePreference !== "auto") {
@@ -94,16 +95,9 @@ export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
     [localStorageSetting, projectSetting.isFetched, projectSetting.data, projectSettingSet],
   )
 
-  // Handle set-theme:* IPC from Electron menu.
-  // Lives here (not in Layout) so it works on the start screen too.
-  useEffect(() => {
-    if (!window.electronAPI) return
-    const unsub = window.electronAPI.onMenuAction((action: string) => {
-      if (!action.startsWith("set-theme:")) return
-      handleChandgeTheme(action.slice(10) as ThemePreference)
-    })
-    return unsub
-  }, [handleChandgeTheme])
+  trpc.native.menuState.theme.subscribe.useSubscription(undefined, {
+    onData: handleChandgeTheme,
+  })
 
   return (
     <ThemeContext.Provider

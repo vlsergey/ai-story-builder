@@ -5,29 +5,18 @@ interface PlanEvents {
   update: [id: number]
 }
 
-export class EventManager extends EventEmitter<PlanEvents> {
+export class EventManager {
   private events = new EventEmitter<PlanEvents>()
 
   private readonly path: string
 
-  // 2. В конструкторе принимаем параметры
   constructor(path: string) {
-    super() // ОБЯЗАТЕЛЬНО: инициализирует EventEmitter
     this.path = path
   }
 
   asSubscription(): Observable<number, unknown> {
     const events = this.events
-    return toObservable<number>(async (emit) => {
-      const iterable = on(events, "update")
-      for await (const [id] of iterable) {
-        if (typeof id !== "number") {
-          console.error("ID must be a number", id)
-          continue
-        }
-        emit.next(id)
-      }
-    })
+    return emitterToSingleArgObservable(events, "update")
   }
 
   /**
@@ -42,6 +31,19 @@ export class EventManager extends EventEmitter<PlanEvents> {
     this.events.emit("update", payload)
   }
 }
+
+export function emitterToSingleArgObservable<K extends string, E extends Record<K, any[]>>(
+  emitter: EventEmitter<E>,
+  eventName: K,
+): Observable<E[K][0], unknown> {
+  return toObservable<E[K][0]>(async (emit: Observer<E[K], unknown>) => {
+    const iterable = on(emitter, eventName) as AsyncIterableIterator<E[K]>
+    for await (const [value] of iterable) {
+      emit.next(value)
+    }
+  })
+}
+
 /**
  * Превращает асинхронную функцию в tRPC Observable.
  * Автоматически вызывает complete() и обрабатывает ошибки.

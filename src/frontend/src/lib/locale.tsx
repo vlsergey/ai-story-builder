@@ -2,43 +2,49 @@ import type React from "react"
 import { createContext, useContext, useState, useMemo, useEffect, useCallback } from "react"
 import en from "../i18n/en.json"
 import ru from "../i18n/ru.json"
+import { trpc } from "@/ipcClient"
+import { DEFAULT_LOCALE, type Locale, LOCALE_VALUES } from "@shared/locales"
 
 type LocaleStrings = Record<string, string>
 const LOCALES: Record<string, LocaleStrings> = { en, ru }
 
 interface LocaleContextValue {
-  locale: string
-  setLocale: (locale: string) => void
+  locale: Locale
+  setLocale: (locale: Locale) => void
   t: (key: string, fallback?: string | null) => string
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<string>(() => {
-    return localStorage.getItem("locale") ?? "en"
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    const localStorageLocale = localStorage.getItem("locale")
+    if (localStorageLocale && LOCALE_VALUES.includes(localStorageLocale as any)) {
+      return localStorageLocale as Locale
+    }
+    return DEFAULT_LOCALE
   })
 
-  const setLocale = useCallback((l: string) => {
-    localStorage.setItem("locale", l)
-    setLocaleState(l)
+  useEffect(() => {
+    setLocaleState(locale)
+  })
+
+  const setLocale = useCallback((value: Locale) => {
+    localStorage.setItem("locale", value)
+    setLocaleState(value)
   }, [])
 
   // Sync locale to the Electron native menu on mount and on change
+  const setMenuLocaleMutation = trpc.native.menuState.locale.set.useMutation()
   useEffect(() => {
-    window.electronAPI?.sendMenuState?.("locale", locale)
-  }, [locale])
+    setMenuLocaleMutation.mutate(locale)
+  }, [locale, setMenuLocaleMutation.mutate])
 
-  // Handle set-locale:* IPC from Electron menu.
+  // Handle Electron menu.
   // Lives here (not in Layout) so it works on the start screen too.
-  useEffect(() => {
-    if (!window.electronAPI) return
-    const unsub = window.electronAPI.onMenuAction((action: string) => {
-      if (!action.startsWith("set-locale:")) return
-      setLocale(action.slice(11))
-    })
-    return unsub
-  }, [setLocale])
+  trpc.native.menuState.locale.subscribe.useSubscription(undefined, {
+    onData: setLocale,
+  })
 
   const strings = useMemo<LocaleStrings>(() => LOCALES[locale] ?? en, [locale])
   const t = (key: string, fallback?: string | null): string => {

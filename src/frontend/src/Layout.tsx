@@ -13,7 +13,6 @@ import LoreEditor from "./lore/LoreEditor"
 import PlanNodeEditor from "./plan/editors/PlanNodeEditor"
 import PlanGraph from "./plan/plan-graph/PlanGraph"
 import SettingsPanel from "./settings/SettingsPanel"
-import AiPlayground from "./ai/AiPlayground"
 import AiBillingPanel from "./ai/AiBillingPanel"
 import RegenerationPanel from "./plan/RegenerationPanel"
 import type { LoreNodeRow } from "@shared/lore-node"
@@ -316,24 +315,20 @@ export default function Layout() {
   // Actions: 'reset-layouts', 'close-project', 'set-theme:<value>'
   // Note: 'set-locale:*' is handled in LocaleProvider so it works on the start screen too.
   // A ref keeps the latest function references accessible inside the one-time effect.
-  const menuActionsRef = useRef({ handleResetLayouts, openSettings, openAiPlayground, closeProject })
-  menuActionsRef.current = { handleResetLayouts, openSettings, openAiPlayground, closeProject }
+  const menuActionsRef = useRef({ handleResetLayouts, openSettings, closeProject })
+  menuActionsRef.current = { handleResetLayouts, openSettings, closeProject }
 
-  useEffect(() => {
-    if (!window.electronAPI) return
-    const unsub = window.electronAPI.onMenuAction((action: string) => {
+  trpc.native.menuState.backToFrontMenuActions.subscribe.useSubscription(undefined, {
+    onData(action) {
       if (action === "open-settings") {
         menuActionsRef.current.openSettings()
-      } else if (action === "open-ai-playground") {
-        menuActionsRef.current.openAiPlayground()
       } else if (action === "reset-layouts") {
         menuActionsRef.current.handleResetLayouts()
       } else if (action === "close-project") {
         menuActionsRef.current.closeProject.mutate()
       }
-    })
-    return unsub
-  }, [])
+    },
+  })
 
   // Custom tab components without close buttons for non-closable panels
   const NonClosableTab = (props: any) => {
@@ -393,7 +388,6 @@ export default function Layout() {
       </div>
     ),
     settings: () => <SettingsPanel />,
-    "ai-playground": () => <AiPlayground />,
     billing: () => <AiBillingPanel />,
     regeneration: (props: { api: DockviewPanelApi }) => <RegenerationPanel panelApi={props.api} />,
   }

@@ -1,6 +1,6 @@
 import { initTRPC } from "@trpc/server"
 import type { MessageBoxOptions } from "electron"
-import { dialog } from "electron"
+import { clipboard, dialog } from "electron"
 import { z } from "zod"
 import type { AiEngineConfig, AllAiEnginesConfig } from "../shared/ai-engine-config.js"
 import { EDGE_TYPES, type PlanNodeUpdate } from "../shared/plan-graph.js"
@@ -8,7 +8,6 @@ import type { RegenerateOptions } from "../shared/RegenerateOptions.js"
 import { THEME_PREFERENCE_VALUES } from "../shared/themes.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
-
 // Lore functions
 import {
   create,
@@ -23,6 +22,7 @@ import {
   restoreLoreNode,
   sortLoreChildren,
 } from "./lore/lore-routes.js"
+import * as AppMenu from "./main.js"
 import { saveFileDialog } from "./native-routes.js"
 import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
 import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
@@ -69,29 +69,7 @@ const t = initTRPC.create({
   },
 })
 
-const dbGuardMiddleware = t.middleware(async ({ next, path }) => {
-  const result = await next()
-
-  // Проверяем, что вернула процедура (в ключе 'data')
-  if (result.ok && result.data) {
-    const data = result.data
-
-    // Ищем признаки объекта SQLite (isOpen, path, name, или конструктор)
-    const isDatabase =
-      data &&
-      (data.constructor?.name === "Database" ||
-        (typeof data === "object" && "isOpen" in data && "name" in data) ||
-        (typeof data === "object" && "isOpen" in data && "path" in data))
-
-    if (isDatabase) {
-      console.error(`🚨 КРИТИЧЕСКАЯ ОШИБКА: Процедура "${path}" вернула объект базы данных вместо данных!`)
-      // Вместо базы возвращаем ошибку или пустой массив, чтобы фронтенд не падал
-      throw new Error(`Security Leak: Procedure ${path} tried to return DB instance`)
-    }
-  }
-
-  return result
-})
+export type RouteBuilder = typeof t
 
 export const appRouter = t.router({
   ai: t.router({
@@ -167,7 +145,7 @@ export const appRouter = t.router({
         ),
       create: t.procedure.input(z.any()).mutation(({ input }) => new PlanNodeService().create(input)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => new PlanNodeService().delete(input)),
-      findAll: t.procedure.use(dbGuardMiddleware).query(() => new PlanNodeRepository().findAll()),
+      findAll: t.procedure.query(() => new PlanNodeRepository().findAll()),
       getById: t.procedure.input(z.int()).query(({ input }) => new PlanNodeService().getById(input)),
       getByIds: t.procedure.input(z.array(z.int())).query(({ input }) => new PlanNodeService().getByIds(input)),
       patch: t.procedure
@@ -264,6 +242,11 @@ export const appRouter = t.router({
   }),
 
   native: t.router({
+    clipboard: t.router({
+      readText: t.procedure.query(() => clipboard.readText()),
+      writeText: t.procedure.input(z.string()).mutation(({ input }) => clipboard.writeText(input)),
+    }),
+    menuState: AppMenu.menuStateRoutes(t),
     saveFileDialog: t.procedure
       .input(
         z.object({

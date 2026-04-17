@@ -1,19 +1,16 @@
+import EventEmitter from "node:events"
 import { createRequire } from "node:module"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  ipcMain,
-  Menu,
-  type MenuItemConstructorOptions,
-  nativeTheme,
-  shell,
-} from "electron"
+import { app, BrowserWindow, dialog, Menu, type MenuItemConstructorOptions, nativeTheme, shell } from "electron"
 import { default as installExtension, REACT_DEVELOPER_TOOLS } from "electron-devtools-installer"
-import { appRouter } from "./router.js"
+import z from "zod"
+import type { BackToFrontMenuAction } from "../shared/back-to-front-menu-actions.js"
+import { DISPLAY_TEXT_STAT_MODE_VALUES, type DisplayTextStatMode } from "../shared/DisplayTextStatMode.js"
+import { DEFAULT_LOCALE, LOCALE_VALUES, type Locale } from "../shared/locales.js"
+import { THEME_PREFERENCE_VALUES, THEME_TO_MODE, type ThemePreference } from "../shared/themes.js"
+import { emitterToSingleArgObservable } from "./lib/event-manager.js"
+import { appRouter, type RouteBuilder } from "./router.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -25,7 +22,6 @@ const MENU_STRINGS = {
     closeProject: "Close Project",
     view: "View",
     settings: "Settings",
-    aiPlayground: "AI Playground",
     resetLayouts: "Reset layouts",
     wordWrap: "Word Wrap in Editors",
     showInLoreTree: "Show in Lore Tree",
@@ -46,7 +42,6 @@ const MENU_STRINGS = {
     closeProject: "Закрыть проект",
     view: "Вид",
     settings: "Настройки",
-    aiPlayground: "Плейграунд ИИ",
     resetLayouts: "Сбросить разметку",
     wordWrap: "Перенос строк в редакторах",
     showInLoreTree: "Показывать в дереве",
@@ -67,9 +62,9 @@ const MENU_STRINGS = {
 // Current toggle/radio states — kept in sync via set-menu-state IPC from the renderer.
 // Used when rebuilding the menu (e.g. on locale change) so checked states are preserved.
 let currentWordWrap = true
-let currentLoreStat = "words"
-let currentTheme = "auto"
-let currentLocale: "ru" | "en" = "en"
+let currentLoreStat: DisplayTextStatMode = "words"
+let currentTheme: ThemePreference = "auto"
+let currentLocale: Locale = DEFAULT_LOCALE
 
 /** Reference to the "Word Wrap" checkbox menu item so we can sync it from the renderer. */
 let wordWrapMenuItem: MenuItemConstructorOptions = {}
@@ -88,13 +83,15 @@ const isDev = process.env.NODE_ENV === "development"
 // Stored once the server (or dev Vite) is ready, reused on macOS re-activate.
 let serverUrl: string | null = null
 
-/**
- * Sends a menu action string to the focused BrowserWindow's renderer process.
- * The renderer listens via window.electronAPI.onMenuAction().
- */
-function sendMenuAction(action: any) {
-  BrowserWindow.getFocusedWindow()?.webContents.send("menu-action", action)
+interface MenuStateEvents {
+  backToFrontMenuAction: [BackToFrontMenuAction]
+  loreStat: [DisplayTextStatMode]
+  locale: [Locale]
+  theme: [ThemePreference]
+  wordWrap: [boolean]
 }
+
+const menuEventsEmitter = new EventEmitter<MenuStateEvents>()
 
 /**
  * Builds and registers the native application menu.
@@ -108,64 +105,48 @@ function buildApplicationMenu() {
     type: "checkbox",
     label: s.wordWrap,
     checked: currentWordWrap,
-    click: (item) => sendMenuAction(`set-word-wrap:${item.checked}`),
+    click: (item) => menuEventsEmitter.emit("wordWrap", item.checked),
   }
 
   loreStatMenuItems = {}
-  for (const [mode, key] of [
-    ["none", "loreStat_none"],
-    ["words", "loreStat_words"],
-    ["chars", "loreStat_chars"],
-    ["bytes", "loreStat_bytes"],
-  ]) {
+  for (const mode of DISPLAY_TEXT_STAT_MODE_VALUES) {
     loreStatMenuItems[mode] = {
       type: "radio",
-      label: s[key as keyof typeof s],
+      label: s[`loreStat_${mode}` as keyof typeof s],
       checked: mode === currentLoreStat,
-      click: () => sendMenuAction(`set-lore-stat:${mode}`),
+      click: () => menuEventsEmitter.emit("loreStat", mode),
     }
   }
 
   themeMenuItems = {}
-  for (const [theme, key] of [
-    ["auto", "theme_auto"],
-    ["obsidian", "theme_obsidian"],
-    ["github", "theme_github"],
-  ]) {
+  for (const theme of THEME_PREFERENCE_VALUES) {
     themeMenuItems[theme] = {
       type: "radio",
-      label: s[key as keyof typeof s],
+      label: s[`theme_${theme}` as keyof typeof s],
       checked: theme === currentTheme,
-      click: () => sendMenuAction(`set-theme:${theme}`),
+      click: () => menuEventsEmitter.emit("theme", theme),
     }
   }
 
   localeMenuItems = {}
-  for (const [locale, key] of [
-    ["en", "language_en"],
-    ["ru", "language_ru"],
-  ]) {
+  for (const locale of LOCALE_VALUES) {
     localeMenuItems[locale] = {
       type: "radio",
-      label: s[key as keyof typeof s],
+      label: s[`language_${locale}` as keyof typeof s],
       checked: locale === currentLocale,
-      click: () => sendMenuAction(`set-locale:${locale}`),
+      click: () => menuEventsEmitter.emit("locale", locale),
     }
   }
 
   const viewSubmenu: MenuItemConstructorOptions[] = [
     {
       label: s.settings,
-      click: () => sendMenuAction("open-settings"),
-    },
-    {
-      label: s.aiPlayground,
-      click: () => sendMenuAction("open-ai-playground"),
+      click: () => menuEventsEmitter.emit("backToFrontMenuAction", "open-settings"),
     },
     { type: "separator" },
     {
       label: s.resetLayouts,
-      click: () => sendMenuAction("reset-layouts"),
+      click: () => menuEventsEmitter.emit("backToFrontMenuAction", "reset-layouts"),
     },
     { type: "separator" },
     wordWrapMenuItem,
@@ -201,7 +182,7 @@ function buildApplicationMenu() {
       submenu: [
         {
           label: s.closeProject,
-          click: () => sendMenuAction("close-project"),
+          click: () => menuEventsEmitter.emit("backToFrontMenuAction", "close-project"),
         },
         { type: "separator" },
         { role: "quit" },
@@ -276,54 +257,58 @@ async function checkNativeDeps() {
   }
 }
 
-// Show a native error dialog with a "Copy to Clipboard" button.
-ipcMain.handle("show-error-dialog", async (event, { title, message }) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (win === null) {
-    console.error("Failed to get window from webContents")
-    return
-  }
+export function menuStateRoutes(t: RouteBuilder) {
+  return t.router({
+    backToFrontMenuActions: t.router({
+      subscribe: t.procedure.subscription(() =>
+        emitterToSingleArgObservable(menuEventsEmitter, "backToFrontMenuAction"),
+      ),
+    }),
+    locale: t.router({
+      get: t.procedure.query(() => currentLocale),
+      set: t.procedure.input(z.enum(LOCALE_VALUES)).mutation(({ input }) => {
+        currentLocale = input
+        // Rebuild entire menu so all labels appear in the new language.
+        buildApplicationMenu()
+      }),
+      subscribe: t.procedure.subscription(() => emitterToSingleArgObservable(menuEventsEmitter, "locale")),
+    }),
+    loreStat: t.router({
+      get: t.procedure.query(() => currentLoreStat),
+      set: t.procedure.input(z.enum(DISPLAY_TEXT_STAT_MODE_VALUES)).mutation(({ input }) => {
+        currentLoreStat = input
+        for (const [mode, item] of Object.entries(loreStatMenuItems)) {
+          item.checked = mode === input
+        }
+      }),
+      subscribe: t.procedure.subscription(() => emitterToSingleArgObservable(menuEventsEmitter, "loreStat")),
+    }),
+    theme: t.router({
+      get: t.procedure.query(() => currentTheme),
+      set: t.procedure.input(z.enum(THEME_PREFERENCE_VALUES)).mutation(({ input }) => {
+        currentTheme = input
+        for (const [theme, item] of Object.entries(themeMenuItems)) {
+          item.checked = theme === input
+        }
 
-  const { response } = await dialog.showMessageBox(win, {
-    type: "error",
-    title,
-    message,
-    buttons: ["Close", "Copy to Clipboard"],
-    defaultId: 0,
-    cancelId: 0,
+        if (input === "auto") {
+          nativeTheme.themeSource = "system"
+        } else {
+          nativeTheme.themeSource = THEME_TO_MODE[input]
+        }
+      }),
+      subscribe: t.procedure.subscription(() => emitterToSingleArgObservable(menuEventsEmitter, "theme")),
+    }),
+    wordWrap: t.router({
+      get: t.procedure.query(() => currentWordWrap),
+      set: t.procedure.input(z.boolean()).mutation(({ input }) => {
+        currentWordWrap = input
+        if (wordWrapMenuItem) wordWrapMenuItem.checked = input
+      }),
+      subscribe: t.procedure.subscription(() => emitterToSingleArgObservable(menuEventsEmitter, "wordWrap")),
+    }),
   })
-  if (response === 1) {
-    clipboard.writeText(message)
-  }
-})
-
-// Renderer sends this to keep menu checkbox/radio in sync with localStorage state
-ipcMain.on("set-menu-state", (_event, { key, value }) => {
-  if (key === "word-wrap") {
-    currentWordWrap = value
-    if (wordWrapMenuItem) wordWrapMenuItem.checked = value
-  } else if (key === "lore-stat") {
-    currentLoreStat = value
-    for (const [mode, item] of Object.entries(loreStatMenuItems)) {
-      item.checked = mode === value
-    }
-  } else if (key === "theme") {
-    currentTheme = value
-    for (const [theme, item] of Object.entries(themeMenuItems)) {
-      item.checked = theme === value
-    }
-    // Sync native window chrome (title bar, menu bar) to the selected theme.
-    // Note: on Linux the window frame is controlled by the window manager and
-    // nativeTheme.themeSource may not visually change the title bar.
-    if (value === "obsidian") nativeTheme.themeSource = "dark"
-    else if (value === "github") nativeTheme.themeSource = "light"
-    else nativeTheme.themeSource = "system"
-  } else if (key === "locale") {
-    currentLocale = value
-    // Rebuild entire menu so all labels appear in the new language.
-    buildApplicationMenu()
-  }
-})
+}
 
 app.whenReady().then(async () => {
   console.log("Electron app is ready")

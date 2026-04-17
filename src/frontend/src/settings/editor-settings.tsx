@@ -1,3 +1,4 @@
+import { trpc } from "@/ipcClient"
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 
@@ -20,21 +21,15 @@ export function EditorSettingsProvider({ children }: { children: React.ReactNode
   })
 
   // Sync wordWrap to Electron native menu checkbox on mount/change
+  const setWordWrapMenuState = trpc.native.menuState.wordWrap.set.useMutation()
   useEffect(() => {
-    window.electronAPI?.sendMenuState?.("word-wrap", wordWrap)
-  }, [wordWrap])
+    setWordWrapMenuState.mutate(wordWrap)
+  }, [setWordWrapMenuState.mutate, wordWrap])
 
-  // Handle set-word-wrap:* IPC from Electron menu.
-  useEffect(() => {
-    if (!window.electronAPI) return
-    const unsub = window.electronAPI.onMenuAction((action: string) => {
-      if (!action.startsWith("set-word-wrap:")) return
-      const value = action === "set-word-wrap:true"
-      localStorage.setItem(WORD_WRAP_KEY, String(value))
-      setWordWrap(value)
-    })
-    return unsub
-  }, [])
+  // Handle set-word-wrap from Electron menu.
+  trpc.native.menuState.wordWrap.subscribe.useSubscription(undefined, {
+    onData: setWordWrap,
+  })
 
   return <EditorSettingsContext.Provider value={{ wordWrap }}>{children}</EditorSettingsContext.Provider>
 }

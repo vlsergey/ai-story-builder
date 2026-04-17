@@ -33,11 +33,12 @@ import {
   Loader2,
   Wand2,
 } from "lucide-react"
-import type { LoreStatMode } from "../types/models"
 import type { LoreNodeRow } from "../../../shared/lore-node.js"
 import { useLoreSettings } from "../settings/lore-settings"
 import { engineSupportsFileUpload } from "../lib/ai-engines"
 import useConfirm from "@/native/useConfirm.js"
+import useError from "@/native/useError.js"
+import type { DisplayTextStatMode } from "@shared/DisplayTextStatMode.js"
 
 // ── Command system ────────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ function subtreeStat(
   nodeId: number,
   nodesById: Map<number, LoreNodeRow>,
   childrenByParentId: Map<number | null, number[]>,
-  mode: LoreStatMode,
+  mode: DisplayTextStatMode,
 ): number {
   const node = nodesById.get(nodeId)
   if (!node) return 0
@@ -188,7 +189,7 @@ function subtreeStat(
   return own + childSum
 }
 
-function formatStat(count: number, mode: LoreStatMode): string {
+function formatStat(count: number, mode: DisplayTextStatMode): string {
   if (count === 0) return ""
   if (mode === "words") return `${count}w`
   if (mode === "chars") return `${count}c`
@@ -515,13 +516,10 @@ export default function LoreTree({
     if (node) onOpenLoreWizard?.(node)
   }
 
-  function showError(message: string) {
-    void window.electronAPI.showErrorDialog("Sync Error", message)
-  }
-
   const currentAiEngine = trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery().data || null
 
   const aiSyncLore = trpc.ai.syncLore.useMutation()
+  const showError = useError()
 
   async function handleSyncLore() {
     if (!currentAiEngine) return
