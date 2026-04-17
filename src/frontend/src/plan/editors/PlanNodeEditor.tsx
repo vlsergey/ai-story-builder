@@ -140,20 +140,21 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
   const regenerateMutation = trpc.plan.nodes.aiGenerateOnly.useMutation()
   const alert = useAlert()
 
-  const handleRegenerate = useCallback(
-    async (options: RegenerateOptions) => {
-      try {
-        await handleSave(value)
-        const result = await regenerateMutation.mutateAsync({ id: value.id, options })
-        setLastSaved(result)
-        setValue(result)
-      } catch (e) {
-        console.error(e)
-        alert(`Node regeneration problem: ${e}`)
+  const handleRegenerate = useCallback(async () => {
+    try {
+      await handleSave(value)
+      const options: RegenerateOptions = {
+        regenerateGenerated: true,
+        regenerateManual: true,
       }
-    },
-    [alert, regenerateMutation, handleSave, value],
-  )
+      const result = await regenerateMutation.mutateAsync({ id: value.id, options })
+      setLastSaved(result)
+      setValue(result)
+    } catch (e) {
+      console.error(e)
+      alert(`Node regeneration problem: ${e}`)
+    }
+  }, [alert, regenerateMutation, handleSave, value])
 
   return (
     <Editor

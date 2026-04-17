@@ -187,7 +187,7 @@ describe("PlanNodeService — full plan content generation", () => {
     expect(splitInputs).toHaveLength(1)
     expect(splitInputs[0].input).toBe("First par.\n\nSecond par.")
 
-    const options: RegenerateOptions = { regenerateManual: false }
+    const options: RegenerateOptions = { regenerateGenerated: false, regenerateManual: false }
 
     // Start regeneration of subtree (all nodes)
     const { regenerateTreeNodesContents } = await import("./generate/regenerateTreeNodesContents.js")

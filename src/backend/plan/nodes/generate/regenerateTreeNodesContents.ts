@@ -262,7 +262,7 @@ export async function regenerateSubtreeNodesContents(
     ERROR: true,
     EMPTY: true,
     GENERATING: true,
-    GENERATED: true,
+    GENERATED: context.options.regenerateManual,
     OUTDATED: true,
     MANUAL: context.options.regenerateManual,
   }

@@ -117,33 +117,10 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
     )
   }
 
-  const statusBadge = () => {
-    if (!event?.inProcess) {
-      return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted text-muted-foreground">
-          {t("regeneration.idle")}
-        </span>
-      )
-    }
-    if (event.stopping) {
-      return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-destructive/20 text-destructive-foreground animate-pulse">
-          {t("regeneration.stopping")}
-        </span>
-      )
-    }
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-600">
-        <div className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></div>
-        {t("regeneration.in_progress")}
-      </span>
-    )
-  }
-
   const formId = useId()
 
   return (
-    <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto">
+    <div className="flex flex-col gap-2 p-2 h-full overflow-y-auto">
       {/* Заголовок и статус */}
       <form id={formId} onSubmit={regenerateOptionsForm.handleSubmit(handleStart)}>
         <RegenerateOptionsForm form={regenerateOptionsForm} />
@@ -158,7 +135,6 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
           {t("regeneration.stop")}
         </Button>
       </ButtonGroup>
-      {statusBadge()}
       {!event ? (
         <p className="text-muted-foreground text-sm">{t("regeneration.no_data")}</p>
       ) : event.inProcess ? (

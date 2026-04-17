@@ -467,7 +467,9 @@ export default function PlanGraph() {
             moveNode={(nodeId, newParentId) =>
               patchNode({ id: nodeId, manual: true, data: { parent_id: newParentId } })
             }
-            regenerateNode={(nodeId) => regenerateNode({ id: nodeId, options: { regenerateManual: true } })}
+            regenerateNode={(nodeId) =>
+              regenerateNode({ id: nodeId, options: { regenerateGenerated: true, regenerateManual: true } })
+            }
             saveToFile={saveToFile}
           />
         )}

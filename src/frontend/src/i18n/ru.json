@@ -288,6 +288,9 @@
   "regeneration.skipped": "Пропущены",
   "regeneration.last_session": "Статистика последней сессии",
 
+  "regenerateOptions.form.accordionTrigger": "Опции генерации",
+  "regenerateOptions.regenerateGenerated.label": "Перегенерировать ИИ-изменения",
+  "regenerateOptions.regenerateGenerated.description": "Нужно ли перегенерировать узлы, в которых не менялись входы/параметры (уже имеют статус «СГЕНЕРИРОВАНО»).",
   "regenerateOptions.regenerateManual.label": "Перегенерировать ручные изменения",
-  "regenerateOptions.regenerateManual.description": "Нужно ли перегенерировать узлы, в которых были сделаны ручные изменения после генерации, в том числе улучшения с помощью ИИ."
+  "regenerateOptions.regenerateManual.description": "Нужно ли перегенерировать узлы, в которых были сделаны ручные изменения после генерации, в том числе улучшения с помощью ИИ (имеют статус «РУЧНЫЕ ИЗМЕНЕНИЯ»)."
 }

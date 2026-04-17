@@ -45,7 +45,7 @@ export default function TextNodeEditor({
 
   const [generationStarted, setGenerationStarted] = useState(false)
   trpc.plan.nodes.aiGenerateWatchAndReview.useSubscription(
-    { id: nodeId, options: { regenerateManual: true } },
+    { id: nodeId, options: { regenerateManual: true, regenerateGenerated: true } },
     {
       enabled: generationStarted,
       onData: (event) => {

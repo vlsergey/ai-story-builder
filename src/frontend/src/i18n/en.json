@@ -282,6 +282,9 @@
   "regeneration.skipped": "Skipped",
   "regeneration.last_session": "Last session stats",
 
+  "regenerateOptions.form.accordionTrigger": "Generation options",
+  "regenerateOptions.regenerateGenerated.label": "Regenerate AI-generated changes",
+  "regenerateOptions.regenerateGenerated.description": "Regenerate nodes whose inputs/parameters have not changed (already have «GENERATED» status).",
   "regenerateOptions.regenerateManual.label": "Regenerate manual changes",
-  "regenerateOptions.regenerateManual.description": "Whether to regenerate nodes that have been manually modified after generation, including AI-driven improvements."
+  "regenerateOptions.regenerateManual.description": "Regenerate nodes that had manual edits after generation, including AI-assisted improvements (have «MANUAL» status)."
 }

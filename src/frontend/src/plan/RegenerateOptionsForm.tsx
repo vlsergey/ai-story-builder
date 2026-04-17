@@ -1,45 +1,41 @@
-import { useLocale } from "@/lib/locale"
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/ui-components/field"
-import { Switch } from "@/ui-components/switch"
+import { FieldGroup } from "@/ui-components/field"
+import ControlledSwitch from "@/forms/ControlledSwitch"
 import type { RegenerateOptions } from "@shared/RegenerateOptions"
-import { useId } from "react"
-import { Controller, type UseFormReturn } from "react-hook-form"
+import type { UseFormReturn } from "react-hook-form"
 import z from "zod"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui-components/accordion"
+import { useLocale } from "@/lib/locale"
 
 interface RegenerateOptionsFormProps {
   form: UseFormReturn<RegenerateOptions>
 }
 
 export const formSchema = z.object({
+  regenerateGenerated: z.boolean(),
   regenerateManual: z.boolean(),
 })
 
 export default function RegenerateOptionsForm({ form }: RegenerateOptionsFormProps) {
   const { t } = useLocale()
-  const regenerateManualId = useId()
-
   return (
-    <FieldGroup>
-      <Controller
-        name="regenerateManual"
-        control={form.control}
-        render={({ field, fieldState }) => (
-          <Field data-invalid={fieldState.invalid} orientation="responsive">
-            <FieldContent>
-              <FieldLabel htmlFor={regenerateManualId}>{t("regenerateOptions.regenerateManual.label")}</FieldLabel>
-              <FieldDescription>{t("regenerateOptions.regenerateManual.description")}</FieldDescription>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </FieldContent>
-            <Switch
-              id={regenerateManualId}
-              name={field.name}
-              checked={field.value}
-              onCheckedChange={field.onChange}
-              aria-invalid={fieldState.invalid}
+    <Accordion type="single" collapsible>
+      <AccordionItem value="form">
+        <AccordionTrigger>{t("regenerateOptions.form.accordionTrigger")}</AccordionTrigger>
+        <AccordionContent>
+          <FieldGroup>
+            <ControlledSwitch
+              form={form}
+              name="regenerateGenerated"
+              translationPrefix="regenerateOptions.regenerateGenerated"
             />
-          </Field>
-        )}
-      />
-    </FieldGroup>
+            <ControlledSwitch
+              form={form}
+              name="regenerateManual"
+              translationPrefix="regenerateOptions.regenerateManual"
+            />
+          </FieldGroup>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   )
 }

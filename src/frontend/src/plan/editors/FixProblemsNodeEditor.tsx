@@ -247,7 +247,7 @@ export default function FixProblemsNodeEditor({
           </TabsContent>
         </Tabs>
 
-        <Button disabled={disabled} onClick={() => onRegenerate({ regenerateManual: true })}>
+        <Button disabled={disabled} onClick={onRegenerate}>
           {t("common.update")}
         </Button>
       </FieldGroup>
