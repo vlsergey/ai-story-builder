@@ -378,15 +378,15 @@ export default function PlanGraph() {
     }
   }
 
-  function applyLayout() {
+  const applyLayout = useCallback(async () => {
     if (!nodes?.length) return
-    const laidNodes = applyHierarchicalLayout([...nodes], [...edges])
+    const laidNodes = await applyHierarchicalLayout([...nodes], [...edges])
     setNodes(laidNodes)
     // Fit view after layout change
     setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2 }), 0)
     // Push changes to server
     debouncedSaveNodes()
-  }
+  }, [debouncedSaveNodes, edges, nodes, setNodes])
 
   // Compute allowed edge types for the dialog
   const allowedEdgeTypes = showConnectDialog
