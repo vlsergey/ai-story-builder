@@ -2,7 +2,7 @@ import { Button } from "@/ui-components/button"
 import { ButtonGroup } from "@/ui-components/button-group"
 import { getCreatableNodeTypes } from "@shared/node-edge-dictionary"
 import type { PlanContainerNodeType, PlanNodeType } from "@shared/plan-graph"
-import React, { useCallback, useState } from "react"
+import { useCallback, useState } from "react"
 import { useMemo } from "react"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { trpc } from "@/ipcClient"
@@ -43,17 +43,20 @@ export default function CreateNodeButtonGroup({ compact, parentNode }: CreateNod
 
   return (
     <ButtonGroup className="create-node-button-group">
-      {creatableNodeTypes.map((nodeType) => (
-        <Button
-          variant="ghost"
-          key={nodeType}
-          onClick={() => handleShowDialog(nodeType)}
-          title={t(`planGraph.addNode.${nodeType}`)}
-        >
-          {React.createElement(NodeTypeIcons[nodeType])}
-          {!compact && t(`planGraph.addNode.${nodeType}`)}
-        </Button>
-      ))}
+      {creatableNodeTypes.map((nodeType) => {
+        const Icon = NodeTypeIcons[nodeType]
+        return (
+          <Button
+            variant="ghost"
+            key={nodeType}
+            onClick={() => handleShowDialog(nodeType)}
+            title={t(`planGraph.addNode.${nodeType}`)}
+          >
+            <Icon />
+            {!compact && t(`planGraph.addNode.${nodeType}`)}
+          </Button>
+        )
+      })}
 
       <AddNodeDialog
         nodeType={nodeTypeToCreate ?? undefined}
