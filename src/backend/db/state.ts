@@ -1,9 +1,10 @@
 import fs from "node:fs"
-import path from "node:path"
 import os from "node:os"
-import type { AppSettings } from "../types/index.js"
-import electron from "electron"
+import path from "node:path"
 import Db, { type Database } from "better-sqlite3"
+import electron from "electron"
+import type { AppSettings } from "../types/index.js"
+
 const { app } = electron
 
 /**

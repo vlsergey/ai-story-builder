@@ -1,6 +1,6 @@
-import { withDbRead, withDbWrite } from "../db/connection.js"
-import type { LoreNodeCreate, LoreNodeRow, LoreNodeUpdate } from "../../shared/lore-node.js"
 import type { RunResult } from "better-sqlite3"
+import type { LoreNodeCreate, LoreNodeRow, LoreNodeUpdate } from "../../shared/lore-node.js"
+import { withDbRead, withDbWrite } from "../db/connection.js"
 
 /**
  * Repository for lore_nodes table operations.

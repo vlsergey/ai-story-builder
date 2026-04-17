@@ -1,7 +1,7 @@
 import OpenAI from "openai"
 import type { ResponseCreateParamsStreaming } from "openai/resources/responses/responses.js"
-import { makeLoggingFetch, isVerboseLogging } from "./ai-logging.js"
 import lastAiGenerationEventManager from "../ai/last-ai-generation-event-manager.js"
+import { isVerboseLogging, makeLoggingFetch } from "./ai-logging.js"
 
 const GROK_BASE = "https://api.x.ai/v1"
 

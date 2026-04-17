@@ -1,9 +1,9 @@
-import type { AiEngineKey } from "../../shared/ai-engines.js"
-import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
-import { withDbRead, withDbWrite } from "../db/connection.js"
 import type { Database } from "better-sqlite3"
 import type { AiEngineConfig, AllAiEnginesConfig } from "../../shared/ai-engine-config.js"
+import type { AiEngineKey } from "../../shared/ai-engines.js"
+import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import type { ThemePreference } from "../../shared/themes.js"
+import { withDbRead, withDbWrite } from "../db/connection.js"
 
 /**
  * Repository for accessing and modifying the `settings` table.

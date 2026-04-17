@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 
+import { execSync } from "node:child_process"
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import Database from "better-sqlite3"
 import { migrateDatabase } from "../dist/backend/db/migrations.js"
-import { writeFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs"
-import { resolve, dirname } from "node:path"
-import { fileURLToPath } from "node:url"
-import { execSync } from "node:child_process"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)

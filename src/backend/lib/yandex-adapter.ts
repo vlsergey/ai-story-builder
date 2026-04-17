@@ -1,8 +1,8 @@
 import type OpenAI from "openai"
-import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapter.js"
 import type { YandexAiGenerationSettings } from "../../shared/yandex-ai-generation-settings.js"
-import { createYandexClient } from "./yandex-client.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
+import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapter.js"
+import { createYandexClient } from "./yandex-client.js"
 
 export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings> {
   async generateResponse(

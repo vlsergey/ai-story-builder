@@ -1,13 +1,13 @@
-import type { PlanNodeService } from "../plan-node-service.js"
-import type { NodeProcessor } from "./node-processor.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
 import type {
   FixIteration,
   FixProblemsPlanNodeContent,
   FixProblemsPlanNodeSettings,
 } from "../../../../shared/fix-problems-plan-node.js"
-import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
 import { findProblems, fixProblems } from "../../../ai/generate-fix-problems.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import type { PlanNodeService } from "../plan-node-service.js"
+import type { NodeProcessor } from "./node-processor.js"
 
 export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSettings> {
   readonly defaultSettings = {

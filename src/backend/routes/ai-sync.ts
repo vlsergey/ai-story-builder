@@ -1,15 +1,15 @@
 import path from "node:path"
 import type OpenAI from "openai"
 import { toFile } from "openai"
-import { getCurrentDbPath } from "../db/state.js"
+import type { YandexEngineConfig } from "../../shared/ai-engine-config.js"
 import { BUILTIN_ENGINES } from "../../shared/ai-engines.js"
-import { createYandexClient, makeLoggingFetch } from "../lib/yandex-client.js"
+import type { LoreNodeRow } from "../../shared/lore-node.js"
+import { getCurrentDbPath } from "../db/state.js"
 import { createGrokClient } from "../lib/grok-client.js"
 import { collapseLoreTree } from "../lib/lore-tree.js"
-import { SettingsRepository } from "../settings/settings-repository.js"
+import { createYandexClient, makeLoggingFetch } from "../lib/yandex-client.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
-import type { YandexEngineConfig } from "../../shared/ai-engine-config.js"
-import type { LoreNodeRow } from "../../shared/lore-node.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
 
 // Exported so tests can override without fake timers
 export const POLL_CONFIG = {

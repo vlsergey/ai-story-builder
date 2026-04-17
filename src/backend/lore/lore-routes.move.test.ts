@@ -14,7 +14,7 @@
  *   - move to a different branch
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { setUpTestDb, tearDownTestDb } from "../db/test-db-utils.js"
 
 // Import pure functions AFTER mock is registered

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest"
-import { NODE_TYPES, EDGE_TYPES_DEFS } from "../../shared/node-edge-dictionary.js"
-import type { PlanNodeType, PlanEdgeType } from "../../shared/plan-graph.js"
+import { describe, expect, it } from "vitest"
+import { EDGE_TYPES_DEFS, NODE_TYPES } from "../../shared/node-edge-dictionary.js"
+import type { PlanEdgeType, PlanNodeType } from "../../shared/plan-graph.js"
 
 describe("node-edge-dictionary consistency", () => {
   // Helper to collect all node/edge IDs

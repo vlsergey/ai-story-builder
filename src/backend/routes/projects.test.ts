@@ -3,7 +3,7 @@
  * (routes that do not require an open database)
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // Mutable app settings store shared across the module mock
 const mockSettings: { recent: string[]; lastOpenedPath?: string } = { recent: [] }

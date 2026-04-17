@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest"
-import Database from "better-sqlite3"
-import { migrateDatabase, CURRENT_VERSION } from "./migrations.js"
 import fs from "node:fs"
 import path from "node:path"
+import Database from "better-sqlite3"
+import { describe, expect, it } from "vitest"
+import { CURRENT_VERSION, migrateDatabase } from "./migrations.js"
 
 function inMemoryDb() {
   return new Database(":memory:")

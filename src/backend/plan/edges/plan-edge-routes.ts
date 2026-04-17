@@ -1,13 +1,13 @@
-import type { PlanEdgeType } from "../../../shared/plan-graph.js"
-import { PlanEdgeRepository } from "./plan-edge-repository.js"
-import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
 import {
-  isValidEdgeType,
   canCreateEdge,
-  getEdgeTypeDefinition,
   EDGE_TYPES_DEFS,
+  getEdgeTypeDefinition,
+  isValidEdgeType,
 } from "../../../shared/node-edge-dictionary.js"
+import type { PlanEdgeType } from "../../../shared/plan-graph.js"
+import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
 import { planEdgeEventManager } from "./plan-edge-event-manager.js"
+import { PlanEdgeRepository } from "./plan-edge-repository.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 

@@ -1,8 +1,8 @@
+import type { LoreSettings } from "../../../../shared/node-settings.js"
+import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
-import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
-import type { LoreSettings } from "../../../../shared/node-settings.js"
-import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**
  * Processor for 'lore' nodes.

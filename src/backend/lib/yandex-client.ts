@@ -1,9 +1,9 @@
 import OpenAI from "openai"
-import { makeLoggingFetch, setVerboseLogging, isVerboseLogging } from "./ai-logging.js"
+import { isVerboseLogging, makeLoggingFetch, setVerboseLogging } from "./ai-logging.js"
 
 // Re-export so existing callers that imported these from yandex-client.ts keep working
 // without changes until each call site is migrated to ai-logging.ts directly.
-export { setVerboseLogging, isVerboseLogging, makeLoggingFetch }
+export { isVerboseLogging, makeLoggingFetch, setVerboseLogging }
 
 const YANDEX_BASE = "https://ai.api.cloud.yandex.net/v1"
 

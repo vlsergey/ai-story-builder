@@ -1,7 +1,7 @@
+import type { ForEachNodeContent } from "../../../../shared/for-each-plan-node.js"
+import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
-import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
-import type { ForEachNodeContent } from "../../../../shared/for-each-plan-node.js"
 
 export class ForEachPrevOutputsProcessor implements NodeProcessor<unknown> {
   readonly defaultSettings = {}

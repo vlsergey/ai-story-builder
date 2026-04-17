@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events"
-import type { ResponseUsage } from "openai/resources/responses/responses.js"
 import { type Observable, observable } from "@trpc/server/observable"
+import type { ResponseUsage } from "openai/resources/responses/responses.js"
 
 interface AiEvents {
   onGenerationEvent: [Partial<ResponseUsage>]

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
+import type { CollapsedGroup, LoreNodeForCollapse } from "./lore-tree.js"
 import { collapseLoreTree } from "./lore-tree.js"
-import type { LoreNodeForCollapse, CollapsedGroup } from "./lore-tree.js"
 
 function node(
   id: number,

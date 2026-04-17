@@ -1,61 +1,57 @@
 import { initTRPC } from "@trpc/server"
-import { SettingsRepository } from "./settings/settings-repository.js"
-import { z } from "zod"
+import type { MessageBoxOptions } from "electron"
 import { dialog } from "electron"
-import { getAiBilling } from "./routes/ai-billing.js"
-import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
-import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
+import { z } from "zod"
+import type { AiEngineConfig, AllAiEnginesConfig } from "../shared/ai-engine-config.js"
+import { EDGE_TYPES, type PlanNodeUpdate } from "../shared/plan-graph.js"
+import type { RegenerateOptions } from "../shared/RegenerateOptions.js"
+import { THEME_PREFERENCE_VALUES } from "../shared/themes.js"
+import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
-
-// Project functions
-import { refreshEngineModels, setCurrentEngine, testEngineConnection } from "./routes/ai-config.js"
-
-// Project functions
-import {
-  getProjectStatus,
-  closeProject,
-  openProject,
-  getRecentProjects,
-  deleteRecentProject,
-  listProjectFiles,
-  openProjectFolder,
-  createProject,
-} from "./routes/projects.js"
 
 // Lore functions
 import {
+  create,
+  deleteLoreNode,
+  duplicateLoreNode,
   findAll,
   getLoreNode,
-  create,
-  patchLoreNode,
-  deleteLoreNode,
   importLoreNode,
   moveLoreNode,
-  duplicateLoreNode,
-  sortLoreChildren,
+  patchLoreNode,
   reorderLoreChildren,
   restoreLoreNode,
+  sortLoreChildren,
 } from "./lore/lore-routes.js"
-
-import { createGraphEdge, patchGraphEdge, deleteGraphEdge } from "./plan/edges/plan-edge-routes.js"
-
-import { syncLore } from "./routes/ai-sync.js"
-import type { AiEngineConfig, AllAiEnginesConfig } from "../shared/ai-engine-config.js"
-import { EDGE_TYPES, type PlanNodeUpdate } from "../shared/plan-graph.js"
-import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
-import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
+import { saveFileDialog } from "./native-routes.js"
+import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
 import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
-import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
-import type { RegenerateOptions } from "../shared/RegenerateOptions.js"
-import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from "./plan/nodes/plan-node-routes.js"
+import { createGraphEdge, deleteGraphEdge, patchGraphEdge } from "./plan/edges/plan-edge-routes.js"
 import {
   regenerateTreeNodesContents,
-  subscribeToRegenerateTreeNodesContentsProgress,
   regenerateTreeNodesContentsStop,
+  subscribeToRegenerateTreeNodesContentsProgress,
 } from "./plan/nodes/generate/regenerateTreeNodesContents.js"
-import { THEME_PREFERENCE_VALUES } from "../shared/themes.js"
-import { saveFileDialog } from "./native-routes.js"
-import type { MessageBoxOptions } from "electron"
+import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
+import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
+import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from "./plan/nodes/plan-node-routes.js"
+import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
+import { getAiBilling } from "./routes/ai-billing.js"
+// Project functions
+import { refreshEngineModels, setCurrentEngine, testEngineConnection } from "./routes/ai-config.js"
+import { syncLore } from "./routes/ai-sync.js"
+// Project functions
+import {
+  closeProject,
+  createProject,
+  deleteRecentProject,
+  getProjectStatus,
+  getRecentProjects,
+  listProjectFiles,
+  openProject,
+  openProjectFolder,
+} from "./routes/projects.js"
+import { SettingsRepository } from "./settings/settings-repository.js"
 
 const t = initTRPC.create({
   // transformer: superjson,

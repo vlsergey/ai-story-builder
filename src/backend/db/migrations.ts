@@ -1,8 +1,7 @@
-import type { Database } from "better-sqlite3"
 import fs from "node:fs"
-import path from "node:path"
+import path, { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import { dirname } from "node:path"
+import type { Database } from "better-sqlite3"
 
 import migration001 from "./migrations/001.js"
 import migration002 from "./migrations/002.js"

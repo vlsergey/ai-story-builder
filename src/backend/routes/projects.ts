@@ -1,22 +1,22 @@
+import { exec } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
-import type { ProjectInitialData } from "../types/index.js"
+import electron from "electron"
+import { openProjectDatabase } from "../db/index.js"
 import {
-  isOpen,
   getCurrentDbPath,
-  setCurrentDbPath,
-  readAppSettings,
-  writeAppSettings,
   getDataDir,
+  isOpen,
+  readAppSettings,
+  setCurrentDbPath,
+  writeAppSettings,
 } from "../db/state.js"
 import { setVerboseLogging } from "../lib/ai-logging.js"
 import { sanitizeProjectName } from "../lib/project-name.js"
-import { SettingsRepository } from "../settings/settings-repository.js"
-import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
-import electron from "electron"
-import { exec } from "node:child_process"
-import { openProjectDatabase } from "../db/index.js"
+import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
+import type { ProjectInitialData } from "../types/index.js"
 
 const { shell } = electron
 

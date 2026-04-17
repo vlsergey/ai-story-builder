@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { PlanNodeService } from "./plan-node-service.js"
-import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
-import { SettingsRepository } from "../../settings/settings-repository.js"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
 import { generatePlanNodeTextContent } from "../../ai/generate-plan-node-text-content.js"
 import { generateSummary } from "../../ai/generate-summary.js"
 import { setUpTestDb, tearDownTestDb } from "../../db/test-db-utils.js"
-import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
+import { SettingsRepository } from "../../settings/settings-repository.js"
+import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
+import { PlanNodeService } from "./plan-node-service.js"
 
 // ─── Mock AI generation ──────────────────────────────────────────────────────
 

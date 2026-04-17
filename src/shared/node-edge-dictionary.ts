@@ -3,7 +3,7 @@
  * Used for building models, dialogs, and backend validation.
  */
 
-import { type PlanNodeType, type PlanEdgeType, type PlanContainerNodeType, EDGE_TYPES } from "./plan-graph.js"
+import { EDGE_TYPES, type PlanContainerNodeType, type PlanEdgeType, type PlanNodeType } from "./plan-graph.js"
 
 export type PlanNodeParentContainerType = PlanContainerNodeType | "root"
 

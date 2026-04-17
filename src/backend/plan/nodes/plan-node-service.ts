@@ -1,43 +1,43 @@
-import type {
-  PlanNodeCreate,
-  PlanNodeUpdate,
-  PlanNodeType,
-  PlanNodeRow,
-  PlanNodeStatus,
-  PlanEdgeType,
-} from "../../../shared/plan-graph.js"
-import { PlanNodeRepository } from "./plan-node-repository.js"
-import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
+import { promises as fs } from "node:fs"
+import type { Observable } from "@trpc/server/observable"
+import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import type { ForEachNodeContent } from "../../../shared/for-each-plan-node.js"
+import getDifference from "../../../shared/getDifference.js"
 import {
+  type EdgeTypeToOutputTypeMap,
+  getNodeTypeDefinition,
   isValidNodeType,
   NODE_TYPES,
-  getNodeTypeDefinition,
-  type EdgeTypeToOutputTypeMap,
 } from "../../../shared/node-edge-dictionary.js"
-import getDifference from "../../../shared/getDifference.js"
-import { planNodeEventManager } from "./plan-node-event-manager.js"
-import type { NodeProcessor } from "./graph/node-processor.js"
-import { TextProcessor } from "./graph/text-processor.js"
-import { LoreProcessor } from "./graph/lore-processor.js"
-import { SplitProcessor } from "./graph/split-processor.js"
-import { MergeProcessor } from "./graph/merge-processor.js"
-import { ForEachProcessor } from "./graph/for-each-processor.js"
-import { mergeNodeSettings } from "./graph/settings-helper.js"
-import { type DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
-import { improvePlanNodeContent } from "../../routes/improve-plan-node-content.js"
-import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import type { Observable } from "@trpc/server/observable"
+import type {
+  PlanEdgeType,
+  PlanNodeCreate,
+  PlanNodeRow,
+  PlanNodeStatus,
+  PlanNodeType,
+  PlanNodeUpdate,
+} from "../../../shared/plan-graph.js"
 import { generateSummary } from "../../ai/generate-summary.js"
+import { type DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../lib/make-errors.js"
-import type { ForEachNodeContent } from "../../../shared/for-each-plan-node.js"
+import { improvePlanNodeContent } from "../../routes/improve-plan-node-content.js"
 import { SettingsRepository } from "../../settings/settings-repository.js"
-import { ForEachOutputProcessor } from "./graph/for-each-output-processor.js"
-import { ForEachInputProcessor } from "./graph/for-each-input-processor.js"
-import { ForEachPrevOutputsProcessor } from "./graph/for-each-prev-outputs-processor.js"
+import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
 import type { RegenerationNodeContext } from "./generate/RegenerationContext.js"
-import { promises as fs } from "node:fs"
 import { FixProblemsProcessor } from "./graph/fix-problems-processor.js"
+import { ForEachInputProcessor } from "./graph/for-each-input-processor.js"
+import { ForEachOutputProcessor } from "./graph/for-each-output-processor.js"
+import { ForEachPrevOutputsProcessor } from "./graph/for-each-prev-outputs-processor.js"
+import { ForEachProcessor } from "./graph/for-each-processor.js"
+import { LoreProcessor } from "./graph/lore-processor.js"
+import { MergeProcessor } from "./graph/merge-processor.js"
+import type { NodeProcessor } from "./graph/node-processor.js"
+import { mergeNodeSettings } from "./graph/settings-helper.js"
+import { SplitProcessor } from "./graph/split-processor.js"
+import { TextProcessor } from "./graph/text-processor.js"
 import type { NodeInputs } from "./NodeInput.js"
+import { planNodeEventManager } from "./plan-node-event-manager.js"
+import { PlanNodeRepository } from "./plan-node-repository.js"
 
 export type NodeUpdateEvent = {
   nodeId: number

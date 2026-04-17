@@ -1,6 +1,5 @@
-import { type Observable, observable, type Observer } from "@trpc/server/observable"
-import { EventEmitter } from "node:events"
-import { on } from "node:events" // Встроенная функция Node.js
+import { EventEmitter, on } from "node:events"
+import { type Observable, type Observer, observable } from "@trpc/server/observable"
 
 interface PlanEvents {
   update: [id: number]

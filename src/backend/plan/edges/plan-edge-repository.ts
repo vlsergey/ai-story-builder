@@ -1,5 +1,5 @@
-import type { PlanEdgeCreate, PlanEdgeUpdate, PlanEdgeRow } from "../../../shared/plan-graph.js"
-import { withDbWrite, withDbRead } from "../../db/connection.js"
+import type { PlanEdgeCreate, PlanEdgeRow, PlanEdgeUpdate } from "../../../shared/plan-graph.js"
+import { withDbRead, withDbWrite } from "../../db/connection.js"
 
 /**
  * Repository for plan_edges table operations.
