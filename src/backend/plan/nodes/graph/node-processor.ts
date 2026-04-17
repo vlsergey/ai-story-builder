@@ -22,7 +22,7 @@ export interface NodeProcessor<S = unknown> {
   getOutput(context: PlanNodeService, planNodeRow: PlanNodeRow): unknown
 
   onUpdate?(
-    context: PlanNodeService,
+    service: PlanNodeService,
     nodeId: number,
     oldNode: PlanNodeRow | null,
     newNode: PlanNodeRow | null,

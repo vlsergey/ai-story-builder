@@ -14,6 +14,7 @@ import {
   getNodeTypeDefinition,
   type EdgeTypeToOutputTypeMap,
 } from "../../../shared/node-edge-dictionary.js"
+import getDifference from "../../../shared/getDifference.js"
 import { planNodeEventManager } from "./plan-node-event-manager.js"
 import type { NodeProcessor } from "./graph/node-processor.js"
 import { TextProcessor } from "./graph/text-processor.js"
@@ -37,6 +38,7 @@ import type { RegenerationNodeContext } from "./generate/RegenerationContext.js"
 import { promises as fs } from "node:fs"
 import { FixProblemsProcessor } from "./graph/fix-problems-processor.js"
 import type { NodeInputs } from "./NodeInput.js"
+
 export type NodeUpdateEvent = {
   nodeId: number
   updatedFields: Partial<PlanNodeRow>
@@ -53,6 +55,20 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   split: new SplitProcessor(),
   merge: new MergeProcessor(),
 }
+
+const DO_NOT_NOTIFY_DOWNSTREAMS_ON_CHANGES_IN: (keyof PlanNodeRow)[] = [
+  "x",
+  "y",
+  "width",
+  "height",
+  "word_count",
+  "char_count",
+  "byte_count",
+  "in_review",
+  "review_base_content",
+  "ai_improve_instruction",
+  "created_at",
+] as const
 
 /**
  * Service for plan node operations.
@@ -150,24 +166,35 @@ export class PlanNodeService {
    * If the processor returns updated PlanNodeRow, the node will be updated (if content changed)
    * and downstream notifications will propagate further.
    */
-  async notifyDownstreamNodes(changedNodeId: number): Promise<void> {
+  async markAsOutdatedAndNotifyDownstreamNodes(changedNodeId: number): Promise<void> {
     const outgoingEdges = new PlanEdgeRepository().findByFromNodeId(changedNodeId)
     for (const edge of outgoingEdges) {
       const downstreamNode = this.getById(edge.to_node_id)
       if (!downstreamNode) continue
+
+      let downstreamUpdate: PlanNodeUpdate = { status: "OUTDATED" }
+      let toBeAfterUpdate: PlanNodeRow = { ...downstreamNode, ...downstreamUpdate }
+
       const processor = this.getProcessor(downstreamNode.type)
       if (processor?.onInputContentChange) {
         console.log(
           `Notifying downstream node ${downstreamNode.id} (${downstreamNode.type}) of changes in node ${changedNodeId}`,
         )
         const settings = this.getNodeSettings(downstreamNode)
-        const planNodeUpdate = await processor.onInputContentChange(this, downstreamNode, changedNodeId, settings)
-        if (planNodeUpdate != null && Object.keys(planNodeUpdate).length !== 0) {
-          console.log(
-            `[PlanNodeService] Updating downstream node ${downstreamNode.id} (${downstreamNode.type}) because of changes in node ${changedNodeId}: ${Object.keys(planNodeUpdate)}`,
-          )
-          await this.patch(downstreamNode.id, false, planNodeUpdate)
+
+        downstreamUpdate = {
+          ...downstreamUpdate,
+          ...(await processor.onInputContentChange(this, toBeAfterUpdate, changedNodeId, settings)),
         }
+        toBeAfterUpdate = { ...downstreamNode, ...downstreamUpdate }
+      }
+
+      if (Object.keys(getDifference(downstreamNode, toBeAfterUpdate)).length !== 0) {
+        console.log(
+          `[PlanNodeService] Updating downstream node ${downstreamNode.id} (${downstreamNode.type}) ` +
+            `because of changes in node ${changedNodeId}: ${Object.keys(downstreamUpdate)}`,
+        )
+        await this.patch(downstreamNode.id, false, downstreamUpdate)
       }
     }
   }
@@ -339,7 +366,7 @@ export class PlanNodeService {
       }
     }
 
-    let update = { ...data }
+    let update: PlanNodeUpdate = { ...data }
 
     if (data.status !== undefined) {
       console.log(`In patch there is a requirement to change status to ${data.status}`)
@@ -374,9 +401,12 @@ export class PlanNodeService {
     // Emit event to frontend
     planNodeEventManager.emitUpdate(nodeId, `patched keys: ${Object.keys(data).join(", ")}`)
 
-    // If content changed, notify downstream nodes
-    if (update.content !== undefined) {
-      await this.notifyDownstreamNodes(nodeId)
+    // If important field is changed, notify downstream nodes
+    const needToNotify = (Object.keys(update) as (keyof PlanNodeUpdate)[]).every(
+      (key) => !DO_NOT_NOTIFY_DOWNSTREAMS_ON_CHANGES_IN.includes(key),
+    )
+    if (needToNotify) {
+      await this.markAsOutdatedAndNotifyDownstreamNodes(nodeId)
     }
 
     return updated

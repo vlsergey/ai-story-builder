@@ -12,20 +12,6 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     separator: "",
     dropFirst: 0,
     dropLast: 0,
-    autoUpdate: false,
-  }
-
-  async onUpdate(
-    service: PlanNodeService,
-    nodeId: number,
-    oldNode: PlanNodeRow | null,
-    newNode: PlanNodeRow | null,
-    settings: SplitSettings,
-  ): Promise<PlanNodeUpdate | null> {
-    if (!newNode || !settings.autoUpdate) {
-      return null
-    }
-    return await this.regenerate(service, undefined, newNode, settings)
   }
 
   getOutput(service: PlanNodeService, node: PlanNodeRow): unknown {
@@ -79,30 +65,6 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     } catch (_) {
       // If regex is invalid, treat as literal string split
       return text.split(regexPattern)
-    }
-  }
-
-  async onInputContentChange(
-    context: PlanNodeService,
-    nodeData: PlanNodeRow,
-    changedInputNodeId: number,
-    settings: SplitSettings,
-  ): Promise<PlanNodeUpdate | null> {
-    // Check if auto‑update is enabled
-    if (!settings.autoUpdate) {
-      return null
-    }
-
-    // Regenerate split content
-    const newContentPatch = await this.regenerate(context, undefined, nodeData, settings)
-    if (newContentPatch?.content === null || newContentPatch?.content === nodeData.content) {
-      // No change or generation failed
-      return null
-    }
-
-    // Return updated node data
-    return {
-      content: newContentPatch?.content,
     }
   }
 

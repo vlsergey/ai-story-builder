@@ -5,8 +5,6 @@ export interface SplitSettings {
   dropFirst: number
   /** Number of last parts to drop (positive integer) */
   dropLast: number
-  /** Whether to automatically re-split when input changes */
-  autoUpdate: boolean
 }
 
 export interface MergeSettings {
@@ -16,8 +14,6 @@ export interface MergeSettings {
   includeInputTitles: boolean
   /** Whether to fix header levels (shift headers so highest is H3) */
   fixHeaders: boolean
-  /** Whether to automatically re-merge when any input changes */
-  autoUpdate: boolean
 }
 
 // No settings so far

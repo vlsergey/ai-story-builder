@@ -22,7 +22,6 @@ interface InputNode {
 }
 
 export default function MergeNodeEditor({
-  dbValue,
   nodeTypeSettings,
   onChange,
   onRegenerate,
@@ -188,49 +187,22 @@ export default function MergeNodeEditor({
             />
           </div>
 
-          <div className="flex items-center justify-between py-2">
-            <Label htmlFor="autoUpdate" className="text-sm mr-2">
-              {t("mergeNode.autoUpdate")}
-            </Label>
-            <Switch
-              id="autoUpdate"
-              checked={nodeTypeSettings.autoUpdate}
-              onCheckedChange={(checked: boolean) =>
-                onNodeTypeSettingsChange({ ...nodeTypeSettings, autoUpdate: checked })
-              }
-              className="w-11 h-6 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
-            />
-          </div>
-
-          {!nodeTypeSettings.autoUpdate && (
-            <Button onClick={onRegenerate} className="w-full">
-              {t("common.update")}
-            </Button>
-          )}
+          <Button onClick={onRegenerate} className="w-full">
+            {t("common.update")}
+          </Button>
         </CardContent>
       </Card>
 
-      {nodeTypeSettings.autoUpdate ? (
-        <CodeMirror
-          value={dbValue.content || ""}
-          height="80vh"
-          extensions={[markdown(), EditorView.lineWrapping]}
-          theme={resolvedTheme === "obsidian" ? "dark" : "light"}
-          className="border rounded"
-          readOnly={true}
-        />
-      ) : (
-        <CodeMirror
-          value={value.content || ""}
-          height="80vh"
-          extensions={[markdown(), EditorView.lineWrapping]}
-          theme={resolvedTheme === "obsidian" ? "dark" : "light"}
-          className="border rounded"
-          onChange={(content) => {
-            onChange({ ...value, content })
-          }}
-        />
-      )}
+      <CodeMirror
+        value={value.content || ""}
+        height="80vh"
+        extensions={[markdown(), EditorView.lineWrapping]}
+        theme={resolvedTheme === "obsidian" ? "dark" : "light"}
+        className="border rounded"
+        onChange={(content) => {
+          onChange({ ...value, content })
+        }}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import getDifference from "@/lib/getDifference"
+import getDifference from "@shared/getDifference.js"
 import { Alert, AlertDescription, AlertTitle } from "@/ui-components/alert"
 import type { PlanNodeRow } from "@shared/plan-graph"
 import type { RegenerateOptions } from "@shared/RegenerateOptions"

@@ -1,4 +1,10 @@
-import type { PlanNodeCreate, PlanNodeUpdate, PlanNodeRow, PlanNodeType } from "../../../shared/plan-graph.js"
+import type {
+  PlanNodeCreate,
+  PlanNodeUpdate,
+  PlanNodeRow,
+  PlanNodeType,
+  PlanNodeStatus,
+} from "../../../shared/plan-graph.js"
 import { withDbWrite, withDbRead } from "../../db/connection.js"
 import type { NodeOverride } from "../../../shared/for-each-plan-node.js"
 
@@ -210,5 +216,53 @@ export class PlanNodeRepository {
    */
   delete(id: number): number {
     return withDbWrite((db) => db.prepare("DELETE FROM plan_nodes WHERE id = ?").run(id).changes)
+  }
+
+  updateForEachPrevOutputsStatusInsideForEachContent(forEachPlanNodeId: number): number {
+    return withDbWrite((db) => {
+      const stmt = db.prepare<[number, string, PlanNodeStatus, number]>(`
+        UPDATE plan_nodes
+        SET content = (
+            WITH
+            -- 1. Get the current index and parent content once
+            source AS (
+                SELECT id, content,
+                      CAST(json_extract(content, '$.currentIndex') AS INTEGER) as c_idx
+                FROM plan_nodes
+                WHERE id = ?
+            ),
+            -- 2. Pre-filter potential target IDs based on type and parent relationship
+            target_ids AS (
+                SELECT id FROM plan_nodes
+                WHERE parent_id = (SELECT id FROM source)
+                  AND type = ?
+            ),
+            -- 3. Iterate through overrides and apply changes to the status
+            new_overrides AS (
+                SELECT
+                    json(
+                        json_group_object(
+                            kv.key,
+                            CASE
+                                -- Check if array index > currentIndex AND node ID matches the type criteria
+                                WHEN CAST(arr.key AS INTEGER) > (SELECT c_idx FROM source)
+                                    AND kv.key IN (SELECT id FROM target_ids)
+                                THEN json_set(json(kv.value), '$.status', ?)
+                                ELSE json(kv.value)
+                            END
+                        )
+                    ) as obj
+                FROM source s,
+                    json_each(s.content, '$.overrides') as arr, -- arr.key is the index in the array [0, 1, 2...]
+                    json_each(arr.value) as kv                   -- kv.key is the node ID string ("123")
+                GROUP BY arr.id -- Regroup entries back into their respective objects
+            )
+            -- 4. Reassemble the final JSON with the modified overrides array
+            SELECT json_set(s.content, '$.overrides', json_group_array(json(no.obj)))
+            FROM source s, new_overrides no
+        )
+        WHERE id = ?`)
+      return stmt.run(forEachPlanNodeId, "for-each-prev-outputs", "OUTDATED", forEachPlanNodeId).changes
+    })
   }
 }

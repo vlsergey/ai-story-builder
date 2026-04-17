@@ -2,14 +2,12 @@ import { useMemo } from "react"
 import { useLocale } from "@/lib/locale"
 import { Button } from "@/ui-components/button"
 import { Label } from "@/ui-components/label"
-import { Switch } from "@/ui-components/switch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui-components/card"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import type { SplitSettings } from "@shared/node-settings"
 import { Input } from "@/ui-components/input"
 
 export default function SplitNodeEditor({
-  dbValue,
   nodeTypeSettings,
   onNodeTypeSettingsChange,
   onRegenerate,
@@ -18,7 +16,7 @@ export default function SplitNodeEditor({
   const { t } = useLocale()
 
   const parts = useMemo<string[]>(() => {
-    const content = nodeTypeSettings.autoUpdate ? dbValue.content : value.content
+    const content = value.content
     if (content) {
       try {
         const parsed = JSON.parse(content)
@@ -33,7 +31,7 @@ export default function SplitNodeEditor({
     } else {
       return []
     }
-  }, [nodeTypeSettings.autoUpdate, dbValue.content, value.content])
+  }, [value.content])
 
   return (
     <div className="space-y-6 p-4">
@@ -52,19 +50,6 @@ export default function SplitNodeEditor({
               onChange={(e) => onNodeTypeSettingsChange({ ...nodeTypeSettings, separator: e.target.value })}
               className="w-full border rounded px-2 py-1 text-sm"
               placeholder={'e.g., "\\n\\n" or "\\\\s*---\\\\s*"'}
-            />
-          </div>
-
-          <div className="flex items-center justify-between py-2">
-            <Label htmlFor="autoUpdate" className="text-sm mr-2">
-              {t("splitNode.autoUpdate")}
-            </Label>
-            <Switch
-              id="autoUpdate"
-              checked={nodeTypeSettings.autoUpdate}
-              onCheckedChange={(checked: boolean) =>
-                onNodeTypeSettingsChange({ ...nodeTypeSettings, autoUpdate: checked })
-              }
             />
           </div>
 
@@ -95,11 +80,10 @@ export default function SplitNodeEditor({
               }
             />
           </div>
-          {!nodeTypeSettings.autoUpdate && (
-            <Button onClick={onRegenerate} className="w-full">
-              {t("common.update")}
-            </Button>
-          )}
+
+          <Button onClick={onRegenerate} className="w-full">
+            {t("common.update")}
+          </Button>
         </CardContent>
       </Card>
 

@@ -30,6 +30,19 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
     return null
   }
 
+  async onUpdate?(
+    service: PlanNodeService,
+    _nodeId: number,
+    oldNode: PlanNodeRow | null,
+    newNode: PlanNodeRow | null,
+    _settings: ForEachOutputSettings,
+  ): Promise<PlanNodeUpdate | null> {
+    const parentId = oldNode?.parent_id || newNode?.parent_id
+    if (parentId === undefined || parentId === null) return null
+    service.repo.updateForEachPrevOutputsStatusInsideForEachContent(parentId)
+    return null
+  }
+
   async regenerate(
     service: PlanNodeService,
     context: RegenerationNodeContext,
