@@ -34,6 +34,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   const regenerateOptionsForm = useForm<RegenerateOptions>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      regenerateGenerated: false,
       regenerateManual: false,
     },
   })
@@ -118,12 +119,18 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   }
 
   const formId = useId()
+  const [showOptionsForm, setShowOptionsForm] = useState(false)
 
   return (
     <div className="flex flex-col gap-2 p-2 h-full overflow-y-auto">
       {/* Заголовок и статус */}
-      <form id={formId} onSubmit={regenerateOptionsForm.handleSubmit(handleStart)}>
-        <RegenerateOptionsForm form={regenerateOptionsForm} />
+      <form
+        id={formId}
+        onSubmit={regenerateOptionsForm.handleSubmit(handleStart, () => {
+          setShowOptionsForm(true)
+        })}
+      >
+        <RegenerateOptionsForm form={regenerateOptionsForm} show={showOptionsForm} onShowChange={setShowOptionsForm} />
       </form>
       <ButtonGroup className="shrink-0 w-full">
         <Button variant="secondary" type="submit" form={formId} disabled={event?.inProcess || startMutation.isPending}>

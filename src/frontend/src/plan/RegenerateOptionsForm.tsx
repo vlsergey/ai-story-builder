@@ -8,6 +8,8 @@ import { useLocale } from "@/lib/locale"
 
 interface RegenerateOptionsFormProps {
   form: UseFormReturn<RegenerateOptions>
+  show: boolean
+  onShowChange: (show: boolean) => void
 }
 
 export const formSchema = z.object({
@@ -15,10 +17,17 @@ export const formSchema = z.object({
   regenerateManual: z.boolean(),
 })
 
-export default function RegenerateOptionsForm({ form }: RegenerateOptionsFormProps) {
+export default function RegenerateOptionsForm({ form, show, onShowChange }: RegenerateOptionsFormProps) {
   const { t } = useLocale()
   return (
-    <Accordion type="single" collapsible>
+    <Accordion
+      type="single"
+      collapsible
+      value={show ? "form" : ""}
+      onValueChange={(value) => {
+        onShowChange(value === "form")
+      }}
+    >
       <AccordionItem value="form">
         <AccordionTrigger>{t("regenerateOptions.form.accordionTrigger")}</AccordionTrigger>
         <AccordionContent>

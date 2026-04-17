@@ -1,8 +1,9 @@
+import type { SplitSettings } from "@shared/node-settings.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import type { NodeInputs } from "../NodeInput.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
-import type { SplitSettings } from "../../../../shared/node-settings.js"
-import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**
  * Processor for 'split' nodes.
@@ -34,11 +35,12 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
     return []
   }
 
-  private splitInput(service: PlanNodeService, node: PlanNodeRow, settings: SplitSettings): string[] {
-    const inputText = this.getInputText(service, node.id)
-    if (inputText === null) {
+  private splitInput(inputs: NodeInputs<string>, settings: SplitSettings): string[] {
+    const inputText = inputs.map((i) => i.input).join("\n\n")
+    if (inputText.trim().length === 0) {
       return []
     }
+
     let parts = this.splitTextByRegex(inputText, settings.separator)
     // Apply dropFirst and dropLast
     if (settings.dropFirst > 0) {
@@ -48,11 +50,6 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
       parts = parts.slice(0, -settings.dropLast)
     }
     return parts
-  }
-
-  private getInputText(service: PlanNodeService, nodeId: number): string | null {
-    const incoming = service.findNodeInputs(nodeId)
-    return incoming[0]?.input as string
   }
 
   private splitTextByRegex(text: string, regexPattern: string): string[] {
@@ -70,15 +67,24 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
 
   async regenerate(
     service: PlanNodeService,
-    context: RegenerationNodeContext | undefined,
+    _context: RegenerationNodeContext | undefined,
     node: PlanNodeRow,
     settings: SplitSettings,
   ): Promise<PlanNodeUpdate | null> {
     console.log(`[SplitProcessor] regenerate called for node ${node.id}, settings:`, settings)
-    const parts = this.splitInput(service, node, settings)
+
+    const incomings = service.findNodeInputsByType(node.id, "text")
+    const parts = this.splitInput(incomings, settings)
     console.log(`[SplitProcessor] splitInput returned parts:`, parts)
-    return {
+    const result: PlanNodeUpdate = {
       content: JSON.stringify(parts),
     }
+
+    if (incomings.length === 1) {
+      // for single input, use source node summary as summary
+      result.summary = incomings[0].sourceNode.summary
+    }
+
+    return result
   }
 }

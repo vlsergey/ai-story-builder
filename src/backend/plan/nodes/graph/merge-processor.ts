@@ -1,8 +1,9 @@
+import type { MergeSettings } from "../../../../shared/node-settings.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
+import type { NodeInputs } from "../NodeInput.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
-import type { MergeSettings } from "../../../../shared/node-settings.js"
-import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 
 /**
  * Processor for 'merge' nodes.
@@ -28,7 +29,8 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     const nodeTitle = node.title
 
     // Fetch inputs (expanded)
-    const inputs = this.getExpandedInputs(service, node.id)
+    const nodeInputs = service.findNodeInputs(node.id)
+    const inputs = this.getExpandedInputs(nodeInputs)
 
     let content = ""
 
@@ -59,17 +61,19 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     // Remove trailing newlines
     content = content.trim()
 
-    return {
+    const result: PlanNodeUpdate = {
       content: content,
     }
+
+    if (nodeInputs.length === 1) {
+      result.summary = nodeInputs[0].sourceNode.summary
+    }
+
+    return result
   }
 
-  private getExpandedInputs = (
-    context: PlanNodeService,
-    nodeId: number,
-  ): Array<{ title: string; content: string | null }> => {
+  private getExpandedInputs = (nodeInputs: NodeInputs<unknown>): Array<{ title: string; content: string | null }> => {
     // Get incoming edges
-    const nodeInputs = context.findNodeInputs(nodeId)
     const inputs: Array<{ title: string; content: string | null }> = []
 
     for (const nodeInput of nodeInputs) {
