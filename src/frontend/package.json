@@ -54,7 +54,7 @@
     "lucide-react": "^0.577.0",
     "marked": "^17.0.4",
     "motion": "^12.38.0",
-    "openai": "^6.33.0",
+    "openai": "^6.34.0",
     "radix-ui": "^1.4.3",
     "react": "^18.2.0",
     "react-complex-tree": "^2.6.1",
