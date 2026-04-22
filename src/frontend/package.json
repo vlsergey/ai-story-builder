@@ -50,7 +50,6 @@
     "dockview": "^5.0.0",
     "electron-trpc": "^0.7.1",
     "elkjs": "^0.11.1",
-    "lodash": "^4.17.23",
     "lucide-react": "^0.577.0",
     "marked": "^17.0.4",
     "motion": "^12.38.0",
