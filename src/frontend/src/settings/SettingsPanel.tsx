@@ -37,9 +37,6 @@ export default function SettingsPanel() {
   const { data: aiConfigStore, isLoading: isAiConfigStoreLoading } = trpc.settings.allAiEnginesConfig.get.useQuery()
   const { data: currentEngine, isLoading: isCurrentEngineLoading } =
     trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery()
-  const { data: autoGenerateSummary, isLoading: isAutoGenerateSummaryLoading } =
-    trpc.settings.autoGenerateSummary.get.useQuery()
-  const { data: verboseAiLogging, isLoading: isVerboseAiLoggingLoading } = trpc.settings.verboseAiLogging.get.useQuery()
   const [engineError, setEngineError] = useState<string | null>(null)
   const utils = trpc.useUtils()
 
@@ -50,8 +47,6 @@ export default function SettingsPanel() {
   }).mutate
 
   const setAllAiEnginesConfig = useSetAndInvalidate(trpc.settings.allAiEnginesConfig.set).mutate
-  const setAutoGenerateSummary = useSetAndInvalidate(trpc.settings.autoGenerateSummary.set).mutate
-  const setVerboseAiLogging = useSetAndInvalidate(trpc.settings.verboseAiLogging.set).mutate
 
   const setAiEngineConfig = useCallback(
     (engineId: string, aiEngineConfig: AiEngineConfig) => {

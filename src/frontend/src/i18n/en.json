@@ -30,19 +30,6 @@
   "aiThinking.web_search_call.open_page": "Reading web page",
   "aiThinking.web_search_call.search": "Web search",
 
-  "settings.loading": "Loading settings…",
-  "settings.uiLanguage.title": "Interface Language",
-  "settings.uiLanguage.en": "English",
-  "settings.uiLanguage.ru": "Русский",
-  "settings.uiLanguage.select": "Select language",
-  "settings.theme.title": "Theme",
-  "settings.theme.auto": "Auto (follow system)",
-  "settings.theme.obsidian": "Obsidian (dark)",
-  "settings.theme.github": "GitHub (light)",
-  "settings.theme.select": "Select theme",
-  "settings.aiEngine.title": "Current AI Engine",
-  "settings.aiEngine.none": "None",
-  "settings.aiEngine.select": "Select engine",
   "settings.aiEngine.description": "Controls the sync-status icon in the Lore Tree. Required credentials must be saved before activating an engine.",
   "settings.aiEngine.active": "● active",
   "settings.aiEngine.by": "by",
@@ -301,14 +288,5 @@
   "regeneration.empty": "Empty",
   "regeneration.skipped": "Skipped",
   "regeneration.last_session": "Last session stats",
-  "regenerateOptions.form.accordionTrigger": "Generation options",
-
-  "settings.aiRegenerateGenerated.label": "Regenerate AI-generated changes",
-  "settings.aiRegenerateGenerated.description": "Regenerate nodes whose inputs/parameters have not changed (already have «GENERATED» status).",
-  "settings.aiRegenerateManual.label": "Regenerate manual changes",
-  "settings.aiRegenerateManual.description": "Regenerate nodes that had manual edits after generation, including AI-assisted improvements (have «MANUAL» status).",
-  "settings.autoGenerateSummary.label": "Auto-summary generation",
-  "settings.autoGenerateSummary.description": "Automatically generate a short summary (5–10 words) for plan nodes when content changes.",
-  "settings.verboseAiLogging.label": "Verbose AI request logging",
-  "settings.verboseAiLogging.description": "Prints full request headers (API key masked) and body to the server console for every AI API call. Use when diagnosing AI integration issues."
+  "regenerateOptions.form.accordionTrigger": "Generation options"
 }

@@ -30,19 +30,6 @@
   "aiThinking.web_search_call.open_page": "Чтение web-страницы",
   "aiThinking.web_search_call.search": "Web-поиск",
 
-  "settings.loading": "Загрузка настроек…",
-  "settings.uiLanguage.title": "Язык интерфейса",
-  "settings.uiLanguage.en": "English",
-  "settings.uiLanguage.ru": "Русский",
-  "settings.uiLanguage.select": "Выберите язык",
-  "settings.theme.title": "Тема",
-  "settings.theme.auto": "Авто (по системе)",
-  "settings.theme.obsidian": "Obsidian (тёмная)",
-  "settings.theme.github": "GitHub (светлая)",
-  "settings.theme.select": "Выберите тему",
-  "settings.aiEngine.title": "Текущий AI движок",
-  "settings.aiEngine.none": "Не выбран",
-  "settings.aiEngine.select": "Выберите движок",
   "settings.aiEngine.description": "Необходимые учётные данные должны быть сохранены перед активацией движка.",
   "settings.aiEngine.active": "● активен",
   "settings.aiEngine.by": "от",
@@ -309,14 +296,5 @@
   "regeneration.empty": "Пустые",
   "regeneration.skipped": "Пропущены",
   "regeneration.last_session": "Статистика последней сессии",
-  "regenerateOptions.form.accordionTrigger": "Опции генерации",
-
-  "settings.autoGenerateSummary.label": "Авто-сводка",
-  "settings.autoGenerateSummary.description": "Автоматически генерировать краткую сводку (5–10 слов) для узлов плана при изменении контента.",
-  "settings.aiRegenerateGenerated.label": "Перегенерировать ИИ-изменения",
-  "settings.aiRegenerateGenerated.description": "Нужно ли перегенерировать узлы, в которых не менялись входы/параметры (уже имеют статус «СГЕНЕРИРОВАНО»).",
-  "settings.aiRegenerateManual.label": "Перегенерировать ручные изменения",
-  "settings.aiRegenerateManual.description": "Нужно ли перегенерировать узлы, в которых были сделаны ручные изменения после генерации, в том числе улучшения с помощью ИИ (имеют статус «РУЧНЫЕ ИЗМЕНЕНИЯ»).",
-  "settings.verboseAiLogging.label": "Подробное логирование AI запросов",
-  "settings.verboseAiLogging.description": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции."
+  "regenerateOptions.form.accordionTrigger": "Опции генерации"
 }
