@@ -1,7 +1,8 @@
-import { BUILTIN_ENGINES } from "../../shared/ai-engines.js"
+import { type AiEngineKey, BUILTIN_ENGINES } from "../../shared/ai-engines.js"
 import type { JsonSchemaSpec } from "../lib/ai-engine-adapter.js"
 import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
+import { getCurrentEngineGenerateSummaryInstructions } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
 // Unused but kept for type compat
@@ -21,11 +22,11 @@ export async function generateSummary(promptCacheKeys: string[], nodeOutput: unk
 
   if (!content) throw makeErrorWithStatus("No content to summarize", 400)
 
-  let engine: string | undefined
+  let engine: AiEngineKey | null
   const engineFileIds: string[] = []
 
   try {
-    engine = SettingsRepository.get("current_backend") || undefined
+    engine = SettingsRepository.getCurrentBackend()
     if (!engine) throw makeErrorWithStatus("no AI engine configured", 400)
   } catch (e: any) {
     if (e.status) throw e
@@ -41,7 +42,7 @@ export async function generateSummary(promptCacheKeys: string[], nodeOutput: unk
   const includeExistingLore = false // summary doesn't need lore attachments
 
   // Get custom summary instructions from engine config
-  const generateSummaryInstructions = SettingsRepository.getCurrentEngineGenerateSummaryInstructions()?.trim()
+  const generateSummaryInstructions = getCurrentEngineGenerateSummaryInstructions()?.trim()
   if (!generateSummaryInstructions) {
     throw makeErrorWithStatus(
       "Summary generation is disabled because generateSummaryInstructions is not configured",

@@ -1,5 +1,5 @@
 import { useId } from "react"
-import { BUILTIN_ENGINES } from "../../../shared/ai-engines"
+import { type AiEngineKey, BUILTIN_ENGINES } from "../../../shared/ai-engines"
 import type { AiGenerationSettings as AiGenerationSettingsDto } from "../../../shared/ai-generation-settings"
 import AiEngineField from "./AiEngineField"
 import { trpc } from "@/ipcClient"
@@ -16,7 +16,7 @@ interface AiGenerationSettingsFieldGroupProps {
   className?: string
   formControl: Control<AiGenerationSettingsDto>
   formFieldNamePrefix?: string
-  engineId: string | null
+  engineId: AiEngineKey | null
   disabled?: boolean
 }
 

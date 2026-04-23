@@ -1,63 +1,50 @@
 import type { AllAiEnginesConfig } from "@shared/ai-engine-config"
-import { THEME_PREFERENCE_VALUES } from "@shared/themes"
+import { AI_ENGINES_KEYS } from "@shared/ai-engines"
 import z from "zod"
 import type { RouteBuilder } from "../router"
 import { refreshEngineModels, setCurrentEngine } from "../routes/ai-config"
+import {
+  getCurrentEngineAvailableModels,
+  getCurrentEngineDefaultAiGenerationSettings,
+  getCurrentEngineSummaryAiGenerationSettings,
+} from "./ai-settings"
+import { AUTO_GENERATE_SUMMARY, LAYOUT, type SettingDef, UI_THEME, VERBOSE_AI_LOGGING } from "./SettingDef"
 import { SettingsRepository } from "./settings-repository"
+
+function buildSettingRouter<T>(t: RouteBuilder, def: SettingDef<T>) {
+  return t.router({
+    get: t.procedure.query(() => SettingsRepository.get(def)),
+    set: t.procedure.input(def.schema).mutation(({ input }) => SettingsRepository.set(def, input as T)),
+  })
+}
 
 export function settingsRoutes(t: RouteBuilder) {
   return t.router({
-    get: t.procedure.input(z.string()).query(({ input }) => SettingsRepository.get(input)),
-    set: t.procedure
-      .input(z.tuple([z.string(), z.any()]))
-      .mutation(({ input }) => SettingsRepository.set(input[0], input[1])),
-
-    autoGenerateSummary: t.router({
-      get: t.procedure.query(() => SettingsRepository.getAutoGenerateSummary()),
-      set: t.procedure.input(z.boolean()).mutation(({ input }) => SettingsRepository.setAutoGenerateSummary(input)),
-    }),
-
-    layout: t.router({
-      get: t.procedure.query(() => SettingsRepository.getLayout()),
-      set: t.procedure.input(z.unknown()).mutation(({ input }) => SettingsRepository.saveLayout(input)),
-    }),
-
-    textLanguage: t.router({
-      get: t.procedure.query(() => SettingsRepository.getTextLanguage()),
-      set: t.procedure.input(z.string()).mutation(({ input }) => SettingsRepository.setTextLanguage(input)),
-    }),
-
-    uiTheme: t.router({
-      get: t.procedure.query(() => SettingsRepository.getUiTheme()),
-      set: t.procedure
-        .input(z.enum(THEME_PREFERENCE_VALUES))
-        .mutation(({ input }) => SettingsRepository.setUiTheme(input)),
-    }),
-
-    verboseAiLogging: t.router({
-      get: t.procedure.query(() => SettingsRepository.getVerboseAiLogging()),
-      set: t.procedure.input(z.boolean()).mutation(({ input }) => SettingsRepository.setVerboseAiLogging(input)),
-    }),
-
+    autoGenerateSummary: buildSettingRouter(t, AUTO_GENERATE_SUMMARY),
+    layout: buildSettingRouter(t, LAYOUT),
+    uiTheme: buildSettingRouter(t, UI_THEME),
+    verboseAiLogging: buildSettingRouter(t, VERBOSE_AI_LOGGING),
     allAiEnginesConfig: t.router({
       get: t.procedure.query(() => SettingsRepository.getAllAiEnginesConfig()),
       set: t.procedure
         .input((v) => v as AllAiEnginesConfig)
-        .mutation(({ input }) => SettingsRepository.saveAllAiEnginesConfig(input)),
+        .mutation(({ input }) => SettingsRepository.setAllAiEnginesConfig(input)),
       currentEngine: t.router({
         get: t.procedure.query(() => SettingsRepository.getCurrentBackend()),
-        set: t.procedure.input(z.string().nullable()).mutation(({ input }) => setCurrentEngine(input)),
+        set: t.procedure.input(z.enum(AI_ENGINES_KEYS).nullable()).mutation(({ input }) => setCurrentEngine(input)),
         availableModels: t.router({
-          get: t.procedure.query(() => SettingsRepository.getCurrentEngineAvailableModels()),
+          get: t.procedure.query(() => getCurrentEngineAvailableModels()),
         }),
         defaultAiGenerationSettings: t.router({
-          get: t.procedure.query(() => SettingsRepository.getCurrentEngineDefaultAiGenerationSettings()),
+          get: t.procedure.query(() => getCurrentEngineDefaultAiGenerationSettings()),
         }),
         summaryAiGenerationSettings: t.router({
-          get: t.procedure.query(() => SettingsRepository.getCurrentEngineSummaryAiGenerationSettings()),
+          get: t.procedure.query(() => getCurrentEngineSummaryAiGenerationSettings()),
         }),
       }),
-      refreshEngineModels: t.procedure.input(z.string()).mutation(({ input }) => refreshEngineModels(input)),
+      refreshEngineModels: t.procedure
+        .input(z.enum(AI_ENGINES_KEYS))
+        .mutation(({ input }) => refreshEngineModels(input)),
     }),
   })
 }

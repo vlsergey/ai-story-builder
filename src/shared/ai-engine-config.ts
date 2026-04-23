@@ -1,5 +1,5 @@
 import * as z from "zod"
-import type { AiEngineDefinition, AiEngineKey } from "./ai-engines.js"
+import type { AiEngineDefinition } from "./ai-engines.js"
 import { type AiGenerationSettings, getAiGenerationSettingsSchema } from "./ai-generation-settings.js"
 import type { GrokAiGenerationSettings } from "./grok-ai-generation-settings.js"
 import type { YandexAiGenerationSettings } from "./yandex-ai-generation-settings.js"
@@ -7,7 +7,6 @@ import type { YandexAiGenerationSettings } from "./yandex-ai-generation-settings
 export interface AllAiEnginesConfig {
   grok?: GrokEngineConfig
   yandex?: YandexEngineConfig
-  [key: AiEngineKey]: AiEngineConfig | undefined
 }
 
 export interface AiEngineConfig<EngineAiGenerationSettings extends AiGenerationSettings = AiGenerationSettings> {

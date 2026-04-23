@@ -40,7 +40,7 @@ export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
   NC21: { label: "NC-21", minAge: 21, bg: "#6b21a8", fg: "#fff" }, // purple-800
 }
 
-export const AI_ENGINES_KEYS = ["grok", "yandex"]
+export const AI_ENGINES_KEYS = ["grok", "yandex"] as const
 export type AiEngineKey = (typeof AI_ENGINES_KEYS)[number]
 
 export interface AiEngineCapabilities {
@@ -100,7 +100,7 @@ export const CAPABILITY_KEYS: Array<keyof AiEngineCapabilities> = [
   "knowledgeBaseAttachment",
 ]
 
-export const GROK_ENGINE_DEF: AiEngineDefinition = {
+export const GROK_ENGINE_DEF = {
   id: "grok",
   provider: "xAI",
   ageRating: "NC21",
@@ -124,9 +124,9 @@ export const GROK_ENGINE_DEF: AiEngineDefinition = {
     { key: "web_search", type: "checkbox", schema: z.coerce.boolean() },
   ],
   maxFilesPerRequest: 10,
-}
+} as const satisfies AiEngineDefinition
 
-export const YANDEX_ENGINE_DEF: AiEngineDefinition = {
+export const YANDEX_ENGINE_DEF = {
   id: "yandex",
   provider: "Yandex",
   ageRating: "12",
@@ -146,10 +146,10 @@ export const YANDEX_ENGINE_DEF: AiEngineDefinition = {
     { key: "webSearch", type: "select", options: ["none", "low", "medium", "high"], defaultValue: "none" },
   ],
   maxFilesPerRequest: null,
-}
+} as const satisfies AiEngineDefinition
 
 /** Built-in AI engine definitions. */
-export const BUILTIN_ENGINES: AiEngineDefinition[] = [GROK_ENGINE_DEF, YANDEX_ENGINE_DEF]
+export const BUILTIN_ENGINES = [GROK_ENGINE_DEF, YANDEX_ENGINE_DEF] as const satisfies AiEngineDefinition[]
 
 /** Returns the capabilities of the given engine, or null if unknown. */
 export function getEngineCapabilities(engineId: string | null | undefined): AiEngineCapabilities | null {

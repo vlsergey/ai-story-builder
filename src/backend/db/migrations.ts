@@ -1,6 +1,5 @@
 import fs from "node:fs"
-import path, { dirname } from "node:path"
-import { fileURLToPath } from "node:url"
+import path from "node:path"
 import type { Database } from "better-sqlite3"
 
 import migration001 from "./migrations/001.js"
@@ -28,6 +27,7 @@ import migration022 from "./migrations/022.js"
 import migration023 from "./migrations/023.js"
 import migration024 from "./migrations/024.js"
 import migration025 from "./migrations/025.js"
+import migration026 from "./migrations/026.js"
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -82,12 +82,12 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration024,
   // version 24 → 25: add width and height columns to plan_nodes and lore_nodes
   migration025,
+  migration026,
 ]
 
-export const CURRENT_VERSION = 25
+export const CURRENT_VERSION = 26
 
 function loadSchemaFromFile(db: Database): void {
-  const backendDir = dirname(fileURLToPath(import.meta.url))
   const schemaPath = path.join(__dirname, "schema.sql")
   const sql = fs.readFileSync(schemaPath, "utf-8")
   db.exec(sql)

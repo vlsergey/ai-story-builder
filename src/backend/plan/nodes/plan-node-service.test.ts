@@ -22,7 +22,7 @@ vi.mock("../../ai/generate-summary.js", () => ({
 function setupTestSettings() {
   SettingsRepository.setCurrentBackend("grok")
   // Save config with defaultAiGenerationSettings
-  SettingsRepository.saveAllAiEnginesConfig({
+  SettingsRepository.setAllAiEnginesConfig({
     grok: {
       api_key: "fake-key",
       defaultAiGenerationSettings: {

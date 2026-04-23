@@ -489,7 +489,7 @@ export async function syncLore(): Promise<{
     updatedConfig.yandex = rest
   }
 
-  SettingsRepository.saveAllAiEnginesConfig(updatedConfig)
+  SettingsRepository.setAllAiEnginesConfig(updatedConfig)
 
   repo.deleteMarkedForDeletion()
 

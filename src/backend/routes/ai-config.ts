@@ -1,5 +1,6 @@
-import type { AiEngineConfig, GrokEngineConfig, YandexEngineConfig } from "../../shared/ai-engine-config.js"
-import { BUILTIN_ENGINES } from "../../shared/ai-engines.js"
+import type { AiEngineConfig, GrokEngineConfig } from "../../shared/ai-engine-config.js"
+import { type AiEngineKey, BUILTIN_ENGINES } from "../../shared/ai-engines.js"
+import { AI_CURRENT_ENGINE } from "../settings/SettingDef.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -12,16 +13,18 @@ function makeError(message: string, status: number): Error {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-export function setCurrentEngine(engine: string | null): { ok: boolean } {
+export function setCurrentEngine(engine: AiEngineKey | null): { ok: boolean } {
   if (engine != null) {
-    const config = SettingsRepository.getAllAiEnginesConfig()
+    const allEnginesConfig = SettingsRepository.getAllAiEnginesConfig()
     const engineDef = BUILTIN_ENGINES.find((x) => x.id === engine)
     if (!engineDef) throw makeError(`Unknown engine: ${engine}`, 400)
 
+    const candidateEngineConfig = allEnginesConfig[engine] || {}
+
     const missing: string[] = []
     for (const field of engineDef.configFields) {
-      if (field.required) {
-        if (!config[field.key]) missing.push(field.key)
+      if ("required" in field && field.required) {
+        if (!(field.key in candidateEngineConfig)) missing.push(field.key)
       }
     }
     if (missing.length > 0) {
@@ -29,24 +32,21 @@ export function setCurrentEngine(engine: string | null): { ok: boolean } {
     }
   }
 
-  SettingsRepository.setCurrentBackend(engine)
+  SettingsRepository.set(AI_CURRENT_ENGINE, engine)
   return { ok: true }
 }
 
-export function getEngineModels(engine: string): { models: string[] } {
-  const config = SettingsRepository.getAllAiEnginesConfig()
-  let models: string[] = []
-  if (engine === "yandex") models = config.yandex?.available_models ?? []
-  else if (engine === "grok") models = config.grok?.available_models ?? []
-  return { models }
+export function getEngineModels(engine: AiEngineKey): { models: string[] } {
+  const allEnginesConfig = SettingsRepository.getAllAiEnginesConfig()
+  return { models: allEnginesConfig[engine]?.available_models ?? [] }
 }
 
-export async function refreshEngineModels(engine: string) {
+export async function refreshEngineModels(engine: AiEngineKey) {
   const config = SettingsRepository.getAllAiEnginesConfig()
   let models: string[] = []
 
   if (engine === "yandex") {
-    const engineConfig = config.yandex as YandexEngineConfig | undefined
+    const engineConfig = config.yandex
     const apiKey = engineConfig?.api_key?.trim()
     const folderId = engineConfig?.folder_id?.trim()
     if (!apiKey || !folderId) {
@@ -83,7 +83,7 @@ export async function refreshEngineModels(engine: string) {
     throw makeError(`Model refresh not supported for engine '${engine}'`, 400)
   }
 
-  SettingsRepository.saveAllAiEnginesConfig(config)
+  SettingsRepository.setAllAiEnginesConfig(config)
 }
 
 export async function testEngineConnection(

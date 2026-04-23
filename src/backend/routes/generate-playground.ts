@@ -1,3 +1,4 @@
+import type { AiEngineKey } from "@shared/ai-engines.js"
 import type OpenAI from "openai"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
@@ -18,11 +19,11 @@ export async function generatePlayground(
 
   if (!instructions?.trim()) throw makeError("instructions is required", 400)
 
-  let engine: string | undefined
+  let engine: AiEngineKey | null
   const engineFileIds: string[] = []
 
   try {
-    engine = SettingsRepository.getCurrentBackend() || undefined
+    engine = SettingsRepository.getCurrentBackend()
     if (!engine) throw makeError("no AI engine configured", 400)
 
     if (includeExistingLore && engine) {

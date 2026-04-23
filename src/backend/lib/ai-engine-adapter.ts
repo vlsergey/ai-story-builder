@@ -53,12 +53,11 @@ export interface AiEngineAdapter<T extends AiGenerationSettings = AiGenerationSe
 import { GrokAdapter } from "./grok-adapter.js"
 import { YandexAdapter } from "./yandex-adapter.js"
 
-const adapters: Record<AiEngineKey, AiEngineAdapter<AiGenerationSettings>> = {
+const adapters = {
   grok: new GrokAdapter(),
   yandex: new YandexAdapter(),
-}
+} as const
 
-/** Returns the adapter for the given engine ID, or null if unsupported. */
-export function getEngineAdapter(engineId: AiEngineKey): AiEngineAdapter<AiGenerationSettings> | null {
-  return adapters[engineId] ?? null
+export function getEngineAdapter(engineId: AiEngineKey): AiEngineAdapter<AiGenerationSettings> {
+  return adapters[engineId]
 }

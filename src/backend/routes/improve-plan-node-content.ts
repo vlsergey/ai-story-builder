@@ -3,6 +3,7 @@ import type { AiGenerationSettings } from "../../shared/ai-generation-settings.j
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
+import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ export async function improvePlanNodeContent(
   const nodeEngineAiSettings =
     (JSON.parse(nodeAiSettings || "{}") as Record<string, AiGenerationSettings>)[engineId] || {}
   const actualAiSettings = {
-    ...SettingsRepository.getCurrentEngineDefaultAiGenerationSettings(),
+    ...getCurrentEngineDefaultAiGenerationSettings(),
     ...nodeEngineAiSettings,
   }
 

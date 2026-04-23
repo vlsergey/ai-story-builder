@@ -3,6 +3,7 @@ import type { AiGenerationSettings } from "../../shared/ai-generation-settings.j
 import type { JsonSchemaSpec } from "../lib/ai-engine-adapter.js"
 import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
+import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ export async function generateLore(
   const nodeEngineAiSettings =
     (JSON.parse(nodeAiSettings || "{}") as Record<string, AiGenerationSettings>)[engineId] || {}
   const aiGenerationSettings = {
-    ...SettingsRepository.getCurrentEngineDefaultAiGenerationSettings(),
+    ...getCurrentEngineDefaultAiGenerationSettings(),
     ...nodeEngineAiSettings,
   }
 

@@ -1,5 +1,5 @@
 import { useCallback, useId, useState } from "react"
-import { BUILTIN_ENGINES } from "../lib/ai-engines"
+import { type AiEngineKey, BUILTIN_ENGINES } from "../lib/ai-engines"
 import { useLocale } from "../lib/locale"
 import { useTheme } from "../lib/theme/theme-provider"
 import AiEngineConfigEditor from "../ai/AiEngineConfigEditor"
@@ -39,7 +39,6 @@ export default function SettingsPanel() {
     trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery()
   const { data: autoGenerateSummary, isLoading: isAutoGenerateSummaryLoading } =
     trpc.settings.autoGenerateSummary.get.useQuery()
-  const { data: textLanguage, isLoading: isTextLanguageLoading } = trpc.settings.textLanguage.get.useQuery()
   const { data: verboseAiLogging, isLoading: isVerboseAiLoggingLoading } = trpc.settings.verboseAiLogging.get.useQuery()
   const [engineError, setEngineError] = useState<string | null>(null)
   const utils = trpc.useUtils()
@@ -52,7 +51,6 @@ export default function SettingsPanel() {
 
   const setAllAiEnginesConfig = useSetAndInvalidate(trpc.settings.allAiEnginesConfig.set).mutate
   const setAutoGenerateSummary = useSetAndInvalidate(trpc.settings.autoGenerateSummary.set).mutate
-  const setTextLanguage = useSetAndInvalidate(trpc.settings.textLanguage.set).mutate
   const setVerboseAiLogging = useSetAndInvalidate(trpc.settings.verboseAiLogging.set).mutate
 
   const setAiEngineConfig = useCallback(
@@ -117,23 +115,6 @@ export default function SettingsPanel() {
           </Select>
         </Field>
 
-        {/* ── Text Language ── */}
-        <Field orientation="responsive">
-          <FieldContent>
-            <FieldLabel htmlFor={htmlIdTextLanguage}>{t("settings.textLanguage.title")}</FieldLabel>
-            <FieldDescription>{t("settings.textLanguage.description")}</FieldDescription>
-          </FieldContent>
-          <Select disabled={isTextLanguageLoading} value={textLanguage || ""} onValueChange={setTextLanguage}>
-            <SelectTrigger id={htmlIdTextLanguage} className="w-64">
-              <SelectValue placeholder="Select language" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ru-RU">Русский (ru-RU)</SelectItem>
-              <SelectItem value="en-US">English (en-US)</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-
         {/* ── Auto-summary generation ── */}
         <Field orientation="responsive">
           <FieldContent>
@@ -157,7 +138,7 @@ export default function SettingsPanel() {
           <Select
             disabled={isCurrentEngineLoading}
             value={currentEngine ?? "none"}
-            onValueChange={(value) => setCurrentEngine(value === "none" ? null : value)}
+            onValueChange={(value) => setCurrentEngine(value === "none" ? null : (value as AiEngineKey))}
           >
             <SelectTrigger id={htmlIdCurrentEngine} className="w-64">
               <SelectValue placeholder={t("settings.aiEngine.select")} />

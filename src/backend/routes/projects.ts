@@ -188,8 +188,7 @@ export function createProject(data: { name?: string; text_language?: string }): 
     }
 
     SettingsRepository.setProjectTitle(name)
-    SettingsRepository.set("locale", "en")
-    SettingsRepository.setTextLanguage(text_language)
+    SettingsRepository.setLocale("en")
 
     const planRepo = new PlanNodeRepository()
     planRepo.insert({ parent_id: null, title: name, position: 0 })

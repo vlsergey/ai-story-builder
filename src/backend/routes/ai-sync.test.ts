@@ -2,6 +2,7 @@
  * Integration tests for syncLore()
  */
 
+import type { AiEngineKey } from "@shared/ai-engines.js"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { AllAiEnginesConfig } from "../../shared/ai-engine-config.js"
 import { setUpTestDb, tearDownTestDb } from "../db/test-db-utils.js"
@@ -39,7 +40,7 @@ function setupDb(opts?: {
   apiKey?: string
   folderId?: string
   searchIndexId?: string
-  currentEngine?: string
+  currentEngine?: AiEngineKey
   grokApiKey?: string
   nodes?: Array<{
     id?: number
@@ -69,7 +70,7 @@ function setupDb(opts?: {
     aiConfig.grok = { api_key: opts.grokApiKey }
   }
   if (Object.keys(aiConfig).length > 0) {
-    SettingsRepository.saveAllAiEnginesConfig(aiConfig)
+    SettingsRepository.setAllAiEnginesConfig(aiConfig)
   }
 
   const repo = new LoreNodeRepository()
@@ -115,16 +116,6 @@ describe("syncLore", () => {
   it("throws 400 when no AI engine is configured", async () => {
     setupDb()
     await expect(syncLore()).rejects.toThrow(/no AI engine configured/)
-    try {
-      await syncLore()
-    } catch (e: any) {
-      expect(e.status).toBe(400)
-    }
-  })
-
-  it("throws 400 when current engine is unknown / not supported", async () => {
-    setupDb({ currentEngine: "unknown-engine" })
-    await expect(syncLore()).rejects.toThrow(/not supported for engine 'unknown-engine'/)
     try {
       await syncLore()
     } catch (e: any) {
