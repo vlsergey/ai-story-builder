@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
 import { generatePlanNodeTextContent } from "../../ai/generate-plan-node-text-content.js"
 import { generateSummary } from "../../ai/generate-summary.js"
 import { setUpTestDb, tearDownTestDb } from "../../db/test-db-utils.js"
@@ -187,11 +186,9 @@ describe("PlanNodeService — full plan content generation", () => {
     expect(splitInputs).toHaveLength(1)
     expect(splitInputs[0].input).toBe("First par.\n\nSecond par.")
 
-    const options: RegenerateOptions = { regenerateGenerated: false, regenerateManual: false }
-
     // Start regeneration of subtree (all nodes)
     const { regenerateTreeNodesContents } = await import("./generate/regenerateTreeNodesContents.js")
-    await regenerateTreeNodesContents(options)
+    await regenerateTreeNodesContents()
 
     // Debug output after regeneration
     const updatedSplitNode = service.getById(splitNodeId)

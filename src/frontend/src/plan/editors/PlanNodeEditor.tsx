@@ -1,7 +1,6 @@
 import getDifference from "@shared/getDifference.js"
 import { Alert, AlertDescription, AlertTitle } from "@/ui-components/alert"
 import type { PlanNodeRow } from "@shared/plan-graph"
-import type { RegenerateOptions } from "@shared/RegenerateOptions"
 import { type FC, useCallback, useEffect, useMemo, useState } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { useDebouncedCallback } from "use-debounce"
@@ -143,11 +142,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
   const handleRegenerate = useCallback(async () => {
     try {
       await handleSave(value)
-      const options: RegenerateOptions = {
-        regenerateGenerated: true,
-        regenerateManual: true,
-      }
-      const result = await regenerateMutation.mutateAsync({ id: value.id, options })
+      const result = await regenerateMutation.mutateAsync(value.id)
       setLastSaved(result)
       setValue(result)
     } catch (e) {

@@ -87,10 +87,6 @@
   "capability.knowledgeBaseAttachment.label": "Прикрепление базы знаний",
   "capability.knowledgeBaseAttachment.description": "Прикрепление готовой базы знаний (векторного хранилища / поискового индекса) к запросу генерации для автоматического извлечения релевантного контекста. Также называется: Search Index Tool (Yandex), Collections Search Tool (xAI Grok), file_search (OpenAI).",
 
-  "settings.autoSummary.title": "Авто-сводка",
-  "settings.autoSummary.description": "Автоматически генерировать краткую сводку (5–10 слов) для узлов плана при изменении контента.",
-  "settings.debug.verboseAiLogging": "Подробное логирование AI запросов",
-  "settings.debug.verboseAiLoggingDescription": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции.",
   "settings.defaultAiGenerationSettings.title": "Настройки генерации текстов по-умолчанию",
   "settings.models.title": "Доступные модели",
   "settings.models.refresh": "Обновить",
@@ -287,10 +283,14 @@
   "regeneration.empty": "Пустые",
   "regeneration.skipped": "Пропущены",
   "regeneration.last_session": "Статистика последней сессии",
-
   "regenerateOptions.form.accordionTrigger": "Опции генерации",
-  "regenerateOptions.regenerateGenerated.label": "Перегенерировать ИИ-изменения",
-  "regenerateOptions.regenerateGenerated.description": "Нужно ли перегенерировать узлы, в которых не менялись входы/параметры (уже имеют статус «СГЕНЕРИРОВАНО»).",
-  "regenerateOptions.regenerateManual.label": "Перегенерировать ручные изменения",
-  "regenerateOptions.regenerateManual.description": "Нужно ли перегенерировать узлы, в которых были сделаны ручные изменения после генерации, в том числе улучшения с помощью ИИ (имеют статус «РУЧНЫЕ ИЗМЕНЕНИЯ»)."
+
+  "settings.autoGenerateSummary.label": "Авто-сводка",
+  "settings.autoGenerateSummary.description": "Автоматически генерировать краткую сводку (5–10 слов) для узлов плана при изменении контента.",
+  "settings.aiRegenerateGenerated.label": "Перегенерировать ИИ-изменения",
+  "settings.aiRegenerateGenerated.description": "Нужно ли перегенерировать узлы, в которых не менялись входы/параметры (уже имеют статус «СГЕНЕРИРОВАНО»).",
+  "settings.aiRegenerateManual.label": "Перегенерировать ручные изменения",
+  "settings.aiRegenerateManual.description": "Нужно ли перегенерировать узлы, в которых были сделаны ручные изменения после генерации, в том числе улучшения с помощью ИИ (имеют статус «РУЧНЫЕ ИЗМЕНЕНИЯ»).",
+  "settings.verboseAiLogging.label": "Подробное логирование AI запросов",
+  "settings.verboseAiLogging.description": "Выводит в консоль сервера полные заголовки (API ключ скрыт) и тело каждого запроса к AI. Используйте при диагностике проблем интеграции."
 }

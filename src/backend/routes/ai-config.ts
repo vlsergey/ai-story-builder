@@ -1,6 +1,5 @@
 import type { AiEngineConfig, GrokEngineConfig } from "../../shared/ai-engine-config.js"
 import { type AiEngineKey, BUILTIN_ENGINES } from "../../shared/ai-engines.js"
-import { AI_CURRENT_ENGINE } from "../settings/SettingDef.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -32,7 +31,7 @@ export function setCurrentEngine(engine: AiEngineKey | null): { ok: boolean } {
     }
   }
 
-  SettingsRepository.set(AI_CURRENT_ENGINE, engine)
+  SettingsRepository.setCurrentBackend(engine)
   return { ok: true }
 }
 

@@ -44,46 +44,43 @@ export default function TextNodeEditor({
   const [tempContent, setTempContent] = useState<string | null>(null)
 
   const [generationStarted, setGenerationStarted] = useState(false)
-  trpc.plan.nodes.aiGenerateWatchAndReview.useSubscription(
-    { id: nodeId, options: { regenerateManual: true, regenerateGenerated: true } },
-    {
-      enabled: generationStarted,
-      onData: (event) => {
-        switch (event.type) {
-          case "event": {
-            const streamEvent = event.event as ResponseStreamEvent
-            switch (streamEvent.type) {
-              case "response.output_text.delta":
-                setTempContent((content) => (content || "") + streamEvent.delta)
-                break
-              default:
-                console.log(JSON.stringify(streamEvent))
-                aiThinkinPanelRef?.current?.onEvent(streamEvent)
-            }
-            break
+  trpc.plan.nodes.aiGenerateWatchAndReview.useSubscription(nodeId, {
+    enabled: generationStarted,
+    onData: (event) => {
+      switch (event.type) {
+        case "event": {
+          const streamEvent = event.event as ResponseStreamEvent
+          switch (streamEvent.type) {
+            case "response.output_text.delta":
+              setTempContent((content) => (content || "") + streamEvent.delta)
+              break
+            default:
+              console.log(JSON.stringify(streamEvent))
+              aiThinkinPanelRef?.current?.onEvent(streamEvent)
           }
-          case "data":
-            onExternalUpdate(event.data)
-            setTempContent(null)
-            break
-          case "completed":
-            aiThinkinPanelRef?.current?.onComplete()
-            setGenerationStarted(false)
-            setTempContent(null)
-            setStatusOverride(null)
-            setEditorMode("review_after_generate")
-            break
+          break
         }
-      },
-      onError: (err) => {
-        console.error(err)
-        aiThinkinPanelRef?.current?.onComplete()
-        setTempContent(null)
-        setGenerationStarted(false)
-        setEditorMode("generate")
-      },
+        case "data":
+          onExternalUpdate(event.data)
+          setTempContent(null)
+          break
+        case "completed":
+          aiThinkinPanelRef?.current?.onComplete()
+          setGenerationStarted(false)
+          setTempContent(null)
+          setStatusOverride(null)
+          setEditorMode("review_after_generate")
+          break
+      }
     },
-  )
+    onError: (err) => {
+      console.error(err)
+      aiThinkinPanelRef?.current?.onComplete()
+      setTempContent(null)
+      setGenerationStarted(false)
+      setEditorMode("generate")
+    },
+  })
   const handleGenerate = useCallback(() => {
     setStatusOverride("GENERATING")
     setGenerationStarted(true)

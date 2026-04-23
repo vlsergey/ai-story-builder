@@ -3,6 +3,20 @@ import { trpc } from "./ipcClient"
 export default function EventsListener() {
   const utils = trpc.useUtils()
 
+  // Settings
+  const settingsUtils = utils.settings
+  trpc.settings.subscribe.useSubscription(undefined, {
+    onData: ({ key }) => {
+      console.debug("Settings updated:", key)
+      if (Object.hasOwn(settingsUtils, key)) {
+        ;(settingsUtils as any)[key].invalidate()
+      }
+    },
+    onError: (err) => {
+      console.error("Settings subscription error:", err)
+    },
+  })
+
   trpc.plan.nodes.subscribe.useSubscription(undefined, {
     onData: (nodeId: number) => {
       console.log("Plan node updated:", nodeId)

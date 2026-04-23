@@ -32,14 +32,28 @@ export class EventManager {
   }
 }
 
-export function emitterToSingleArgObservable<K extends string, E extends Record<K, any[]>>(
-  emitter: EventEmitter<E>,
+export function emitterToSingleArgObservable<K extends string, M extends Record<K, any[]>>(
+  emitter: EventEmitter<M>,
   eventName: K,
-): Observable<E[K][0], unknown> {
-  return toObservable<E[K][0]>(async (emit: Observer<E[K], unknown>) => {
-    const iterable = on(emitter, eventName) as AsyncIterableIterator<E[K]>
+): Observable<M[K][0], unknown> {
+  return toObservable<M[K][0]>(async (emit: Observer<M[K], unknown>) => {
+    const iterable = on(emitter, eventName) as AsyncIterableIterator<M[K]>
     for await (const [value] of iterable) {
       emit.next(value)
+    }
+  })
+}
+
+export function emitterToObservable<K extends string, M extends Record<K, any[]>, E>(
+  emitter: EventEmitter<M>,
+  eventName: K,
+  mapper: (value: M[K]) => E,
+): Observable<E, unknown> {
+  return toObservable<M[K][0]>(async (emit: Observer<E, unknown>) => {
+    const iterable = on(emitter, eventName) as AsyncIterableIterator<M[K]>
+    for await (const values of iterable) {
+      const mapped = mapper(values)
+      emit.next(mapped)
     }
   })
 }

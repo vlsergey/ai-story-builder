@@ -4,7 +4,6 @@ import { clipboard, dialog } from "electron"
 import { z } from "zod"
 import type { AiEngineConfig } from "../shared/ai-engine-config.js"
 import { EDGE_TYPES, type PlanNodeUpdate } from "../shared/plan-graph.js"
-import type { RegenerateOptions } from "../shared/RegenerateOptions.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
 import {
@@ -121,12 +120,10 @@ export const appRouter = t.router({
   plan: t.router({
     nodes: t.router({
       acceptReview: t.procedure.input(z.int()).mutation(({ input }) => new PlanNodeService().acceptReview(input)),
-      aiGenerateOnly: t.procedure
-        .input((v) => v as { id: number; options: RegenerateOptions })
-        .mutation(({ input }) => aiRegenerateNodeContentOnly(input.id, input.options)),
+      aiGenerateOnly: t.procedure.input(z.int()).mutation(({ input }) => aiRegenerateNodeContentOnly(input)),
       aiGenerateWatchAndReview: t.procedure
-        .input((v) => v as { id: number; options: RegenerateOptions })
-        .subscription(({ input }) => aiRegenerateNodeContentWatchAndReview(input.id, input.options)),
+        .input(z.int())
+        .subscription(({ input }) => aiRegenerateNodeContentWatchAndReview(input)),
       aiGenerateSummary: t.procedure
         .input(z.int())
         .mutation(({ input }) => new PlanNodeService().aiGenerateSummary(input)),
@@ -147,9 +144,7 @@ export const appRouter = t.router({
       patch: t.procedure
         .input((v) => v as { id: number; manual: boolean; data: PlanNodeUpdate })
         .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
-      regenerateTreeNodesContents: t.procedure
-        .input((v) => v as RegenerateOptions)
-        .mutation(({ input }) => regenerateTreeNodesContents(input)),
+      regenerateTreeNodesContents: t.procedure.mutation(() => regenerateTreeNodesContents()),
       regenerateTreeNodesContentsProgress: t.procedure.subscription(() =>
         subscribeToRegenerateTreeNodesContentsProgress(),
       ),

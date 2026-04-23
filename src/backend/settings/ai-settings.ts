@@ -1,6 +1,6 @@
 import type { AiEngineConfig } from "@shared/ai-engine-config"
 import type { AiGenerationSettings } from "@shared/ai-generation-settings"
-import { SettingsRepository } from "./settings-repository"
+import { SettingsRepository } from "./settings-repository.js"
 
 export function getCurrentEngineConfig(): AiEngineConfig {
   const engine = SettingsRepository.getCurrentBackend()

@@ -5,9 +5,9 @@ import { useTheme } from "../lib/theme/theme-provider"
 import AiEngineConfigEditor from "../ai/AiEngineConfigEditor"
 import { trpc } from "../ipcClient"
 import type { AiEngineConfig } from "@shared/ai-engine-config"
-import { Switch } from "../ui-components/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui-components/select"
 import { Field, FieldLabel, FieldDescription, FieldGroup, FieldError, FieldContent } from "../ui-components/field"
+import SettingSwitch from "./SettingSwitch"
 
 function useSetAndInvalidate<T extends { useMutation: any }>(procedure: T) {
   const utils = trpc.useUtils()
@@ -66,10 +66,7 @@ export default function SettingsPanel() {
 
   const htmlIdLanguage = useId()
   const htmlIdTheme = useId()
-  const htmlIdTextLanguage = useId()
-  const htmlIdAutoSummary = useId()
   const htmlIdCurrentEngine = useId()
-  const htmlIdVerboseLogging = useId()
 
   if (isAiConfigStoreLoading) {
     return (
@@ -115,19 +112,7 @@ export default function SettingsPanel() {
           </Select>
         </Field>
 
-        {/* ── Auto-summary generation ── */}
-        <Field orientation="responsive">
-          <FieldContent>
-            <FieldLabel htmlFor={htmlIdAutoSummary}>{t("settings.autoSummary.title")}</FieldLabel>
-            <FieldDescription>{t("settings.autoSummary.description")}</FieldDescription>
-          </FieldContent>
-          <Switch
-            id={htmlIdAutoSummary}
-            disabled={isAutoGenerateSummaryLoading}
-            checked={autoGenerateSummary}
-            onCheckedChange={setAutoGenerateSummary}
-          />
-        </Field>
+        <SettingSwitch settingKey="autoGenerateSummary" />
 
         {/* ── Current AI Engine ── */}
         <Field orientation="responsive">
@@ -155,19 +140,7 @@ export default function SettingsPanel() {
           {engineError && <FieldError>{engineError}</FieldError>}
         </Field>
 
-        {/* ── Debug ── */}
-        <Field orientation="responsive">
-          <FieldContent>
-            <FieldLabel htmlFor={htmlIdVerboseLogging}>{t("settings.debug.verboseAiLogging")}</FieldLabel>
-            <FieldDescription>{t("settings.debug.verboseAiLoggingDescription")}</FieldDescription>
-          </FieldContent>
-          <Switch
-            id={htmlIdVerboseLogging}
-            disabled={isVerboseAiLoggingLoading}
-            checked={verboseAiLogging}
-            onCheckedChange={setVerboseAiLogging}
-          />
-        </Field>
+        <SettingSwitch settingKey="verboseAiLogging" />
       </FieldGroup>
 
       {/* ── Per-engine sections ── */}

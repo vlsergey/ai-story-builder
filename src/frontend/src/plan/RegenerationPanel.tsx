@@ -1,20 +1,17 @@
-import { useCallback, useEffect, useId, useState } from "react"
-import { useLocale } from "../lib/locale"
-import { trpc } from "../ipcClient"
-import { Button } from "../ui-components/button"
-import { Card } from "../ui-components/card"
-import type { DockviewPanelApi } from "dockview"
 import { ButtonGroup } from "@/ui-components/button-group"
-import { PlayIcon, SquareIcon } from "lucide-react"
-import { useForm } from "react-hook-form"
-import type { RegenerateOptions } from "@shared/RegenerateOptions"
-import { zodResolver } from "@hookform/resolvers/zod"
-import RegenerateOptionsForm, { formSchema } from "./RegenerateOptionsForm"
 import type {
   RegenerateEvent,
   RegenerationStackItemIteration,
   RegenerationStackItemNode,
 } from "@shared/RegenerateEvent"
+import type { DockviewPanelApi } from "dockview"
+import { PlayIcon, SquareIcon } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { trpc } from "../ipcClient"
+import { useLocale } from "../lib/locale"
+import { Button } from "../ui-components/button"
+import { Card } from "../ui-components/card"
+import RegenerateOptionsForm from "./RegenerateOptionsForm"
 
 export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPanelApi }) {
   const { t } = useLocale()
@@ -31,21 +28,10 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   const startMutation = trpc.plan.nodes.regenerateTreeNodesContents.useMutation()
   const stopMutation = trpc.plan.nodes.regenerateTreeNodesContentsStop.useMutation()
 
-  const regenerateOptionsForm = useForm<RegenerateOptions>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      regenerateGenerated: false,
-      regenerateManual: false,
-    },
-  })
-
-  const handleStart = useCallback(
-    (options: RegenerateOptions) => {
-      console.info("[RegenerationPanel] startMutation", options)
-      startMutation.mutateAsync(options)
-    },
-    [startMutation],
-  )
+  const handleStart = useCallback(() => {
+    console.info("[RegenerationPanel] startMutation")
+    startMutation.mutateAsync()
+  }, [startMutation])
 
   const renderCurrentRegenerationStack = () => {
     if (!event?.currentRegenerationStack?.length) return null
@@ -118,22 +104,13 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
     )
   }
 
-  const formId = useId()
   const [showOptionsForm, setShowOptionsForm] = useState(false)
 
   return (
     <div className="flex flex-col gap-2 p-2 h-full overflow-y-auto">
-      {/* Заголовок и статус */}
-      <form
-        id={formId}
-        onSubmit={regenerateOptionsForm.handleSubmit(handleStart, () => {
-          setShowOptionsForm(true)
-        })}
-      >
-        <RegenerateOptionsForm form={regenerateOptionsForm} show={showOptionsForm} onShowChange={setShowOptionsForm} />
-      </form>
+      <RegenerateOptionsForm show={showOptionsForm} onShowChange={setShowOptionsForm} />
       <ButtonGroup className="shrink-0 w-full">
-        <Button variant="secondary" type="submit" form={formId} disabled={event?.inProcess || startMutation.isPending}>
+        <Button variant="secondary" onClick={handleStart} disabled={event?.inProcess || startMutation.isPending}>
           <PlayIcon />
           {t("regeneration.start")}
         </Button>

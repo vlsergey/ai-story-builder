@@ -6,8 +6,8 @@ import type {
   RegenerationStackItem,
   RegenerationStackItemIteration,
 } from "../../../../shared/RegenerateEvent.js"
-import type { RegenerateOptions } from "../../../../shared/RegenerateOptions.js"
 import { makeErrorWithStatus } from "../../../lib/make-errors.js"
+import { SettingsRepository } from "../../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeService } from "../plan-node-service.js"
 import type {
@@ -73,7 +73,7 @@ export function regenerateTreeNodesContentsStop(): void {
 /**
  * Generate content for all nodes in topological order, respecting dependencies.
  */
-export async function regenerateTreeNodesContents(options: RegenerateOptions): Promise<void> {
+export async function regenerateTreeNodesContents(): Promise<void> {
   if (inProcess) throw makeErrorWithStatus("Some regeneration is already in process", 429)
   inProcess = true
   stopping = false
@@ -84,6 +84,11 @@ export async function regenerateTreeNodesContents(options: RegenerateOptions): P
   generatedSame = 0
   generatedNew = 0
   skipped = 0
+
+  const options = {
+    regenerateGenerated: SettingsRepository.getAiRegenerateGenerated(),
+    regenerateManual: SettingsRepository.getAiRegenerateManual(),
+  }
 
   console.info("[regenerateTreeNodesContents] Starting regeneration")
   try {

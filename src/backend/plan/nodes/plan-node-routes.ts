@@ -2,9 +2,9 @@ import type { Observable } from "@trpc/server/observable"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
 import { isValidNodeType, NODE_TYPES } from "../../../shared/node-edge-dictionary.js"
 import type { PlanNodeCreate, PlanNodeRow } from "../../../shared/plan-graph.js"
-import type { RegenerateOptions } from "../../../shared/RegenerateOptions.js"
 import { type DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../lib/make-errors.js"
+import { SettingsRepository } from "../../settings/settings-repository.js"
 import type {
   PlanNodeAiGenerationStatus,
   RegenerationContainerContext,
@@ -15,10 +15,13 @@ import { PlanNodeService } from "./plan-node-service.js"
 
 export function aiRegenerateNodeContentWatchAndReview(
   nodeId: number,
-  options: RegenerateOptions,
 ): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
   const service = new PlanNodeService()
   const oldNode = service.getById(nodeId)
+  const options = {
+    regenerateGenerated: SettingsRepository.getAiRegenerateGenerated(),
+    regenerateManual: SettingsRepository.getAiRegenerateManual(),
+  }
 
   return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
     const asCycle: RegenerationNodeContext["asCycle"] = async <T>(
@@ -56,9 +59,7 @@ export function aiRegenerateNodeContentWatchAndReview(
     }
 
     const mainNodeContext: RegenerationNodeContext = {
-      options: {
-        regenerateManual: true,
-      } as RegenerateOptions,
+      options,
       onData: (data) => {
         emit.next({ type: "data", data })
       },
@@ -81,7 +82,12 @@ export function aiRegenerateNodeContentWatchAndReview(
   })
 }
 
-export async function aiRegenerateNodeContentOnly(nodeId: number, options: RegenerateOptions): Promise<PlanNodeRow> {
+export async function aiRegenerateNodeContentOnly(nodeId: number): Promise<PlanNodeRow> {
+  const options = {
+    regenerateGenerated: SettingsRepository.getAiRegenerateGenerated(),
+    regenerateManual: SettingsRepository.getAiRegenerateManual(),
+  }
+
   const asCycle: RegenerationNodeContext["asCycle"] = async <T>(
     _totalIterations: number | undefined,
     block: (context: RegenerationCycleContext) => Promise<T>,

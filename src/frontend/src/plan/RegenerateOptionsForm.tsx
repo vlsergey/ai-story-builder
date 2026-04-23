@@ -1,24 +1,16 @@
-import { FieldGroup } from "@/ui-components/field"
-import ControlledSwitch from "@/forms/ControlledSwitch"
-import type { RegenerateOptions } from "@shared/RegenerateOptions"
-import type { UseFormReturn } from "react-hook-form"
-import z from "zod"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui-components/accordion"
 import { useLocale } from "@/lib/locale"
+import SettingSwitch from "@/settings/SettingSwitch"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui-components/accordion"
+import { FieldGroup } from "@/ui-components/field"
 
 interface RegenerateOptionsFormProps {
-  form: UseFormReturn<RegenerateOptions>
   show: boolean
   onShowChange: (show: boolean) => void
 }
 
-export const formSchema = z.object({
-  regenerateGenerated: z.boolean(),
-  regenerateManual: z.boolean(),
-})
-
-export default function RegenerateOptionsForm({ form, show, onShowChange }: RegenerateOptionsFormProps) {
+export default function RegenerateOptionsForm({ show, onShowChange }: RegenerateOptionsFormProps) {
   const { t } = useLocale()
+
   return (
     <Accordion
       type="single"
@@ -32,16 +24,8 @@ export default function RegenerateOptionsForm({ form, show, onShowChange }: Rege
         <AccordionTrigger>{t("regenerateOptions.form.accordionTrigger")}</AccordionTrigger>
         <AccordionContent>
           <FieldGroup>
-            <ControlledSwitch
-              form={form}
-              name="regenerateGenerated"
-              translationPrefix="regenerateOptions.regenerateGenerated"
-            />
-            <ControlledSwitch
-              form={form}
-              name="regenerateManual"
-              translationPrefix="regenerateOptions.regenerateManual"
-            />
+            <SettingSwitch settingKey="aiRegenerateGenerated" />
+            <SettingSwitch settingKey="aiRegenerateManual" />
           </FieldGroup>
         </AccordionContent>
       </AccordionItem>
