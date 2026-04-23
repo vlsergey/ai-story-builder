@@ -33,7 +33,7 @@ interface AiEngineConfigEditorProps {
 }
 
 export default function AiEngineConfigEditor({ active, engine, value, onChange }: AiEngineConfigEditorProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation("ai-engines")
 
   const maxRatingIdx = AGE_RATING_ORDER.indexOf(engine.ageRating)
   const supportedRatings = AGE_RATING_ORDER.slice(0, maxRatingIdx + 1)

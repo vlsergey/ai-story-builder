@@ -1,25 +1,28 @@
+import { DEFAULT_LOCALE, LOCALE_VALUES } from "@shared/locales"
 import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
-import { DEFAULT_LOCALE, LOCALE_VALUES } from "@shared/locales"
-
-import translationsEn from "./en.json"
-import translationsRu from "./ru.json"
+import aiEnginesEn from "../ai/ai-engines-i18n.en.json"
+import aiEnginesRu from "../ai/ai-engines-i18n.ru.json"
 import settingsEn from "../settings/settings-i18n.en.json"
 import settingsRu from "../settings/settings-i18n.ru.json"
+import translationsEn from "./en.json"
+import translationsRu from "./ru.json"
 
 const resources = {
   en: {
-    translations: translationsEn,
+    "ai-engines": aiEnginesEn,
     settings: settingsEn,
+    translations: translationsEn,
   },
   ru: {
-    translations: translationsRu,
+    "ai-engines": aiEnginesRu,
     settings: settingsRu,
+    translations: translationsRu,
   },
 } as const
 
 i18n.use(initReactI18next).init({
-  ns: ["translations", "settings"],
+  ns: ["ai-engines", "translations", "settings"],
   supportedLngs: LOCALE_VALUES,
   fallbackLng: DEFAULT_LOCALE,
   resources: resources,

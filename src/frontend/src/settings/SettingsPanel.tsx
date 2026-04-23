@@ -33,7 +33,7 @@ function useSetAndInvalidate<T extends { useMutation: any }>(procedure: T) {
 
 export default function SettingsPanel() {
   const { locale, setLocale } = useLocale()
-  const { t } = useTranslation(["settings", "translations"])
+  const { t } = useTranslation(["ai-engines", "settings"])
   const { themePreference, setThemePreference } = useTheme()
 
   const { data: aiConfigStore, isLoading: isAiConfigStoreLoading } = trpc.settings.allAiEnginesConfig.get.useQuery()
@@ -129,7 +129,7 @@ export default function SettingsPanel() {
               <SelectItem value="none">{t("settings:aiEngine.none")}</SelectItem>
               {BUILTIN_ENGINES.map((e) => (
                 <SelectItem key={e.id} value={e.id}>
-                  {t(`translations:engine.${e.id}.name`)}
+                  {t(`ai-engines:engine.${e.id}.name`)}
                 </SelectItem>
               ))}
             </SelectContent>
