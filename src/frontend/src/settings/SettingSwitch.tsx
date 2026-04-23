@@ -10,7 +10,7 @@ interface SettingSwitchProps {
 }
 
 export default function SettingSwitch({ settingKey }: SettingSwitchProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation("settings")
   const idField = useId()
   const idDescription = useId()
 
@@ -46,8 +46,8 @@ export default function SettingSwitch({ settingKey }: SettingSwitchProps) {
   return (
     <Field orientation="responsive">
       <FieldContent>
-        <FieldLabel htmlFor={idField}>{t(`settings.${settingKey}.label`)}</FieldLabel>
-        <FieldDescription id={idDescription}>{t(`settings.${settingKey}.description`)}</FieldDescription>
+        <FieldLabel htmlFor={idField}>{t(`${settingKey}.label`)}</FieldLabel>
+        <FieldDescription id={idDescription}>{t(`${settingKey}.description`)}</FieldDescription>
       </FieldContent>
       <Switch aria-describedby={idDescription} id={idField} checked={value} onCheckedChange={handleOnChange} />
     </Field>

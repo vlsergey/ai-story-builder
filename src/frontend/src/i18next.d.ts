@@ -4,9 +4,10 @@ import type settingsEn from "./settings/settings-i18n.en.json"
 
 declare module "i18next" {
   interface CustomTypeOptions {
-    defaultNS: "translation"
+    defaultNS: "translations"
     resources: {
-      translation: typeof translationEn & typeof settingsEn
+      settings: typeof settingsEn
+      translations: typeof translationEn
     }
   }
 }

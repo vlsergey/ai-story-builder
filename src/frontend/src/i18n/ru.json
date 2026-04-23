@@ -30,7 +30,6 @@
   "aiThinking.web_search_call.open_page": "Чтение web-страницы",
   "aiThinking.web_search_call.search": "Web-поиск",
 
-  "settings.aiEngine.description": "Необходимые учётные данные должны быть сохранены перед активацией движка.",
   "settings.aiEngine.active": "● активен",
   "settings.aiEngine.by": "от",
   "settings.testConnection": "Проверить соединение",

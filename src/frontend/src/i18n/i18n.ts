@@ -2,28 +2,24 @@ import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
 import { DEFAULT_LOCALE, LOCALE_VALUES } from "@shared/locales"
 
-import translationEn from "./en.json"
-import translationRu from "./ru.json"
+import translationsEn from "./en.json"
+import translationsRu from "./ru.json"
 import settingsEn from "../settings/settings-i18n.en.json"
 import settingsRu from "../settings/settings-i18n.ru.json"
 
 const resources = {
   en: {
-    translation: {
-      ...translationEn,
-      ...settingsEn,
-    },
+    translations: translationsEn,
+    settings: settingsEn,
   },
   ru: {
-    translation: {
-      ...translationRu,
-      ...settingsRu,
-    },
+    translations: translationsRu,
+    settings: settingsRu,
   },
 } as const
 
 i18n.use(initReactI18next).init({
-  ns: ["translation", "settings"],
+  ns: ["translations", "settings"],
   supportedLngs: LOCALE_VALUES,
   fallbackLng: DEFAULT_LOCALE,
   resources: resources,

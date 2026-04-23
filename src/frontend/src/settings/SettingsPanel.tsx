@@ -33,7 +33,7 @@ function useSetAndInvalidate<T extends { useMutation: any }>(procedure: T) {
 
 export default function SettingsPanel() {
   const { locale, setLocale } = useLocale()
-  const { t } = useTranslation()
+  const { t } = useTranslation(["settings", "translations"])
   const { themePreference, setThemePreference } = useTheme()
 
   const { data: aiConfigStore, isLoading: isAiConfigStoreLoading } = trpc.settings.allAiEnginesConfig.get.useQuery()
@@ -68,7 +68,7 @@ export default function SettingsPanel() {
   if (isAiConfigStoreLoading) {
     return (
       <div className="flex items-center justify-center">
-        <span className="text-muted-foreground text-sm">{t("settings.loading")}</span>
+        <span className="text-muted-foreground text-sm">{t("settings:loading")}</span>
       </div>
     )
   }
@@ -79,15 +79,15 @@ export default function SettingsPanel() {
         {/* ── Interface Language ── */}
         <Field orientation="responsive">
           <FieldContent>
-            <FieldLabel htmlFor={htmlIdLanguage}>{t("settings.uiLanguage.title")}</FieldLabel>
+            <FieldLabel htmlFor={htmlIdLanguage}>{t("settings:uiLanguage.title")}</FieldLabel>
           </FieldContent>
           <Select value={locale} onValueChange={setLocale}>
             <SelectTrigger id={htmlIdLanguage}>
-              <SelectValue placeholder={t("settings.uiLanguage.select")} />
+              <SelectValue placeholder={t("settings:uiLanguage.select")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="en">{t("settings.uiLanguage.en")}</SelectItem>
-              <SelectItem value="ru">{t("settings.uiLanguage.ru")}</SelectItem>
+              <SelectItem value="en">{t("settings:uiLanguage.en")}</SelectItem>
+              <SelectItem value="ru">{t("settings:uiLanguage.ru")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -95,16 +95,16 @@ export default function SettingsPanel() {
         {/* ── Theme ── */}
         <Field orientation="responsive">
           <FieldContent>
-            <FieldLabel htmlFor={htmlIdTheme}>{t("settings.theme.title")}</FieldLabel>
+            <FieldLabel htmlFor={htmlIdTheme}>{t("settings:theme.title")}</FieldLabel>
           </FieldContent>
           <Select value={themePreference} onValueChange={setThemePreference}>
             <SelectTrigger id={htmlIdTheme}>
-              <SelectValue placeholder={t("settings.theme.select")} />
+              <SelectValue placeholder={t("settings:theme.select")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">{t("settings.theme.auto")}</SelectItem>
-              <SelectItem value="obsidian">{t("settings.theme.obsidian")}</SelectItem>
-              <SelectItem value="github">{t("settings.theme.github")}</SelectItem>
+              <SelectItem value="auto">{t("settings:theme.auto")}</SelectItem>
+              <SelectItem value="obsidian">{t("settings:theme.obsidian")}</SelectItem>
+              <SelectItem value="github">{t("settings:theme.github")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -114,8 +114,8 @@ export default function SettingsPanel() {
         {/* ── Current AI Engine ── */}
         <Field orientation="responsive">
           <FieldContent>
-            <FieldLabel htmlFor={htmlIdCurrentEngine}>{t("settings.aiEngine.title")}</FieldLabel>
-            <FieldDescription>{t("settings.aiEngine.description")}</FieldDescription>
+            <FieldLabel htmlFor={htmlIdCurrentEngine}>{t("settings:aiEngine.title")}</FieldLabel>
+            <FieldDescription>{t("settings:aiEngine.description")}</FieldDescription>
           </FieldContent>
           <Select
             disabled={isCurrentEngineLoading}
@@ -123,13 +123,13 @@ export default function SettingsPanel() {
             onValueChange={(value) => setCurrentEngine(value === "none" ? null : (value as AiEngineKey))}
           >
             <SelectTrigger id={htmlIdCurrentEngine} className="w-64">
-              <SelectValue placeholder={t("settings.aiEngine.select")} />
+              <SelectValue placeholder={t("settings:aiEngine.select")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">{t("settings.aiEngine.none")}</SelectItem>
+              <SelectItem value="none">{t("settings:aiEngine.none")}</SelectItem>
               {BUILTIN_ENGINES.map((e) => (
                 <SelectItem key={e.id} value={e.id}>
-                  {t(`engine.${e.id}.name`)}
+                  {t(`translations:engine.${e.id}.name`)}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -30,7 +30,6 @@
   "aiThinking.web_search_call.open_page": "Reading web page",
   "aiThinking.web_search_call.search": "Web search",
 
-  "settings.aiEngine.description": "Controls the sync-status icon in the Lore Tree. Required credentials must be saved before activating an engine.",
   "settings.aiEngine.active": "● active",
   "settings.aiEngine.by": "by",
   "settings.testConnection": "Test Connection",
