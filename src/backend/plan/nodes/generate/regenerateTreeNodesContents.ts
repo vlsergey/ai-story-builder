@@ -153,6 +153,7 @@ export async function regenerateTreeNodesContents(): Promise<void> {
             zeroBasedIterationIndex,
           }
           currentRegenerationStack.push(stackItem)
+          emitRegenerateEvent()
           try {
             return await block(nodeContext(container))
           } finally {
@@ -162,8 +163,8 @@ export async function regenerateTreeNodesContents(): Promise<void> {
               // biome-ignore lint/correctness/noUnsafeFinally: that panic error anyway
               throw Error("Stack item mismatch")
             }
+            emitRegenerateEvent()
           }
-          return await block(nodeContext(container))
         },
         asContainer: async <T>(
           zeroBasedIterationIndex: number,
