@@ -5,11 +5,11 @@ import type settingsEn from "./settings/settings-i18n.en.json"
 
 declare module "i18next" {
   interface CustomTypeOptions {
-    defaultNS: "translations"
+    defaultNS: "translation"
     resources: {
       "ai-engines": typeof aiEnginesEn
       settings: typeof settingsEn
-      translations: typeof translationEn
+      translation: typeof translationEn
     }
   }
 }

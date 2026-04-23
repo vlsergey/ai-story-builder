@@ -12,17 +12,17 @@ const resources = {
   en: {
     "ai-engines": aiEnginesEn,
     settings: settingsEn,
-    translations: translationsEn,
+    translation: translationsEn,
   },
   ru: {
     "ai-engines": aiEnginesRu,
     settings: settingsRu,
-    translations: translationsRu,
+    translation: translationsRu,
   },
 } as const
 
 i18n.use(initReactI18next).init({
-  ns: ["ai-engines", "translations", "settings"],
+  ns: ["ai-engines", "translation", "settings"],
   supportedLngs: LOCALE_VALUES,
   fallbackLng: DEFAULT_LOCALE,
   resources: resources,
