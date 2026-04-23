@@ -3,7 +3,6 @@ import { createRequire } from "node:module"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { app, BrowserWindow, dialog, Menu, type MenuItemConstructorOptions, nativeTheme, shell } from "electron"
-import { default as installExtension, REACT_DEVELOPER_TOOLS } from "electron-devtools-installer"
 import z from "zod"
 import type { BackToFrontMenuAction } from "../shared/back-to-front-menu-actions.js"
 import { DISPLAY_TEXT_STAT_MODE_VALUES, type DisplayTextStatMode } from "../shared/DisplayTextStatMode.js"
@@ -322,10 +321,18 @@ app.whenReady().then(async () => {
     console.log("Development mode, serverUrl:", serverUrl)
     // Install React Developer Tools
     try {
-      await installExtension(REACT_DEVELOPER_TOOLS, {
-        loadExtensionOptions: { allowFileAccess: true },
-      })
-      console.log("React Developer Tools installed")
+      const installer = await import("electron-devtools-installer")
+      const install = (installer.default as any)?.default || installer.default || installer
+      const devtools = installer.REACT_DEVELOPER_TOOLS || (installer.default as any)?.REACT_DEVELOPER_TOOLS
+
+      if (typeof install === "function") {
+        await install(devtools, {
+          loadExtensionOptions: { allowFileAccess: true },
+        })
+        console.log("React Developer Tools installed")
+      } else {
+        console.warn("Could not find install function in electron-devtools-installer", installer)
+      }
     } catch (err) {
       console.warn("Failed to install React Developer Tools:", err)
     }
