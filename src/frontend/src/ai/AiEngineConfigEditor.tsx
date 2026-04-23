@@ -1,4 +1,4 @@
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { type AiEngineConfig, getAiEngineConfigSchema } from "@shared/ai-engine-config"
 import { AGE_RATING_INFO, AGE_RATING_ORDER, type AiEngineDefinition, CAPABILITY_KEYS } from "@shared/ai-engines"
 import { useCallback, useEffect } from "react"
@@ -33,7 +33,7 @@ interface AiEngineConfigEditorProps {
 }
 
 export default function AiEngineConfigEditor({ active, engine, value, onChange }: AiEngineConfigEditorProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   const maxRatingIdx = AGE_RATING_ORDER.indexOf(engine.ageRating)
   const supportedRatings = AGE_RATING_ORDER.slice(0, maxRatingIdx + 1)

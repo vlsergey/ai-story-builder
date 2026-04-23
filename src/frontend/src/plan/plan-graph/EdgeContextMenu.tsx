@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import useConfirm from "@/native/useConfirm"
 import {
   ContextMenu,
@@ -23,7 +23,7 @@ interface EdgeContextMenuProps {
 }
 
 export default function EdgeContextMenu({ edgeData, triggerRef }: EdgeContextMenuProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   const deleteMutation = trpc.plan.edges.delete.useMutation()
   const confirm = useConfirm()

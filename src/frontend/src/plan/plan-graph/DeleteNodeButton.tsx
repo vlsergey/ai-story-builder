@@ -1,7 +1,7 @@
 import type React from "react"
 import { X } from "lucide-react"
 import { Button } from "@/ui-components/button"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 
 interface DeleteNodeButtonProps {
   onDelete: (e: React.MouseEvent) => void
@@ -16,7 +16,7 @@ export default function DeleteNodeButton({
   size = "icon-xs",
   variant = "ghost",
 }: DeleteNodeButtonProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   return (
     <Button

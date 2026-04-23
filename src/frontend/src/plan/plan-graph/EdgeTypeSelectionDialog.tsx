@@ -1,5 +1,5 @@
 import type { Connection } from "@xyflow/react"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import type { PlanEdgeType } from "@shared/plan-graph"
 
 interface EdgeTypeSelectionDialogProps {
@@ -15,7 +15,7 @@ export default function EdgeTypeSelectionDialog({
   confirmConnect,
   setShowConnectDialog,
 }: EdgeTypeSelectionDialogProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   if (!showConnectDialog) return null
 
   return (

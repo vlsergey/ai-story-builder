@@ -3,7 +3,7 @@ import { trpc } from "../ipcClient"
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, XIcon } from "lucide-react"
 import { Button } from "../ui-components/button"
 import { Input } from "../ui-components/input"
-import { useLocale } from "../i18n/locale"
+import { useTranslation } from "react-i18next"
 import { ButtonGroup } from "@/ui-components/button-group"
 
 /** Returns the project display name from a full filesystem path: basename without extension. */
@@ -67,7 +67,7 @@ function CreateNewForm() {
 }
 
 export default function StartScreen() {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   const recent = trpc.project.recent.useQuery().data
   const projectsData = trpc.project.files.useQuery().data

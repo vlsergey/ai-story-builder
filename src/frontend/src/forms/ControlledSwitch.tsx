@@ -1,4 +1,4 @@
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import type { ParseKeys } from "i18next"
 import { useId } from "react"
 import { Controller, type FieldValues, type Path, type UseFormReturn } from "react-hook-form"
@@ -19,7 +19,7 @@ export default function ControlledSwitch<T extends FieldValues>({
   name,
   translationPrefix,
 }: ControlledSwitchProps<T>) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   const idField = useId()
   const idDescription = useId()

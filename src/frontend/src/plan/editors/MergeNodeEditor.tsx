@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { trpc } from "@/ipcClient"
 import { useTheme } from "@/lib/theme/theme-provider"
 import { Button } from "@/ui-components/button"
@@ -28,7 +28,7 @@ export default function MergeNodeEditor({
   onNodeTypeSettingsChange,
   value,
 }: TypedPlanNodeEditorProps<MergeSettings>) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
 
   const inputEdges = trpc.plan.edges.findByToNodeId.useQuery(value.id).data

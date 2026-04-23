@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as Diff from "diff"
 import { ChevronLeft, ChevronRight, Check, X, WrapText, Pilcrow } from "lucide-react"
-import { useLocale } from "../i18n/locale"
+import { useTranslation } from "react-i18next"
 
 export interface DiffViewAndAcceptProps {
   oldText: string
@@ -174,7 +174,7 @@ function Toolbar({
   onToggleWordWrap: () => void
   onToggleIgnoreWhitespace: () => void
 }) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border bg-muted/20 text-xs shrink-0 flex-wrap">
@@ -281,7 +281,7 @@ function SplitView({
   wordWrap: boolean
   onHunkClick: (idx: number) => void
 }) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([])
   const [expandedGaps, setExpandedGaps] = useState<Set<number>>(new Set())
 
@@ -406,7 +406,7 @@ function UnifiedView({
   onDecide: (hunkId: number, decision: "accepted" | "rejected") => void
   onHunkClick: (idx: number) => void
 }) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([])
   const [expandedGaps, setExpandedGaps] = useState<Set<number>>(new Set())
 

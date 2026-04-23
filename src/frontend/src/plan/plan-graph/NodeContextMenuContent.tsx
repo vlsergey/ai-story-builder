@@ -10,7 +10,7 @@ import {
 } from "@/ui-components/context-menu"
 import type { PlanNodeRow } from "@shared/plan-graph"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { ExternalLink, TrashIcon, SaveIcon } from "lucide-react"
 
@@ -33,7 +33,7 @@ export default function NodeContextMenuContent({
   regenerateNode,
   saveToFile,
 }: NodeContextMenuContentProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const contextMenuNode = useMemo(
     () => serverNodes?.find((n) => n.id === contextMenuNodeId),
     [serverNodes, contextMenuNodeId],

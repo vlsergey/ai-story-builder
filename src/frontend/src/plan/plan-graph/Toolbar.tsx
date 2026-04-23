@@ -1,4 +1,4 @@
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { ButtonGroup } from "@/ui-components/button-group"
 import { Button } from "@/ui-components/button"
 import CreateNodeButtonGroup from "./CreateNodeButtonGroup"
@@ -18,7 +18,7 @@ export default function Toolbar({
   toggleAutoLayout,
   applyLayout,
 }: ToolbarProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   return (
     <ButtonGroup className={className}>
       <CreateNodeButtonGroup />

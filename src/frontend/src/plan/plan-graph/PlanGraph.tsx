@@ -23,7 +23,7 @@ import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useDebouncedCallback } from "use-debounce"
 import { trpc } from "../../ipcClient"
-import { useLocale } from "../../i18n/locale"
+import { useTranslation } from "react-i18next"
 import EdgeContextMenu from "./EdgeContextMenu"
 import EdgeTypeSelectionDialog from "./EdgeTypeSelectionDialog"
 import GroupNode from "./GroupNode"
@@ -84,7 +84,7 @@ function toReactFlowEdges(graphEdges: PlanEdgeRow[], onDeleteEdge: (id: number) 
 }
 
 export default function PlanGraph() {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const [nodes, setNodes, onNodesChangeImpl] = useNodesState<NodeImpl>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<EdgeImpl>([])
 

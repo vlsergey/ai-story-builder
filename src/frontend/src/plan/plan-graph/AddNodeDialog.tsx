@@ -1,7 +1,7 @@
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { PlanNodeType } from "@shared/plan-graph"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/ui-components/button"
 import { Input } from "@/ui-components/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/ui-components/dialog"
@@ -14,7 +14,7 @@ interface AddNodeDialogProps {
 }
 
 export default function AddNodeDialog({ nodeType, open, onClose, onConfirm }: AddNodeDialogProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const [title, setTitle] = useState("")
   const addTitleInputRef = useRef<HTMLInputElement>(null)
 

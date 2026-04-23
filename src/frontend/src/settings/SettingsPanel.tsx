@@ -1,6 +1,7 @@
 import { useCallback, useId, useState } from "react"
 import { type AiEngineKey, BUILTIN_ENGINES } from "../lib/ai-engines"
 import { useLocale } from "../i18n/locale"
+import { useTranslation } from "react-i18next"
 import { useTheme } from "../lib/theme/theme-provider"
 import AiEngineConfigEditor from "../ai/AiEngineConfigEditor"
 import { trpc } from "../ipcClient"
@@ -31,7 +32,8 @@ function useSetAndInvalidate<T extends { useMutation: any }>(procedure: T) {
 }
 
 export default function SettingsPanel() {
-  const { t, locale, setLocale } = useLocale()
+  const { locale, setLocale } = useLocale()
+  const { t } = useTranslation()
   const { themePreference, setThemePreference } = useTheme()
 
   const { data: aiConfigStore, isLoading: isAiConfigStoreLoading } = trpc.settings.allAiEnginesConfig.get.useQuery()

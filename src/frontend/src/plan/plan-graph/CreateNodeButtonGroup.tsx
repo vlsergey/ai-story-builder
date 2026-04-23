@@ -6,7 +6,7 @@ import { useCallback, useState } from "react"
 import { useMemo } from "react"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import AddNodeDialog from "./AddNodeDialog"
 
 interface CreateNodeButtonGroupProps {
@@ -18,7 +18,7 @@ interface CreateNodeButtonGroupProps {
 }
 
 export default function CreateNodeButtonGroup({ compact, parentNode }: CreateNodeButtonGroupProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const [nodeTypeToCreate, setNodeTypeToCreate] = useState<PlanNodeType | null>(null)
   const [showAddDialog, setShowAddDialog] = useState<boolean>(false)
 

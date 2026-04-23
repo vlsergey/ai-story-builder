@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { type AiEngineDefinition, BUILTIN_ENGINES } from "@shared/ai-engines"
 import { type AiGenerationSettings, getAiGenerationSettingsSchema } from "@shared/ai-generation-settings"
@@ -15,7 +15,7 @@ import { useDebouncedCallback } from "use-debounce"
 export default function AiGenerationSettingsFormWrapper(
   props: Omit<AiGenerationSettingsFormProps, "aiEngineDef" | "defaultAiGenerationSettings">,
 ) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const currentAiEngine = trpc.settings.allAiEnginesConfig.currentEngine.get.useQuery()?.data
   const currentAiEngineDef = BUILTIN_ENGINES.find((it) => it.id === currentAiEngine)
   const defaultAiGenerationSettings =
@@ -49,7 +49,7 @@ function AiGenerationSettingsForm({
   value,
   onChange,
 }: AiGenerationSettingsFormProps): ReactNode {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const [overriden, setOverriden] = useState<boolean>(!value)
 
   useEffect(() => {

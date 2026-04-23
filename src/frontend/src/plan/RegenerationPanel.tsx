@@ -8,13 +8,13 @@ import type { DockviewPanelApi } from "dockview"
 import { PlayIcon, SquareIcon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { trpc } from "../ipcClient"
-import { useLocale } from "../i18n/locale"
+import { useTranslation } from "react-i18next"
 import { Button } from "../ui-components/button"
 import { Card } from "../ui-components/card"
 import RegenerateOptionsForm from "./RegenerateOptionsForm"
 
 export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPanelApi }) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const [event, setEvent] = useState<RegenerateEvent | null>(null)
 
   useEffect(() => {

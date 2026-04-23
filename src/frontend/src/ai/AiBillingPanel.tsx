@@ -1,4 +1,4 @@
-import { useLocale } from "../i18n/locale"
+import { useTranslation } from "react-i18next"
 import { trpc } from "../ipcClient"
 import { useState } from "react"
 import type { ResponseUsage } from "openai/resources/responses/responses.js"
@@ -63,7 +63,7 @@ function formatUsd(usd: number | null | undefined): string {
 const POLL_INTERVAL_MS = 60_000
 
 export default function AiBillingPanel() {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   // Format tokens with unit (e.g., "1,234 tokens")
   function formatTokensWithUnit(n: number | null | undefined): string {
     if (n == null) return "—"

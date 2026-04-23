@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/ui-components/button"
 import { Label } from "@/ui-components/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui-components/card"
@@ -13,7 +13,7 @@ export default function SplitNodeEditor({
   onRegenerate,
   value,
 }: TypedPlanNodeEditorProps<SplitSettings>) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   const parts = useMemo<string[]>(() => {
     const content = value.content

@@ -3,6 +3,7 @@ import type { ResponseOutputItem, ResponseStreamEvent } from "openai/resources/r
 import { forwardRef, useImperativeHandle, useState } from "react"
 import { GlobeIcon, WrenchIcon } from "lucide-react"
 import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { SiX } from "@icons-pack/react-simple-icons"
 
 interface AiThinkingPanelProps {
@@ -22,7 +23,8 @@ const icons: Record<string, React.FC<{ className: string }>> = {
 }
 
 const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(({ className, itemClassName }, ref) => {
-  const { exists, t } = useLocale()
+  const { exists } = useLocale()
+  const { t } = useTranslation()
   const [items, setItems] = useState<ResponseOutputItem[]>([])
 
   useImperativeHandle(ref, () => ({

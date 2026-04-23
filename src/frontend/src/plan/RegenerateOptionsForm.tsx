@@ -1,4 +1,4 @@
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import SettingSwitch from "@/settings/SettingSwitch"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui-components/accordion"
 import { FieldGroup } from "@/ui-components/field"
@@ -9,7 +9,7 @@ interface RegenerateOptionsFormProps {
 }
 
 export default function RegenerateOptionsForm({ show, onShowChange }: RegenerateOptionsFormProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   return (
     <Accordion

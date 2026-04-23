@@ -5,7 +5,7 @@ import { markdown } from "@codemirror/lang-markdown"
 import { EditorView } from "@codemirror/view"
 import { useTheme } from "../lib/theme/theme-provider"
 import { useEditorSettings } from "../settings/editor-settings"
-import { useLocale } from "../i18n/locale"
+import { useTranslation } from "react-i18next"
 import DiffViewAndAccept from "./DiffViewAndAccept"
 import type { AiGenerationSettings } from "../../../shared/ai-generation-settings"
 import type { AiEngineSyncRecord } from "../types/models"
@@ -71,7 +71,7 @@ export default function NodeEditor<N extends Node>({
 }: NodeEditorProps<N>) {
   const { resolvedTheme } = useTheme()
   const { wordWrap } = useEditorSettings()
-  const { t } = useLocale()
+  const { t } = useTranslation()
 
   // ── Editor mode ────────────────────────────────────────────────────────────
   const [selectedTab, setSelectedTab] = useState<DiffTab>("new")

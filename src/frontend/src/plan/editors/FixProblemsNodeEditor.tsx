@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import { useTheme } from "@/lib/theme/theme-provider"
 import { Button } from "@/ui-components/button"
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/ui-components/field"
@@ -34,7 +34,7 @@ export default function FixProblemsNodeEditor({
   value,
   onChange,
 }: TypedPlanNodeEditorProps<FixProblemsPlanNodeSettings>) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
 
   const inputEdges = trpc.plan.edges.findByToNodeIdAndType.useQuery({ id: dbValue.id, type: "text" }).data

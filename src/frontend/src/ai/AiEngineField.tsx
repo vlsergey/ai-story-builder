@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import type { AiEngineDefinition, AiEngineFieldDef } from "@shared/ai-engines"
 import { type ComponentProps, useId } from "react"
 import { Input } from "../ui-components/input"
@@ -32,7 +32,7 @@ export default function AiEngineField({
   field,
   orientation,
 }: AiEngineFieldProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const htmlId = useId()
   const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label` as ParseKeys)
   const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint` as ParseKeys)

@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/i18n/locale"
+import { useTranslation } from "react-i18next"
 import type { BooleanSettingKey } from "@shared/settings"
 import { useCallback, useEffect, useId, useState } from "react"
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/ui-components/field"
@@ -10,7 +10,7 @@ interface SettingSwitchProps {
 }
 
 export default function SettingSwitch({ settingKey }: SettingSwitchProps) {
-  const { t } = useLocale()
+  const { t } = useTranslation()
   const idField = useId()
   const idDescription = useId()
 
