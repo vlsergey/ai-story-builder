@@ -27,13 +27,16 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     const detected = languageDetector.detect() as string | undefined
     console.info("User language detected as", detected)
     if (LOCALE_VALUES.includes(detected as Locale)) {
-      i18next.i18n.changeLanguage(detected)
       return detected as Locale
     } else {
-      i18next.i18n.changeLanguage(DEFAULT_LOCALE)
       return DEFAULT_LOCALE
     }
   })
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only once at startup
+  useEffect(() => {
+    i18next.i18n.changeLanguage(locale)
+  }, [])
 
   const setLocale = useCallback(
     (value: Locale) => {
