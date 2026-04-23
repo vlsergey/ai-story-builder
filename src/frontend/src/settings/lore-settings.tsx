@@ -25,7 +25,7 @@ export function LoreSettingsProvider({ children }: { children: ReactNode }) {
   const setLoreStateMenuState = trpc.native.menuState.loreStat.set.useMutation()
   useEffect(() => {
     setLoreStateMenuState.mutate(statMode)
-  }, [setLoreStateMenuState.mutate, statMode])
+  }, [statMode])
 
   // Handle set-lore-stat:* IPC from Electron menu.
   trpc.native.menuState.loreStat.subscribe.useSubscription(undefined, {

@@ -27,13 +27,10 @@ export default function SettingSwitch({ settingKey }: SettingSwitchProps) {
   }, [dbValue])
 
   const mutation = router.set.useMutation()
-  const handleOnChange = useCallback(
-    async (value: boolean) => {
-      setValue(value)
-      await mutation.mutateAsync(value)
-    },
-    [mutation.mutateAsync],
-  )
+  const handleOnChange = useCallback(async (value: boolean) => {
+    setValue(value)
+    await mutation.mutateAsync(value)
+  }, [])
 
   router.subscribe.useSubscription(undefined, {
     onData(data) {

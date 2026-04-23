@@ -24,7 +24,7 @@ export function EditorSettingsProvider({ children }: { children: React.ReactNode
   const setWordWrapMenuState = trpc.native.menuState.wordWrap.set.useMutation()
   useEffect(() => {
     setWordWrapMenuState.mutate(wordWrap)
-  }, [setWordWrapMenuState.mutate, wordWrap])
+  }, [wordWrap])
 
   // Handle set-word-wrap from Electron menu.
   trpc.native.menuState.wordWrap.subscribe.useSubscription(undefined, {

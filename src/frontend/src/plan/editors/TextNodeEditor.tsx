@@ -38,7 +38,7 @@ export default function TextNodeEditor({
     const newValue = await acceptChangesMutation(nodeId)
     onChange(newValue)
     setEditorMode((prevMode) => (prevMode === "review_after_generate" ? "generate" : "improve"))
-  }, [acceptChangesMutation, onChange, nodeId, save, value])
+  }, [onChange, nodeId, save, value])
 
   const aiThinkinPanelRef = useRef<AiThinkingPanelHandle>(null)
   const [tempContent, setTempContent] = useState<string | null>(null)

@@ -34,7 +34,7 @@ export default function EdgeContextMenu({ edgeData, triggerRef }: EdgeContextMen
     const confirmed = await confirm("planGraph.edgeContextMenu.delete.confirm")
     if (!confirmed) return
     await deleteMutation.mutateAsync(edgeData.edge.id)
-  }, [deleteMutation, confirm, edgeData?.edge])
+  }, [confirm, edgeData?.edge])
 
   if (edgeData === null) {
     return null

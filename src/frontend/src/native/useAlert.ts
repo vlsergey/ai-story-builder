@@ -23,7 +23,7 @@ export default function useAlert() {
         })
         return result.response === 0
       },
-    [mutation.mutateAsync, t],
+    [t],
   )
 
   return result

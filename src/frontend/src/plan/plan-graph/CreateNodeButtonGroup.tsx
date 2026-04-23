@@ -36,7 +36,7 @@ export default function CreateNodeButtonGroup({ compact, parentNode }: CreateNod
       const type = nodeTypeToCreate
       addNode({ type, title, x: 0, y: 0, parent_id: parentNode?.id })
     },
-    [showAddDialog, nodeTypeToCreate, addNode, parentNode?.id],
+    [showAddDialog, nodeTypeToCreate, parentNode?.id],
   )
 
   const creatableNodeTypes = useMemo(() => getCreatableNodeTypes(parentNode?.type || "root"), [parentNode?.type])

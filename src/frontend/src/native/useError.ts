@@ -27,7 +27,7 @@ export default function useError() {
           writeTextToClipboard.mutateAsync(messageTranslationKey)
         }
       },
-    [showMessageBox.mutateAsync, t, writeTextToClipboard.mutateAsync],
+    [t],
   )
 
   return result

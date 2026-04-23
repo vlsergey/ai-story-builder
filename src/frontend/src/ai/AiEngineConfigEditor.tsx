@@ -68,7 +68,7 @@ export default function AiEngineConfigEditor({ active, engine, value, onChange }
       onSettled: () => utils.settings.allAiEnginesConfig.invalidate(),
     })
 
-  const onRefreshingModels = useCallback(() => refreshEngineModels(engine.id), [engine, refreshEngineModels])
+  const onRefreshingModels = useCallback(() => refreshEngineModels(engine.id), [engine])
   const testMutation = trpc.ai.test.useMutation()
 
   return (

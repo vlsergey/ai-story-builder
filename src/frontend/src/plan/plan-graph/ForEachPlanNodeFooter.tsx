@@ -16,7 +16,7 @@ export default function ForEachPlanNodeFooter({ node }: ForEachPlanNodeFooterPro
     ({ target: { value } }: { target: { value: number } }) => {
       changePage.mutateAsync({ nodeId: node.id, page: value })
     },
-    [changePage, node.id],
+    [node.id],
   )
 
   return (

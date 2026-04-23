@@ -52,7 +52,7 @@ export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
   const setMenuStateTheme = trpc.native.menuState.theme.set.useMutation()
   useEffect(() => {
     setMenuStateTheme.mutate(actualThemePreference)
-  }, [actualThemePreference, setMenuStateTheme])
+  }, [actualThemePreference])
 
   const actualResolvedTheme = useMemo<ResolvedTheme>(() => {
     if (actualThemePreference !== "auto") {
@@ -92,7 +92,7 @@ export function ThemeProvider({ children, projectLoaded }: ThemeProviderProps) {
         projectSettingSet.mutate(newTheme)
       }
     },
-    [localStorageSetting, projectSetting.isFetched, projectSetting.data, projectSettingSet],
+    [localStorageSetting, projectSetting.isFetched, projectSetting.data],
   )
 
   trpc.native.menuState.theme.subscribe.useSubscription(undefined, {

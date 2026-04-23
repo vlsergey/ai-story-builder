@@ -36,7 +36,18 @@
       },
       "correctness": {
         "noUnusedFunctionParameters": "off",
-        "noUnusedVariables": "off"
+        "noUnusedVariables": "off",
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": {
+            "hooks": [
+              {
+                "name": "useMutation",
+                "stableResult": ["mutate", "mutateAsync"]
+              }
+            ]
+          }
+        }
       },
       "style": {
         "noNonNullAssertion": "off"

@@ -31,7 +31,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   const handleStart = useCallback(() => {
     console.info("[RegenerationPanel] startMutation")
     startMutation.mutateAsync()
-  }, [startMutation])
+  }, [])
 
   const renderCurrentRegenerationStack = () => {
     if (!event?.currentRegenerationStack?.length) return null

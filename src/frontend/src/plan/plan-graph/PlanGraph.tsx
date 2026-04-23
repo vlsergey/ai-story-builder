@@ -119,7 +119,7 @@ export default function PlanGraph() {
       if (!confirmed) return
       deleteNodeMutation(nodeId)
     },
-    [deleteNodeMutation, confirm],
+    [confirm],
   )
 
   const saveToFile = useCallback(
@@ -148,7 +148,7 @@ export default function PlanGraph() {
         })
       }
     },
-    [findAllNodes.data, saveFileDialogMutation, saveToFileMutation, alert, t],
+    [findAllNodes.data, alert, t],
   )
 
   // replace local cache with server data
@@ -157,7 +157,7 @@ export default function PlanGraph() {
   }, [findAllNodes.isFetched, findAllNodes.data, deleteNode, setNodes])
   useEffect(() => {
     if (findAllEdges.isFetched) setEdges(toReactFlowEdges(findAllEdges.data ?? [], deleteEdge))
-  }, [findAllEdges.isFetched, findAllEdges.data, deleteEdge, setEdges])
+  }, [findAllEdges.isFetched, findAllEdges.data, setEdges])
 
   const patchNodes = trpc.plan.nodes.batchPatch.useMutation().mutate
 
@@ -248,7 +248,7 @@ export default function PlanGraph() {
         return patchNode({ id: Number(node.id), manual: true, data: { parent_id: newParentId } })
       }
     },
-    [autoLayout, patchNode],
+    [autoLayout],
   )
 
   const contextMenuTriggerRef = useRef<HTMLSpanElement>(null)
@@ -320,7 +320,7 @@ export default function PlanGraph() {
       // Multiple allowed edge types, show selection dialog
       setShowConnectDialog(connection)
     },
-    [nodes, createEdge],
+    [nodes],
   )
 
   const [edgeContextMenuData, setEdgeContextMenuData] = useState<{

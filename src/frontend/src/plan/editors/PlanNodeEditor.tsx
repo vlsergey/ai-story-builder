@@ -95,7 +95,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
 
       setStatus("SAVED")
     },
-    [lastSaved, nodeId, patchMutation],
+    [lastSaved, nodeId],
   )
 
   const debounceSave = useDebouncedCallback(saveImpl, 1000)
@@ -149,7 +149,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
       console.error(e)
       alert("PlanNodeEditor.regenerationProblem.message", { error: `${e}` })
     }
-  }, [alert, regenerateMutation, handleSave, value])
+  }, [alert, handleSave, value])
 
   return (
     <Editor

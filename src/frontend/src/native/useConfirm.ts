@@ -27,7 +27,7 @@ export default function useConfirm() {
         })
         return result.response === 0
       },
-    [mutation.mutateAsync, t],
+    [t],
   )
 
   return result
