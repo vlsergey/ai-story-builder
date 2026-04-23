@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import useConfirm from "@/native/useConfirm"
 import {
   ContextMenu,

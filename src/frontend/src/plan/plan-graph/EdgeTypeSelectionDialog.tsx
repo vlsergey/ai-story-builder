@@ -1,9 +1,10 @@
 import type { Connection } from "@xyflow/react"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
+import type { PlanEdgeType } from "@shared/plan-graph"
 
 interface EdgeTypeSelectionDialogProps {
   showConnectDialog: Connection | null
-  allowedEdgeTypes: string[]
+  allowedEdgeTypes: PlanEdgeType[]
   confirmConnect: (edgeType: string) => void
   setShowConnectDialog: (connection: Connection | null) => void
 }

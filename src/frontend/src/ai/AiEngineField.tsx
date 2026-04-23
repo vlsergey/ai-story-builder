@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import type { AiEngineDefinition, AiEngineFieldDef } from "@shared/ai-engines"
 import { type ComponentProps, useId } from "react"
 import { Input } from "../ui-components/input"
@@ -11,6 +11,7 @@ import { TriangleAlert, Info, Eye, EyeOff } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-components/tooltip"
 import { ButtonGroup } from "../ui-components/button-group"
 import { Button } from "../ui-components/button"
+import type { TranslationKey } from "@/i18n/TranslationKey"
 
 interface AiEngineFieldProps {
   className?: string
@@ -33,8 +34,8 @@ export default function AiEngineField({
 }: AiEngineFieldProps) {
   const { t } = useLocale()
   const htmlId = useId()
-  const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label`)
-  const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint`, null)
+  const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label` as TranslationKey)
+  const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint` as TranslationKey)
 
   const [showHiddenValue, setShowHiddenValue] = useState<boolean>(false)
 
@@ -106,7 +107,7 @@ export default function AiEngineField({
             <SelectContent>
               {field.options?.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {t(`engine.${engine.id}.field.${field.key}.option.${option}`, option)}
+                  {t(`engine.${engine.id}.field.${field.key}.option.${option}` as TranslationKey)}
                 </SelectItem>
               ))}
             </SelectContent>

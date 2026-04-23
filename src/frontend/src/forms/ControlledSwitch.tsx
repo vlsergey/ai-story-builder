@@ -1,13 +1,17 @@
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
+import type { TranslationKey } from "@/i18n/TranslationKey"
 import { useId } from "react"
 import { Controller, type FieldValues, type Path, type UseFormReturn } from "react-hook-form"
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "../ui-components/field"
 import { Switch } from "../ui-components/switch"
 
+type GetPrefix<K, Suffix extends string> = K extends `${infer P}.${Suffix}` ? P : never
+type AllowedPrefixes = Extract<GetPrefix<TranslationKey, "label">, GetPrefix<TranslationKey, "description">>
+
 interface ControlledSwitchProps<T extends FieldValues> {
   form: UseFormReturn<T>
   name: Path<T>
-  translationPrefix: string
+  translationPrefix: AllowedPrefixes
 }
 
 export default function ControlledSwitch<T extends FieldValues>({

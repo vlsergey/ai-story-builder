@@ -21,8 +21,9 @@
 
   "native.alert.title": "Alert",
   "native.confirm.title": "Confirm",
-  "native.confirm.button.ok": "OK",
-  "native.confirm.button.cancel": "Cancel",
+  "native.showMessageBox.button.ok": "OK",
+  "native.showMessageBox.button.cancel": "Cancel",
+  "native.showMessageBox.button.copyToClipboard": "Copy to clipboard",
 
   "aiThinking.custom_tool_call": "Tool call",
   "aiThinking.web_search_call.find_in_page": "Examining web page",
@@ -66,13 +67,19 @@
   "engine.grok.field.top_p.label": "Top P",
   "engine.grok.field.top_p.hint": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered. It is generally recommended to alter this or temperature but not both.",
   "engine.grok.field.x_search.label": "X Search",
+  "engine.grok.field.x_search.hint": "",
   "engine.grok.field.web_search.label": "Web Search",
+  "engine.grok.field.web_search.hint": "",
 
   "engine.yandex.name": "Yandex Cloud AI",
   "engine.yandex.notes": "Subject to Russian Federation content regulations. No LGBTQ+ or political content.",
   "engine.yandex.field.api_key.label": "API Key",
   "engine.yandex.field.folder_id.label": "Folder ID",
   "engine.yandex.field.folder_id.hint": "Your Yandex Cloud folder ID (e.g. b1gXXXXXXXXXX). Models use URI: gpt://{folder_id}/{model}/latest",
+  "engine.yandex.field.max_completion_tokens.label": "Max completion tokens",
+  "engine.yandex.field.max_completion_tokens.hint": "An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens.",
+  "engine.yandex.field.webSearch.label": "Web Search",
+  "engine.yandex.field.webSearch.hint": "",
 
   "capability.fileUpload.label": "File Upload",
   "capability.fileUpload.description": "Upload documents (PDF, TXT, etc.) to persistent AI storage. Uploaded files can be reused across multiple requests without re-uploading.",
@@ -90,6 +97,7 @@
   "settings.models.refresh": "Refresh",
   "settings.models.refreshing": "Refreshing…",
   "settings.models.none": "No models cached",
+  "settings.summaryAiGenerationSettings.title": "Summary generation settings",
   "settings.generateSummaryInstructions.label": "Summary generation instructions",
   "settings.generateSummaryInstructions.description": "The prompt used to generate summaries. If empty, summary generation will be disabled. The instructions will be prepended to the analyzed text.",
   "settings.generateSummaryInstructions.placeholder": "E.g., “Briefly describe the content of the text (8 to 12 words):”",
@@ -99,9 +107,17 @@
   "fixProblemsNode.minSeverityToFix.label": "Minimum error severity to fix",
   "fixProblemsNode.minSeverityToFix.description": "Since there can be multiple correction iterations, a stopping condition is needed. If none of the errors in the current set have a severity level equal to or higher than the specified one, the process will terminate.",
   "fixProblemsNode.foundProblemsTemplate.label": "Error list template name for instructions",
-  "fixProblemsNode.foundProblemsTemplate.description": "Similar to how other node texts are inserted into instructions (using curly braces, e.g., {{Characters}}), the correction prompt requires a placeholder for the list of found errors. This field defines the template name. For example, if you enter 'Error List', you should use {{Error List}} in your instructions.",
+  "fixProblemsNode.foundProblemsTemplate.description": "Similar to how other node texts are inserted into instructions (using curly braces, e.g., <code>{{Characters}}</code>), the correction prompt requires a placeholder for the list of found errors. This field defines the template name. For example, if you enter 'Error List', you should use {{Error List}} in your instructions.",
   "fixProblemsNode.maxIterations.label": "Maximum iterations",
   "fixProblemsNode.maxIterations.description": "The correction process will stop once the maximum number of iterations is reached, even if some important errors remain unfixed.",
+  "fixProblemsNode.aiSystemInstructionsToFindProblems.label": "AI system instructions to <strong>find</strong> problems",
+  "fixProblemsNode.aiSystemInstructionsToFindProblems.description": "",
+  "fixProblemsNode.aiUserInstructionsToFindProblems.label": "AI user instructions to <strong>find</strong> problems",
+  "fixProblemsNode.aiUserInstructionsToFindProblems.description": "",
+  "fixProblemsNode.aiSystemInstructionsToFixProblems.label": "AI system instructions to <strong>fix</strong> problems",
+  "fixProblemsNode.aiSystemInstructionsToFixProblems.description": "",
+  "fixProblemsNode.aiUserInstructionsToFixProblems.label": "AI user instructions to <strong>fix</strong> problems",
+  "fixProblemsNode.aiUserInstructionsToFixProblems.description": "",
 
   "mergeNode.title": "Merge Node Settings",
   "mergeNode.inputs": "Inputs",
@@ -123,6 +139,11 @@
   "splitNode.parts": "Parts",
   "splitNode.dropFirst": "Drop first N parts",
   "splitNode.dropLast": "Drop last N parts",
+
+  "planNode.title.label": "Node Title",
+  "planNode.title.description": "Short human-readable node title. Displayed in plan graph and also used as placeholder template name in linked nodes instructions (<code>{{Title}}</code>).",
+
+  "PlanNodeEditor.regenerationProblem.message": "Node regeneration problem: {{error}}",
 
   "plan.generate": "Generate",
   "plan.regenerate": "Regenerate",
@@ -158,6 +179,7 @@
   "planGraph.addNode.for-each": "For-each Cycle",
   "planGraph.addNode.for-each-input": "For-each Cycle Input",
   "planGraph.addNode.for-each-output": "For-each Cycle Output",
+  "planGraph.addNode.for-each-prev-outputs": "For-each Cycle Prev Outputs",
   "planGraph.addNode.text": "Text",
   "planGraph.addNode.lore": "Lore",
   "planGraph.addNode.merge": "Merge",
@@ -165,8 +187,6 @@
 
   "planGraph.toolbar.autoLayout": "Auto layout",
   "planGraph.toolbar.applyLayout": "Apply layout",
-
-  "planGraph.nodeTitle": "Node title",
 
   "planGraph.edgeContextMenu.label": "Link #",
   "planGraph.edgeContextMenu.delete": "Delete link",
@@ -179,6 +199,7 @@
   "planGraph.nodeContextMenu.moveToRoot": "Move to Root",
   "planGraph.nodeContextMenu.saveToFile": "Save to file",
   "planGraph.saveToFile.emptyContent": "Node content is empty, nothing to save",
+  "planGraph.saveToFile.error.message": "Failed to save file: {{error}}",
 
   "planGraph.edge.text": "Text",
   "planGraph.edge.textArray": "Text array",
@@ -212,6 +233,11 @@
   "lore.userPrompt": "Generation instruction",
   "lore.systemPrompt": "System prompt",
   "lore.aiInstructions": "AI instructions",
+
+  "LoreTree.handleDelete.confirm_one": "Mark {{count}} node for deletion? All descendants will also be marked.",
+  "LoreTree.handleDelete.confirm_other": "Mark {{count}} nodes for deletion? All descendants will also be marked.",
+  "LoreTree.syncLore.failure.errorMessage": "Sync failed: unknown error",
+  "LoreTree.syncLore.error.errorMessage": "Sync error: {{error}}",
 
   "thinking.generating": "Generating…",
   "thinking.reasoning": "Reasoning…",
@@ -281,8 +307,8 @@
   "settings.aiRegenerateGenerated.description": "Regenerate nodes whose inputs/parameters have not changed (already have «GENERATED» status).",
   "settings.aiRegenerateManual.label": "Regenerate manual changes",
   "settings.aiRegenerateManual.description": "Regenerate nodes that had manual edits after generation, including AI-assisted improvements (have «MANUAL» status).",
-  "settings.autoSummary.label": "Auto-summary generation",
-  "settings.autoSummary.description": "Automatically generate a short summary (5–10 words) for plan nodes when content changes.",
-  "settings.verboseAiLogging.title": "Verbose AI request logging",
+  "settings.autoGenerateSummary.label": "Auto-summary generation",
+  "settings.autoGenerateSummary.description": "Automatically generate a short summary (5–10 words) for plan nodes when content changes.",
+  "settings.verboseAiLogging.label": "Verbose AI request logging",
   "settings.verboseAiLogging.description": "Prints full request headers (API key masked) and body to the server console for every AI API call. Use when diagnosing AI integration issues."
 }

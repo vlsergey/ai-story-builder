@@ -9,7 +9,7 @@ vi.mock("@xyflow/react", () => ({
   Position: { Left: "left", Right: "right" },
 }))
 
-vi.mock("../lib/locale", () => ({
+vi.mock("../i18n/locale", () => ({
   useLocale: () => ({ locale: "en", t: (key: string) => key }),
 }))
 

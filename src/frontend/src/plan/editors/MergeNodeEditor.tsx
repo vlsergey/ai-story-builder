@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { trpc } from "@/ipcClient"
 import { useTheme } from "@/lib/theme/theme-provider"
 import { Button } from "@/ui-components/button"

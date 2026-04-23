@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { Button } from "@/ui-components/button"
 import { Label } from "@/ui-components/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui-components/card"

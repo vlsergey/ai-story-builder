@@ -1,5 +1,7 @@
+import { useLocale } from "@/i18n/locale"
+import type { TranslationKey } from "@/i18n/TranslationKey"
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import type { TOptions } from "i18next"
 import { useMemo } from "react"
 
 export default function useError() {
@@ -9,15 +11,20 @@ export default function useError() {
 
   const result = useMemo(
     () =>
-      async (message: string, titleTranslationKey: string = "native.alert.title") => {
+      async (
+        messageTranslationKey: TranslationKey,
+        messageOptions: TOptions = {},
+        titleTranslationKey: TranslationKey = "native.alert.title",
+        titleOptions: TOptions = {},
+      ) => {
         const result = await showMessageBox.mutateAsync({
-          message: message,
+          message: t(messageTranslationKey, messageOptions),
           type: "error",
-          buttons: [t("Close"), t("Copy to Clipboard")],
-          title: t(titleTranslationKey),
+          buttons: [t("native.showMessageBox.button.ok"), t("native.showMessageBox.button.copyToClipboard")],
+          title: t(titleTranslationKey, titleOptions),
         })
         if (result.response === 0) {
-          writeTextToClipboard.mutateAsync(message)
+          writeTextToClipboard.mutateAsync(messageTranslationKey)
         }
       },
     [showMessageBox.mutateAsync, t, writeTextToClipboard.mutateAsync],

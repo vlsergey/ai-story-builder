@@ -1,7 +1,7 @@
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { PlanNodeType } from "@shared/plan-graph"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { Button } from "@/ui-components/button"
 import { Input } from "@/ui-components/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/ui-components/dialog"
@@ -72,7 +72,7 @@ export default function AddNodeDialog({ nodeType, open, onClose, onConfirm }: Ad
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t("planGraph.nodeTitle")}
+            placeholder={t("planNode.title.label")}
             className="w-full"
           />
         </div>

@@ -6,7 +6,7 @@ import { useCallback, useState } from "react"
 import { useMemo } from "react"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import AddNodeDialog from "./AddNodeDialog"
 
 interface CreateNodeButtonGroupProps {

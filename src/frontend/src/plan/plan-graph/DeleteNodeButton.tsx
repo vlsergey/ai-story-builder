@@ -1,7 +1,7 @@
 import type React from "react"
 import { X } from "lucide-react"
 import { Button } from "@/ui-components/button"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 
 interface DeleteNodeButtonProps {
   onDelete: (e: React.MouseEvent) => void
@@ -23,7 +23,7 @@ export default function DeleteNodeButton({
       variant={variant}
       size={size}
       onClick={onDelete}
-      aria-label={t("planGraph.deleteNode", "Delete node")}
+      aria-label={t("planGraph.deleteNode")}
       className={`hover:!bg-destructive hover:!text-destructive-foreground ${className}`}
     >
       <X />

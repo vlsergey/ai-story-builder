@@ -2,7 +2,7 @@ import type React from "react"
 import type { ResponseOutputItem, ResponseStreamEvent } from "openai/resources/responses/responses.js"
 import { forwardRef, useImperativeHandle, useState } from "react"
 import { GlobeIcon, WrenchIcon } from "lucide-react"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { SiX } from "@icons-pack/react-simple-icons"
 
 interface AiThinkingPanelProps {
@@ -22,7 +22,7 @@ const icons: Record<string, React.FC<{ className: string }>> = {
 }
 
 const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(({ className, itemClassName }, ref) => {
-  const { t } = useLocale()
+  const { exists, t } = useLocale()
   const [items, setItems] = useState<ResponseOutputItem[]>([])
 
   useImperativeHandle(ref, () => ({
@@ -61,13 +61,17 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
             className = "flex items-center text-destructive"
           }
 
+          const i18nKey = `aiThinking.${item.type}${(item as any)?.action?.type ? `.${(item as any).action.type}` : ""}`
+          const validKey = exists(i18nKey)
+
           return (
             <div key={index} className={itemClassName}>
               <div className={className}>
                 <div>{icon && icon}</div>
                 <div className="flex-1 ml-1 text-xs">
                   <span>
-                    {t(`aiThinking.${item.type}${(item as any)?.action?.type ? `.${(item as any).action.type}` : ""}`)}
+                    {validKey && t(i18nKey)}
+                    {!validKey && `${item.type}; ${(item as any)?.action?.type ? `.${(item as any).action.type}` : ""}`}
                   </span>
 
                   {item.type === "custom_tool_call" && (

@@ -486,8 +486,7 @@ export default function LoreTree({
       return n?.parent_id !== null && !n?.to_be_deleted
     })
     if (toDelete.length === 0) return
-    const message = `Mark ${toDelete.length} node${toDelete.length > 1 ? "s" : ""} for deletion? All descendants will also be marked.`
-    const confirmed = await confirm(message)
+    const confirmed = await confirm("LoreTree.handleDelete.confirm", { count: toDelete.length })
     if (!confirmed) return
     await Promise.all(toDelete.map((id) => loreDelete.mutateAsync(id)))
     setViewState((prev) => ({ ...prev, "lore-tree": { ...prev["lore-tree"], selectedItems: [] } }))
@@ -528,10 +527,10 @@ export default function LoreTree({
     try {
       const data = await aiSyncLore.mutateAsync()
       if (!data.ok) {
-        showError(`Sync failed: unknown error`)
+        showError(`LoreTree.syncLore.failure.errorMessage`)
       }
     } catch (e) {
-      showError(`Sync error: ${String(e)}`)
+      showError("LoreTree.syncLore.error.errorMessage", { error: `${e}` })
     } finally {
       setSyncingIds(new Set())
       await utils.lore.findAll.invalidate()

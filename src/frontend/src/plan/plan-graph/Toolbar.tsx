@@ -1,4 +1,4 @@
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { ButtonGroup } from "@/ui-components/button-group"
 import { Button } from "@/ui-components/button"
 import CreateNodeButtonGroup from "./CreateNodeButtonGroup"

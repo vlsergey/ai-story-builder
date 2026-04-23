@@ -126,6 +126,11 @@ export const GROK_ENGINE_DEF = {
   maxFilesPerRequest: 10,
 } as const satisfies AiEngineDefinition
 
+// for i18n checks
+export type GrokFieldKeys =
+  | (typeof GROK_ENGINE_DEF.configFields)[number]["key"]
+  | (typeof GROK_ENGINE_DEF.aiSettingsFields)[number]["key"]
+
 export const YANDEX_ENGINE_DEF = {
   id: "yandex",
   provider: "Yandex",
@@ -147,6 +152,11 @@ export const YANDEX_ENGINE_DEF = {
   ],
   maxFilesPerRequest: null,
 } as const satisfies AiEngineDefinition
+
+// for i18n checks
+export type YandexFieldKeys =
+  | (typeof YANDEX_ENGINE_DEF.configFields)[number]["key"]
+  | (typeof YANDEX_ENGINE_DEF.aiSettingsFields)[number]["key"]
 
 /** Built-in AI engine definitions. */
 export const BUILTIN_ENGINES = [GROK_ENGINE_DEF, YANDEX_ENGINE_DEF] as const satisfies AiEngineDefinition[]

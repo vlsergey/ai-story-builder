@@ -1,5 +1,7 @@
+import { useLocale } from "@/i18n/locale"
+import type { TranslationKey } from "@/i18n/TranslationKey"
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import type { TOptions } from "i18next"
 import { useMemo } from "react"
 
 export default function useConfirm() {
@@ -9,13 +11,14 @@ export default function useConfirm() {
   const result = useMemo(
     () =>
       async (
-        messageTranslationKey: string,
-        titleTranslationKey: string = "native.confirm.title",
-        okTranslationKey: string = "native.confirm.button.ok",
-        cancelTranslationKey: string = "native.confirm.button.cancel",
+        messageTranslationKey: TranslationKey,
+        messageTranslationOptions: TOptions = {},
+        titleTranslationKey: TranslationKey = "native.confirm.title",
+        okTranslationKey: TranslationKey = "native.showMessageBox.button.ok",
+        cancelTranslationKey: TranslationKey = "native.showMessageBox.button.cancel",
       ) => {
         const result = await mutation.mutateAsync({
-          message: t(messageTranslationKey),
+          message: t(messageTranslationKey, messageTranslationOptions),
           type: "question",
           title: t(titleTranslationKey),
           buttons: [t(okTranslationKey), t(cancelTranslationKey)],

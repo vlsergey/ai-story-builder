@@ -1,4 +1,4 @@
-import { useLocale } from "../lib/locale"
+import { useLocale } from "../i18n/locale"
 import { trpc } from "../ipcClient"
 import { useState } from "react"
 import type { ResponseUsage } from "openai/resources/responses/responses.js"

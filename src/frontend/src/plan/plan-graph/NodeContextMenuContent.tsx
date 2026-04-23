@@ -10,7 +10,7 @@ import {
 } from "@/ui-components/context-menu"
 import type { PlanNodeRow } from "@shared/plan-graph"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { ExternalLink, TrashIcon, SaveIcon } from "lucide-react"
 

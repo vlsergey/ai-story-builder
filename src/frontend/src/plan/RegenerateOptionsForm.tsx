@@ -1,4 +1,4 @@
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import SettingSwitch from "@/settings/SettingSwitch"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui-components/accordion"
 import { FieldGroup } from "@/ui-components/field"

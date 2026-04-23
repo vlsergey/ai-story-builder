@@ -5,7 +5,7 @@ import { markdown } from "@codemirror/lang-markdown"
 import { EditorView } from "@codemirror/view"
 import { useTheme } from "../lib/theme/theme-provider"
 import { useEditorSettings } from "../settings/editor-settings"
-import { useLocale } from "../lib/locale"
+import { useLocale } from "../i18n/locale"
 import DiffViewAndAccept from "./DiffViewAndAccept"
 import type { AiGenerationSettings } from "../../../shared/ai-generation-settings"
 import type { AiEngineSyncRecord } from "../types/models"
@@ -46,7 +46,7 @@ interface NodeEditorProps<N extends Node> {
   aiThinkinPanelRef?: React.RefObject<AiThinkingPanelHandle | null>
   editorMode: EditorMode
   onEditorModeChange: (mode: EditorMode) => void
-  i18nPrefix: string
+  i18nPrefix: "lore" | "plan"
   onAcceptChanges: () => Promise<void>
   onChange: (node: N) => void
   onGenerate: () => void
@@ -72,7 +72,6 @@ export default function NodeEditor<N extends Node>({
   const { resolvedTheme } = useTheme()
   const { wordWrap } = useEditorSettings()
   const { t } = useLocale()
-  const tp = useCallback((s: string) => t(`${i18nPrefix}.${s}`), [i18nPrefix, t])
 
   // ── Editor mode ────────────────────────────────────────────────────────────
   const [selectedTab, setSelectedTab] = useState<DiffTab>("new")
@@ -229,7 +228,7 @@ export default function NodeEditor<N extends Node>({
             className="flex-1 basis-auto min-h-[50px] [field-sizing:fixed]! resize-y! overflow-auto"
             value={node.ai_system_prompt || ""}
             onChange={onAiSystemPromptChange}
-            placeholder="System instructions (optional)"
+            placeholder={t("ai.systemInstructions.description")}
           />
         </TabsContent>
         <TabsContent className="flex-1 flex flex-col" value="user">
@@ -237,7 +236,7 @@ export default function NodeEditor<N extends Node>({
             className="flex-1 basis-auto min-h-[50px] [field-sizing:fixed]! resize-y! overflow-auto"
             value={node.ai_user_prompt || ""}
             onChange={onAiUserPromptChange}
-            placeholder={tp("aiInstructions")}
+            placeholder={t("ai.userInstructions.description")}
           />
         </TabsContent>
       </Tabs>
@@ -258,7 +257,7 @@ export default function NodeEditor<N extends Node>({
               void handleImprove()
             }
           }}
-          placeholder={tp("improve_placeholder")}
+          placeholder={t(`${i18nPrefix}.improve_placeholder`)}
           disabled={status === "GENERATING" || status === "IMPROVING"}
           rows={2}
           className="w-full resize-none border-b border-border bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
@@ -275,7 +274,7 @@ export default function NodeEditor<N extends Node>({
             variant="secondary"
             disabled={status === "GENERATING" || status === "IMPROVING" || !node.ai_improve_instruction}
           >
-            {status === "GENERATING" || status === "IMPROVING" ? "Generating…" : tp("repeat_improve")}
+            {status === "GENERATING" || status === "IMPROVING" ? "Generating…" : t(`${i18nPrefix}.repeat_improve`)}
           </Button>
         </div>
       </div>
@@ -294,7 +293,11 @@ export default function NodeEditor<N extends Node>({
             onClick={handleGenerate}
             disabled={status !== "SAVED"}
           >
-            {status === "GENERATING" ? "Generating…" : hasContent ? tp("regenerate") : tp("generate")}
+            {status === "GENERATING"
+              ? "Generating…"
+              : hasContent
+                ? t(`${i18nPrefix}.regenerate`)
+                : t(`${i18nPrefix}.generate`)}
           </Button>
         </div>
       )}
@@ -341,7 +344,11 @@ export default function NodeEditor<N extends Node>({
                     : "bg-muted text-muted-foreground hover:bg-background/70"
                 }`}
               >
-                {tab === "new" ? tp("tab_new") : tab === "sidebyside" ? tp("tab_sidebyside") : tp("tab_perlines")}
+                {tab === "new"
+                  ? t(`${i18nPrefix}.tab_new`)
+                  : tab === "sidebyside"
+                    ? t(`${i18nPrefix}.tab_sidebyside`)
+                    : t(`${i18nPrefix}.tab_perlines`)}
               </button>
             ))}
           </div>
@@ -394,7 +401,7 @@ export default function NodeEditor<N extends Node>({
         style={{ maxHeight: editorMode === "generate" && hasContent && status !== "GENERATING" ? "52px" : "0px" }}
       >
         <div className="flex justify-end px-2 py-1.5">
-          <Button onClick={() => onEditorModeChange("improve")}>{tp("improve_with_ai")}</Button>
+          <Button onClick={() => onEditorModeChange("improve")}>{t(`${i18nPrefix}.improve_with_ai`)}</Button>
         </div>
       </div>
 
@@ -411,7 +418,7 @@ export default function NodeEditor<N extends Node>({
         <Textarea
           value={node.ai_improve_instruction || ""}
           onChange={onAiImproveInstructionsChange}
-          placeholder={tp("improve_placeholder")}
+          placeholder={t(`${i18nPrefix}.improve_placeholder`)}
           readOnly={status === "IMPROVING"}
           className="flex-1 basis-auto min-h-[50px] [field-sizing:fixed]! resize-y! overflow-auto"
         />
@@ -428,7 +435,7 @@ export default function NodeEditor<N extends Node>({
                   onEditorModeChange("generate")
                 }}
               >
-                {tp("cancel_improve")}
+                {t(`${i18nPrefix}.cancel_improve`)}
               </Button>
             )}
             <Button
@@ -436,7 +443,7 @@ export default function NodeEditor<N extends Node>({
               onClick={handleImprove}
               disabled={status !== "SAVED" || !node.ai_improve_instruction}
             >
-              {status === "IMPROVING" ? "Improving…" : tp("improve")}
+              {status === "IMPROVING" ? "Improving…" : t(`${i18nPrefix}.improve`)}
             </Button>
           </div>
         </div>
@@ -454,7 +461,7 @@ export default function NodeEditor<N extends Node>({
         <div className="overflow-hidden min-h-0">
           <div className="flex items-center justify-end px-2 py-1.5">
             <Button variant="default" onClick={onAcceptChanges}>
-              {tp("accept_changes")}
+              {t(`${i18nPrefix}.accept_changes`)}
             </Button>
           </div>
         </div>

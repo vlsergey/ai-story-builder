@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { type AiEngineDefinition, BUILTIN_ENGINES } from "@shared/ai-engines"
 import { type AiGenerationSettings, getAiGenerationSettingsSchema } from "@shared/ai-generation-settings"

@@ -3,7 +3,7 @@ import { trpc } from "../ipcClient"
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, XIcon } from "lucide-react"
 import { Button } from "../ui-components/button"
 import { Input } from "../ui-components/input"
-import { useLocale } from "../lib/locale"
+import { useLocale } from "../i18n/locale"
 import { ButtonGroup } from "@/ui-components/button-group"
 
 /** Returns the project display name from a full filesystem path: basename without extension. */

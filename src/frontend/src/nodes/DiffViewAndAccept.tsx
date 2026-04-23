@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as Diff from "diff"
 import { ChevronLeft, ChevronRight, Check, X, WrapText, Pilcrow } from "lucide-react"
-import { useLocale } from "../lib/locale"
+import { useLocale } from "../i18n/locale"
 
 export interface DiffViewAndAcceptProps {
   oldText: string

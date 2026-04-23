@@ -1,5 +1,7 @@
+import { useLocale } from "@/i18n/locale"
+import type { TranslationKey } from "@/i18n/TranslationKey"
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import type { TOptions } from "i18next"
 import { useMemo } from "react"
 
 export default function useAlert() {
@@ -8,11 +10,16 @@ export default function useAlert() {
 
   const result = useMemo(
     () =>
-      async (messageTranslationKey: string, titleTranslationKey: string = "native.alert.title") => {
+      async (
+        messageTranslationKey: TranslationKey,
+        messageOptions: TOptions = {},
+        titleTranslationKey: TranslationKey = "native.alert.title",
+        titleOptions: TOptions = {},
+      ) => {
         const result = await mutation.mutateAsync({
-          message: t(messageTranslationKey),
+          message: t(messageTranslationKey, messageOptions),
           type: "warning",
-          title: t(titleTranslationKey),
+          title: t(titleTranslationKey, titleOptions),
         })
         return result.response === 0
       },

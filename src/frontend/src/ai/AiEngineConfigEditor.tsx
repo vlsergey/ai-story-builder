@@ -1,4 +1,4 @@
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { type AiEngineConfig, getAiEngineConfigSchema } from "@shared/ai-engine-config"
 import { AGE_RATING_INFO, AGE_RATING_ORDER, type AiEngineDefinition, CAPABILITY_KEYS } from "@shared/ai-engines"
 import { useCallback, useEffect } from "react"
@@ -39,7 +39,7 @@ export default function AiEngineConfigEditor({ active, engine, value, onChange }
   const supportedRatings = AGE_RATING_ORDER.slice(0, maxRatingIdx + 1)
 
   const engineModels: string[] = value.available_models ?? []
-  const engineNotes = t(`engine.${engine.id}.notes`, "")
+  const engineNotes = t(`engine.${engine.id}.notes`)
 
   const formSchema = getAiEngineConfigSchema(engine)
 

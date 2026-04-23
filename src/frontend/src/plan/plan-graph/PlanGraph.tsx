@@ -23,7 +23,7 @@ import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useDebouncedCallback } from "use-debounce"
 import { trpc } from "../../ipcClient"
-import { useLocale } from "../../lib/locale"
+import { useLocale } from "../../i18n/locale"
 import EdgeContextMenu from "./EdgeContextMenu"
 import EdgeTypeSelectionDialog from "./EdgeTypeSelectionDialog"
 import GroupNode from "./GroupNode"
@@ -143,7 +143,9 @@ export default function PlanGraph() {
       try {
         await saveToFileMutation({ nodeId, filePath })
       } catch (error) {
-        await alert(`Failed to save file: ${error instanceof Error ? error.message : String(error)}`)
+        await alert(`planGraph.saveToFile.error.message`, {
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     },
     [findAllNodes.data, saveFileDialogMutation, saveToFileMutation, alert, t],

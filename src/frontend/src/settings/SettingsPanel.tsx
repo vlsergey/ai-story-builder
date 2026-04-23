@@ -1,6 +1,6 @@
 import { useCallback, useId, useState } from "react"
 import { type AiEngineKey, BUILTIN_ENGINES } from "../lib/ai-engines"
-import { useLocale } from "../lib/locale"
+import { useLocale } from "../i18n/locale"
 import { useTheme } from "../lib/theme/theme-provider"
 import AiEngineConfigEditor from "../ai/AiEngineConfigEditor"
 import { trpc } from "../ipcClient"

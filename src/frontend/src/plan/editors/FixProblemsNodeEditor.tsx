@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import { useTheme } from "@/lib/theme/theme-provider"
 import { Button } from "@/ui-components/button"
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/ui-components/field"
@@ -15,6 +15,7 @@ import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import { Textarea } from "@/ui-components/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui-components/tooltip"
 import { CircleQuestionMarkIcon } from "lucide-react"
+import { Separator } from "@/ui-components/separator"
 
 interface InputNode {
   edgeId: number
@@ -32,7 +33,7 @@ export default function FixProblemsNodeEditor({
   value,
   onChange,
 }: TypedPlanNodeEditorProps<FixProblemsPlanNodeSettings>) {
-  const { t } = useLocale()
+  const { t, T } = useLocale()
   const { resolvedTheme } = useTheme()
 
   const inputEdges = trpc.plan.edges.findByToNodeIdAndType.useQuery({ id: dbValue.id, type: "text" }).data
@@ -71,11 +72,15 @@ export default function FixProblemsNodeEditor({
 
   return (
     <div className="p-2">
-      <FieldGroup>
+      <FieldGroup className="max-w-2xl">
         <Field orientation="responsive">
           <FieldContent>
-            <FieldLabel htmlFor={htmlIdTitle}>{t(`planNode.title.label`)}</FieldLabel>
-            <FieldDescription>{t(`planNode.title.description`)}</FieldDescription>
+            <FieldLabel htmlFor={htmlIdTitle}>
+              <T i18nKey="planNode.title.label" />
+            </FieldLabel>
+            <FieldDescription>
+              <T i18nKey="planNode.title.description" />
+            </FieldDescription>
           </FieldContent>
           <Input
             value={value.title}
@@ -152,6 +157,10 @@ export default function FixProblemsNodeEditor({
           />
         </Field>
 
+        <Separator />
+      </FieldGroup>
+
+      <FieldGroup>
         <Tabs defaultValue="user">
           <TabsList variant="line">
             <TabsTrigger value="system">
@@ -299,13 +308,23 @@ export default function FixProblemsNodeEditor({
   )
 }
 
-function FieldLabelAndDescription({ fieldKey, htmlIdFor }: { fieldKey: string; htmlIdFor: string }) {
-  const { t } = useLocale()
+function FieldLabelAndDescription({
+  fieldKey,
+  htmlIdFor,
+}: {
+  fieldKey: keyof FixProblemsPlanNodeSettings
+  htmlIdFor: string
+}) {
+  const { T } = useLocale()
 
   return (
     <FieldContent>
-      <FieldLabel htmlFor={htmlIdFor}>{t(`fixProblemsNode.${fieldKey}.label`)}</FieldLabel>
-      <FieldDescription>{t(`fixProblemsNode.${fieldKey}.description`)}</FieldDescription>
+      <FieldLabel htmlFor={htmlIdFor}>
+        <T i18nKey={`fixProblemsNode.${fieldKey}.label`} />
+      </FieldLabel>
+      <FieldDescription>
+        <T i18nKey={`fixProblemsNode.${fieldKey}.description`} />
+      </FieldDescription>
     </FieldContent>
   )
 }

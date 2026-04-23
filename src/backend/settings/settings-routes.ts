@@ -17,7 +17,6 @@ function buildSettingRouter<K extends SettingKey>(t: RouteBuilder, key: K) {
     get: t.procedure.query(() => SettingsRepository.get(def)),
     set: t.procedure
       .input((val: unknown): SettingsTypes[K] => {
-        console.info("buildSettingRouter", "set", "input", val)
         if (val === undefined && def.schema instanceof z.ZodBoolean) {
           // falsy bug workaround
           val = false

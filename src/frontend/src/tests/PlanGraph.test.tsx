@@ -13,7 +13,7 @@ vi.mock("@xyflow/react", () => ({
   BackgroundVariant: { Dots: "dots" },
 }))
 
-vi.mock("../lib/locale", () => ({
+vi.mock("../i18n/locale", () => ({
   useLocale: () => ({ locale: "en", t: (key: string) => key }),
 }))
 

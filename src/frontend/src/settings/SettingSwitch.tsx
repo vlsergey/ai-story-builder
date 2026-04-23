@@ -1,5 +1,5 @@
 import { trpc } from "@/ipcClient"
-import { useLocale } from "@/lib/locale"
+import { useLocale } from "@/i18n/locale"
 import type { BooleanSettingKey } from "@shared/settings"
 import { useCallback, useEffect, useId, useState } from "react"
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/ui-components/field"

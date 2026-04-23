@@ -147,7 +147,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
       setValue(result)
     } catch (e) {
       console.error(e)
-      alert(`Node regeneration problem: ${e}`)
+      alert("PlanNodeEditor.regenerationProblem.message", { error: `${e}` })
     }
   }, [alert, regenerateMutation, handleSave, value])
 
