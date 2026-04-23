@@ -16,6 +16,7 @@ import { Textarea } from "@/ui-components/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui-components/tooltip"
 import { CircleQuestionMarkIcon } from "lucide-react"
 import { Separator } from "@/ui-components/separator"
+import TransWrapper from "@/i18n/TransWrapper"
 
 interface InputNode {
   edgeId: number
@@ -33,7 +34,7 @@ export default function FixProblemsNodeEditor({
   value,
   onChange,
 }: TypedPlanNodeEditorProps<FixProblemsPlanNodeSettings>) {
-  const { t, T } = useLocale()
+  const { t } = useLocale()
   const { resolvedTheme } = useTheme()
 
   const inputEdges = trpc.plan.edges.findByToNodeIdAndType.useQuery({ id: dbValue.id, type: "text" }).data
@@ -76,10 +77,10 @@ export default function FixProblemsNodeEditor({
         <Field orientation="responsive">
           <FieldContent>
             <FieldLabel htmlFor={htmlIdTitle}>
-              <T i18nKey="planNode.title.label" />
+              <TransWrapper i18nKey="planNode.title.label" />
             </FieldLabel>
             <FieldDescription>
-              <T i18nKey="planNode.title.description" />
+              <TransWrapper i18nKey="planNode.title.description" />
             </FieldDescription>
           </FieldContent>
           <Input
@@ -315,15 +316,13 @@ function FieldLabelAndDescription({
   fieldKey: keyof FixProblemsPlanNodeSettings
   htmlIdFor: string
 }) {
-  const { T } = useLocale()
-
   return (
     <FieldContent>
       <FieldLabel htmlFor={htmlIdFor}>
-        <T i18nKey={`fixProblemsNode.${fieldKey}.label`} />
+        <TransWrapper i18nKey={`fixProblemsNode.${fieldKey}.label`} />
       </FieldLabel>
       <FieldDescription>
-        <T i18nKey={`fixProblemsNode.${fieldKey}.description`} />
+        <TransWrapper i18nKey={`fixProblemsNode.${fieldKey}.description`} />
       </FieldDescription>
     </FieldContent>
   )

@@ -1,10 +1,9 @@
 import { trpc } from "@/ipcClient"
 import { DEFAULT_LOCALE, type Locale, LOCALE_VALUES } from "@shared/locales"
+import LanguageDetector from "i18next-browser-languagedetector"
 import type React from "react"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { Trans, useTranslation, type UseTranslationResponse } from "react-i18next"
-import LanguageDetector from "i18next-browser-languagedetector"
-import type { TOptions } from "i18next"
+import { useTranslation, type UseTranslationResponse } from "react-i18next"
 import type { TranslationKey } from "./TranslationKey"
 
 interface LocaleContextValue {
@@ -12,7 +11,6 @@ interface LocaleContextValue {
   locale: Locale
   setLocale: (locale: Locale) => void
   t: UseTranslationResponse<"translation", unknown>["t"]
-  T: typeof TransWrapper
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
@@ -66,7 +64,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
         locale,
         setLocale,
         t: i18next.t,
-        T: TransWrapper,
       }}
     >
       {children}
@@ -78,13 +75,4 @@ export function useLocale(): LocaleContextValue {
   const ctx = useContext(LocaleContext)
   if (!ctx) throw new Error("useLocale must be used within LocaleProvider")
   return ctx
-}
-
-interface TransWrapperProps {
-  i18nKey: TranslationKey
-  values?: TOptions
-}
-
-function TransWrapper({ i18nKey, values = {} }: TransWrapperProps) {
-  return <Trans components={{ code: <code />, strong: <strong /> }} i18nKey={i18nKey} values={values} />
 }
