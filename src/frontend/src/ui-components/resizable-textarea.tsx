@@ -56,7 +56,6 @@ export default function ResizableTextarea({
   const handleMouseUp = useCallback(() => {
     isDragging.current = false
     document.removeEventListener("mousemove", handleMouseMove)
-    // eslint-disable-next-line react-hooks/immutability
     document.removeEventListener("mouseup", handleMouseUp)
   }, [handleMouseMove])
 

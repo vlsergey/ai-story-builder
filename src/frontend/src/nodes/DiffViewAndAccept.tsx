@@ -552,7 +552,7 @@ export default function DiffViewAndAccept({
   // Keep currentHunkIdx in bounds when hunks count changes (after parent updates texts)
   useEffect(() => {
     if (hunks.length === 0) return
-    setCurrentHunkIdx((i) => Math.min(i, hunks.length - 1)) // eslint-disable-line react-hooks/set-state-in-effect
+    setCurrentHunkIdx((i) => Math.min(i, hunks.length - 1))
   }, [hunks.length])
 
   function goToPrev() {
