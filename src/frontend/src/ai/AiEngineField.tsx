@@ -11,7 +11,7 @@ import { TriangleAlert, Info, Eye, EyeOff } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui-components/tooltip"
 import { ButtonGroup } from "../ui-components/button-group"
 import { Button } from "../ui-components/button"
-import type { TranslationKey } from "@/i18n/TranslationKey"
+import type { ParseKeys } from "i18next"
 
 interface AiEngineFieldProps {
   className?: string
@@ -34,8 +34,8 @@ export default function AiEngineField({
 }: AiEngineFieldProps) {
   const { t } = useLocale()
   const htmlId = useId()
-  const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label` as TranslationKey)
-  const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint` as TranslationKey)
+  const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label` as ParseKeys)
+  const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint` as ParseKeys)
 
   const [showHiddenValue, setShowHiddenValue] = useState<boolean>(false)
 
@@ -107,7 +107,7 @@ export default function AiEngineField({
             <SelectContent>
               {field.options?.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {t(`engine.${engine.id}.field.${field.key}.option.${option}` as TranslationKey)}
+                  {t(`engine.${engine.id}.field.${field.key}.option.${option}` as ParseKeys)}
                 </SelectItem>
               ))}
             </SelectContent>

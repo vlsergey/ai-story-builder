@@ -4,10 +4,10 @@ import LanguageDetector from "i18next-browser-languagedetector"
 import type React from "react"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { useTranslation, type UseTranslationResponse } from "react-i18next"
-import type { TranslationKey } from "./TranslationKey"
+import type { ParseKeys } from "i18next"
 
 interface LocaleContextValue {
-  exists: (candidate: string) => candidate is TranslationKey
+  exists: (candidate: string) => candidate is ParseKeys
   locale: Locale
   setLocale: (locale: Locale) => void
   t: UseTranslationResponse<"translation", unknown>["t"]
@@ -60,7 +60,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   return (
     <LocaleContext.Provider
       value={{
-        exists: (candidate: string): candidate is TranslationKey => i18next.i18n.exists(candidate),
+        exists: (candidate: string): candidate is ParseKeys => i18next.i18n.exists(candidate),
         locale,
         setLocale,
         t: i18next.t,

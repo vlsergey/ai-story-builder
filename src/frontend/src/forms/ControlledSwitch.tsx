@@ -1,12 +1,12 @@
 import { useLocale } from "@/i18n/locale"
-import type { TranslationKey } from "@/i18n/TranslationKey"
+import type { ParseKeys } from "i18next"
 import { useId } from "react"
 import { Controller, type FieldValues, type Path, type UseFormReturn } from "react-hook-form"
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "../ui-components/field"
 import { Switch } from "../ui-components/switch"
 
 type GetPrefix<K, Suffix extends string> = K extends `${infer P}.${Suffix}` ? P : never
-type AllowedPrefixes = Extract<GetPrefix<TranslationKey, "label">, GetPrefix<TranslationKey, "description">>
+type AllowedPrefixes = Extract<GetPrefix<ParseKeys, "label">, GetPrefix<ParseKeys, "description">>
 
 interface ControlledSwitchProps<T extends FieldValues> {
   form: UseFormReturn<T>
