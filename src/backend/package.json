@@ -23,11 +23,9 @@
   "dependencies": {
     "@trpc/server": "^10.45.4",
     "best-effort-json-parser": "^1.4.0",
+    "better-sqlite3": "^12.9.0",
     "electron-trpc": "^0.7.1",
     "openai": "^6.34.0",
     "zod": "^4.3.6"
-  },
-  "optionalDependencies": {
-    "better-sqlite3": "^12.6.2"
   }
 }
