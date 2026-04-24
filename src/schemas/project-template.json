@@ -17,7 +17,7 @@
       "type": "object",
       "required": ["fields"],
       "properties": {
-        "fields": { "$ref": "#/definitions/WizardField" }
+        "fields": { "type": "array", "items": { "$ref": "#/definitions/WizardField" } }
       },
       "additionalProperties": false
     },

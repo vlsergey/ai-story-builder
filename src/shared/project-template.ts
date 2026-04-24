@@ -12,7 +12,7 @@ export interface ProjectTemplate {
 }
 
 export interface WizardPage {
-  fields: WizardField
+  fields: WizardField[]
 }
 
 export interface BaseWizardField {
