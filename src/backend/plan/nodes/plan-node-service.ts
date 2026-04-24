@@ -453,6 +453,12 @@ export class PlanNodeService {
         patch = (await nodeProcessor.regenerate(this, context, node, settings)) || {}
       }
 
+      if (context.abortSignal.aborted) {
+        console.warn("[PlanNodeService]", "regenerate", `Stop node ${context.nodeId} regeneration due to abort signal`)
+        node = await this.patch(nodeId, false, { status: "OUTDATED" })
+        return node
+      }
+
       const patchedContent = nodeProcessor.getOutput(this, {
         ...node,
         ...patch,
@@ -488,6 +494,12 @@ export class PlanNodeService {
           summary: patch.summary || null,
           status: patchedContent ? "GENERATED" : "EMPTY",
         }
+      }
+
+      if (context.abortSignal.aborted) {
+        console.warn("[PlanNodeService]", "regenerate", `Stop node ${context.nodeId} regeneration due to abort signal`)
+        node = await this.patch(nodeId, false, { status: "OUTDATED" })
+        return node
       }
 
       return await this.patch(nodeId, false, patch)
