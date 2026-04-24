@@ -2,9 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ProjectTemplate",
   "type": "object",
-  "required": ["title", "plan"],
+  "required": ["$schema", "label", "description", "plan"],
   "properties": {
-    "title": { "type": "string" },
+    "$schema": { "type": "string" },
+    "label": { "type": "string" },
+    "description": { "type": "string" },
     "wizardPages": {
       "type": "array",
       "items": { "$ref": "#/definitions/WizardPage" }

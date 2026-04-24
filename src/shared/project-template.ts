@@ -6,7 +6,9 @@ import type { PlanNodeType } from "./plan-node-types"
 import type { PlanEdgeType } from "./plan-edge-types"
 
 export interface ProjectTemplate {
-  title: string
+  $schema: string
+  label: string
+  description: string
   wizardPages?: WizardPage[]
   plan: TemplateProjectPlan
 }
