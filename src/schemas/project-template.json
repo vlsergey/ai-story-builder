@@ -4,9 +4,13 @@
   "definitions": {
     "ProjectTemplate": {
       "type": "object",
-      "required": ["wizardScreens", "plan"],
+      "required": ["title", "plan"],
       "properties": {
-        "wizardScreens": { "$ref": "#/definitions/WizardPage" },
+        "title": { "type": "string" },
+        "wizardPages": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WizardPage" }
+        },
         "plan": { "$ref": "#/definitions/TemplateProjectPlan" }
       }
     },
@@ -57,7 +61,7 @@
       "properties": {
         "id": { "type": "number" },
         "title": { "type": "string" },
-        "type": { "$ref": "plan-node-types.json#/" },
+        "type": { "$ref": "plan-node-types.json#" },
         "content": { "type": "string" },
         "children": { "$ref": "#/definitions/TemplateProjectNode" },
         "outputs": {
@@ -67,7 +71,7 @@
             "required": ["targetNodeId", "type"],
             "properties": {
               "targetNodeId": { "type": "number" },
-              "type": { "$ref": "plan-edge-types.json#/" }
+              "type": { "$ref": "plan-edge-types.json#" }
             }
           }
         }

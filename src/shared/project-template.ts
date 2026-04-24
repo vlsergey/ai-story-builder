@@ -5,7 +5,8 @@
 import type { PlanNodeType } from "./plan-node-types"
 
 export interface ProjectTemplate {
-  wizardScreens: WizardPage
+  title: string
+  wizardPages?: WizardPage[]
   plan: TemplateProjectPlan
 }
 
