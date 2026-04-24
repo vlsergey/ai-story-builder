@@ -57,12 +57,13 @@
     },
     "TemplateProjectNode": {
       "type": "object",
-      "required": ["id", "title", "type", "content", "outputs"],
+      "required": ["id", "title", "type", "outputs"],
       "properties": {
         "id": { "type": "number" },
         "title": { "type": "string" },
         "type": { "$ref": "plan-node-types.json#" },
-        "content": { "type": "string" },
+        "aiUserInstructions": { "type": "array", "items": { "type": "string" } },
+        "content": { "type": "array", "items": { "type": "string" } },
         "children": { "$ref": "#/definitions/TemplateProjectNode" },
         "outputs": {
           "type": "array",

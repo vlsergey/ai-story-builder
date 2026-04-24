@@ -39,7 +39,8 @@ export interface TemplateProjectNode {
   id: number
   title: string
   type: PlanNodeType
-  content: string
+  aiUserInstructions?: string[]
+  content?: string[]
   children?: TemplateProjectNode
   outputs: Record<string, any>[]
 }
