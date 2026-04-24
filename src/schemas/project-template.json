@@ -11,13 +11,15 @@
     },
     "plan": { "$ref": "#/definitions/TemplateProjectPlan" }
   },
+  "additionalProperties": false,
   "definitions": {
     "WizardPage": {
       "type": "object",
       "required": ["fields"],
       "properties": {
         "fields": { "$ref": "#/definitions/WizardField" }
-      }
+      },
+      "additionalProperties": false
     },
     "BaseWizardField": {
       "type": "object",
@@ -34,14 +36,16 @@
       "properties": {
         "type": { "const": "textarea" }
       },
-      "required": ["type"]
+      "required": ["type"],
+      "additionalProperties": false
     },
     "WizardInputField": {
       "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
       "properties": {
         "type": { "const": "input" }
       },
-      "required": ["type"]
+      "required": ["type"],
+      "additionalProperties": false
     },
     "WizardField": {
       "oneOf": [{ "$ref": "#/definitions/WizardInputField" }, { "$ref": "#/definitions/WizardTextAreaField" }]
@@ -51,7 +55,8 @@
       "required": ["nodes"],
       "properties": {
         "nodes": { "$ref": "#/definitions/TemplateProjectNode" }
-      }
+      },
+      "additionalProperties": false
     },
     "TemplateProjectNode": {
       "type": "object",
@@ -67,7 +72,8 @@
           "type": "array",
           "items": { "$ref": "#/definitions/TemplateProjectNodeInput" }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "TemplateProjectNodeInput": {
       "type": "object",
@@ -75,7 +81,8 @@
       "properties": {
         "sourceNodeId": { "type": "number" },
         "type": { "$ref": "plan-edge-types.json#" }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }
