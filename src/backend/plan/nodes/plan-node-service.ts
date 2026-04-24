@@ -434,13 +434,9 @@ export class PlanNodeService {
 
   async regenerate<T extends Record<string, any> = Record<string, any>>(
     context: RegenerationNodeContext,
-    nodeId: number,
   ): Promise<PlanNodeRow> {
-    // await sleep(600000)
-    let node = this.repo.findById(nodeId)
-    if (!node) throw makeErrorWithStatus("node not found", 404)
-
-    node = await this.patch(nodeId, false, { status: "GENERATING" })
+    const nodeId = context.nodeId
+    let node = await this.patch(nodeId, false, { status: "GENERATING" })
 
     try {
       const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>

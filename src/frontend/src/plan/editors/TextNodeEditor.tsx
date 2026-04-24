@@ -43,48 +43,33 @@ export default function TextNodeEditor({
   const aiThinkinPanelRef = useRef<AiThinkingPanelHandle>(null)
   const [tempContent, setTempContent] = useState<string | null>(null)
 
-  const [generationStarted, setGenerationStarted] = useState(false)
-  trpc.plan.nodes.aiGenerateWatchAndReview.useSubscription(nodeId, {
-    enabled: generationStarted,
-    onData: (event) => {
-      switch (event.type) {
-        case "event": {
-          const streamEvent = event.event as ResponseStreamEvent
-          switch (streamEvent.type) {
-            case "response.output_text.delta":
-              setTempContent((content) => (content || "") + streamEvent.delta)
-              break
-            default:
-              console.log(JSON.stringify(streamEvent))
-              aiThinkinPanelRef?.current?.onEvent(streamEvent)
-          }
-          break
-        }
-        case "data":
-          onExternalUpdate(event.data)
-          setTempContent(null)
-          break
-        case "completed":
-          aiThinkinPanelRef?.current?.onComplete()
-          setGenerationStarted(false)
-          setTempContent(null)
-          setStatusOverride(null)
-          setEditorMode("review_after_generate")
-          break
+  trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
+    onData({ nodeId: eventNodeId, event }) {
+      if (eventNodeId !== nodeId) return
+      if (event.type === "response.output_text.delta") {
+        setTempContent((content) => (content || "") + event.delta)
       }
+      aiThinkinPanelRef?.current?.onEvent(event as ResponseStreamEvent)
     },
-    onError: (err) => {
+  })
+
+  const generateForNode = trpc.plan.nodes.aiGenerateAndReview.useMutation()
+  const handleGenerate = useCallback(async () => {
+    setStatusOverride("GENERATING")
+    try {
+      const newNodeVersion = await generateForNode.mutateAsync(nodeId)
+      aiThinkinPanelRef?.current?.onComplete()
+      setTempContent(null)
+      onExternalUpdate(newNodeVersion)
+      setStatusOverride(null)
+      setEditorMode("review_after_generate")
+    } catch (err) {
       console.error(err)
       aiThinkinPanelRef?.current?.onComplete()
       setTempContent(null)
-      setGenerationStarted(false)
       setEditorMode("generate")
-    },
-  })
-  const handleGenerate = useCallback(() => {
-    setStatusOverride("GENERATING")
-    setGenerationStarted(true)
-  }, [])
+    }
+  }, [nodeId, onExternalUpdate])
 
   const [improvingStarted, setImprovingStarted] = useState(false)
   trpc.plan.nodes.aiImprove.useSubscription(nodeId, {

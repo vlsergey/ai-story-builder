@@ -13,6 +13,7 @@ import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import { useTranslation } from "react-i18next"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { ExternalLink, TrashIcon, SaveIcon } from "lucide-react"
+import { trpc } from "@/ipcClient"
 
 interface NodeContextMenuContentProps {
   contextMenuNodeId: number
@@ -20,7 +21,6 @@ interface NodeContextMenuContentProps {
   aiGenerateSummary: (nodeId: number) => void
   deleteNode: (nodeId: number) => void
   moveNode: (nodeId: number, parentId: number | null) => void
-  regenerateNode: (nodeId: number) => void
   saveToFile: (nodeId: number) => void
 }
 
@@ -30,7 +30,6 @@ export default function NodeContextMenuContent({
   aiGenerateSummary,
   deleteNode,
   moveNode,
-  regenerateNode,
   saveToFile,
 }: NodeContextMenuContentProps) {
   const { t } = useTranslation()
@@ -40,6 +39,7 @@ export default function NodeContextMenuContent({
   )
   const nodeType = contextMenuNode?.type
   const nodeDef = nodeType ? getNodeTypeDefinition(nodeType) : null
+  const regenerateNode = trpc.plan.nodes.aiGenerate.startForNode.useMutation().mutate
 
   return (
     <UIContextMenuContent>

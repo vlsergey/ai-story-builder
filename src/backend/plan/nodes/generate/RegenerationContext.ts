@@ -14,9 +14,10 @@ export interface RegenerationContainerContext {
 }
 
 export interface RegenerationNodeContext {
+  nodeId: number
   options: RegenerateOptions
-  onData(node: PlanNodeRow): void
-  onEvent(event: ResponseStreamEvent): void
+  onNodeUpdated(node: PlanNodeRow): void
+  onResponseStreamEvent(contentPath: (string | number)[], event: ResponseStreamEvent): void
   asContainer<T>(block: (context: RegenerationContainerContext) => Promise<T>): Promise<T>
   asCycle<T>(totalIterations: number | undefined, block: (context: RegenerationCycleContext) => Promise<T>): Promise<T>
 }

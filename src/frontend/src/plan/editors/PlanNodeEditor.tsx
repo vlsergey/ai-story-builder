@@ -136,7 +136,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
     [value, handleChange],
   )
 
-  const regenerateMutation = trpc.plan.nodes.aiGenerateOnly.useMutation()
+  const regenerateMutation = trpc.plan.nodes.aiGenerate.startForNode.useMutation()
   const alert = useAlert()
 
   const handleRegenerate = useCallback(async () => {

@@ -225,5 +225,8 @@
   "regeneration.empty": "Empty",
   "regeneration.skipped": "Skipped",
   "regeneration.last_session": "Last session stats",
-  "regenerateOptions.form.accordionTrigger": "Generation options"
+  "regenerateOptions.form.accordionTrigger": "Generation options",
+
+  "ResponseStreamWatcher.label": "AI Generation Stream Mirror",
+  "ResponseStreamWatcher.placeholder": "A mirror of the AI generation stream will appear here to show the system is active and processing your request"
 }

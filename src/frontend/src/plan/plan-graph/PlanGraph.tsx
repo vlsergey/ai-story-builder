@@ -217,7 +217,6 @@ export default function PlanGraph() {
   }, [nodes])
 
   const patchNode = trpc.plan.nodes.patch.useMutation().mutateAsync
-  const regenerateNode = trpc.plan.nodes.aiGenerateOnly.useMutation().mutateAsync
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -469,7 +468,6 @@ export default function PlanGraph() {
             moveNode={(nodeId, newParentId) =>
               patchNode({ id: nodeId, manual: true, data: { parent_id: newParentId } })
             }
-            regenerateNode={regenerateNode}
             saveToFile={saveToFile}
           />
         )}

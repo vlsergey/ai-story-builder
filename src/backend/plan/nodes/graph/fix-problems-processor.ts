@@ -78,7 +78,9 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
         newContent.iterations.push(iterationResult)
 
         await cycleContext.asNode(iteration, async (nodeContext) => {
-          const findProblemsResult = await findProblems(node, input, nodeContext.onEvent)
+          const findProblemsResult = await findProblems(node, input, (event) => {
+            nodeContext.onResponseStreamEvent([iteration, "findProblemsResult"], event)
+          })
           iterationResult.findProblemsResult = findProblemsResult
           iteration++
           maxSeverity =
@@ -93,7 +95,9 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
               input,
               foundProblemsTemplate,
               findProblemsResult,
-              nodeContext.onEvent,
+              (event) => {
+                nodeContext.onResponseStreamEvent([iteration, "fixProblemsResult"], event)
+              },
             )
             iterationResult.fixProblemsResult = fixProblemsResult
             input = fixProblemsResult

@@ -14,7 +14,7 @@ export interface RegenerationStackItemNode {
 
 export type RegenerationStackItem = RegenerationStackItemIteration | RegenerationStackItemNode
 
-export interface RegenerateEvent {
+export interface RegenerateStatusEvent {
   inProcess: boolean
   stopping: boolean
 

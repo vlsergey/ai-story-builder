@@ -52,14 +52,16 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
   }
 
   async regenerate(
-    service: PlanNodeService,
+    _service: PlanNodeService,
     context: RegenerationNodeContext,
     node: PlanNodeRow,
-    settings: TextSettings,
+    _settings: TextSettings,
   ): Promise<PlanNodeUpdate | null> {
     // Generate content using AI for text nodes
     console.log(`[TextProcessor] regenerating node ${node.id} (title: ${node.title})`)
-    const content = await generatePlanNodeTextContent(node, (event) => context.onEvent(event))
+    const content = await generatePlanNodeTextContent(node, (event) =>
+      context.onResponseStreamEvent(["content"], event),
+    )
     console.log(`[TextProcessor] generated content length: ${content?.length ?? "null"}`)
     if (content === node.content) return null
     return { content }

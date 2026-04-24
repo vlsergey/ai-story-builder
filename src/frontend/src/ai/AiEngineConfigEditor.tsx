@@ -22,7 +22,7 @@ import { Separator } from "../ui-components/separator"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import AiEngineField from "./AiEngineField"
-import { Textarea } from "../ui-components/textarea"
+import { Textarea } from "../ui-components/textarea.tsx"
 import { useDebouncedCallback } from "use-debounce"
 
 interface AiEngineConfigEditorProps {

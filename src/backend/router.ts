@@ -24,14 +24,10 @@ import { saveFileDialog } from "./native-routes.js"
 import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
 import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
 import { createGraphEdge, deleteGraphEdge, patchGraphEdge } from "./plan/edges/plan-edge-routes.js"
-import {
-  regenerateTreeNodesContents,
-  regenerateTreeNodesContentsStop,
-  subscribeToRegenerateTreeNodesContentsProgress,
-} from "./plan/nodes/generate/regenerateTreeNodesContents.js"
+import { buildRoutes as buildPlanRegenerateRoutes } from "./plan/nodes/generate/regenerate-routes.js"
 import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
 import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
-import { aiRegenerateNodeContentOnly, aiRegenerateNodeContentWatchAndReview } from "./plan/nodes/plan-node-routes.js"
+import { aiGenerateAndReview } from "./plan/nodes/plan-node-routes.js"
 import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
 import { getAiBilling } from "./routes/ai-billing.js"
 import { testEngineConnection } from "./routes/ai-config.js"
@@ -120,10 +116,8 @@ export const appRouter = t.router({
   plan: t.router({
     nodes: t.router({
       acceptReview: t.procedure.input(z.int()).mutation(({ input }) => new PlanNodeService().acceptReview(input)),
-      aiGenerateOnly: t.procedure.input(z.int()).mutation(({ input }) => aiRegenerateNodeContentOnly(input)),
-      aiGenerateWatchAndReview: t.procedure
-        .input(z.int())
-        .subscription(({ input }) => aiRegenerateNodeContentWatchAndReview(input)),
+      aiGenerate: buildPlanRegenerateRoutes(t),
+      aiGenerateAndReview: t.procedure.input(z.int()).mutation(({ input }) => aiGenerateAndReview(input)),
       aiGenerateSummary: t.procedure
         .input(z.int())
         .mutation(({ input }) => new PlanNodeService().aiGenerateSummary(input)),
@@ -144,11 +138,6 @@ export const appRouter = t.router({
       patch: t.procedure
         .input((v) => v as { id: number; manual: boolean; data: PlanNodeUpdate })
         .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
-      regenerateTreeNodesContents: t.procedure.mutation(() => regenerateTreeNodesContents()),
-      regenerateTreeNodesContentsProgress: t.procedure.subscription(() =>
-        subscribeToRegenerateTreeNodesContentsProgress(),
-      ),
-      regenerateTreeNodesContentsStop: t.procedure.mutation(() => regenerateTreeNodesContentsStop()),
       saveContentToFile: t.procedure
         .input(z.object({ nodeId: z.int(), filePath: z.string() }))
         .mutation(({ input }) => new PlanNodeService().saveContentToFile(input.nodeId, input.filePath)),

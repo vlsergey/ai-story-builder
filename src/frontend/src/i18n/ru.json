@@ -233,5 +233,8 @@
   "regeneration.empty": "Пустые",
   "regeneration.skipped": "Пропущены",
   "regeneration.last_session": "Статистика последней сессии",
-  "regenerateOptions.form.accordionTrigger": "Опции генерации"
+  "regenerateOptions.form.accordionTrigger": "Опции генерации",
+
+  "ResponseStreamWatcher.label": "Копия потока ИИ генерации",
+  "ResponseStreamWatcher.placeholder": "Копия потока ИИ генерации будет показана тут, чтобы было понятно, что система не зависла и работает над запросом"
 }

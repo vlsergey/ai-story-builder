@@ -1,6 +1,6 @@
 import { ButtonGroup } from "@/ui-components/button-group"
 import type {
-  RegenerateEvent,
+  RegenerateStatusEvent,
   RegenerationStackItemIteration,
   RegenerationStackItemNode,
 } from "@shared/RegenerateEvent"
@@ -12,21 +12,22 @@ import { useTranslation } from "react-i18next"
 import { Button } from "../ui-components/button"
 import { Card } from "../ui-components/card"
 import RegenerateOptionsForm from "./RegenerateOptionsForm"
+import ResponseStreamWatcher from "./ResponseStreamWatcher"
 
 export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPanelApi }) {
   const { t } = useTranslation()
-  const [event, setEvent] = useState<RegenerateEvent | null>(null)
+  const [event, setEvent] = useState<RegenerateStatusEvent | null>(null)
 
   useEffect(() => {
     panelApi.setTitle(t("regeneration.title"))
   }, [panelApi, t])
 
-  trpc.plan.nodes.regenerateTreeNodesContentsProgress.useSubscription(undefined, {
+  trpc.plan.nodes.aiGenerate.subscribeToStatusEvents.useSubscription(undefined, {
     onData: setEvent,
   })
 
-  const startMutation = trpc.plan.nodes.regenerateTreeNodesContents.useMutation()
-  const stopMutation = trpc.plan.nodes.regenerateTreeNodesContentsStop.useMutation()
+  const startMutation = trpc.plan.nodes.aiGenerate.startForAll.useMutation()
+  const stopMutation = trpc.plan.nodes.aiGenerate.stop.useMutation()
 
   const handleStart = useCallback(() => {
     console.info("[RegenerationPanel] startMutation")
@@ -134,6 +135,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
           {renderStats()}
         </div>
       )}
+      <ResponseStreamWatcher className="flex-1 min-h-0 text-muted-foreground text-xs" />
     </div>
   )
 }

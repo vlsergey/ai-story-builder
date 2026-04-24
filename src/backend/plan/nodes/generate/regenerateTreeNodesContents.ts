@@ -1,11 +1,13 @@
 import EventEmitter from "node:events"
-import { type Observable, observable } from "@trpc/server/observable"
+import type { Observable } from "@trpc/server/observable"
+import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
 import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
 import type {
-  RegenerateEvent,
+  RegenerateStatusEvent,
   RegenerationStackItem,
   RegenerationStackItemIteration,
 } from "../../../../shared/RegenerateEvent.js"
+import { emitterToObservable, emitterToSingleArgObservable } from "../../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../../lib/make-errors.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
@@ -17,10 +19,16 @@ import type {
   RegenerationNodeContext,
 } from "./RegenerationContext.js"
 
-const eventEmitter = new EventEmitter()
+interface RegenerateEvents {
+  nodeUpdate: [node: PlanNodeRow]
+  responseStream: [nodeId: number, contentPath: (string | number)[], event: ResponseStreamEvent]
+  status: [event: RegenerateStatusEvent]
+}
 
-function emitRegenerateEvent() {
-  const event: RegenerateEvent = {
+const eventEmitter = new EventEmitter<RegenerateEvents>()
+
+function emitRegenerateStatusEvent() {
+  const event: RegenerateStatusEvent = {
     inProcess,
     stopping,
     currentRegenerationStack: currentRegenerationStack,
@@ -30,26 +38,32 @@ function emitRegenerateEvent() {
     generatedEmpty,
     skipped,
   }
-  eventEmitter.emit("regenerate", event)
+  eventEmitter.emit("status", event)
 }
 
-export function subscribeToRegenerateTreeNodesContentsProgress(): Observable<RegenerateEvent, unknown> {
-  return observable((emit) => {
-    let active = true
+export function subscribeToStatusEvents(): Observable<RegenerateStatusEvent, unknown> {
+  return emitterToSingleArgObservable(eventEmitter, "status")
+}
 
-    const listener = (event: RegenerateEvent) => {
-      if (active) {
-        emit.next(event)
-      }
-    }
-    eventEmitter.on("regenerate", listener)
+interface ResponseStreamEventWrapper {
+  nodeId: number
+  contentPath: (string | number)[]
+  event: ResponseStreamEvent
+}
 
-    // Функция отписки
-    return () => {
-      active = false
-      eventEmitter.off("regenerate", listener)
-    }
-  })
+const eventEmitterTupleToEventMapper = ([nodeId, contentPath, event]: [
+  nodeId: number,
+  contentPath: (string | number)[],
+  event: ResponseStreamEvent,
+]) =>
+  ({
+    nodeId,
+    contentPath,
+    event,
+  }) satisfies ResponseStreamEventWrapper
+
+export function subscribeToResponseStreamEvents(): Observable<ResponseStreamEventWrapper, unknown> {
+  return emitterToObservable(eventEmitter, "responseStream", eventEmitterTupleToEventMapper)
 }
 
 let inProcess = false
@@ -63,17 +77,17 @@ let generatedSame: number = 0
 let generatedEmpty: number = 0
 let skipped: number = 0
 
-export function regenerateTreeNodesContentsStop(): void {
+export function stop(): void {
   if (inProcess && !stopping) {
     stopping = true
-    emitRegenerateEvent()
+    emitRegenerateStatusEvent()
   }
 }
 
 /**
  * Generate content for all nodes in topological order, respecting dependencies.
  */
-export async function regenerateTreeNodesContents(): Promise<void> {
+export async function regenerateTreeNodesContents(nodeId?: number): Promise<void> {
   if (inProcess) throw makeErrorWithStatus("Some regeneration is already in process", 429)
   inProcess = true
   stopping = false
@@ -84,6 +98,7 @@ export async function regenerateTreeNodesContents(): Promise<void> {
   generatedSame = 0
   generatedNew = 0
   skipped = 0
+  emitRegenerateStatusEvent()
 
   const options = {
     regenerateGenerated: SettingsRepository.getAiRegenerateGenerated(),
@@ -96,7 +111,7 @@ export async function regenerateTreeNodesContents(): Promise<void> {
       options,
       onNodeSkip() {
         skipped++
-        emitRegenerateEvent()
+        emitRegenerateStatusEvent()
       },
       async onNodeStart<T>(
         node: PlanNodeRow,
@@ -113,7 +128,7 @@ export async function regenerateTreeNodesContents(): Promise<void> {
           }
         }
         currentRegenerationStack.push({ type: "node", node: node })
-        emitRegenerateEvent()
+        emitRegenerateStatusEvent()
         try {
           const blockResult = await block(nodeContext(node))
           switch (blockResult.status) {
@@ -136,7 +151,7 @@ export async function regenerateTreeNodesContents(): Promise<void> {
           throw e
         } finally {
           currentRegenerationStack.pop()
-          emitRegenerateEvent()
+          emitRegenerateStatusEvent()
         }
       },
     }
@@ -153,7 +168,7 @@ export async function regenerateTreeNodesContents(): Promise<void> {
             zeroBasedIterationIndex,
           }
           currentRegenerationStack.push(stackItem)
-          emitRegenerateEvent()
+          emitRegenerateStatusEvent()
           try {
             return await block(nodeContext(container))
           } finally {
@@ -163,7 +178,7 @@ export async function regenerateTreeNodesContents(): Promise<void> {
               // biome-ignore lint/correctness/noUnsafeFinally: that panic error anyway
               throw Error("Stack item mismatch")
             }
-            emitRegenerateEvent()
+            emitRegenerateStatusEvent()
           }
         },
         asContainer: async <T>(
@@ -195,12 +210,15 @@ export async function regenerateTreeNodesContents(): Promise<void> {
 
     function nodeContext(node: PlanNodeRow): RegenerationNodeContext {
       return {
+        nodeId: node.id,
         options,
-        onData: () => {
+        onNodeUpdated: (node: PlanNodeRow) => {
           if (stopping) throw Error("Stop was required")
+          eventEmitter.emit("nodeUpdate", node)
         },
-        onEvent: () => {
+        onResponseStreamEvent: (contentPath: (string | number)[], event: ResponseStreamEvent) => {
           if (stopping) throw Error("Stop was required")
+          eventEmitter.emit("responseStream", node.id, contentPath, event)
         },
         async asContainer<T>(block: (context: RegenerationContainerContext) => Promise<T>): Promise<T> {
           if (stopping) throw Error("Stop was required")
@@ -216,9 +234,29 @@ export async function regenerateTreeNodesContents(): Promise<void> {
       }
     }
 
-    await regenerateSubtreeNodesContents(containerContext, null)
+    if (nodeId === undefined) {
+      await regenerateSubtreeNodesContents(containerContext, null)
+    } else {
+      const service = new PlanNodeService()
+      const node = service.getById(nodeId)
+      const stackItem: RegenerationStackItem = { type: "node", node: node }
+      currentRegenerationStack.push(stackItem)
+      emitRegenerateStatusEvent()
+
+      try {
+        await new PlanNodeService().regenerate(nodeContext(node))
+      } finally {
+        const popped = currentRegenerationStack.pop()
+        if (popped !== stackItem) {
+          console.error("Stack item mismatch", popped, stackItem)
+          // biome-ignore lint/correctness/noUnsafeFinally: that panic error anyway
+          throw Error("Stack item mismatch")
+        }
+      }
+    }
   } finally {
     inProcess = false
+    emitRegenerateStatusEvent()
   }
 }
 
@@ -296,7 +334,7 @@ export async function regenerateSubtreeNodesContents(
 
     if (willRegenerate) {
       await context.onNodeStart(node, async (childContext) => {
-        const result = await planNodeService.regenerate(childContext, nodeId)
+        const result = await planNodeService.regenerate(childContext)
         const status =
           (result.content?.length || 0) === 0 ? "EMPTY" : result.content === node.content ? "SAME" : "GENERATED"
         return { result, status }
