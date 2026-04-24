@@ -1,4 +1,4 @@
-import type { PlanNodeType } from "@shared/plan-graph"
+import type { PlanNodeType } from "@shared/plan-node-types"
 import {
   BookOpenCheckIcon,
   FileCheck2Icon,

@@ -1,24 +1,8 @@
-export const CONTAINER_NODE_TYPES = ["for-each"] as const
-export const NON_CONTAINER_NODE_TYPES = [
-  "text",
-  "lore",
-  "merge",
-  "split",
-  "fix-problems",
-  "for-each-input",
-  "for-each-output",
-  "for-each-prev-outputs",
-] as const
-
-export const NODE_TYPES = [...CONTAINER_NODE_TYPES, ...NON_CONTAINER_NODE_TYPES] as const
-export type PlanContainerNodeType = (typeof CONTAINER_NODE_TYPES)[number]
-export type PlanNodeType = (typeof NODE_TYPES)[number]
+import type { PlanEdgeType } from "./plan-edge-types.js"
+import type { PlanNodeType } from "./plan-node-types.js"
 
 export const PLAN_NODE_STATUSES = ["EMPTY", "GENERATING", "GENERATED", "MANUAL", "OUTDATED", "ERROR"] as const
 export type PlanNodeStatus = (typeof PLAN_NODE_STATUSES)[number]
-
-export const EDGE_TYPES = ["text", "textArray"] as const
-export type PlanEdgeType = (typeof EDGE_TYPES)[number]
 
 export interface PlanNodeRow {
   id: number

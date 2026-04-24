@@ -1,6 +1,6 @@
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { PlanNodeType } from "@shared/plan-graph"
+import type { PlanNodeType } from "@shared/plan-node-types"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/ui-components/button"
 import { Input } from "@/ui-components/input"

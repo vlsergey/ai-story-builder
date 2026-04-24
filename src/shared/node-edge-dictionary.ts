@@ -3,7 +3,8 @@
  * Used for building models, dialogs, and backend validation.
  */
 
-import { EDGE_TYPES, type PlanContainerNodeType, type PlanEdgeType, type PlanNodeType } from "./plan-graph.js"
+import { PLAN_EDGE_TYPE_VALUES, type PlanEdgeType } from "./plan-edge-types.js"
+import type { PlanContainerNodeType, PlanNodeType } from "./plan-node-types.js"
 
 export type PlanNodeParentContainerType = PlanContainerNodeType | "root"
 
@@ -122,7 +123,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
 ] as const
 
 // Edge type definitions
-export const EDGE_TYPES_DEFS = EDGE_TYPES.map((edgeType) => ({
+export const EDGE_TYPES_DEFS = PLAN_EDGE_TYPE_VALUES.map((edgeType) => ({
   id: edgeType,
   allowedSourceNodeTypes: NODE_TYPES.filter((t) => t.allowedOutgoingEdgeTypes.includes(edgeType)).map((t) => t.id),
   allowedTargetNodeTypes: NODE_TYPES.filter((t) => t.allowedIncomingEdgeTypes.includes(edgeType)).map((t) => t.id),

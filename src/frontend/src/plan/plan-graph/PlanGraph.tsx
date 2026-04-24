@@ -1,7 +1,9 @@
 import { sortByHierarchy } from "@/lib/sortByHierarchy"
 import { ContextMenu, ContextMenuTrigger } from "@/ui-components/context-menu"
 import { EDGE_TYPES_DEFS, canCreateEdge, getNodeTypeDefinition } from "@shared/node-edge-dictionary"
-import type { PlanEdgeRow, PlanEdgeType, PlanNodeRow, PlanNodeType, PlanNodeUpdate } from "@shared/plan-graph"
+import type { PlanEdgeRow, PlanNodeRow, PlanNodeUpdate } from "@shared/plan-graph"
+import type { PlanEdgeType } from "@shared/plan-edge-types"
+import type { PlanNodeType } from "@shared/plan-node-types"
 import {
   Background,
   BackgroundVariant,

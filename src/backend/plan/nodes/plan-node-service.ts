@@ -9,14 +9,9 @@ import {
   isValidNodeType,
   NODE_TYPES,
 } from "../../../shared/node-edge-dictionary.js"
-import type {
-  PlanEdgeType,
-  PlanNodeCreate,
-  PlanNodeRow,
-  PlanNodeStatus,
-  PlanNodeType,
-  PlanNodeUpdate,
-} from "../../../shared/plan-graph.js"
+import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
+import type { PlanNodeCreate, PlanNodeRow, PlanNodeStatus, PlanNodeUpdate } from "../../../shared/plan-graph.js"
+import type { PlanNodeType } from "../../../shared/plan-node-types.js"
 import { generateSummary } from "../../ai/generate-summary.js"
 import { type DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../lib/make-errors.js"

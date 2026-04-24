@@ -1,6 +1,6 @@
 import type { Connection } from "@xyflow/react"
 import { useTranslation } from "react-i18next"
-import type { PlanEdgeType } from "@shared/plan-graph"
+import type { PlanEdgeType } from "@shared/plan-edge-types"
 
 interface EdgeTypeSelectionDialogProps {
   showConnectDialog: Connection | null

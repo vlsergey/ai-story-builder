@@ -8,7 +8,7 @@ import type { NodeImpl } from "./Types"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import ForEachPlanNodeFooter from "./ForEachPlanNodeFooter"
 import CreateNodeButtonGroup from "./CreateNodeButtonGroup"
-import type { PlanContainerNodeType } from "@shared/plan-graph"
+import type { PlanContainerNodeType } from "@shared/plan-node-types"
 
 export default function GroupNode({ data }: NodeProps<NodeImpl>) {
   const nodeType = useMemo(() => getNodeTypeDefinition(data.type), [data.type])

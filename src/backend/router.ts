@@ -3,7 +3,8 @@ import type { MessageBoxOptions } from "electron"
 import { clipboard, dialog } from "electron"
 import { z } from "zod"
 import type { AiEngineConfig } from "../shared/ai-engine-config.js"
-import { EDGE_TYPES, type PlanNodeUpdate } from "../shared/plan-graph.js"
+import { PLAN_EDGE_TYPE_VALUES } from "../shared/plan-edge-types.js"
+import type { PlanNodeUpdate } from "../shared/plan-graph.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
 import {
@@ -156,7 +157,7 @@ export const appRouter = t.router({
       findAll: t.procedure.query(() => new PlanEdgeRepository().findAll()),
       findByToNodeId: t.procedure.input(z.int()).query(({ input }) => new PlanEdgeRepository().findByToNodeId(input)),
       findByToNodeIdAndType: t.procedure
-        .input(z.object({ id: z.int(), type: z.enum(EDGE_TYPES) }))
+        .input(z.object({ id: z.int(), type: z.enum(PLAN_EDGE_TYPE_VALUES) }))
         .query(({ input }) => new PlanEdgeRepository().findByToNodeIdAndType(input.id, input.type)),
       patch: t.procedure
         .input(z.object({ id: z.number(), data: z.any() }))

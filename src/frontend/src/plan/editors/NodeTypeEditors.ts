@@ -1,4 +1,4 @@
-import type { PlanNodeType } from "@shared/plan-graph"
+import type { PlanNodeType } from "@shared/plan-node-types"
 import type { FC } from "react"
 import FixProblemsNodeEditor from "./FixProblemsNodeEditor"
 import MergeNodeEditor from "./MergeNodeEditor"

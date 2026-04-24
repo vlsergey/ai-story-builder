@@ -1,7 +1,7 @@
 import { Button } from "@/ui-components/button"
 import { ButtonGroup } from "@/ui-components/button-group"
 import { getCreatableNodeTypes } from "@shared/node-edge-dictionary"
-import type { PlanContainerNodeType, PlanNodeType } from "@shared/plan-graph"
+import type { PlanContainerNodeType, PlanNodeType } from "@shared/plan-node-types"
 import { useCallback, useState } from "react"
 import { useMemo } from "react"
 import NodeTypeIcons from "./NodeTypeIcons"
