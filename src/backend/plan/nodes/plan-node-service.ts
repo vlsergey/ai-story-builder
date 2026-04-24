@@ -463,7 +463,8 @@ export class PlanNodeService {
           try {
             patch = {
               ...patch,
-              summary: (await generateSummary(["plan-node-summary", `${nodeId}`], patchedContent)) || "",
+              summary:
+                (await generateSummary(context.abortSignal, ["plan-node-summary", `${nodeId}`], patchedContent)) || "",
               status: "GENERATED",
             }
           } catch (e) {
@@ -612,7 +613,9 @@ export class PlanNodeService {
     const nodeContent = nodeProcessor.getOutput(this, node)
 
     return await this.patch(nodeId, false, {
-      summary: nodeContent ? await generateSummary(["plan-node-summary", `${nodeId}`], nodeContent) : "",
+      summary: nodeContent
+        ? await generateSummary(new AbortController().signal, ["plan-node-summary", `${nodeId}`], nodeContent)
+        : "",
     })
   }
 
@@ -621,7 +624,7 @@ export class PlanNodeService {
     if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404)
 
     return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
-      const { oldNode, newContent } = await improvePlanNodeContent(nodeId, (event) => {
+      const { oldNode, newContent } = await improvePlanNodeContent(new AbortController().signal, nodeId, (event) => {
         emit.next({ type: "event", event })
       })
 

@@ -8,7 +8,11 @@ import { SettingsRepository } from "../settings/settings-repository.js"
 // Unused but kept for type compat
 void (undefined as unknown as JsonSchemaSpec)
 
-export async function generateSummary(promptCacheKeys: string[], nodeOutput: unknown): Promise<string> {
+export async function generateSummary(
+  abortSignal: AbortSignal,
+  promptCacheKeys: string[],
+  nodeOutput: unknown,
+): Promise<string> {
   let content: string
   if (nodeOutput === null || nodeOutput === undefined) {
     return ""
@@ -53,6 +57,7 @@ export async function generateSummary(promptCacheKeys: string[], nodeOutput: unk
   const userPrompt = `${generateSummaryInstructions.trim()}\n\n${content.trim()}`
 
   return await adapter.generateResponse({
+    abortSignal,
     userPrompt,
     systemPrompt: null,
     promptCacheKeys: ["generate-summary", ...promptCacheKeys],

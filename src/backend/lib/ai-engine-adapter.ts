@@ -11,6 +11,7 @@ export interface JsonSchemaSpec {
 }
 
 export interface GenerateResponseRequest<S extends AiGenerationSettings = AiGenerationSettings> {
+  abortSignal: AbortSignal
   userPrompt: string | null
   systemPrompt: string | null
   /** Whether to include existing lore files as attachments. */

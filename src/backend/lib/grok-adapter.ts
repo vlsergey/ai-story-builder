@@ -71,7 +71,7 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       }
     }
 
-    return await grokGenerate(apiKey, requestParams, onEvent)
+    return await grokGenerate(req.abortSignal, apiKey, requestParams, onEvent)
   }
 }
 

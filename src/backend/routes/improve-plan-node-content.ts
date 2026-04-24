@@ -20,6 +20,7 @@ interface ImproveResult {
 }
 
 export async function improvePlanNodeContent(
+  abortSignal: AbortSignal,
   nodeId: number,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<ImproveResult> {
@@ -49,6 +50,7 @@ export async function improvePlanNodeContent(
 
   const newContent = await adapter.generateResponse(
     {
+      abortSignal,
       userPrompt,
       systemPrompt,
       aiGenerationSettings: actualAiSettings,

@@ -115,7 +115,11 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
           <PlayIcon />
           {t("regeneration.start")}
         </Button>
-        <Button variant="destructive" onClick={() => {}} disabled={!event?.inProcess || stopMutation.isPending}>
+        <Button
+          variant="destructive"
+          onClick={() => stopMutation.mutateAsync()}
+          disabled={!event?.inProcess || stopMutation.isPending}
+        >
           <SquareIcon />
           {t("regeneration.stop")}
         </Button>

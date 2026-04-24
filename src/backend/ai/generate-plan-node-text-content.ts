@@ -9,6 +9,7 @@ import { SettingsRepository } from "../settings/settings-repository.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
 export async function generatePlanNodeTextContent(
+  abortSignal: AbortSignal,
   node: PlanNodeRow,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string> {
@@ -53,6 +54,7 @@ export async function generatePlanNodeTextContent(
 
   return await adapter.generateResponse(
     {
+      abortSignal,
       userPrompt: finalUserPrompt,
       systemPrompt: finalSystemPrompt,
       // TODO: fix at some moment, this is very nice to have feature

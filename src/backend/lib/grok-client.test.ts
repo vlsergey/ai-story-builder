@@ -36,7 +36,7 @@ describe("grokGenerate — onEvent callbacks", () => {
     mockCreate.mockResolvedValue(makeStream([event]))
 
     const onEvent = vi.fn()
-    await grokGenerate("fake-key", { model: "grok-3" }, onEvent)
+    await grokGenerate(null, "fake-key", { model: "grok-3" }, onEvent)
 
     expect(onEvent).toHaveBeenCalledWith(event)
   })
@@ -49,7 +49,7 @@ describe("grokGenerate — onEvent callbacks", () => {
     mockCreate.mockResolvedValue(makeStream([event]))
 
     const onEvent = vi.fn()
-    await grokGenerate("fake-key", { model: "grok-3" }, onEvent)
+    await grokGenerate(null, "fake-key", { model: "grok-3" }, onEvent)
 
     expect(onEvent).toHaveBeenCalledWith(event)
   })
@@ -62,7 +62,7 @@ describe("grokGenerate — onEvent callbacks", () => {
     mockCreate.mockResolvedValue(makeStream([event]))
 
     const onEvent = vi.fn()
-    await grokGenerate("fake-key", { model: "grok-3" }, onEvent)
+    await grokGenerate(null, "fake-key", { model: "grok-3" }, onEvent)
 
     expect(onEvent).toHaveBeenCalledWith(event)
   })

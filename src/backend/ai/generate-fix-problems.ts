@@ -14,6 +14,7 @@ import { SettingsRepository } from "../settings/settings-repository.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
 export async function findProblems(
+  abortSignal: AbortSignal,
   node: PlanNodeRow,
   source: string,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
@@ -52,6 +53,7 @@ export async function findProblems(
 
   const aiResult = await adapter.generateResponse(
     {
+      abortSignal,
       userPrompt: finalUserPrompt,
       systemPrompt: finalSystemPrompt,
       responseSchema: {
@@ -70,6 +72,7 @@ export async function findProblems(
 }
 
 export async function fixProblems(
+  abortSignal: AbortSignal,
   node: PlanNodeRow,
   source: string,
   foundProblemsTemplateTitle: string,
@@ -113,6 +116,7 @@ export async function fixProblems(
 
   return await adapter.generateResponse(
     {
+      abortSignal,
       userPrompt: finalUserPrompt,
       systemPrompt: finalSystemPrompt,
       // TODO: fix at some moment, this is very nice to have feature

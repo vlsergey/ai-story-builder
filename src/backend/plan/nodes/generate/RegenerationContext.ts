@@ -5,6 +5,7 @@ import type { RegenerateOptions } from "../../../../shared/RegenerateOptions"
 export type PlanNodeAiGenerationStatus = "EMPTY" | "SAME" | "GENERATED"
 
 export interface RegenerationContainerContext {
+  abortSignal: AbortSignal
   options: RegenerateOptions
   onNodeSkip(node: PlanNodeRow, skipReason: string): void
   onNodeStart<T>(
@@ -14,6 +15,7 @@ export interface RegenerationContainerContext {
 }
 
 export interface RegenerationNodeContext {
+  abortSignal: AbortSignal
   nodeId: number
   options: RegenerateOptions
   onNodeUpdated(node: PlanNodeRow): void
@@ -23,6 +25,7 @@ export interface RegenerationNodeContext {
 }
 
 export interface RegenerationCycleContext {
+  abortSignal: AbortSignal
   options: RegenerateOptions
   asContainer<T>(
     zeroBasedIterationIndex: number,

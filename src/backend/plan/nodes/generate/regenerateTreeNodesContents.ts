@@ -30,7 +30,7 @@ const eventEmitter = new EventEmitter<RegenerateEvents>()
 function emitRegenerateStatusEvent() {
   const event: RegenerateStatusEvent = {
     inProcess,
-    stopping,
+    stopping: abortController == null ? true : abortController.signal.aborted,
     currentRegenerationStack: currentRegenerationStack,
     firstError,
     generatedNew,
@@ -66,8 +66,8 @@ export function subscribeToResponseStreamEvents(): Observable<ResponseStreamEven
   return emitterToObservable(eventEmitter, "responseStream", eventEmitterTupleToEventMapper)
 }
 
+let abortController: AbortController | null = null
 let inProcess = false
-let stopping = false
 
 const currentRegenerationStack: RegenerationStackItem[] = []
 let firstError: unknown = null
@@ -78,8 +78,8 @@ let generatedEmpty: number = 0
 let skipped: number = 0
 
 export function stop(): void {
-  if (inProcess && !stopping) {
-    stopping = true
+  if (inProcess && !abortController?.signal.aborted) {
+    abortController?.abort()
     emitRegenerateStatusEvent()
   }
 }
@@ -90,7 +90,6 @@ export function stop(): void {
 export async function regenerateTreeNodesContents(nodeId?: number): Promise<void> {
   if (inProcess) throw makeErrorWithStatus("Some regeneration is already in process", 429)
   inProcess = true
-  stopping = false
   firstError = null
   currentRegenerationStack.length = 0
 
@@ -98,6 +97,9 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
   generatedSame = 0
   generatedNew = 0
   skipped = 0
+
+  const myAbortController = new AbortController()
+  abortController = myAbortController
   emitRegenerateStatusEvent()
 
   const options = {
@@ -108,6 +110,7 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
   console.info("[regenerateTreeNodesContents] Starting regeneration")
   try {
     const containerContext: RegenerationContainerContext = {
+      abortSignal: myAbortController.signal,
       options,
       onNodeSkip() {
         skipped++
@@ -117,7 +120,7 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
         node: PlanNodeRow,
         block: (context: RegenerationNodeContext) => Promise<{ result: T; status: PlanNodeAiGenerationStatus }>,
       ) {
-        if (stopping) throw Error("Stop was required")
+        if (myAbortController.signal.aborted) throw Error("Stop was required")
         if (currentRegenerationStack.length > 0) {
           const topStackItem = currentRegenerationStack[currentRegenerationStack.length - 1]
           if (topStackItem.type === "node" && topStackItem.node.id !== node.parent_id) {
@@ -147,7 +150,7 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
           if (firstError == null) {
             firstError = e
           }
-          stopping = true
+          myAbortController.abort()
           throw e
         } finally {
           currentRegenerationStack.pop()
@@ -158,9 +161,10 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
 
     function cycleContext(totalIterations: number | undefined, container: PlanNodeRow): RegenerationCycleContext {
       return {
+        abortSignal: myAbortController.signal,
         options,
         asNode: async <T>(zeroBasedIterationIndex: number, block: (context: RegenerationNodeContext) => Promise<T>) => {
-          if (stopping) throw Error("Stop was required")
+          if (myAbortController.signal.aborted) throw Error("Stop was required")
           const stackItem: RegenerationStackItemIteration = {
             type: "iteration",
             container,
@@ -185,7 +189,7 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
           zeroBasedIterationIndex: number,
           block: (context: RegenerationContainerContext) => Promise<T>,
         ) => {
-          if (stopping) throw Error("Stop was required")
+          if (myAbortController.signal.aborted) throw Error("Stop was required")
 
           const stackItem: RegenerationStackItemIteration = {
             type: "iteration",
@@ -210,25 +214,26 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
 
     function nodeContext(node: PlanNodeRow): RegenerationNodeContext {
       return {
+        abortSignal: myAbortController.signal,
         nodeId: node.id,
         options,
         onNodeUpdated: (node: PlanNodeRow) => {
-          if (stopping) throw Error("Stop was required")
+          if (myAbortController.signal.aborted) throw Error("Stop was required")
           eventEmitter.emit("nodeUpdate", node)
         },
         onResponseStreamEvent: (contentPath: (string | number)[], event: ResponseStreamEvent) => {
-          if (stopping) throw Error("Stop was required")
+          if (myAbortController.signal.aborted) throw Error("Stop was required")
           eventEmitter.emit("responseStream", node.id, contentPath, event)
         },
         async asContainer<T>(block: (context: RegenerationContainerContext) => Promise<T>): Promise<T> {
-          if (stopping) throw Error("Stop was required")
+          if (myAbortController.signal.aborted) throw Error("Stop was required")
           return await block(containerContext)
         },
         async asCycle<T>(
           totalIterations: number | undefined,
           block: (context: RegenerationCycleContext) => Promise<T>,
         ): Promise<T> {
-          if (stopping) throw Error("Stop was required")
+          if (myAbortController.signal.aborted) throw Error("Stop was required")
           return await block(cycleContext(totalIterations, node))
         },
       }
@@ -256,6 +261,7 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
     }
   } finally {
     inProcess = false
+    abortController = null
     emitRegenerateStatusEvent()
   }
 }
@@ -311,7 +317,7 @@ export async function regenerateSubtreeNodesContents(
     MANUAL: context.options.regenerateManual,
   }
 
-  while (queue.length > 0 && !stopping) {
+  while (queue.length > 0 && !context.abortSignal.aborted) {
     const nodeId = queue.shift()!
     const node = nodeMap.get(nodeId)!
 

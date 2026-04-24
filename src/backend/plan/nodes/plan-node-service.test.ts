@@ -42,7 +42,7 @@ describe("PlanNodeService — full plan content generation", () => {
 
     vi.resetAllMocks()
     // Mock AI generation to return predictable text
-    ;(generatePlanNodeTextContent as any).mockImplementation(async (node: any) => {
+    ;(generatePlanNodeTextContent as any).mockImplementation(async (abortSignal: AbortSignal, node: any) => {
       console.log(
         `[MOCK] generatePlanNodeTextContent called for node ${node.id} title ${node.title} type ${node.type} parent_id ${node.parent_id}`,
       )

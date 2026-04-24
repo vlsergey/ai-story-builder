@@ -59,7 +59,7 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
   ): Promise<PlanNodeUpdate | null> {
     // Generate content using AI for text nodes
     console.log(`[TextProcessor] regenerating node ${node.id} (title: ${node.title})`)
-    const content = await generatePlanNodeTextContent(node, (event) =>
+    const content = await generatePlanNodeTextContent(context.abortSignal, node, (event) =>
       context.onResponseStreamEvent(["content"], event),
     )
     console.log(`[TextProcessor] generated content length: ${content?.length ?? "null"}`)

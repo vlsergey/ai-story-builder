@@ -37,6 +37,7 @@ export interface GenerateLoreParams {
 }
 
 export async function generateLore(
+  abortSignal: AbortSignal,
   nodeId: number,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string> {
@@ -84,6 +85,7 @@ export async function generateLore(
 
   return await adapter.generateResponse(
     {
+      abortSignal,
       userPrompt: aiUserPrompt!.trim(),
       systemPrompt: aiSystemPrompt?.trim() ?? null,
       // TODO: fix and implement it it

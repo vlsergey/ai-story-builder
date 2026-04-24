@@ -22,16 +22,22 @@ export function createGrokClient(apiKey: string): OpenAI {
  * Optional callbacks allow the caller to react to thinking status changes and text deltas.
  */
 export async function grokGenerate(
+  abortSignal: AbortSignal | null,
   apiKey: string,
   params: Omit<ResponseCreateParamsStreaming, "stream">,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string> {
   const client = createGrokClient(apiKey)
 
-  const stream = await client.responses.create({
-    ...params,
-    stream: true,
-  } as ResponseCreateParamsStreaming)
+  const stream = await client.responses.create(
+    {
+      ...params,
+      stream: true,
+    } satisfies ResponseCreateParamsStreaming,
+    {
+      signal: abortSignal,
+    },
+  )
 
   let text = ""
 
