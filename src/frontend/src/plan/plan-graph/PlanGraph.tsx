@@ -375,7 +375,7 @@ export default function PlanGraph() {
     } catch {
       /* ignore */
     }
-    if (next && !!nodes?.length) {
+    if (next && nodes?.length) {
       applyLayout()
     }
   }
