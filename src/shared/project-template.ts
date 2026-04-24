@@ -26,10 +26,12 @@ export interface BaseWizardField {
 
 export interface WizardTextAreaField extends BaseWizardField {
   type: "textarea"
+  placeholder?: string
 }
 
 export interface WizardInputField extends BaseWizardField {
   type: "input"
+  placeholder?: string
 }
 
 export type WizardField = WizardInputField | WizardTextAreaField

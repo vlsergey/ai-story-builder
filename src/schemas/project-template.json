@@ -36,18 +36,20 @@
     "WizardTextAreaField": {
       "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
       "properties": {
-        "type": { "const": "textarea" }
+        "type": { "const": "textarea" },
+        "placeholder": { "type": "string" }
       },
       "required": ["type"],
-      "additionalProperties": false
+      "unevaluatedProperties": false
     },
     "WizardInputField": {
       "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
       "properties": {
-        "type": { "const": "input" }
+        "type": { "const": "input" },
+        "placeholder": { "type": "string" }
       },
       "required": ["type"],
-      "additionalProperties": false
+      "unevaluatedProperties": false
     },
     "WizardField": {
       "oneOf": [{ "$ref": "#/definitions/WizardInputField" }, { "$ref": "#/definitions/WizardTextAreaField" }]
