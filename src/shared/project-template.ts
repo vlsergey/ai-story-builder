@@ -33,7 +33,7 @@ export interface WizardInputField extends BaseWizardField {
 export type WizardField = WizardInputField | WizardTextAreaField
 
 export interface TemplateProjectPlan {
-  nodes: TemplateProjectNode
+  nodes: TemplateProjectNode[]
 }
 
 export interface TemplateProjectNode {
