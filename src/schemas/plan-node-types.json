@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlanNodeType",
+  "anyOf": [{ "$ref": "#/definitions/PlanContainerNodeType" }, { "$ref": "#/definitions/PlanNonContainerNodeType" }],
+  "definitions": {
+    "PlanContainerNodeType": {
+      "type": "string",
+      "enum": ["for-each"]
+    },
+    "PlanNonContainerNodeType": {
+      "type": "string",
+      "enum": [
+        "text",
+        "lore",
+        "merge",
+        "split",
+        "fix-problems",
+        "for-each-input",
+        "for-each-output",
+        "for-each-prev-outputs"
+      ]
+    },
+    "PlanEdgeType": {
+      "type": "string",
+      "enum": ["text", "textArray"]
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org",
+  "title": "ProjectTemplate",
+  "definitions": {
+    "ProjectTemplate": {
+      "type": "object",
+      "required": ["wizardScreens", "plan"],
+      "properties": {
+        "wizardScreens": { "$ref": "#/definitions/WizardPage" },
+        "plan": { "$ref": "#/definitions/TemplateProjectPlan" }
+      }
+    },
+    "WizardPage": {
+      "type": "object",
+      "required": ["fields"],
+      "properties": {
+        "fields": { "$ref": "#/definitions/WizardField" }
+      }
+    },
+    "BaseWizardField": {
+      "type": "object",
+      "required": ["name", "label", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "WizardTextAreaField": {
+      "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
+      "properties": {
+        "type": { "const": "textarea" }
+      },
+      "required": ["type"]
+    },
+    "WizardInputField": {
+      "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
+      "properties": {
+        "type": { "const": "input" }
+      },
+      "required": ["type"]
+    },
+    "WizardField": {
+      "oneOf": [{ "$ref": "#/definitions/WizardInputField" }, { "$ref": "#/definitions/WizardTextAreaField" }]
+    },
+    "TemplateProjectPlan": {
+      "type": "object",
+      "required": ["nodes"],
+      "properties": {
+        "nodes": { "$ref": "#/definitions/TemplateProjectNode" }
+      }
+    },
+    "TemplateProjectNode": {
+      "type": "object",
+      "required": ["id", "title", "type", "content", "outputs"],
+      "properties": {
+        "id": { "type": "number" },
+        "title": { "type": "string" },
+        "type": { "$ref": "plan-node-types.json#/" },
+        "content": { "type": "string" },
+        "children": { "$ref": "#/definitions/TemplateProjectNode" },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["targetNodeId", "type"],
+            "properties": {
+              "targetNodeId": { "type": "number" },
+              "type": { "$ref": "plan-edge-types.json#/" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

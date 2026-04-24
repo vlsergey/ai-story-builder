@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "ES2022.Intl"],
+    "module": "Node16",
+    "moduleResolution": "node16",
+    "strict": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["**/*.ts"]
+}
