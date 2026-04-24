@@ -1,19 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ProjectTemplate",
-  "definitions": {
-    "ProjectTemplate": {
-      "type": "object",
-      "required": ["title", "plan"],
-      "properties": {
-        "title": { "type": "string" },
-        "wizardPages": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/WizardPage" }
-        },
-        "plan": { "$ref": "#/definitions/TemplateProjectPlan" }
-      }
+  "type": "object",
+  "required": ["title", "plan"],
+  "properties": {
+    "title": { "type": "string" },
+    "wizardPages": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/WizardPage" }
     },
+    "plan": { "$ref": "#/definitions/TemplateProjectPlan" }
+  },
+  "definitions": {
     "WizardPage": {
       "type": "object",
       "required": ["fields"],

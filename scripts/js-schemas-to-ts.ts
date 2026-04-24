@@ -42,18 +42,11 @@ function parseSchema(schema: any, fileName: string) {
 
   const title = schema.title || path.basename(fileName, ".json")
 
-  // Process root level enum
-  if (schema.type === "string" && schema.enum) {
-    models.push({
-      name: title,
-      isEnum: true,
-      constName: getConstName(title),
-      typeName: title,
-      values: toMustacheArray(schema.enum),
-    })
-  }
-
   // Process definitions
+  if (schema.type && schema.title) {
+    // root is also schema
+    processDefinition(schema.title, schema, imports, models)
+  }
   if (schema.definitions) {
     for (const [defName, def] of Object.entries(schema.definitions)) {
       processDefinition(defName, def, imports, models)
