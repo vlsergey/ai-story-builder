@@ -3,6 +3,7 @@
 // Run `npm run generate-code` to update.
 
 import type { PlanNodeType } from "./plan-node-types"
+import type { PlanEdgeType } from "./plan-edge-types"
 
 export interface ProjectTemplate {
   title: string
@@ -42,5 +43,10 @@ export interface TemplateProjectNode {
   aiUserInstructions?: string[]
   content?: string[]
   children?: TemplateProjectNode
-  outputs: Record<string, any>[]
+  inputs?: TemplateProjectNodeInput[]
+}
+
+export interface TemplateProjectNodeInput {
+  sourceNodeId: number
+  type: PlanEdgeType
 }

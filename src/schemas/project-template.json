@@ -57,7 +57,7 @@
     },
     "TemplateProjectNode": {
       "type": "object",
-      "required": ["id", "title", "type", "outputs"],
+      "required": ["id", "title", "type"],
       "properties": {
         "id": { "type": "number" },
         "title": { "type": "string" },
@@ -65,17 +65,18 @@
         "aiUserInstructions": { "type": "array", "items": { "type": "string" } },
         "content": { "type": "array", "items": { "type": "string" } },
         "children": { "$ref": "#/definitions/TemplateProjectNode" },
-        "outputs": {
+        "inputs": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["targetNodeId", "type"],
-            "properties": {
-              "targetNodeId": { "type": "number" },
-              "type": { "$ref": "plan-edge-types.json#" }
-            }
-          }
+          "items": { "$ref": "#/definitions/TemplateProjectNodeInput" }
         }
+      }
+    },
+    "TemplateProjectNodeInput": {
+      "type": "object",
+      "required": ["sourceNodeId", "type"],
+      "properties": {
+        "sourceNodeId": { "type": "number" },
+        "type": { "$ref": "plan-edge-types.json#" }
       }
     }
   }
