@@ -30,6 +30,7 @@ import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
 import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
 import { aiGenerateAndReview } from "./plan/nodes/plan-node-routes.js"
 import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
+import { exportProjectAsTemplate } from "./plan/templates/export-project-as-template.js"
 import { getAiBilling } from "./routes/ai-billing.js"
 import { testEngineConnection } from "./routes/ai-config.js"
 import { syncLore } from "./routes/ai-sync.js"
@@ -89,6 +90,9 @@ export const appRouter = t.router({
     create: t.procedure
       .input(z.object({ name: z.string().optional(), text_language: z.string().optional() }))
       .mutation(({ input }) => createProject(input)),
+    exportProjectAsTemplate: t.procedure
+      .input(z.object({ filePath: z.string() }))
+      .mutation(({ input }) => exportProjectAsTemplate(input.filePath)),
   }),
 
   lore: t.router({

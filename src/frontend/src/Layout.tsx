@@ -1,27 +1,28 @@
-import { useRef, useEffect, useCallback } from "react"
+import type { LoreNodeRow } from "@shared/lore-node"
+import type { PlanNodeRow } from "@shared/plan-graph"
 import {
-  DockviewReact,
   DockviewDefaultTab,
-  type DockviewReadyEvent,
+  DockviewReact,
   type DockviewApi,
-  type DockviewPanelApi,
   type DockviewGroupPanel,
+  type DockviewPanelApi,
+  type DockviewReadyEvent,
 } from "dockview"
+import { useCallback, useEffect, useRef } from "react"
+import AiBillingPanel from "./ai/AiBillingPanel"
 import { trpc } from "./ipcClient"
-import LoreSection from "./lore/LoreSection"
+import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from "./lib/plan-graph-events"
 import LoreEditor from "./lore/LoreEditor"
+import LoreSection from "./lore/LoreSection"
 import PlanNodeEditor from "./plan/editors/PlanNodeEditor"
 import PlanGraph from "./plan/plan-graph/PlanGraph"
-import SettingsPanel from "./settings/SettingsPanel"
-import AiBillingPanel from "./ai/AiBillingPanel"
 import RegenerationPanel from "./plan/RegenerationPanel"
-import type { LoreNodeRow } from "@shared/lore-node"
 import { EditorSettingsProvider } from "./settings/editor-settings"
 import { LoreSettingsProvider } from "./settings/lore-settings"
-import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from "./lib/plan-graph-events"
-import type { PlanNodeRow } from "@shared/plan-graph"
+import SettingsPanel from "./settings/SettingsPanel"
 
 import "dockview/dist/styles/dockview.css"
+import useExportProjectAsTemplateHandler from "./useExportProjectAsTemplateHandler"
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -328,6 +329,9 @@ export default function Layout() {
       }
     },
   })
+
+  // additional menu handlers
+  useExportProjectAsTemplateHandler()
 
   // Custom tab components without close buttons for non-closable panels
   const NonClosableTab = (props: any) => {

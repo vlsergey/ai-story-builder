@@ -19,6 +19,7 @@ const MENU_STRINGS = {
   en: {
     file: "File",
     closeProject: "Close Project",
+    exportProjectAsTemplate: "Export as template...",
     view: "View",
     settings: "Settings",
     resetLayouts: "Reset layouts",
@@ -39,6 +40,7 @@ const MENU_STRINGS = {
   ru: {
     file: "Файл",
     closeProject: "Закрыть проект",
+    exportProjectAsTemplate: "Экспортировать как шаблон...",
     view: "Вид",
     settings: "Настройки",
     resetLayouts: "Сбросить разметку",
@@ -179,6 +181,11 @@ function buildApplicationMenu() {
     {
       label: s.file,
       submenu: [
+        {
+          label: s.exportProjectAsTemplate,
+          click: () => menuEventsEmitter.emit("backToFrontMenuAction", "export-project-as-template"),
+        },
+        { type: "separator" },
         {
           label: s.closeProject,
           click: () => menuEventsEmitter.emit("backToFrontMenuAction", "close-project"),

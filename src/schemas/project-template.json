@@ -70,8 +70,9 @@
         "title": { "type": "string" },
         "type": { "$ref": "plan-node-types.json#" },
         "aiUserInstructions": { "type": "array", "items": { "type": "string" } },
+        "nodeTypeSettings": { "type": "object" },
         "content": { "type": "array", "items": { "type": "string" } },
-        "children": { "$ref": "#/definitions/TemplateProjectNode" },
+        "children": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectNode" } },
         "inputs": {
           "type": "array",
           "items": { "$ref": "#/definitions/TemplateProjectNodeInput" }

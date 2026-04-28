@@ -2,8 +2,8 @@
 // DO NOT EDIT MANUALLY
 // Run `npm run generate-code` to update.
 
-import type { PlanNodeType } from "./plan-node-types"
 import type { PlanEdgeType } from "./plan-edge-types"
+import type { PlanNodeType } from "./plan-node-types"
 
 export interface ProjectTemplate {
   $schema: string
@@ -45,8 +45,9 @@ export interface TemplateProjectNode {
   title: string
   type: PlanNodeType
   aiUserInstructions?: string[]
+  nodeTypeSettings?: Record<string, any>
   content?: string[]
-  children?: TemplateProjectNode
+  children?: TemplateProjectNode[]
   inputs?: TemplateProjectNodeInput[]
 }
 

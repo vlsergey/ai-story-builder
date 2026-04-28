@@ -118,6 +118,7 @@
 
   "planGraph.toolbar.autoLayout": "Авторазмещение",
   "planGraph.toolbar.applyLayout": "Применить раскладку",
+  "planGraph.toolbar.export": "Экспортировать проект",
 
   "planGraph.edgeContextMenu.label": "Связь #",
   "planGraph.edgeContextMenu.delete": "Удалить связь",
@@ -131,10 +132,12 @@
   "planGraph.nodeContextMenu.saveToFile": "Сохранить в файл",
   "planGraph.saveToFile.emptyContent": "Контент узла пуст, нечего сохранять",
   "planGraph.saveToFile.error.message": "Ошибка при сохранении в файл: {{error}}",
+  "planGraph.exportProject.error.message": "Ошибка при экспорте проекта: {{error}}",
 
   "fileFilterName.*": "Все файлы",
   "fileFilterName.md": "Файлы Markdown",
   "fileFilterName.txt": "Текстовые файлы",
+  "fileFilterName.json": "JSON файлы",
 
   "planGraph.edge.text": "Текст",
   "planGraph.edge.textArray": "Массив текстов",

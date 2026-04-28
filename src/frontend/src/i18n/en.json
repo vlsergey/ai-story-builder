@@ -118,6 +118,7 @@
 
   "planGraph.toolbar.autoLayout": "Auto layout",
   "planGraph.toolbar.applyLayout": "Apply layout",
+  "planGraph.toolbar.export": "Export project",
 
   "planGraph.edgeContextMenu.label": "Link #",
   "planGraph.edgeContextMenu.delete": "Delete link",
@@ -131,6 +132,7 @@
   "planGraph.nodeContextMenu.saveToFile": "Save to file",
   "planGraph.saveToFile.emptyContent": "Node content is empty, nothing to save",
   "planGraph.saveToFile.error.message": "Failed to save file: {{error}}",
+  "planGraph.exportProject.error.message": "Failed to export project: {{error}}",
 
   "planGraph.edge.text": "Text",
   "planGraph.edge.textArray": "Text array",
@@ -141,6 +143,7 @@
   "fileFilterName.*": "All files",
   "fileFilterName.md": "Markdown files",
   "fileFilterName.txt": "Text files",
+  "fileFilterName.json": "JSON files",
 
   "lore.generate": "Generate",
   "lore.regenerate": "Regenerate",
