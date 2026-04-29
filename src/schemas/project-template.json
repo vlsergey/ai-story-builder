@@ -18,8 +18,11 @@
   "definitions": {
     "WizardPage": {
       "type": "object",
-      "required": ["fields"],
+      "required": ["id", "title", "fields"],
       "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "description": {"type": "string"},
         "fields": { "type": "array", "items": { "$ref": "#/definitions/WizardField" } }
       },
       "additionalProperties": false

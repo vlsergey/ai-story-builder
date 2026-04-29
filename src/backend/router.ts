@@ -34,7 +34,7 @@ import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
 import { aiGenerateAndReview } from "./plan/nodes/plan-node-routes.js"
 import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
 import { exportProjectAsTemplate } from "./plan/templates/export-project-as-template.js"
-import { findTemplates, getTemplateFolders } from "./plan/templates/find-templates.js"
+import { findTemplates, getTemplate, getTemplateFolders } from "./plan/templates/find-templates.js"
 import { getAiBilling } from "./routes/ai-billing.js"
 import { testEngineConnection } from "./routes/ai-config.js"
 import { syncLore } from "./routes/ai-sync.js"
@@ -94,6 +94,7 @@ export const appRouter = t.router({
       .input(exportProjectAsTemplateOptionsSchema)
       .mutation(({ input }) => exportProjectAsTemplate(input)),
     findTemplates: t.procedure.query(() => findTemplates()),
+    getTemplate: t.procedure.input(z.string()).query(({ input }) => getTemplate(input)),
     getTemplatesFolders: t.procedure.query(() => getTemplateFolders()),
   }),
 

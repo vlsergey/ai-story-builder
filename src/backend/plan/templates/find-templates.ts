@@ -20,6 +20,10 @@ export const getTemplateFolders = () => ({
   user: USER_TEMPLATES,
 })
 
+export async function getTemplate(templatePath: string): Promise<ProjectTemplate> {
+  return (await fs.readJson(templatePath)) as ProjectTemplate
+}
+
 export async function findTemplates(): Promise<TemplateInfo[]> {
   const systemTemplatesPromise = findTemplatesImpl(SYSTEM_TEMPLATES, "system")
   const userTemplatesPromise = findTemplatesImpl(USER_TEMPLATES, "user")

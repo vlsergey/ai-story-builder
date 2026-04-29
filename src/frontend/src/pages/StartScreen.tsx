@@ -6,6 +6,7 @@ import { Input } from "../ui-components/input"
 import { useTranslation } from "react-i18next"
 import { ButtonGroup } from "@/ui-components/button-group"
 import { TemplateCombobox } from "./TemplateCombobox"
+import CreateProjectWizard from "@/projects/CreateProjectWizard"
 
 /** Returns the project display name from a full filesystem path: basename without extension. */
 function projectDisplayName(fullPath: string): string {
@@ -205,6 +206,7 @@ export default function StartScreen() {
           </section>
         </div>
       </main>
+      <CreateProjectWizard />
     </div>
   )
 }

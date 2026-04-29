@@ -2,8 +2,8 @@
 // DO NOT EDIT MANUALLY
 // Run `npm run generate-code` to update.
 
-import type { PlanEdgeType } from "./plan-edge-types"
 import type { PlanNodeType } from "./plan-node-types"
+import type { PlanEdgeType } from "./plan-edge-types"
 
 export interface ProjectTemplate {
   $schema?: string
@@ -15,6 +15,9 @@ export interface ProjectTemplate {
 }
 
 export interface WizardPage {
+  id: string
+  title: string
+  description?: string
   fields: WizardField[]
 }
 

@@ -1,4 +1,5 @@
 {
+  "CreateProjectWizard.title": "Create new project", 
   "ExportProjectAsTemplateDialog.title": "Export Project as Template",
   "ExportProjectAsTemplateDialog.filePath.label": "Save to file",
   "ExportProjectAsTemplateDialog.filePath.placeholder": "Select a file path",
