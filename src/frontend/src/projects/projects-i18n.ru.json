@@ -1,0 +1,13 @@
+{
+  "ExportProjectAsTemplateDialog.title": "Экспорт проекта как шаблона",
+  "ExportProjectAsTemplateDialog.filePath.label": "Сохранить в файл",
+  "ExportProjectAsTemplateDialog.filePath.placeholder": "Выберите путь к файлу",
+  "ExportProjectAsTemplateDialog.browse": "Обзор...",
+  "ExportProjectAsTemplateDialog.exportLoreStructure.label": "Экспортировать структуру лора",
+  "ExportProjectAsTemplateDialog.exportLoreStructure.description": "Включить структуру папок лора (только папки, без содержимого) в экспортируемый шаблон",
+  "ExportProjectAsTemplateDialog.error": "Не получилось экспортировать проект как шаблон из-за ошибки: {{error}}",
+  "ExportProjectAsTemplateDialog.error.noFilePath": "Пожалуйста, выберите путь к файлу",
+  "ExportProjectAsTemplateDialog.cancel": "Cancel",
+  "ExportProjectAsTemplateDialog.export": "Экспорт",
+  "ExportProjectAsTemplateDialog.exporting": "Экспорт..."
+}

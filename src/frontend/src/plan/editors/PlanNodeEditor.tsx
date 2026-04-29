@@ -1,14 +1,15 @@
-import getDifference from "@shared/getDifference.js"
+import useAlert from "@/native/useAlert"
 import { Alert, AlertDescription, AlertTitle } from "@/ui-components/alert"
+import getDifference from "@shared/getDifference.js"
 import type { PlanNodeRow } from "@shared/plan-graph"
+import { CircleAlertIcon } from "lucide-react"
 import { type FC, useCallback, useEffect, useMemo, useState } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
+import { useTranslation } from "react-i18next"
 import { useDebouncedCallback } from "use-debounce"
 import { trpc } from "../../ipcClient"
 import { NodeTypeEditors } from "./NodeTypeEditors"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
-import { CircleAlertIcon } from "lucide-react"
-import useAlert from "@/native/useAlert"
 
 export interface PlanNodeEditorProps {
   nodeId: number
@@ -137,6 +138,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
   )
 
   const regenerateMutation = trpc.plan.nodes.aiGenerate.startForNode.useMutation()
+  const { t } = useTranslation()
   const alert = useAlert()
 
   const handleRegenerate = useCallback(async () => {
@@ -147,9 +149,9 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue }: PlanNodeEditorWrapperPr
       setValue(result)
     } catch (e) {
       console.error(e)
-      alert("PlanNodeEditor.regenerationProblem.message", { error: `${e}` })
+      alert(t("PlanNodeEditor.regenerationProblem.message", { error: `${e}` }))
     }
-  }, [alert, handleSave, value])
+  }, [alert, handleSave, t, value])
 
   return (
     <Editor

@@ -1,14 +1,4 @@
 {
-  "start.title": "Open project",
-  "start.recent": "Recent projects",
-  "start.no_recent": "No recent projects",
-  "start.upload": "Upload project database",
-  "start.upload_btn": "Upload",
-  "start.create": "Create new project",
-  "start.existing_open": "Project already exists – opening existing",
-  "start.projects_folder": "Projects folder",
-  "start.no_files": "No project files found",
-
   "ai.systemInstructions": "System Instructions",
   "ai.systemInstructions.description": "System instructions are the basic rules and settings that define the model's behavior at a fundamental level. System instructions shape the model's «personality», its communication style, limitations, ethical principles, and overall approach to responses. For example, they can instruct the model to be helpful, truthful, witty, or to strictly adhere to certain safety rules. These instructions take priority over everything else.",
   "ai.userInstructions": "User Instructions",

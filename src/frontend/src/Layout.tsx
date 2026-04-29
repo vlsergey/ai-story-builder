@@ -17,12 +17,12 @@ import LoreSection from "./lore/LoreSection"
 import PlanNodeEditor from "./plan/editors/PlanNodeEditor"
 import PlanGraph from "./plan/plan-graph/PlanGraph"
 import RegenerationPanel from "./plan/RegenerationPanel"
+import ExportProjectAsTemplateDialog from "./projects/ExportProjectAsTemplateDialog"
 import { EditorSettingsProvider } from "./settings/editor-settings"
 import { LoreSettingsProvider } from "./settings/lore-settings"
 import SettingsPanel from "./settings/SettingsPanel"
 
 import "dockview/dist/styles/dockview.css"
-import useExportProjectAsTemplateHandler from "./useExportProjectAsTemplateHandler"
 
 /**
  * Shown in any empty group (including the center on startup).
@@ -330,9 +330,6 @@ export default function Layout() {
     },
   })
 
-  // additional menu handlers
-  useExportProjectAsTemplateHandler()
-
   // Custom tab components without close buttons for non-closable panels
   const NonClosableTab = (props: any) => {
     return (
@@ -446,6 +443,7 @@ export default function Layout() {
             <p className="text-muted-foreground text-sm">Project open</p>
           </div>
         </div>
+        <ExportProjectAsTemplateDialog />
       </EditorSettingsProvider>
     </LoreSettingsProvider>
   )

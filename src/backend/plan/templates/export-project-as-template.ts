@@ -1,10 +1,13 @@
 import { promises as fs } from "node:fs"
+import type { ExportProjectAsTemplateOptions } from "../../../shared/export-as-template-options.js"
 import type { ProjectTemplate } from "../../../shared/project-template.js"
+import { LoreNodeRepository } from "../../lore/lore-node-repository.js"
 import { SettingsRepository } from "../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
 
-export async function exportProjectAsTemplate(filePath: string) {
+export async function exportProjectAsTemplate(options: ExportProjectAsTemplateOptions) {
+  const { filePath, exportLoreStructure } = options
   const nodes = new PlanNodeRepository().findAll()
   const edges = new PlanEdgeRepository().findAll()
   const projectTitle = SettingsRepository.getProjectTitle() || ""
@@ -79,13 +82,44 @@ export async function exportProjectAsTemplate(filePath: string) {
 
   // Construct the ProjectTemplate object
   const projectTemplate: ProjectTemplate = {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
     label: projectTitle,
     description: "",
     wizardPages: [],
     plan: {
       nodes: rootNodes,
     },
+  }
+
+  // Add lore structure if requested
+  if (exportLoreStructure) {
+    const allLoreNodes = new LoreNodeRepository().findAll()
+
+    // Build a map of parent to children count
+    const childrenCount = new Map<number, number>()
+    for (const node of allLoreNodes) {
+      if (node.parent_id !== null) {
+        childrenCount.set(node.parent_id, (childrenCount.get(node.parent_id) || 0) + 1)
+      }
+    }
+
+    // Collect nodes that have children (folders)
+    const loreFolderNodes = allLoreNodes.filter((node) => {
+      return childrenCount.has(node.id) && childrenCount.get(node.id)! > 0
+    })
+
+    // Convert to TemplateProjectLoreNode (without children)
+    const loreNodes = loreFolderNodes.map((node) => ({
+      id: node.id,
+      title: node.title,
+      // content is optional, we can include it if it exists
+      ...(node.content ? { content: node.content.split("\n").filter((line) => line.trim() !== "") } : {}),
+    }))
+
+    if (loreNodes.length > 0) {
+      projectTemplate.lore = {
+        nodes: loreNodes,
+      }
+    }
   }
 
   // Write to file

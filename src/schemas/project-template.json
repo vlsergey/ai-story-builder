@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ProjectTemplate",
   "type": "object",
-  "required": ["$schema", "label", "description", "plan"],
+  "required": ["label", "description", "plan"],
   "properties": {
     "$schema": { "type": "string" },
     "label": { "type": "string" },
@@ -11,6 +11,7 @@
       "type": "array",
       "items": { "$ref": "#/definitions/WizardPage" }
     },
+    "lore": { "$ref": "#/definitions/TemplateProjectLore" },
     "plan": { "$ref": "#/definitions/TemplateProjectPlan" }
   },
   "additionalProperties": false,
@@ -54,15 +55,34 @@
     "WizardField": {
       "oneOf": [{ "$ref": "#/definitions/WizardInputField" }, { "$ref": "#/definitions/WizardTextAreaField" }]
     },
+    "TemplateProjectLore": {
+      "type": "object",
+      "required": ["nodes"],
+      "properties": {
+        "nodes": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectLoreNode" } }
+      },
+      "additionalProperties": false
+    },
+    "TemplateProjectLoreNode": {
+      "type": "object",
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "type": "number" },
+        "title": { "type": "string" },
+        "content": { "type": "array", "items": { "type": "string" } },
+        "children": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectLoreNode" } }
+      },
+      "additionalProperties": false
+    },
     "TemplateProjectPlan": {
       "type": "object",
       "required": ["nodes"],
       "properties": {
-        "nodes": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectNode" } }
+        "nodes": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectPlanNode" } }
       },
       "additionalProperties": false
     },
-    "TemplateProjectNode": {
+    "TemplateProjectPlanNode": {
       "type": "object",
       "required": ["id", "title", "type"],
       "properties": {
@@ -72,15 +92,15 @@
         "aiUserInstructions": { "type": "array", "items": { "type": "string" } },
         "nodeTypeSettings": { "type": "object" },
         "content": { "type": "array", "items": { "type": "string" } },
-        "children": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectNode" } },
+        "children": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectPlanNode" } },
         "inputs": {
           "type": "array",
-          "items": { "$ref": "#/definitions/TemplateProjectNodeInput" }
+          "items": { "$ref": "#/definitions/TemplateProjectPlanNodeInput" }
         }
       },
       "additionalProperties": false
     },
-    "TemplateProjectNodeInput": {
+    "TemplateProjectPlanNodeInput": {
       "type": "object",
       "required": ["sourceNodeId", "type"],
       "properties": {

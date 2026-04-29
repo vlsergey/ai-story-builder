@@ -6,10 +6,11 @@ import type { PlanEdgeType } from "./plan-edge-types"
 import type { PlanNodeType } from "./plan-node-types"
 
 export interface ProjectTemplate {
-  $schema: string
+  $schema?: string
   label: string
   description: string
   wizardPages?: WizardPage[]
+  lore?: TemplateProjectLore
   plan: TemplateProjectPlan
 }
 
@@ -36,22 +37,33 @@ export interface WizardInputField extends BaseWizardField {
 
 export type WizardField = WizardInputField | WizardTextAreaField
 
-export interface TemplateProjectPlan {
-  nodes: TemplateProjectNode[]
+export interface TemplateProjectLore {
+  nodes: TemplateProjectLoreNode[]
 }
 
-export interface TemplateProjectNode {
+export interface TemplateProjectLoreNode {
+  id: number
+  title: string
+  content?: string[]
+  children?: TemplateProjectLoreNode[]
+}
+
+export interface TemplateProjectPlan {
+  nodes: TemplateProjectPlanNode[]
+}
+
+export interface TemplateProjectPlanNode {
   id: number
   title: string
   type: PlanNodeType
   aiUserInstructions?: string[]
   nodeTypeSettings?: Record<string, any>
   content?: string[]
-  children?: TemplateProjectNode[]
-  inputs?: TemplateProjectNodeInput[]
+  children?: TemplateProjectPlanNode[]
+  inputs?: TemplateProjectPlanNodeInput[]
 }
 
-export interface TemplateProjectNodeInput {
+export interface TemplateProjectPlanNodeInput {
   sourceNodeId: number
   type: PlanEdgeType
 }

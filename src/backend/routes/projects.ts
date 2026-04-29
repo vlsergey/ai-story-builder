@@ -1,7 +1,8 @@
-import { exec } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import electron from "electron"
+import type { ProjectCreateOptions } from "../../shared/project-create-options.js"
+import type { ProjectTemplate } from "../../shared/project-template.js"
 import { openProjectDatabase } from "../db/index.js"
 import {
   getCurrentDbPath,
@@ -14,6 +15,7 @@ import {
 import { setVerboseLogging } from "../lib/ai-logging.js"
 import { sanitizeProjectName } from "../lib/project-name.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
+import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import type { ProjectInitialData } from "../types/index.js"
@@ -120,85 +122,144 @@ export function listProjectFiles(): { dir: string; files: string[] } {
   return { dir: projectsDir, files }
 }
 
-export function openProjectFolder(): { ok: boolean } {
-  const projectsDir = path.join(getDataDir(), "projects")
-  fs.mkdirSync(projectsDir, { recursive: true })
-  try {
-    // In production, the backend runs inside Electron — use shell.openPath()
-    shell.openPath(projectsDir)
-  } catch {
-    // In dev, fall back to a platform-specific CLI command
-    const cmd =
-      process.platform === "win32"
-        ? `explorer "${projectsDir}"`
-        : process.platform === "darwin"
-          ? `open "${projectsDir}"`
-          : `xdg-open "${projectsDir}"`
-    exec(cmd)
+function importProjectFromTemplate(templatePath: string): void {
+  if (!fs.existsSync(templatePath)) {
+    throw makeError(`Template file not found: ${templatePath}`, 404)
   }
-  return { ok: true }
+  const templateData = JSON.parse(fs.readFileSync(templatePath, "utf8")) as ProjectTemplate
+
+  const planRepo = new PlanNodeRepository()
+  const edgeRepo = new PlanEdgeRepository()
+  const loreRepo = new LoreNodeRepository()
+
+  // Map old node ID -> new node ID
+  const nodeIdMap = new Map<number, number>()
+
+  // Recursive function to create plan nodes
+  function createPlanNodes(nodes: any[], parentId: number | null = null): void {
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]
+      const { id, title, type, aiUserInstructions, nodeTypeSettings, children, inputs } = node
+
+      // Insert node with position based on index
+      const insertedId = planRepo.insert({
+        title,
+        type,
+        parent_id: parentId,
+        position: i,
+        ai_user_prompt: aiUserInstructions ? aiUserInstructions.join("\n") : null,
+        node_type_settings: nodeTypeSettings ? JSON.stringify(nodeTypeSettings) : null,
+      })
+
+      nodeIdMap.set(id, insertedId)
+
+      // Recursively create children
+      if (children && children.length > 0) {
+        createPlanNodes(children, insertedId)
+      }
+    }
+  }
+
+  // Create all plan nodes (starting from root nodes)
+  if (templateData.plan?.nodes) {
+    createPlanNodes(templateData.plan.nodes, null)
+  }
+
+  // Create edges based on inputs
+  if (templateData.plan?.nodes) {
+    // Flatten all nodes to process inputs
+    function flattenNodes(nodes: any[]): any[] {
+      const flat: any[] = []
+      for (const node of nodes) {
+        flat.push(node)
+        if (node.children) {
+          flat.push(...flattenNodes(node.children))
+        }
+      }
+      return flat
+    }
+
+    const allNodes = flattenNodes(templateData.plan.nodes)
+    for (const node of allNodes) {
+      if (node.inputs && node.inputs.length > 0) {
+        const targetNewId = nodeIdMap.get(node.id)
+        if (!targetNewId) continue
+
+        for (const input of node.inputs) {
+          const sourceNewId = nodeIdMap.get(input.sourceNodeId)
+          if (!sourceNewId) continue
+
+          edgeRepo.insert({
+            from_node_id: sourceNewId,
+            to_node_id: targetNewId,
+            type: input.type,
+          })
+        }
+      }
+    }
+  }
+
+  // Create lore nodes if present
+  if (templateData.lore?.nodes) {
+    const loreIdMap = new Map<number, number>()
+
+    // Recursive function to create lore nodes
+    function createLoreNodes(nodes: any[], parentId: number | null = null): void {
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i]
+        const { id, title, content, children } = node
+
+        const insertedId = loreRepo.insert({
+          title,
+          content: content ? content.join("\n") : null,
+          parent_id: parentId,
+          position: i,
+        })
+
+        loreIdMap.set(id, insertedId)
+
+        // Recursively create children
+        if (children && children.length > 0) {
+          createLoreNodes(children, insertedId)
+        }
+      }
+    }
+
+    createLoreNodes(templateData.lore.nodes, null)
+  }
 }
 
-export function createProject(data: { name?: string; text_language?: string }): {
+export function createProject({ title, templatePath }: ProjectCreateOptions): {
   path: string
   layout: unknown
   projectTitle: string | null
   reused?: boolean
 } {
-  const name = data?.name ? data.name : `project-${Date.now()}`
-  const text_language = data?.text_language ?? "ru-RU"
-  const safeName = sanitizeProjectName(name)
+  const safeName = sanitizeProjectName(title)
   const projectsDir = path.join(getDataDir(), "projects")
   fs.mkdirSync(projectsDir, { recursive: true })
   const dbPath = path.join(projectsDir, `${safeName}.sqlite`)
 
-  const defaultNodes = text_language.startsWith("ru")
-    ? { root: "Лор истории", children: ["Персонажи", "Локации", "Способности", "Заклинания", "Бестиарий", "Задания"] }
-    : { root: "Story Lore", children: ["Characters", "Locations", "Abilities", "Spells", "Bestiary", "Quests"] }
-
   if (fs.existsSync(dbPath)) {
-    try {
-      // Ensure the project is set as current for repositories
-      setCurrentDbPath(dbPath)
-      const loreRepo = new LoreNodeRepository()
-      const rootNodes = loreRepo.findAll().filter((n) => n.parent_id === null)
-      if (rootNodes.length === 0) {
-        const rootId = loreRepo.insert({ parent_id: null, title: defaultNodes.root })
-        for (const childTitle of defaultNodes.children) {
-          loreRepo.insert({ parent_id: rootId, title: childTitle })
-        }
-      }
-    } catch (e) {
-      throw makeError(String(e), 500)
-    }
     setCurrentDbPath(dbPath)
     updateRecent(dbPath)
     return { path: dbPath, reused: true, ...getProjectInitialData(dbPath) }
   }
 
   try {
-    const db = openProjectDatabase(dbPath)
+    openProjectDatabase(dbPath)
+    setCurrentDbPath(dbPath)
 
-    // Create default lore nodes using repository
-    setCurrentDbPath(dbPath) // temporary for repositories
-    const loreRepo = new LoreNodeRepository()
-    const root = loreRepo.insert({ parent_id: null, title: defaultNodes.root })
-    for (const childTitle of defaultNodes.children) {
-      loreRepo.insert({ parent_id: root, title: childTitle })
+    // Create project from template if templatePath is specified
+    if (templatePath) {
+      importProjectFromTemplate(templatePath)
     }
 
-    SettingsRepository.setProjectTitle(name)
-    SettingsRepository.setLocale("en")
+    SettingsRepository.setProjectTitle(title)
 
-    const planRepo = new PlanNodeRepository()
-    planRepo.insert({ parent_id: null, title: name, position: 0 })
-
-    db.close()
-
-    setCurrentDbPath(dbPath)
     updateRecent(dbPath)
 
-    return { path: dbPath, layout: null, projectTitle: name }
+    return { path: dbPath, layout: null, projectTitle: title }
   } catch (e) {
     throw makeError(String(e), 500)
   }

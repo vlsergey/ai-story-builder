@@ -5,6 +5,7 @@ import { Button } from "../ui-components/button"
 import { Input } from "../ui-components/input"
 import { useTranslation } from "react-i18next"
 import { ButtonGroup } from "@/ui-components/button-group"
+import { TemplateCombobox } from "./TemplateCombobox"
 
 /** Returns the project display name from a full filesystem path: basename without extension. */
 function projectDisplayName(fullPath: string): string {
@@ -13,8 +14,8 @@ function projectDisplayName(fullPath: string): string {
 }
 
 function CreateNewForm() {
-  const [name, setName] = React.useState("MyProject")
-  const [textLanguage, setTextLanguage] = React.useState("ru-RU")
+  const [title, setTitle] = React.useState<string>("MyProject")
+  const [templatePath, setTemplatePath] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [createError, setCreateError] = React.useState<string | null>(null)
 
@@ -30,7 +31,7 @@ function CreateNewForm() {
     setBusy(true)
     setCreateError(null)
     try {
-      await createProject.mutateAsync({ name, text_language: textLanguage })
+      await createProject.mutateAsync({ title, templatePath: templatePath === null ? undefined : templatePath })
     } catch (err) {
       setCreateError(`Create failed: ${(err as Error).message}`)
     } finally {
@@ -43,8 +44,8 @@ function CreateNewForm() {
       <form onSubmit={submit} className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             className="h-8 text-sm"
             placeholder="Project name"
           />
@@ -52,14 +53,7 @@ function CreateNewForm() {
             {busy ? "Creating…" : "Create"}
           </Button>
         </div>
-        <select
-          value={textLanguage}
-          onChange={(e) => setTextLanguage(e.target.value)}
-          className="h-8 text-sm rounded-md border border-input bg-background px-3 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option value="ru-RU">Русский (ru-RU)</option>
-          <option value="en-US">English (en-US)</option>
-        </select>
+        <TemplateCombobox value={templatePath} onChange={(value) => setTemplatePath(value)} />
       </form>
       {createError && <p className="mt-2 text-xs text-destructive">{createError}</p>}
     </div>
@@ -67,12 +61,12 @@ function CreateNewForm() {
 }
 
 export default function StartScreen() {
-  const { t } = useTranslation()
+  const { t } = useTranslation("start-screen")
 
   const recent = trpc.project.recent.useQuery().data
   const projectsData = trpc.project.files.useQuery().data
 
-  const openFolder = trpc.project.openFolder.useMutation().mutateAsync
+  const openPath = trpc.native.openPath.useMutation().mutateAsync
 
   const utils = trpc.useUtils()
   const recentDelete = trpc.project.recentDelete.useMutation()
@@ -176,7 +170,7 @@ export default function StartScreen() {
               <h3 className="text-sm font-semibold">{t("start.projects_folder")}</h3>
               <button
                 type="button"
-                onClick={() => openFolder()}
+                onClick={() => (projectsData !== undefined ? openPath(projectsData.dir) : {})}
                 title="Open in file manager"
                 className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >

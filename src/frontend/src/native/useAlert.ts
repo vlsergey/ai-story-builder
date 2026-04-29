@@ -1,8 +1,7 @@
-import { useTranslation } from "react-i18next"
-import type { ParseKeys } from "i18next"
 import { trpc } from "@/ipcClient"
-import type { TOptions } from "i18next"
+import type { DefaultNamespace, ParseKeys, TOptions } from "i18next"
 import { useMemo } from "react"
+import { useTranslation } from "react-i18next"
 
 export default function useAlert() {
   const { t } = useTranslation()
@@ -11,13 +10,12 @@ export default function useAlert() {
   const result = useMemo(
     () =>
       async (
-        messageTranslationKey: ParseKeys,
-        messageOptions: TOptions = {},
-        titleTranslationKey: ParseKeys = "native.alert.title",
+        message: string,
+        titleTranslationKey: ParseKeys<DefaultNamespace> = "native.alert.title",
         titleOptions: TOptions = {},
       ) => {
         const result = await mutation.mutateAsync({
-          message: t(messageTranslationKey, messageOptions),
+          message,
           type: "warning",
           title: t(titleTranslationKey, titleOptions),
         })

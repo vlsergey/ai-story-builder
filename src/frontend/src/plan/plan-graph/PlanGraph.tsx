@@ -145,9 +145,11 @@ export default function PlanGraph() {
       try {
         await saveToFileMutation({ nodeId, filePath })
       } catch (error) {
-        await alert(`planGraph.saveToFile.error.message`, {
-          error: error instanceof Error ? error.message : String(error),
-        })
+        await alert(
+          t(`planGraph.saveToFile.error.message`, {
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        )
       }
     },
     [findAllNodes.data, alert, t],

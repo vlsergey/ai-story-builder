@@ -1,10 +1,13 @@
+import { mkdir } from "node:fs/promises"
 import { initTRPC } from "@trpc/server"
 import type { MessageBoxOptions } from "electron"
-import { clipboard, dialog } from "electron"
+import { clipboard, dialog, shell } from "electron"
 import { z } from "zod"
 import type { AiEngineConfig } from "../shared/ai-engine-config.js"
+import { exportProjectAsTemplateOptionsSchema } from "../shared/export-as-template-options.js"
 import { PLAN_EDGE_TYPE_VALUES } from "../shared/plan-edge-types.js"
 import type { PlanNodeUpdate } from "../shared/plan-graph.js"
+import { PROJECT_CREATE_OPTIONS_SCHEMA } from "../shared/project-create-options.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
 import {
@@ -31,6 +34,7 @@ import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
 import { aiGenerateAndReview } from "./plan/nodes/plan-node-routes.js"
 import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
 import { exportProjectAsTemplate } from "./plan/templates/export-project-as-template.js"
+import { findTemplates, getTemplateFolders } from "./plan/templates/find-templates.js"
 import { getAiBilling } from "./routes/ai-billing.js"
 import { testEngineConnection } from "./routes/ai-config.js"
 import { syncLore } from "./routes/ai-sync.js"
@@ -42,7 +46,6 @@ import {
   getRecentProjects,
   listProjectFiles,
   openProject,
-  openProjectFolder,
 } from "./routes/projects.js"
 import { settingsRoutes } from "./settings/settings-routes.js"
 
@@ -86,13 +89,12 @@ export const appRouter = t.router({
     recent: t.procedure.query(() => getRecentProjects()),
     recentDelete: t.procedure.input(z.string()).mutation(({ input }) => deleteRecentProject(input)),
     files: t.procedure.query(() => listProjectFiles()),
-    openFolder: t.procedure.mutation(() => openProjectFolder()),
-    create: t.procedure
-      .input(z.object({ name: z.string().optional(), text_language: z.string().optional() }))
-      .mutation(({ input }) => createProject(input)),
+    create: t.procedure.input(PROJECT_CREATE_OPTIONS_SCHEMA).mutation(({ input }) => createProject(input)),
     exportProjectAsTemplate: t.procedure
-      .input(z.object({ filePath: z.string() }))
-      .mutation(({ input }) => exportProjectAsTemplate(input.filePath)),
+      .input(exportProjectAsTemplateOptionsSchema)
+      .mutation(({ input }) => exportProjectAsTemplate(input)),
+    findTemplates: t.procedure.query(() => findTemplates()),
+    getTemplatesFolders: t.procedure.query(() => getTemplateFolders()),
   }),
 
   lore: t.router({
@@ -175,10 +177,23 @@ export const appRouter = t.router({
 
   native: t.router({
     clipboard: t.router({
-      readText: t.procedure.query(() => clipboard.readText()),
+      /** The content in the clipboard as plain text. */
+      readText: t.procedure.mutation(() => clipboard.readText()),
+      /** Writes the `text` into the clipboard as plain text. */
       writeText: t.procedure.input(z.string()).mutation(({ input }) => clipboard.writeText(input)),
     }),
     menuState: AppMenu.menuStateRoutes(t),
+    mkdir: t.procedure
+      .input(
+        z.object({
+          path: z.string(),
+          recursive: z.boolean().optional().default(false),
+        }),
+      )
+      .mutation(({ input }) => mkdir(input.path, { recursive: input.recursive })),
+    /** Open the given file in the desktop's default manner. */
+    openPath: t.procedure.input(z.string()).mutation(({ input }) => shell.openPath(input)),
+    /** Show a native save file dialog. */
     saveFileDialog: t.procedure
       .input(
         z.object({
@@ -194,6 +209,7 @@ export const appRouter = t.router({
         }),
       )
       .mutation(async ({ input }) => saveFileDialog(input.defaultPath ?? "", input.filters ?? [])),
+    /** Shows a message box. */
     showMessageBox: t.procedure
       .input((v) => v as MessageBoxOptions)
       .mutation(async ({ input }) => await dialog.showMessageBox(input)),

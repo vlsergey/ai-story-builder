@@ -1,0 +1,13 @@
+{
+  "ExportProjectAsTemplateDialog.title": "Export Project as Template",
+  "ExportProjectAsTemplateDialog.filePath.label": "Save to file",
+  "ExportProjectAsTemplateDialog.filePath.placeholder": "Select a file path",
+  "ExportProjectAsTemplateDialog.browse": "Browse...",
+  "ExportProjectAsTemplateDialog.exportLoreStructure.label": "Export lore structure",
+  "ExportProjectAsTemplateDialog.exportLoreStructure.description": "Include lore folder structure (folders only, without content) in the exported template",
+  "ExportProjectAsTemplateDialog.error": "Unable to export project as template due to error: {{error}}",
+  "ExportProjectAsTemplateDialog.error.noFilePath": "Please select a file path",
+  "ExportProjectAsTemplateDialog.cancel": "Cancel",
+  "ExportProjectAsTemplateDialog.export": "Export",
+  "ExportProjectAsTemplateDialog.exporting": "Exporting..."
+}

@@ -22,6 +22,7 @@ export default defineConfig([
         js: ".js",
       }
     },
+    publicDir: "resources",
     loader: {
       ".icns": "copy",
       ".ico": "copy",

@@ -1,0 +1,18 @@
+{
+  "start.title": "Open project",
+  "start.recent": "Recent projects",
+  "start.no_recent": "No recent projects",
+  "start.upload": "Upload project database",
+  "start.upload_btn": "Upload",
+  "start.create": "Create new project",
+  "start.existing_open": "Project already exists – opening existing",
+  "start.projects_folder": "Projects folder",
+  "start.no_files": "No project files found",
+
+  "TemplateCombobox.noTemplate": "No template",
+  "TemplateCombobox.systemTemplates": "System templates",
+  "TemplateCombobox.myTemplates": "My templates",
+  "TemplateCombobox.searchPlaceholder": "Search templates...",
+  "TemplateCombobox.notFound": "No templates found",
+  "TemplateCombobox.openPath": "Show in Explorer"
+}
