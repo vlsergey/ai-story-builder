@@ -2,6 +2,8 @@
   "label": "Одна арка по одной инструкции",
   "wizardPages": [
     {
+      "id": "instructions",
+      "title": "Инструкции",
       "fields": [
         {
           "name": "instructions",

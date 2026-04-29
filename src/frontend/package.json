@@ -62,9 +62,10 @@
     "react-error-boundary": "^6.1.1",
     "react-hook-form": "^7.73.1",
     "react-i18next": "^17.0.4",
+    "react-resizable-panels": "^4.10.0",
     "react-router-dom": "^7.14.2",
     "tailwind-merge": "^3.5.0",
     "use-debounce": "^10.1.1",
-    "zod": "^4.3.6"
+    "zod": "^4.4.1"
   }
 }

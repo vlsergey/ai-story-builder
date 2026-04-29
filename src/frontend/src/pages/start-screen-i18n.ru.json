@@ -1,5 +1,4 @@
 {
-  "start.title": "Открыть проект",
   "start.recent": "Недавние проекты",
   "start.no_recent": "Нет недавних проектов",
   "start.upload": "Загрузить базу проекта",
@@ -9,7 +8,7 @@
   "start.projects_folder": "Папка проектов",
   "start.no_files": "Файлы проектов не найдены",
 
-  "TemplateCombobox.noTemplate": "Без шаблона",
+  "TemplateCombobox.noTemplate": "Создать новый проект без шаблона",
   "TemplateCombobox.systemTemplates": "Системные шаблоны",
   "TemplateCombobox.myTemplates": "Мои шаблоны",
   "TemplateCombobox.searchPlaceholder": "Поиск шаблонов...",

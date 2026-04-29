@@ -1,0 +1,19 @@
+{
+  "ai-select.page-title": "Select AI",
+  "ai-settings.page-title": "AI Settings",
+  "confirm.page-title": "Confirm",
+  "fileToImportSettingsFrom.accessReadable": "File does not exist or insufficient permissions to read it",
+  "fileToImportSettingsFrom.description": "You can specify a file to import all settings from, including AI access configurations (tokens, limits, technical settings, etc.).",
+  "fileToImportSettingsFrom.label": "File to import settings from",
+  "generate.description": "Automatically start the AI text generation process for all project nodes after successful project creation.",
+  "generate.label": "Start generation",
+  "import-settings.page-title": "Import Settings",
+  "navigation.back": "Back",
+  "navigation.cancel": "Cancel",
+  "navigation.create": "Create project",
+  "navigation.next": "Next",
+  "title": "Create New Project",
+  "title.alreadyExists": "A project with this name already exists; please choose a different name.",
+  "title.description": "A human-readable project name; it will also be used as the base for the project file name.",
+  "title.label": "Project Name"
+}

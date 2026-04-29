@@ -1,10 +1,10 @@
 import { promises as fs } from "node:fs"
-import type { ExportProjectAsTemplateOptions } from "../../../shared/export-as-template-options.js"
-import type { ProjectTemplate } from "../../../shared/project-template.js"
-import { LoreNodeRepository } from "../../lore/lore-node-repository.js"
-import { SettingsRepository } from "../../settings/settings-repository.js"
-import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
-import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
+import type { ExportProjectAsTemplateOptions } from "../../shared/export-as-template-options.js"
+import type { ProjectTemplate } from "../../shared/project-template.js"
+import { LoreNodeRepository } from "../lore/lore-node-repository.js"
+import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
+import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
+import { SettingsRepository } from "../settings/settings-repository.js"
 
 export async function exportProjectAsTemplate(options: ExportProjectAsTemplateOptions) {
   const { filePath, exportLoreStructure } = options

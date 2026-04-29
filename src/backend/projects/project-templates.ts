@@ -1,5 +1,3 @@
-// main.ts / main.js (или index.ts)
-
 import path from "node:path"
 import type { ProjectTemplate } from "@shared/project-template"
 import { app } from "electron"
@@ -19,6 +17,10 @@ export const getTemplateFolders = () => ({
   system: SYSTEM_TEMPLATES,
   user: USER_TEMPLATES,
 })
+
+export async function getTemplate(templatePath: string): Promise<ProjectTemplate> {
+  return (await fs.readJson(templatePath)) as ProjectTemplate
+}
 
 export async function findTemplates(): Promise<TemplateInfo[]> {
   const systemTemplatesPromise = findTemplatesImpl(SYSTEM_TEMPLATES, "system")

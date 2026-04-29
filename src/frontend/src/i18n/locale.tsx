@@ -5,6 +5,10 @@ import type React from "react"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { ParseKeys } from "i18next"
+import z from "zod"
+import { en, ru } from "zod/v4/locales"
+
+const ZOD_LOCALES = { en, ru } as const
 
 interface LocaleContextValue {
   exists: (candidate: string) => candidate is ParseKeys
@@ -38,6 +42,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.debug("Initial locale set")
     i18next.i18n.changeLanguage(locale)
+    z.config(ZOD_LOCALES[locale]())
   }, [])
 
   const setLocale = useCallback(
@@ -45,6 +50,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       console.debug("LocaleProvider", "Update locale", locale, value)
       setLocaleState(value)
       i18next.i18n.changeLanguage(value)
+      z.config(ZOD_LOCALES[value]())
       languageDetector.cacheUserLanguage(value)
     },
     [i18next.i18n.changeLanguage, locale],

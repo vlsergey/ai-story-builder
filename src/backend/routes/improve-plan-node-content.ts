@@ -1,7 +1,7 @@
 import type OpenAI from "openai"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
-import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
+import { getEngineAdapter } from "../ai/ai-engine-adapter.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"

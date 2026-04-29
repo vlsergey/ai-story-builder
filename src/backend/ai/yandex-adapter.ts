@@ -1,7 +1,9 @@
+import type { AiEngineConfig } from "@shared/ai-engine-config.js"
 import type OpenAI from "openai"
 import type { YandexAiGenerationSettings } from "../../shared/yandex-ai-generation-settings.js"
+import type { AiEngineAdapter, GenerateResponseRequest } from "../ai/ai-engine-adapter.js"
+import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
-import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapter.js"
 import { createYandexClient } from "./yandex-client.js"
 
 export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings> {
@@ -65,5 +67,29 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
 
     const completion = await client.chat.completions.create(requestParams)
     return completion.choices[0]?.message?.content ?? ""
+  }
+
+  async testConnectivity(
+    settings: AiEngineConfig<YandexAiGenerationSettings>,
+  ): Promise<{ ok: boolean; detail?: string; error?: string }> {
+    const apiKey = settings.api_key?.trim()
+    const folderId = settings.folder_id?.trim()
+    if (!apiKey) throw makeErrorWithStatus("api_key is required", 400)
+    if (!folderId) throw makeErrorWithStatus("folder_id is required", 400)
+
+    const r = await fetch("https://ai.api.cloud.yandex.net/v1/models", {
+      headers: {
+        Authorization: `Api-Key ${apiKey}`,
+        "x-folder-id": folderId,
+      },
+    })
+    if (r.ok) {
+      const data = (await r.json()) as { data?: unknown[] }
+      const count = Array.isArray(data.data) ? data.data.length : 0
+      return { ok: true, detail: `Connected. ${count} model(s) available.` }
+    } else {
+      const body = await r.text()
+      return { ok: false, error: `HTTP ${r.status}: ${body}` }
+    }
   }
 }

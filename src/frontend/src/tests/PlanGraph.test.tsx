@@ -51,8 +51,9 @@ vi.mock("../ipcClient", () => ({
       },
     },
     native: {
-      saveFileDialog: { useMutation: mockUseMutation },
+      showOpenDialog: { useMutation: mockUseMutation },
       showMessageBox: { useMutation: mockUseMutation },
+      showSaveDialog: { useMutation: mockUseMutation },
     },
   },
 }))

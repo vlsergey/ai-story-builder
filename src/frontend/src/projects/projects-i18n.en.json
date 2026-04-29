@@ -1,13 +1,19 @@
 {
-  "ExportProjectAsTemplateDialog.title": "Export Project as Template",
+  "CreateProjectWizard.ai-select.page-title": "Select AI",
+  "CreateProjectWizard.fileToImportSettingsFrom.accessReadable": "File does not exist or insufficient permissions to read it",
+  "CreateProjectWizard.fileToImportSettingsFrom.description": "You can specify a file to import all settings from, including AI access configurations (tokens, limits, technical settings, etc.).",
+  "CreateProjectWizard.fileToImportSettingsFrom.label": "File to import settings from",
+  "CreateProjectWizard.import-settings.page-title": "Import Settings",
+  "CreateProjectWizard.title": "Create New Project",
+  "ExportProjectAsTemplateDialog.browse": "Browse...",
+  "ExportProjectAsTemplateDialog.cancel": "Cancel",
+  "ExportProjectAsTemplateDialog.error": "Unable to export project as template due to an error: {{error}}",
+  "ExportProjectAsTemplateDialog.error.noFilePath": "Please select a file path",
+  "ExportProjectAsTemplateDialog.export": "Export",
+  "ExportProjectAsTemplateDialog.exporting": "Exporting...",
+  "ExportProjectAsTemplateDialog.exportLoreStructure.description": "Include lore folder structure (folders only, without content) in the exported template",
+  "ExportProjectAsTemplateDialog.exportLoreStructure.label": "Export lore structure",
   "ExportProjectAsTemplateDialog.filePath.label": "Save to file",
   "ExportProjectAsTemplateDialog.filePath.placeholder": "Select a file path",
-  "ExportProjectAsTemplateDialog.browse": "Browse...",
-  "ExportProjectAsTemplateDialog.exportLoreStructure.label": "Export lore structure",
-  "ExportProjectAsTemplateDialog.exportLoreStructure.description": "Include lore folder structure (folders only, without content) in the exported template",
-  "ExportProjectAsTemplateDialog.error": "Unable to export project as template due to error: {{error}}",
-  "ExportProjectAsTemplateDialog.error.noFilePath": "Please select a file path",
-  "ExportProjectAsTemplateDialog.cancel": "Cancel",
-  "ExportProjectAsTemplateDialog.export": "Export",
-  "ExportProjectAsTemplateDialog.exporting": "Exporting..."
+  "ExportProjectAsTemplateDialog.title": "Export Project as Template"
 }

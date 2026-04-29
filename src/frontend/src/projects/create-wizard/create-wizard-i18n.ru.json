@@ -1,0 +1,19 @@
+{
+  "ai-select.page-title": "Выбор ИИ",
+  "ai-settings.page-title": "Настройки ИИ",
+  "confirm.page-title": "Подтверждение",
+  "fileToImportSettingsFrom.accessReadable": "Файл не существует или недостаточно прав для его чтения",
+  "fileToImportSettingsFrom.description": "Вы можете указать файл для импорта всех настроек, включая параметры доступа к ИИ (токены, лимиты, технические настройки и т. д.).",
+  "fileToImportSettingsFrom.label": "Файл для импорта настроек",
+  "generate.description": "Автоматически запустить процесс генерации текста ИИ для всех узлов проекта после его успешного создания.",
+  "generate.label": "Запустить генерацию",
+  "import-settings.page-title": "Импорт настроек",
+  "navigation.back": "Назад",
+  "navigation.cancel": "Отмена",
+  "navigation.create": "Создать проект",
+  "navigation.next": "Далее",
+  "title": "Создание нового проекта",
+  "title.alreadyExists": "Проект с данным именем уже существует, следует выбрать другое имя проекта.",
+  "title.description": "Понятное человеку название проекта; также будет использоваться как основа для имени файла проекта.",
+  "title.label": "Название проекта"
+}

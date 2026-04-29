@@ -1,63 +1,28 @@
-import React from "react"
-import { trpc } from "../ipcClient"
-import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Plus, XIcon } from "lucide-react"
-import { Button } from "../ui-components/button"
-import { Input } from "../ui-components/input"
-import { useTranslation } from "react-i18next"
 import { ButtonGroup } from "@/ui-components/button-group"
-import { TemplateCombobox } from "./TemplateCombobox"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui-components/card"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/ui-components/resizable"
+import {
+  BookOpen,
+  ChevronRight,
+  ExternalLink,
+  FilePlusCornerIcon,
+  FileText,
+  FolderOpen,
+  HistoryIcon,
+  XIcon,
+} from "lucide-react"
+import type React from "react"
+import { useTranslation } from "react-i18next"
+import { trpc } from "../ipcClient"
+import { Button } from "../ui-components/button"
+import { TemplateCommand } from "./TemplateCommand"
+import { useCallback, useState } from "react"
+import CreateProjectWizard from "@/projects/create-wizard/CreateProjectWizard"
 
 /** Returns the project display name from a full filesystem path: basename without extension. */
 function projectDisplayName(fullPath: string): string {
   const base = fullPath.split(/[/\\]/).pop() ?? fullPath
   return base.replace(/\.[^.]+$/, "")
-}
-
-function CreateNewForm() {
-  const [title, setTitle] = React.useState<string>("MyProject")
-  const [templatePath, setTemplatePath] = React.useState<string | null>(null)
-  const [busy, setBusy] = React.useState(false)
-  const [createError, setCreateError] = React.useState<string | null>(null)
-
-  const utils = trpc.useUtils().project
-  const createProject = trpc.project.create.useMutation({
-    onSettled() {
-      utils.invalidate()
-    },
-  })
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setCreateError(null)
-    try {
-      await createProject.mutateAsync({ title, templatePath: templatePath === null ? undefined : templatePath })
-    } catch (err) {
-      setCreateError(`Create failed: ${(err as Error).message}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div>
-      <form onSubmit={submit} className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="h-8 text-sm"
-            placeholder="Project name"
-          />
-          <Button type="submit" disabled={busy} size="sm" className="shrink-0">
-            {busy ? "Creating…" : "Create"}
-          </Button>
-        </div>
-        <TemplateCombobox value={templatePath} onChange={(value) => setTemplatePath(value)} />
-      </form>
-      {createError && <p className="mt-2 text-xs text-destructive">{createError}</p>}
-    </div>
-  )
 }
 
 export default function StartScreen() {
@@ -88,12 +53,19 @@ export default function StartScreen() {
     openProject.mutateAsync(path)
   }
 
+  const [templateFilePath, setTemplateFilePath] = useState<string | null>(null)
+  const [showCreateNewProjectWizard, setShowCreateNewProjectWizard] = useState(false)
+
+  const handleSelectTemplate = useCallback((templateFilePath: string | null) => {
+    setTemplateFilePath(templateFilePath)
+    setShowCreateNewProjectWizard(true)
+  }, [])
+
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
-      {/* ── Left panel: branding + recent projects ── */}
-      <aside className="w-80 shrink-0 flex flex-col border-r border-border bg-muted/20">
+    <ResizablePanelGroup orientation="horizontal" className="h-screen">
+      <ResizablePanel defaultSize={50} minSize={40} className="flex flex-col">
         {/* App identity */}
-        <div className="px-5 pt-8 pb-5 border-b border-border">
+        <div className="shrink-0 px-5 pt-8 pb-5 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
               <BookOpen className="h-4 w-4 text-primary" />
@@ -106,83 +78,72 @@ export default function StartScreen() {
         </div>
 
         {/* Recent projects list */}
-        <div className="flex-1 overflow-y-auto py-4">
-          <p className="px-5 mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-            {t("start.recent")}
-          </p>
+        <Card className="flex-1 m-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HistoryIcon />
+              {t("start.recent")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex-1 overflow-y-auto">
+              {openProject.isError && (
+                <div className="mx-3 mb-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">
+                  {`${openProject.error}`}
+                </div>
+              )}
 
-          {openProject.isError && (
-            <div className="mx-3 mb-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">
-              {`${openProject.error}`}
-            </div>
-          )}
-
-          {(recent || []).length === 0 ? (
-            <p className="px-5 py-2 text-xs text-muted-foreground">{t("start.no_recent")}</p>
-          ) : (
-            <ButtonGroup orientation="vertical" className="w-full">
-              {(recent || []).map((r) => (
-                <ButtonGroup key={r} orientation="horizontal" className="w-full group/recent-item">
-                  <Button className="flex-1 min-w-0" variant="ghost" onClick={() => openRecent(r)}>
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
-                    <span className="flex-1 truncate text-left">{projectDisplayName(r)}</span>
-                    <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity" />
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={(e) => removeRecent(e, r)}
-                    title="Remove from list"
-                    className="shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity"
-                  >
-                    <XIcon className="h-3 w-3" />
-                  </Button>
+              {(recent || []).length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("start.no_recent")}</p>
+              ) : (
+                <ButtonGroup orientation="vertical" className="w-full">
+                  {(recent || []).map((r) => (
+                    <ButtonGroup key={r} orientation="horizontal" className="w-full group/recent-item">
+                      <Button className="flex-1 min-w-0" variant="ghost" onClick={() => openRecent(r)}>
+                        <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+                        <span className="flex-1 truncate text-left">{projectDisplayName(r)}</span>
+                        <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={(e) => removeRecent(e, r)}
+                        title="Remove from list"
+                        className="shrink-0 opacity-0 group-hover/recent-item:opacity-100 transition-opacity"
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </Button>
+                    </ButtonGroup>
+                  ))}
                 </ButtonGroup>
-              ))}
-            </ButtonGroup>
-          )}
-        </div>
-      </aside>
-
-      {/* ── Right panel: create new + projects folder ── */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        {/* Page header */}
-        <div className="px-10 pt-10 pb-8">
-          <h2 className="text-2xl font-bold tracking-tight">{t("start.title")}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Start a new story or continue an existing one.</p>
-        </div>
-
-        <div className="px-10 pb-10 flex flex-col gap-8 max-w-lg">
-          {/* ── Create new project ── */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Plus className="h-4 w-4 text-primary shrink-0" />
-              <h3 className="text-sm font-semibold">{t("start.create")}</h3>
+              )}
             </div>
-            <CreateNewForm />
-          </section>
+          </CardContent>
+        </Card>
 
-          <div className="border-t border-border" />
-
-          {/* ── Projects folder ── */}
-          <section>
-            <div className="flex items-center gap-2 mb-1">
-              <FolderOpen className="h-4 w-4 text-primary shrink-0" />
-              <h3 className="text-sm font-semibold">{t("start.projects_folder")}</h3>
-              <button
-                type="button"
-                onClick={() => (projectsData !== undefined ? openPath(projectsData.dir) : {})}
-                title="Open in file manager"
-                className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ExternalLink className="h-3 w-3" />
-                Show in explorer
-              </button>
-            </div>
-
+        {/* ── Projects folder ── */}
+        <Card className="flex-2 m-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FolderOpen />
+              {t("start.projects_folder")}
+            </CardTitle>
             {projectsData && (
-              <p className="text-[11px] text-muted-foreground mb-3 pl-6 break-all">{projectsData.dir}</p>
+              <CardDescription>
+                <code>{projectsData.dir}</code>
+              </CardDescription>
             )}
-
+            <CardAction>
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => (projectsData !== undefined ? openPath(projectsData.dir) : {})}
+              >
+                <ExternalLink />
+                {"Show in explorer"}
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
             {!projectsData || projectsData.files.length === 0 ? (
               <p className="pl-6 text-sm text-muted-foreground">{t("start.no_files")}</p>
             ) : (
@@ -202,9 +163,30 @@ export default function StartScreen() {
                 ))}
               </ul>
             )}
-          </section>
-        </div>
-      </main>
-    </div>
+          </CardContent>
+        </Card>
+      </ResizablePanel>
+
+      <ResizableHandle withHandle />
+
+      <ResizablePanel defaultSize={50} minSize={30} className="flex flex-col">
+        <Card className="m-2 flex-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FilePlusCornerIcon />
+              {t("start.create")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TemplateCommand onSelect={handleSelectTemplate} />
+            <CreateProjectWizard
+              open={showCreateNewProjectWizard}
+              templateFilePath={templateFilePath}
+              onOpenChange={setShowCreateNewProjectWizard}
+            />
+          </CardContent>
+        </Card>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   )
 }

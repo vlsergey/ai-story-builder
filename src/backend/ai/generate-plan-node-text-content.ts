@@ -1,11 +1,11 @@
 import type OpenAI from "openai"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
-import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
+import { getEngineAdapter } from "./ai-engine-adapter.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
 export async function generatePlanNodeTextContent(

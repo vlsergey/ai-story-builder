@@ -15,6 +15,9 @@ export interface ProjectTemplate {
 }
 
 export interface WizardPage {
+  id: string
+  title: string
+  description?: string
   fields: WizardField[]
 }
 

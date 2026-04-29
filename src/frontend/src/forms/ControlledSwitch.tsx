@@ -1,42 +1,42 @@
-import { useTranslation } from "react-i18next"
-import type { ParseKeys } from "i18next"
-import { useId } from "react"
-import { Controller, type FieldValues, type Path, type UseFormReturn } from "react-hook-form"
+import { type ComponentProps, type ReactNode, useId } from "react"
+import { type Control, Controller, type FieldValues, type Path } from "react-hook-form"
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "../ui-components/field"
 import { Switch } from "../ui-components/switch"
 
-type GetPrefix<K, Suffix extends string> = K extends `${infer P}.${Suffix}` ? P : never
-type AllowedPrefixes = Extract<GetPrefix<ParseKeys, "label">, GetPrefix<ParseKeys, "description">>
-
 interface ControlledSwitchProps<T extends FieldValues> {
-  form: UseFormReturn<T>
+  description?: ReactNode
+  disabled?: ComponentProps<typeof Switch>["disabled"]
+  formControl: Control<T, any, any>
+  label: ReactNode
   name: Path<T>
-  translationPrefix: AllowedPrefixes
+  orientation?: ComponentProps<typeof Field>["orientation"]
 }
 
 export default function ControlledSwitch<T extends FieldValues>({
-  form,
+  disabled,
+  formControl,
   name,
-  translationPrefix,
+  label,
+  description,
+  orientation,
 }: ControlledSwitchProps<T>) {
-  const { t } = useTranslation()
-
   const idField = useId()
   const idDescription = useId()
   return (
     <Controller
       name={name}
-      control={form.control}
+      control={formControl}
       render={({ field, fieldState }) => (
-        <Field data-invalid={fieldState.invalid} orientation="responsive">
+        <Field data-disabled={disabled} data-invalid={fieldState.invalid} orientation={orientation}>
           <FieldContent>
-            <FieldLabel htmlFor={idField}>{t(`${translationPrefix}.label`)}</FieldLabel>
-            <FieldDescription id={idDescription}>{t(`${translationPrefix}.description`)}</FieldDescription>
+            <FieldLabel htmlFor={idField}>{label}</FieldLabel>
+            <FieldDescription id={idDescription}>{description}</FieldDescription>
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </FieldContent>
           <Switch
             aria-describedby={idDescription}
             aria-invalid={fieldState.invalid}
+            disabled={disabled}
             id={idField}
             name={field.name}
             checked={field.value}

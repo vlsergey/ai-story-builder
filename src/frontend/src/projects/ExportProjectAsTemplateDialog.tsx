@@ -23,7 +23,7 @@ export default function ExportProjectAsTemplateDialog() {
     },
   })
 
-  const saveFileDialogMutation = trpc.native.saveFileDialog.useMutation().mutateAsync
+  const showSaveDialogMutation = trpc.native.showSaveDialog.useMutation().mutateAsync
   const exportProjectAsTemplateMutation = trpc.project.exportProjectAsTemplate.useMutation().mutateAsync
 
   const userTemplatesDir = trpc.project.getTemplatesFolders.useQuery().data?.user
@@ -37,9 +37,13 @@ export default function ExportProjectAsTemplateDialog() {
       userTemplatesDir === undefined
         ? `project-${Date.now()}.json`
         : `${userTemplatesDir.replace(/\\/g, "/")}/project-${Date.now()}.json`
-    const selectedPath = await saveFileDialogMutation({ defaultPath, filters })
-    if (selectedPath) {
-      setFilePath(selectedPath)
+    const saveDialogResult = await showSaveDialogMutation({
+      defaultPath,
+      filters,
+      properties: ["createDirectory", "showOverwriteConfirmation"],
+    })
+    if (!saveDialogResult.canceled) {
+      setFilePath(saveDialogResult.filePath)
     }
   }, [t, userTemplatesDir])
 

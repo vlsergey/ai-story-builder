@@ -1,6 +1,9 @@
+import type { AiEngineConfig } from "@shared/ai-engine-config.js"
 import type OpenAI from "openai"
 import type { AiEngineKey } from "../../shared/ai-engines.js"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
+import { GrokAdapter } from "./grok-adapter.js"
+import { YandexAdapter } from "./yandex-adapter.js"
 
 export interface JsonSchemaSpec {
   /** Identifier used in the API call (no spaces, e.g. "lore_node") */
@@ -49,10 +52,9 @@ export interface AiEngineAdapter<T extends AiGenerationSettings = AiGenerationSe
     req: GenerateResponseRequest<T>,
     onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
   ): Promise<string>
-}
 
-import { GrokAdapter } from "./grok-adapter.js"
-import { YandexAdapter } from "./yandex-adapter.js"
+  testConnectivity(settings: AiEngineConfig<T>): Promise<{ ok: boolean; detail?: string; error?: string }>
+}
 
 const adapters = {
   grok: new GrokAdapter(),

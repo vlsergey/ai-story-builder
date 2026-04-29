@@ -1,9 +1,9 @@
 import { type AiEngineKey, BUILTIN_ENGINES } from "../../shared/ai-engines.js"
-import type { JsonSchemaSpec } from "../lib/ai-engine-adapter.js"
-import { getEngineAdapter } from "../lib/ai-engine-adapter.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { getCurrentEngineGenerateSummaryInstructions } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
+import type { JsonSchemaSpec } from "./ai-engine-adapter.js"
+import { getEngineAdapter } from "./ai-engine-adapter.js"
 
 // Unused but kept for type compat
 void (undefined as unknown as JsonSchemaSpec)

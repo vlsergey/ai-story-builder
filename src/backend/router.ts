@@ -1,13 +1,9 @@
-import { mkdir } from "node:fs/promises"
+import type { AiEngineKey } from "@shared/ai-engines.js"
 import { initTRPC } from "@trpc/server"
-import type { MessageBoxOptions } from "electron"
-import { clipboard, dialog, shell } from "electron"
 import { z } from "zod"
 import type { AiEngineConfig } from "../shared/ai-engine-config.js"
-import { exportProjectAsTemplateOptionsSchema } from "../shared/export-as-template-options.js"
 import { PLAN_EDGE_TYPE_VALUES } from "../shared/plan-edge-types.js"
 import type { PlanNodeUpdate } from "../shared/plan-graph.js"
-import { PROJECT_CREATE_OPTIONS_SCHEMA } from "../shared/project-create-options.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
 import {
@@ -23,8 +19,7 @@ import {
   restoreLoreNode,
   sortLoreChildren,
 } from "./lore/lore-routes.js"
-import * as AppMenu from "./main.js"
-import { saveFileDialog } from "./native-routes.js"
+import { nativeRoutes } from "./native-routes.js"
 import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
 import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
 import { createGraphEdge, deleteGraphEdge, patchGraphEdge } from "./plan/edges/plan-edge-routes.js"
@@ -33,20 +28,10 @@ import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
 import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
 import { aiGenerateAndReview } from "./plan/nodes/plan-node-routes.js"
 import { PlanNodeService } from "./plan/nodes/plan-node-service.js"
-import { exportProjectAsTemplate } from "./plan/templates/export-project-as-template.js"
-import { findTemplates, getTemplateFolders } from "./plan/templates/find-templates.js"
+import { buildProjectRoutes } from "./projects/projects-routes.js"
 import { getAiBilling } from "./routes/ai-billing.js"
 import { testEngineConnection } from "./routes/ai-config.js"
 import { syncLore } from "./routes/ai-sync.js"
-import {
-  closeProject,
-  createProject,
-  deleteRecentProject,
-  getProjectStatus,
-  getRecentProjects,
-  listProjectFiles,
-  openProject,
-} from "./routes/projects.js"
 import { settingsRoutes } from "./settings/settings-routes.js"
 
 const t = initTRPC.create({
@@ -77,25 +62,12 @@ export const appRouter = t.router({
       get: t.procedure.query(() => getAiBilling()),
     }),
     test: t.procedure
-      .input((val: unknown) => val as { engineId: string; aiEngineConfig: AiEngineConfig })
+      .input((val: unknown) => val as { engineId: AiEngineKey; aiEngineConfig: AiEngineConfig })
       .mutation(({ input }) => testEngineConnection(input.engineId, input.aiEngineConfig)),
     syncLore: t.procedure.mutation(() => syncLore()),
   }),
 
-  project: t.router({
-    status: t.procedure.query(() => getProjectStatus()),
-    close: t.procedure.mutation(() => closeProject()),
-    open: t.procedure.input(z.string()).mutation(({ input }) => openProject(input)),
-    recent: t.procedure.query(() => getRecentProjects()),
-    recentDelete: t.procedure.input(z.string()).mutation(({ input }) => deleteRecentProject(input)),
-    files: t.procedure.query(() => listProjectFiles()),
-    create: t.procedure.input(PROJECT_CREATE_OPTIONS_SCHEMA).mutation(({ input }) => createProject(input)),
-    exportProjectAsTemplate: t.procedure
-      .input(exportProjectAsTemplateOptionsSchema)
-      .mutation(({ input }) => exportProjectAsTemplate(input)),
-    findTemplates: t.procedure.query(() => findTemplates()),
-    getTemplatesFolders: t.procedure.query(() => getTemplateFolders()),
-  }),
+  project: buildProjectRoutes(t),
 
   lore: t.router({
     get: t.procedure.input(z.number()).query(({ input }) => getLoreNode(input)),
@@ -173,47 +145,9 @@ export const appRouter = t.router({
     }),
   }),
 
-  settings: settingsRoutes(t),
+  native: nativeRoutes(t),
 
-  native: t.router({
-    clipboard: t.router({
-      /** The content in the clipboard as plain text. */
-      readText: t.procedure.mutation(() => clipboard.readText()),
-      /** Writes the `text` into the clipboard as plain text. */
-      writeText: t.procedure.input(z.string()).mutation(({ input }) => clipboard.writeText(input)),
-    }),
-    menuState: AppMenu.menuStateRoutes(t),
-    mkdir: t.procedure
-      .input(
-        z.object({
-          path: z.string(),
-          recursive: z.boolean().optional().default(false),
-        }),
-      )
-      .mutation(({ input }) => mkdir(input.path, { recursive: input.recursive })),
-    /** Open the given file in the desktop's default manner. */
-    openPath: t.procedure.input(z.string()).mutation(({ input }) => shell.openPath(input)),
-    /** Show a native save file dialog. */
-    saveFileDialog: t.procedure
-      .input(
-        z.object({
-          defaultPath: z.string().optional(),
-          filters: z
-            .array(
-              z.object({
-                name: z.string(),
-                extensions: z.array(z.string()),
-              }),
-            )
-            .optional(),
-        }),
-      )
-      .mutation(async ({ input }) => saveFileDialog(input.defaultPath ?? "", input.filters ?? [])),
-    /** Shows a message box. */
-    showMessageBox: t.procedure
-      .input((v) => v as MessageBoxOptions)
-      .mutation(async ({ input }) => await dialog.showMessageBox(input)),
-  }),
+  settings: settingsRoutes(t),
 })
 
 export type AppRouter = typeof appRouter

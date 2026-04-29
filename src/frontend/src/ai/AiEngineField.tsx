@@ -32,10 +32,10 @@ export default function AiEngineField({
   field,
   orientation,
 }: AiEngineFieldProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation("ai-engines")
   const htmlId = useId()
-  const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label` as ParseKeys)
-  const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint` as ParseKeys)
+  const fieldLabel = t(`engine.${engine.id}.field.${field.key}.label` as ParseKeys<"ai-engines">)
+  const fieldHint = t(`engine.${engine.id}.field.${field.key}.hint` as ParseKeys<"ai-engines">)
 
   const [showHiddenValue, setShowHiddenValue] = useState<boolean>(false)
 
@@ -107,7 +107,7 @@ export default function AiEngineField({
             <SelectContent>
               {field.options?.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {t(`engine.${engine.id}.field.${field.key}.option.${option}` as ParseKeys)}
+                  {t(`engine.${engine.id}.field.${field.key}.option.${option}` as ParseKeys<"ai-engines">)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -141,7 +141,7 @@ export default function AiEngineField({
               onBlur={onBlur}
               aria-invalid={invalid}
             />
-            <Button variant="secondary" onClick={() => setShowHiddenValue((v) => !v)}>
+            <Button variant="secondary" type="button" onClick={() => setShowHiddenValue((v) => !v)}>
               {showHiddenValue ? <EyeOff /> : <Eye />}
             </Button>
           </ButtonGroup>

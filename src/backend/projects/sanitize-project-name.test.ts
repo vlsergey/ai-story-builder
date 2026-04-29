@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { sanitizeProjectName } from "./project-name.js"
+import { sanitizeProjectName } from "./sanitize-project-name.js"
 
 describe("sanitizeProjectName", () => {
   it("preserves ASCII alphanumeric characters unchanged", () => {

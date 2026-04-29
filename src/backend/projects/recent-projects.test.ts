@@ -4,6 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { deleteRecentProject } from "./recent-projects"
 
 // Mutable app settings store shared across the module mock
 const mockSettings: { recent: string[]; lastOpenedPath?: string } = { recent: [] }
@@ -20,8 +21,6 @@ vi.mock("../db/state.js", () => ({
 }))
 
 vi.mock("../lib/ai-logging.js", () => ({ setVerboseLogging: vi.fn() }))
-
-const { deleteRecentProject } = await import("./projects.js")
 
 beforeEach(() => {
   mockSettings.recent = []

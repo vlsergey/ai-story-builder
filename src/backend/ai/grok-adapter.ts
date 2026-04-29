@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto"
+import type { AiEngineConfig } from "@shared/ai-engine-config.js"
 import type OpenAI from "openai"
 import type { ResponseCreateParamsStreaming, Tool } from "openai/resources/responses/responses.js"
 import type { GrokAiGenerationSettings } from "../../shared/grok-ai-generation-settings.js"
+import type { AiEngineAdapter, GenerateResponseRequest } from "../ai/ai-engine-adapter.js"
 import { getCurrentDbPath } from "../db/state.js"
+import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
-import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapter.js"
 import { grokGenerate } from "./grok-client.js"
 
 export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
@@ -72,6 +74,25 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     }
 
     return await grokGenerate(req.abortSignal, apiKey, requestParams, onEvent)
+  }
+
+  async testConnectivity(
+    settings: AiEngineConfig<GrokAiGenerationSettings>,
+  ): Promise<{ ok: boolean; detail?: string; error?: string }> {
+    const apiKey = settings.api_key?.trim()
+    if (!apiKey) throw makeErrorWithStatus("api_key is required", 400)
+
+    const r = await fetch("https://api.x.ai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    })
+    if (r.ok) {
+      const data = (await r.json()) as { data?: unknown[] }
+      const count = Array.isArray(data.data) ? data.data.length : 0
+      return { ok: true, detail: `Connected. ${count} model(s) available.` }
+    } else {
+      const body = await r.text()
+      return { ok: false, error: `HTTP ${r.status}: ${body}` }
+    }
   }
 }
 

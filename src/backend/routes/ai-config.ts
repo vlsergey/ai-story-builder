@@ -1,5 +1,6 @@
 import type { AiEngineConfig, GrokEngineConfig } from "../../shared/ai-engine-config.js"
 import { type AiEngineKey, BUILTIN_ENGINES } from "../../shared/ai-engines.js"
+import { getEngineAdapter } from "../ai/ai-engine-adapter.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -86,48 +87,11 @@ export async function refreshEngineModels(engine: AiEngineKey) {
 }
 
 export async function testEngineConnection(
-  engineId: string,
-  creds: AiEngineConfig,
+  engineId: AiEngineKey,
+  settings: AiEngineConfig,
 ): Promise<{ ok: boolean; detail?: string; error?: string }> {
   try {
-    if (engineId === "grok") {
-      const apiKey = creds.api_key?.trim()
-      if (!apiKey) throw makeError("api_key is required", 400)
-
-      const r = await fetch("https://api.x.ai/v1/models", {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      })
-      if (r.ok) {
-        const data = (await r.json()) as { data?: unknown[] }
-        const count = Array.isArray(data.data) ? data.data.length : 0
-        return { ok: true, detail: `Connected. ${count} model(s) available.` }
-      } else {
-        const body = await r.text()
-        return { ok: false, error: `HTTP ${r.status}: ${body}` }
-      }
-    } else if (engineId === "yandex") {
-      const apiKey = creds.api_key?.trim()
-      const folderId = creds.folder_id?.trim()
-      if (!apiKey) throw makeError("api_key is required", 400)
-      if (!folderId) throw makeError("folder_id is required", 400)
-
-      const r = await fetch("https://ai.api.cloud.yandex.net/v1/models", {
-        headers: {
-          Authorization: `Api-Key ${apiKey}`,
-          "x-folder-id": folderId,
-        },
-      })
-      if (r.ok) {
-        const data = (await r.json()) as { data?: unknown[] }
-        const count = Array.isArray(data.data) ? data.data.length : 0
-        return { ok: true, detail: `Connected. ${count} model(s) available.` }
-      } else {
-        const body = await r.text()
-        return { ok: false, error: `HTTP ${r.status}: ${body}` }
-      }
-    } else {
-      return { ok: false, error: `Unknown engine: ${engineId}` }
-    }
+    return getEngineAdapter(engineId).testConnectivity(settings)
   } catch (e: any) {
     if (e.status) throw e // re-throw our own errors
     return { ok: false, error: String(e) }

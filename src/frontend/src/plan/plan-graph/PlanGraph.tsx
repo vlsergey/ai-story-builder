@@ -111,7 +111,7 @@ export default function PlanGraph() {
   const deleteNodeMutation = trpc.plan.nodes.delete.useMutation().mutate
   const aiGenerateSummary = trpc.plan.nodes.aiGenerateSummary.useMutation().mutate
   const saveToFileMutation = trpc.plan.nodes.saveContentToFile.useMutation().mutateAsync
-  const saveFileDialogMutation = trpc.native.saveFileDialog.useMutation().mutateAsync
+  const showSaveDialogMutation = trpc.native.showSaveDialog.useMutation().mutateAsync
   const alert = useAlert()
   const confirm = useConfirm()
 
@@ -137,13 +137,17 @@ export default function PlanGraph() {
         { name: t("fileFilterName.*"), extensions: ["*"] },
       ]
       const defaultPath = `${node.title.replace(/[\\/:*?"<>|\x00]/g, "_")}.txt`
-      const filePath = await saveFileDialogMutation({ defaultPath, filters })
-      if (!filePath) {
+      const saveDialogResult = await showSaveDialogMutation({
+        defaultPath,
+        filters,
+        properties: ["createDirectory", "showOverwriteConfirmation"],
+      })
+      if (saveDialogResult.canceled) {
         // User cancelled
         return
       }
       try {
-        await saveToFileMutation({ nodeId, filePath })
+        await saveToFileMutation({ nodeId, filePath: saveDialogResult.filePath })
       } catch (error) {
         await alert(
           t(`planGraph.saveToFile.error.message`, {

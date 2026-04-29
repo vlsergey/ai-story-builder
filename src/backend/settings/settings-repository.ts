@@ -47,6 +47,14 @@ class BaseSettingsRepository {
     return result
   }
 
+  static getAll(): SettingsTypes {
+    return Object.fromEntries(
+      Object.entries(SettingsMap).map(([key, def]) => {
+        return [key, BaseSettingsRepository.get(def)]
+      }),
+    ) as SettingsTypes
+  }
+
   static set<T>(def: SettingDef<T>, value: T): void {
     if (value === null || value === def.defaultValue) {
       withDbWrite((db: Database) => {
