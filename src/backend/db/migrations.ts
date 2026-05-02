@@ -88,9 +88,19 @@ const MIGRATIONS: Array<(db: Database) => void> = [
 export const CURRENT_VERSION = 26
 
 function loadSchemaFromFile(db: Database): void {
-  const schemaPath = path.join(__dirname, "schema.sql")
-  const sql = fs.readFileSync(schemaPath, "utf-8")
-  db.exec(sql)
+  for (const candidate of [
+    // usual run
+    [__dirname, "db", "schema.sql"],
+    // for tests
+    [__dirname, "schema.sql"],
+  ] as const) {
+    const schemaPath = path.join(...candidate)
+    if (fs.existsSync(schemaPath)) {
+      const sql = fs.readFileSync(schemaPath, "utf-8")
+      db.exec(sql)
+      return
+    }
+  }
 }
 
 /**
