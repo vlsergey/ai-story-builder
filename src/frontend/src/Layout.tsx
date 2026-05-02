@@ -177,6 +177,7 @@ export default function Layout() {
       title: "Lore",
       position: { referenceGroup: centerGroup, direction: "left" },
       minimumWidth: 200,
+      maximumWidth: 400,
     })
 
     // Add plan-graph panel to the center group
@@ -189,12 +190,12 @@ export default function Layout() {
     })
 
     dockviewRef.current.addPanel({
-      id: "cards-panel",
-      component: "cards",
+      id: "regeneration-panel",
+      component: "regeneration",
       tabComponent: "nonClosableTab",
-      title: "Cards",
-      position: { referenceGroup: centerGroup, direction: "right" },
-      minimumWidth: 200,
+      title: "Generation Progress",
+      position: { referencePanel: "lore-panel", direction: "below" },
+      minimumHeight: 150,
     })
 
     dockviewRef.current.addPanel({
@@ -202,16 +203,8 @@ export default function Layout() {
       component: "billing",
       tabComponent: "nonClosableTab",
       title: "AI Billing",
-      position: { referencePanel: "cards-panel", direction: "below" },
-      minimumHeight: 100,
-    })
-
-    dockviewRef.current.addPanel({
-      id: "regeneration-panel",
-      component: "regeneration",
-      tabComponent: "nonClosableTab",
-      title: "Generation Progress",
-      position: { referencePanel: "billing-panel", direction: "below" },
+      position: { referencePanel: "regeneration-panel", direction: "within", index: 1 },
+      inactive: true,
       minimumHeight: 150,
     })
   }, [])
@@ -381,12 +374,6 @@ export default function Layout() {
     "plan-node-editor": (props: { api: DockviewPanelApi; params: { nodeId: number } }) => (
       <PlanNodeEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
-    cards: () => (
-      <div className="p-2 h-full">
-        <h3 className="font-semibold mb-2">Cards</h3>
-        <p className="text-muted-foreground">Card definitions and values panel placeholder.</p>
-      </div>
-    ),
     settings: () => <SettingsPanel />,
     billing: () => <AiBillingPanel />,
     regeneration: (props: { api: DockviewPanelApi }) => <RegenerationPanel panelApi={props.api} />,
@@ -398,7 +385,7 @@ export default function Layout() {
     editorTab: EditorTab,
   }
 
-  // Prevent sidebar/utility panels (lore, cards) from being dropped into the editor group.
+  // Prevent sidebar/utility panels (lore) from being dropped into the editor group.
   const handleWillDrop = (event: any) => {
     const targetGroup = event.group
     if (!targetGroup) return
