@@ -13,7 +13,7 @@
   "scripts": {
     "postinstall": "electron-builder install-app-deps && electron-rebuild -f -w better-sqlite3",
     "generate-code": "tsx scripts/js-schemas-to-ts.ts && biome format --write src/shared",
-    "dev": "electron-rebuild -f -w better-sqlite3 && concurrently \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/main.js dist/preload/preload.cjs tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "dev": "electron-rebuild -f -w better-sqlite3 && concurrently --kill-others \"npm run dev --workspace=src/backend\" \"npm run dev --workspace=src/frontend\" \"wait-on dist/backend/main.js dist/preload/preload.cjs tcp:localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "build": "npm run build:backend && npm run build:frontend",
     "build:frontend": "npm run build --workspace=src/frontend",
     "build:backend": "npm run build --workspace=src/backend",
