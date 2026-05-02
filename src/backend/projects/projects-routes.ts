@@ -14,7 +14,7 @@ import { deleteRecentProject, getRecentProjects } from "./recent-projects.js"
 export function buildProjectRoutes(t: RouteBuilder) {
   return t.router({
     applyProjectSettings: t.procedure
-      .input((v) => v as SettingsTypes)
+      .input((v) => v as Partial<SettingsTypes>)
       .mutation(({ input }) => applyProjectSettings(input)),
     status: t.procedure.query(() => getProjectStatus()),
     close: t.procedure.mutation(() => closeProject()),
