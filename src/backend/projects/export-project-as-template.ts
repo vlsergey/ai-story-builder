@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs"
 import type { ExportProjectAsTemplateOptions } from "../../shared/export-as-template-options.js"
-import type { ProjectTemplate } from "../../shared/project-template.js"
+import type { ProjectTemplate, TemplateProjectPlanNode } from "../../shared/project-template.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
@@ -13,16 +13,21 @@ export async function exportProjectAsTemplate(options: ExportProjectAsTemplateOp
   const projectTitle = SettingsRepository.getProjectTitle() || ""
 
   // Map node id to its exported representation
-  const nodeMap = new Map<number, any>()
-  const childrenMap = new Map<number, any[]>()
+  const nodeMap = new Map<number, TemplateProjectPlanNode>()
+  const childrenMap = new Map<number, TemplateProjectPlanNode[]>()
 
   // First pass: create basic node structure and build children map
   for (const node of nodes) {
-    const exportedNode: any = {
+    const exportedNode: TemplateProjectPlanNode = {
       id: node.id,
       title: node.title,
       type: node.type,
+      x: node.x,
+      y: node.y,
     }
+
+    if (node.width !== null) exportedNode.width = node.width
+    if (node.height !== null) exportedNode.height = node.height
 
     // Add aiUserInstructions if ai_user_prompt exists
     if (node.ai_user_prompt) {
