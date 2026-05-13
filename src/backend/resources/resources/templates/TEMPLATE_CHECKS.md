@@ -12,9 +12,9 @@ This file is the canonical checklist for the parts that genuinely need an LLM to
 
 1.1. The top-level `description` field is **outcome-oriented**: it tells the user what they'll get and when to reach for this template. Not what the template's internals look like.
 
-1.2. Good signal: "Получаете повесть прозой около 30 000 слов из одного короткого синопсиса. Подходит, когда…". Bad signal: "Шаблон содержит узел A, потом узел B, потом цикл по битам, потом merge…".
+1.2. Good signal: "You get a ~30 000-word novella from one short synopsis. Reach for it when…". Bad signal: "The template contains a node A, then node B, then a for-each over beats, then a merge…".
 
-1.3. The description includes at minimum: the form of the output ("повесть прозой", "роман в виде глав", "набор рекламных заголовков"), the rough scale ("~30 000 слов", "5 заголовков по 10 слов"), and the use cases / scenarios the template fits.
+1.3. The description includes at minimum: the form of the output ("novella in prose", "novel in chapters", "set of marketing headlines"), the rough scale ("~30 000 words", "5 headlines of 10 words each"), and the use cases / scenarios the template fits.
 
 ---
 
@@ -28,7 +28,7 @@ This file is the canonical checklist for the parts that genuinely need an LLM to
 
 2.4. No single node's target exceeds the model's per-call output cap (~1500 words for Grok). If the target is above ~1400 words, the node should be split into smaller pieces or the target lowered.
 
-2.5. **Anywhere a word count appears in the prompt** (target, range, or ceiling), explicitly forbid emitting the count in the output: "количество слов в выводе не указывай" (or analog). Without this guard, the model treats the number as something to report back and emits "(123 слова)" annotations into the result.
+2.5. **Anywhere a word count appears in the prompt** (target, range, or ceiling), explicitly forbid emitting the count in the output: a sentence like "do not include the word count in the output" (in the template's language). Without this guard, the model treats the number as something to report back and emits "(123 words)" annotations into the result.
 
 ---
 
@@ -121,7 +121,7 @@ For text nodes that receive prev-outputs (full prior scenes), the prompt must ex
 
 9.2. Register is consistent — e.g. either consistently informal or consistently neutral. Current convention for Russian templates: imperative neutral, no pronoun.
 
-9.3. No `if / если` branches in instruction text. Conditional behaviour is a known cause of LLM confusion. Rewrite imperatively: state the desired action for each case as a separate sentence ("Caconic characters — canonical voice. New characters — invent.") instead of "if X then A, if Y then B".
+9.3. No `if`-style branches in instruction text (in any language — "if X then A, otherwise B" patterns confuse the model). Rewrite imperatively: state the desired action for each case as a separate sentence ("Canonical characters — canonical voice. New characters — invent.") instead of "if X then A, if Y then B".
 
 ---
 
@@ -133,7 +133,7 @@ For text nodes that receive prev-outputs (full prior scenes), the prompt must ex
 
 10.3. For fix-problems' `aiUserInstructionsToFixProblems`, the prompt explicitly says "output only the corrected text" (or analog) — otherwise the model wraps with "Here is the corrected version:" prefixes.
 
-10.4. **Classification / analysis / planning nodes (anything whose job is to describe ABOUT the work rather than write the work) explicitly forbid story prose.** Without this, when the prompt includes a synopsis or scene plan, the model can slide into writing the story itself — especially when given high word ceilings or the word "prose" anywhere in the instruction. The forbidding sentence should name the slippage concretely: "это классификация, а не текст произведения — не пиши прозу, не сочиняй сцены, не приводи диалоги". Applies to: theme, genre, world description, character profile, scene plan, director notes, plot outline, setup/payoff registry, fix-problems find-step.
+10.4. **Classification / analysis / planning nodes (anything whose job is to describe ABOUT the work rather than write the work) explicitly forbid story prose.** Without this, when the prompt includes a synopsis or scene plan, the model can slide into writing the story itself — especially when given high word ceilings or the word "prose" anywhere in the instruction. The forbidding sentence should name the slippage concretely — e.g. "this is classification, not the work itself: do not write prose, do not compose scenes, do not produce dialogue" (in the template's language). Applies to: theme, genre, world description, character profile, scene plan, director notes, plot outline, setup/payoff registry, fix-problems find-step.
 
 ---
 
