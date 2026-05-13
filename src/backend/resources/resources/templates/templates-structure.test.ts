@@ -66,8 +66,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   const template = loadTemplate(file)
   const allNodes = walkPlanNodes(template.plan?.nodes)
 
-  // ─── Section 1.4 — split nodes ───────────────────────────────────────────
-  describe("1.4 split nodes have partDescription", () => {
+  describe("split nodes have partDescription", () => {
     const splitNodes = allNodes.filter(({ node }) => node.type === "split")
     if (splitNodes.length === 0) {
       it.skip("no split nodes in this template", () => {})
@@ -83,8 +82,54 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     )
   })
 
-  // ─── Section 4.1 — every {{X}} has a matching input edge ─────────────────
-  describe("4.1 placeholders match input edges", () => {
+  // For text / split / lore / fix-problems, an input edge only matters if the
+  // node's prompt actually substitutes the source via `{{Title}}`. An edge
+  // without a matching placeholder is a dead wire — the engine never injects
+  // the source content into the prompt automatically, so the LLM only sees
+  // the instruction with nothing to operate on.
+  describe("LLM-call node inputs are referenced via {{Title}} in at least one prompt field", () => {
+    const llmCallTypes = new Set(["text", "split", "lore", "fix-problems"])
+    const candidates = allNodes.filter(({ node }) => llmCallTypes.has(node.type))
+    if (candidates.length === 0) {
+      it.skip("no LLM-call nodes in this template", () => {})
+    }
+
+    function collectPromptFields(node: TemplateProjectPlanNode): string[] {
+      const fields: string[] = []
+      if (node.aiUserInstructions) fields.push(node.aiUserInstructions.join("\n"))
+      if (node.type === "fix-problems") {
+        const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
+        const find = nts.aiUserInstructionsToFindProblems as string[] | undefined
+        const fix = nts.aiUserInstructionsToFixProblems as string[] | undefined
+        if (find) fields.push(find.join("\n"))
+        if (fix) fields.push(fix.join("\n"))
+      }
+      return fields
+    }
+
+    const cases: Array<[string, string]> = []
+    for (const { node } of candidates) {
+      for (const input of node.inputs ?? []) {
+        if (input.type !== "text") continue
+        cases.push([node.title, input.sourceNodeTitle])
+      }
+    }
+    if (cases.length === 0) {
+      it.skip("no text-input edges on LLM-call nodes", () => {})
+    }
+
+    it.each(cases)("%s references its input {{%s}}", (consumerTitle, sourceTitle) => {
+      const consumer = candidates.find((n) => n.node.title === consumerTitle)!.node
+      const allPromptText = collectPromptFields(consumer).join("\n")
+      expect(
+        allPromptText.includes(`{{${sourceTitle}}}`),
+        `${consumerTitle} has an input edge from "${sourceTitle}" but never references {{${sourceTitle}}} in any prompt field. ` +
+          `The engine does NOT auto-inject input content into prompts; without {{Title}} substitution the LLM never sees the source.`,
+      ).toBe(true)
+    })
+  })
+
+  describe("every {{Title}} placeholder has a matching input edge", () => {
     for (const { node } of allNodes) {
       const collected = new Set<string>()
       const inputs = new Set((node.inputs ?? []).map((i) => i.sourceNodeTitle))
@@ -118,8 +163,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     }
   })
 
-  // ─── Section 4.2 — fix-problems has both find and fix prompts ────────────
-  describe("4.2 fix-problems has find and fix prompts", () => {
+  describe("fix-problems has find and fix prompts", () => {
     const fixNodes = allNodes.filter(({ node }) => node.type === "fix-problems")
     if (fixNodes.length === 0) {
       it.skip("no fix-problems nodes in this template", () => {})
@@ -137,8 +181,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     )
   })
 
-  // ─── Section 4.4 — every for-each has at least one for-each-input child ──
-  describe("4.4 every for-each has a for-each-input child", () => {
+  describe("every for-each has a for-each-input child", () => {
     const forEachNodes = allNodes.filter(({ node }) => node.type === "for-each")
     if (forEachNodes.length === 0) {
       it.skip("no for-each nodes in this template", () => {})
@@ -153,8 +196,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     )
   })
 
-  // ─── Section 4.5 — every for-each-output has exactly one incoming edge ───
-  describe("4.5 every for-each-output has exactly one incoming text edge", () => {
+  describe("every for-each-output has exactly one incoming text edge", () => {
     const outputs = allNodes.filter(({ node }) => node.type === "for-each-output")
     if (outputs.length === 0) {
       it.skip("no for-each-output nodes in this template", () => {})
@@ -169,8 +211,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     )
   })
 
-  // ─── Section 4.6 — foundProblemsTemplate matches placeholder in fix prompt
-  describe("4.6 fix-problems foundProblemsTemplate appears in fix prompt", () => {
+  describe("fix-problems foundProblemsTemplate appears in fix prompt", () => {
     const fixNodes = allNodes.filter(({ node }) => node.type === "fix-problems")
     if (fixNodes.length === 0) {
       it.skip("no fix-problems nodes in this template", () => {})
@@ -192,8 +233,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     )
   })
 
-  // ─── Section 5.1 — global plan-title uniqueness (excl. internal types) ───
-  it("5.1 plan titles are globally unique (excluding for-each-input/output)", () => {
+  it("plan titles are globally unique (excluding for-each-input/output)", () => {
     const seen = new Map<string, number>()
     for (const { node } of allNodes) {
       if (INTERNAL_PLAN_NODE_TYPES.has(node.type)) continue
@@ -204,16 +244,14 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     expect(duplicates, `duplicate plan titles: ${duplicates.join(", ")}`).toEqual([])
   })
 
-  // ─── Section 5.2 — for-each-index titles unique ──────────────────────────
-  it("5.2 for-each-index nodes have globally unique titles", () => {
+  it("for-each-index nodes have globally unique titles", () => {
     const indexes = allNodes.filter(({ node }) => node.type === "for-each-index")
     const titles = indexes.map(({ node }) => node.title)
     const dupes = titles.filter((t, i) => titles.indexOf(t) !== i)
     expect(dupes, `for-each-index titles must be globally unique; duplicates: ${dupes.join(", ")}`).toEqual([])
   })
 
-  // ─── Section 6.1 — every ${VARNAME} has a matching wizard field ──────────
-  it("6.1 every ${VARNAME} in content/aiUserInstructions has a wizard field", () => {
+  it("every ${VARNAME} in content/aiUserInstructions has a wizard field", () => {
     const wizardNames = new Set(
       (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => f.name)),
     )
@@ -226,8 +264,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     expect(missing, `wizard variables used but not declared: ${missing.join(", ")}`).toEqual([])
   })
 
-  // ─── Section 6.2 — wizard fields have non-empty label/description/placeholder
-  describe("6.2 wizard fields are fully populated", () => {
+  describe("wizard fields are fully populated", () => {
     const fields = (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => ({ ...f, page: p.id })))
     if (fields.length === 0) {
       it.skip("no wizard fields in this template", () => {})
