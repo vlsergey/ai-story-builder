@@ -31,20 +31,37 @@ export default function SplitNodeEditor({
         <CardHeader>
           <CardTitle>{t("splitNode.settings")}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">{t("splitNode.promptHint")}</p>
-          <Textarea
-            value={nodeTypeSettings.userPrompt ?? ""}
-            onChange={(e) =>
-              onNodeTypeSettingsChange({
-                ...nodeTypeSettings,
-                userPrompt: e.currentTarget.value,
-              })
-            }
-            placeholder={t("splitNode.promptPlaceholder")}
-            rows={4}
-            className="resize-y"
-          />
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">{t("splitNode.promptHint")}</p>
+            <Textarea
+              value={nodeTypeSettings.userPrompt ?? ""}
+              onChange={(e) =>
+                onNodeTypeSettingsChange({
+                  ...nodeTypeSettings,
+                  userPrompt: e.currentTarget.value,
+                })
+              }
+              placeholder={t("splitNode.promptPlaceholder")}
+              rows={4}
+              className="resize-y"
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">{t("splitNode.partDescriptionHint")}</p>
+            <Textarea
+              value={nodeTypeSettings.partDescription ?? ""}
+              onChange={(e) =>
+                onNodeTypeSettingsChange({
+                  ...nodeTypeSettings,
+                  partDescription: e.currentTarget.value,
+                })
+              }
+              placeholder={t("splitNode.partDescriptionPlaceholder")}
+              rows={3}
+              className="resize-y"
+            />
+          </div>
           <Button onClick={onRegenerate} className="w-full">
             {t("common.update")}
           </Button>

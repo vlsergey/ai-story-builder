@@ -56,6 +56,8 @@
   "splitNode.parts": "Parts",
   "splitNode.promptHint": "Describe how the input should be split. For example: «Split into 20 plot beats, one beat per item» or «Split by scenes, each scene is one item».",
   "splitNode.promptPlaceholder": "Split into … each … is one array element.",
+  "splitNode.partDescriptionHint": "Optional: describe what one array element should look like. Sent as `items.description` in the response schema so the model can keep each element's shape consistent.",
+  "splitNode.partDescriptionPlaceholder": "E.g. \"One plot beat, 100–150 words, prose, third-person past tense, no headings\".",
 
   "planNode.title.label": "Node Title",
   "planNode.title.description": "Short human-readable node title. Displayed in plan graph and also used as placeholder template name in linked nodes instructions (<code>{{Title}}</code>).",

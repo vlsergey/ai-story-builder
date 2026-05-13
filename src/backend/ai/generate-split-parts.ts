@@ -1,5 +1,6 @@
 import type OpenAI from "openai"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
+import type { SplitSettings } from "../../shared/node-settings.js"
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { getNodePrompts } from "../plan/nodes/graph/settings-helper.js"
@@ -9,17 +10,33 @@ import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
-const SPLIT_RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    parts: {
-      type: "array",
-      items: { type: "string" },
+export function buildSplitResponseSchema(partDescription: string | null): Record<string, unknown> {
+  const items: Record<string, unknown> = { type: "string" }
+  if (partDescription && partDescription.trim().length > 0) {
+    items.description = partDescription.trim()
+  }
+  return {
+    type: "object",
+    properties: {
+      parts: {
+        type: "array",
+        items,
+      },
     },
-  },
-  required: ["parts"],
-  additionalProperties: false,
-} as const
+    required: ["parts"],
+    additionalProperties: false,
+  }
+}
+
+function readPartDescription(nodeTypeSettings: string | null): string | null {
+  if (!nodeTypeSettings) return null
+  try {
+    const parsed = JSON.parse(nodeTypeSettings) as Partial<SplitSettings>
+    return typeof parsed.partDescription === "string" ? parsed.partDescription : null
+  } catch {
+    return null
+  }
+}
 
 const SYSTEM_PROMPT_FALLBACK =
   "You are splitting input text into discrete parts. Respond with a JSON object {\"parts\": [...]} where parts is an array of strings. Each element must be a complete, self-contained piece of the input. Do not add commentary, do not omit content. If the user prompt does not specify a number of parts, choose what is natural."
@@ -43,6 +60,7 @@ export async function generateSplitParts(
   const replacements = nodeInputsToReplacements(inputs)
   const finalUserPrompt = replaceTemplates(aiUserPrompt, replacements)
   const finalSystemPrompt = aiSystemPrompt ? replaceTemplates(aiSystemPrompt, replacements) : SYSTEM_PROMPT_FALLBACK
+  const responseSchema = buildSplitResponseSchema(readPartDescription(node.node_type_settings))
 
   const engineId = SettingsRepository.getCurrentBackend()
   if (!engineId) throw makeErrorWithStatus("no AI engine configured", 400)
@@ -66,7 +84,7 @@ export async function generateSplitParts(
         systemPrompt: finalSystemPrompt,
         responseSchema: {
           name: "splitResult",
-          schema: SPLIT_RESPONSE_SCHEMA as Record<string, unknown>,
+          schema: responseSchema,
         },
         includeExistingLore: false,
         aiGenerationSettings: actualAiSettings,

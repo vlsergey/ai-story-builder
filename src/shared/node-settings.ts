@@ -11,7 +11,15 @@ interface LlmCallPrompts {
   systemPrompt?: string | null
 }
 
-export interface SplitSettings extends LlmCallPrompts {}
+export interface SplitSettings extends LlmCallPrompts {
+  /**
+   * Optional human-readable description of what one element of the resulting
+   * array should look like. Injected into the response schema as
+   * `items.description` so the LLM understands the expected shape without
+   * needing it duplicated in the user prompt.
+   */
+  partDescription?: string
+}
 
 export interface MergeSettings {
   /** Whether to include the node's own title as an H1 header */
