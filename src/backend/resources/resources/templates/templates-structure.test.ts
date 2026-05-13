@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ProjectTemplate, TemplateProjectPlanNode } from "../../../../shared/project-template.js"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
+import { computeTemplateLayoutWithEntries } from "../../../lib/elk-template-layout.js"
 import { applyProjectTemplate } from "../../../projects/apply-project-template.js"
 
 vi.mock("../../../settings/settings-repository.js", () => ({
@@ -278,6 +279,33 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
         expect(f.placeholder?.trim() ?? "", "placeholder").not.toBe("")
       },
     )
+  })
+
+  // ─── Coordinate freshness — author hasn't forgotten to run layout ────────
+  // Adding/removing nodes or edges shifts the ELK-computed layout. If the
+  // stored coordinates diverge from what layout-templates would produce now,
+  // someone forgot to run `npm run layout-templates` after a structural edit.
+  describe("coordinates match what the layout script would produce now", () => {
+    it("running layout would produce a no-op (template author ran layout-templates after the last structural change)", async () => {
+      const entries = await computeTemplateLayoutWithEntries(template)
+      const drifted: string[] = []
+      for (const { node, expected } of entries) {
+        const oldX = node.x ?? 0
+        const oldY = node.y ?? 0
+        const oldW = node.width
+        const oldH = node.height
+        if (expected.x !== oldX || expected.y !== oldY || expected.width !== oldW || expected.height !== oldH) {
+          drifted.push(
+            `${node.title}: stored=(${oldX},${oldY},${oldW},${oldH}), expected=(${expected.x},${expected.y},${expected.width},${expected.height})`,
+          )
+        }
+      }
+      expect(
+        drifted,
+        `${drifted.length} node(s) have stale coordinates. Run \`npm run layout-templates\` to refresh.\n` +
+          drifted.slice(0, 10).join("\n"),
+      ).toEqual([])
+    })
   })
 
   // ─── Apply-time check — the whole template applies into a fresh DB ───────
