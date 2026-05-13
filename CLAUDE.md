@@ -34,6 +34,16 @@ npm run <script> --workspace src/frontend
 
 Do not change directories with `cd` — this ensures proper dependency resolution and environment.
 
+### Architecture research notes
+
+When investigating the codebase produces findings worth keeping across sessions (module maps, data-flow traces, refactor plans, design decisions), persist them as Markdown files under `.claude/research/`. One topic per file, descriptive kebab-case names (e.g. `template-export-format.md`, `plan-graph-execution.md`).
+
+Rules for these notes:
+- **English only** — language of the codebase, regardless of the conversation language.
+- Include file paths with line numbers when referencing code, so notes stay navigable.
+- Date stamp each note and re-verify before relying on it — the code drifts faster than the notes.
+- Update or delete a note when its content becomes stale; do not let outdated notes accumulate.
+
 ## References
 
 - [Root README](README.md) — general project description.
