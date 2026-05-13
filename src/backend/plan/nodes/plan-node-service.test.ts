@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { generatePlanNodeTextContent } from "../../ai/generate-plan-node-text-content.js"
+import { generateSplitParts } from "../../ai/generate-split-parts.js"
 import { generateSummary } from "../../ai/generate-summary.js"
 import { setUpTestDb, tearDownTestDb } from "../../db/test-db-utils.js"
 import { SettingsRepository } from "../../settings/settings-repository.js"
@@ -10,6 +11,10 @@ import { PlanNodeService } from "./plan-node-service.js"
 
 vi.mock("../../ai/generate-plan-node-text-content.js", () => ({
   generatePlanNodeTextContent: vi.fn(),
+}))
+
+vi.mock("../../ai/generate-split-parts.js", () => ({
+  generateSplitParts: vi.fn(),
 }))
 
 vi.mock("../../ai/generate-summary.js", () => ({
@@ -61,6 +66,11 @@ describe("PlanNodeService — full plan content generation", () => {
       console.log(`[MOCK] generateSummary called for content length ${content.length}`)
       return `Summary: ${content.substring(0, 30)}...`
     })
+    ;(generateSplitParts as any).mockImplementation(async (_abortSignal: AbortSignal, node: any) => {
+      console.log(`[MOCK] generateSplitParts called for node ${node.id} title ${node.title}`)
+      // Test feeds "First par.\n\nSecond par." to the split node; mock returns two parts.
+      return ["First par.", "Second par."]
+    })
   })
 
   afterEach(() => {
@@ -85,18 +95,13 @@ describe("PlanNodeService — full plan content generation", () => {
     expect(textNode).toBeDefined()
     const textNodeId = textNode.id
 
-    // 3. Create split node that will split paragraphs by \n\n
+    // 3. Create split node — LLM-driven now; the mock returns two parts.
     const splitNode = service.create({
       type: "split",
       title: "Split Node",
       content: null,
-      status: "OUTDATED", // Set OUTDATED to guarantee regeneration
-      node_type_settings: JSON.stringify({
-        separator: "\\n\\n",
-        dropFirst: 0,
-        dropLast: 0,
-        autoUpdate: true, // Enable auto-update
-      }),
+      status: "OUTDATED",
+      ai_user_prompt: "Split the input by paragraphs.",
     })
     const splitNodeId = splitNode.id
 

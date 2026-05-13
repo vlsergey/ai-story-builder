@@ -1,11 +1,7 @@
-export interface SplitSettings {
-  /** Regex pattern used to split text (empty string = no split) */
-  separator: string
-  /** Number of first parts to drop (positive integer) */
-  dropFirst: number
-  /** Number of last parts to drop (positive integer) */
-  dropLast: number
-}
+// Split nodes carry no type-specific settings.
+// The "how to split" instruction lives in `plan_nodes.ai_user_prompt`,
+// the same column other LLM-powered node types use.
+export type SplitSettings = unknown
 
 export interface MergeSettings {
   /** Whether to include the node's own title as an H1 header */
@@ -61,12 +57,7 @@ export type NodeTypeSettingsPartial<T extends keyof NodeTypeSettingsPartialMap =
 export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(nodeType: T): NodeTypeSettingsMap[T] {
   switch (nodeType) {
     case "split":
-      return {
-        separator: "",
-        dropFirst: 0,
-        dropLast: 0,
-        autoUpdate: false,
-      } as NodeTypeSettingsMap[T]
+      return {} as NodeTypeSettingsMap[T]
     case "merge":
       return {
         includeNodeTitle: false,

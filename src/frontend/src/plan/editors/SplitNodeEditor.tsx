@@ -1,15 +1,11 @@
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/ui-components/button"
-import { Label } from "@/ui-components/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui-components/card"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import type { SplitSettings } from "@shared/node-settings"
-import { Input } from "@/ui-components/input"
 
 export default function SplitNodeEditor({
-  nodeTypeSettings,
-  onNodeTypeSettingsChange,
   onRegenerate,
   value,
 }: TypedPlanNodeEditorProps<SplitSettings>) {
@@ -17,18 +13,11 @@ export default function SplitNodeEditor({
 
   const parts = useMemo<string[]>(() => {
     const content = value.content
-    if (content) {
-      try {
-        const parsed = JSON.parse(content)
-        if (Array.isArray(parsed)) {
-          return parsed
-        } else {
-          return []
-        }
-      } catch {
-        return []
-      }
-    } else {
+    if (!content) return []
+    try {
+      const parsed = JSON.parse(content)
+      return Array.isArray(parsed) ? parsed.filter((p) => typeof p === "string") : []
+    } catch {
       return []
     }
   }, [value.content])
@@ -40,47 +29,7 @@ export default function SplitNodeEditor({
           <CardTitle>{t("splitNode.settings")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="separator" className="text-sm">
-              {t("splitNode.separator")}
-            </Label>
-            <input
-              id="separator"
-              value={nodeTypeSettings.separator}
-              onChange={(e) => onNodeTypeSettingsChange({ ...nodeTypeSettings, separator: e.target.value })}
-              className="w-full border rounded px-2 py-1 text-sm"
-              placeholder={'e.g., "\\n\\n" or "\\\\s*---\\\\s*"'}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="dropFirst" className="text-sm">
-              {t("splitNode.dropFirst")}
-            </Label>
-            <Input
-              type="number"
-              min="0"
-              value={nodeTypeSettings.dropFirst}
-              onChange={(e) =>
-                onNodeTypeSettingsChange({ ...nodeTypeSettings, dropFirst: parseInt(e.target.value, 10) || 0 })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="dropLast" className="text-sm">
-              {t("splitNode.dropLast")}
-            </Label>
-            <Input
-              type="number"
-              min="0"
-              value={nodeTypeSettings.dropLast}
-              onChange={(e) =>
-                onNodeTypeSettingsChange({ ...nodeTypeSettings, dropLast: parseInt(e.target.value, 10) || 0 })
-              }
-            />
-          </div>
-
+          <p className="text-sm text-muted-foreground mb-3">{t("splitNode.promptHint")}</p>
           <Button onClick={onRegenerate} className="w-full">
             {t("common.update")}
           </Button>

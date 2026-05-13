@@ -1,90 +1,52 @@
 import type { SplitSettings } from "@shared/node-settings.js"
 import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import { generateSplitParts } from "../../../ai/generate-split-parts.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
-import type { NodeInputs } from "../NodeInput.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
 
 /**
  * Processor for 'split' nodes.
+ *
+ * Splitting is now LLM-driven: the user describes how to split via the node's
+ * `ai_user_prompt`, and the model returns a JSON array of parts. Pure-regex
+ * splitting has been removed — see migration 027 for the legacy data path.
  */
 export class SplitProcessor implements NodeProcessor<SplitSettings> {
-  readonly defaultSettings: SplitSettings = {
-    separator: "",
-    dropFirst: 0,
-    dropLast: 0,
-  }
+  readonly defaultSettings: SplitSettings = {}
 
-  getOutput(service: PlanNodeService, node: PlanNodeRow): unknown {
-    return this.parseContentAsJsonArray(node)
-  }
-
-  private parseContentAsJsonArray(node: PlanNodeRow): string[] {
-    // Try to parse content as JSON array of split parts
-    if (node.content) {
-      try {
-        const parsed = JSON.parse(node.content)
-        if (Array.isArray(parsed)) {
-          // Assume each element has a 'content' field (or is a string)
-          return parsed.map((item: any) => (typeof item === "string" ? item : item.content || ""))
-        }
-      } catch (_) {
-        // Not valid JSON, treat as empty array
+  getOutput(_service: PlanNodeService, node: PlanNodeRow): string[] {
+    if (!node.content) return []
+    try {
+      const parsed = JSON.parse(node.content)
+      if (Array.isArray(parsed) && parsed.every((p) => typeof p === "string")) {
+        return parsed
       }
+    } catch {
+      // fall through
     }
     return []
   }
 
-  private splitInput(inputs: NodeInputs<string>, settings: SplitSettings): string[] {
-    const inputText = inputs.map((i) => i.input).join("\n\n")
-    if (inputText.trim().length === 0) {
-      return []
-    }
-
-    let parts = this.splitTextByRegex(inputText, settings.separator)
-    // Apply dropFirst and dropLast
-    if (settings.dropFirst > 0) {
-      parts = parts.slice(settings.dropFirst)
-    }
-    if (settings.dropLast > 0) {
-      parts = parts.slice(0, -settings.dropLast)
-    }
-    return parts
-  }
-
-  private splitTextByRegex(text: string, regexPattern: string): string[] {
-    if (!regexPattern.trim()) {
-      return [text]
-    }
-    try {
-      const regex = new RegExp(regexPattern, "g")
-      return text.split(regex)
-    } catch (_) {
-      // If regex is invalid, treat as literal string split
-      return text.split(regexPattern)
-    }
-  }
-
   async regenerate(
     service: PlanNodeService,
-    _context: RegenerationNodeContext | undefined,
+    context: RegenerationNodeContext,
     node: PlanNodeRow,
-    settings: SplitSettings,
+    _settings: SplitSettings,
   ): Promise<PlanNodeUpdate | null> {
-    console.log(`[SplitProcessor] regenerate called for node ${node.id}, settings:`, settings)
-
-    const incomings = service.findNodeInputsByType(node.id, "text")
-    const parts = this.splitInput(incomings, settings)
-    console.log(`[SplitProcessor] splitInput returned parts:`, parts)
-    const result: PlanNodeUpdate = {
-      content: JSON.stringify(parts),
+    const inputs = service.findNodeInputsByType(node.id, "text")
+    if (inputs.length === 0) {
+      return { content: JSON.stringify([]) }
     }
 
-    if (incomings.length === 1) {
-      // for single input, use source node summary as summary
-      result.summary = incomings[0].sourceNode.summary
-    }
+    const parts = await generateSplitParts(context.abortSignal, node, (event) =>
+      context.onResponseStreamEvent(["content"], event),
+    )
 
+    const result: PlanNodeUpdate = { content: JSON.stringify(parts) }
+    if (inputs.length === 1) {
+      result.summary = inputs[0].sourceNode.summary
+    }
     return result
   }
 }
