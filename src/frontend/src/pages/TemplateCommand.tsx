@@ -78,9 +78,16 @@ export function TemplateCommand({ className, onSelect }: TemplateComboboxProps) 
                 <div className="flex items-start gap-3 w-full">
                   <Package className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="font-medium truncate">{template.label}</span>
+                    <span className="font-medium truncate" title={template.label}>
+                      {template.label}
+                    </span>
                     {template.description && (
-                      <span className="text-xs text-muted-foreground line-clamp-2">{template.description}</span>
+                      <span
+                        className="text-xs text-muted-foreground line-clamp-5 whitespace-normal"
+                        title={template.description}
+                      >
+                        {template.description}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -117,9 +124,16 @@ export function TemplateCommand({ className, onSelect }: TemplateComboboxProps) 
                 <div className="flex items-start gap-3 w-full">
                   <User className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="font-medium truncate">{template.label}</span>
+                    <span className="font-medium truncate" title={template.label}>
+                      {template.label}
+                    </span>
                     {template.description && (
-                      <span className="text-xs text-muted-foreground line-clamp-2">{template.description}</span>
+                      <span
+                        className="text-xs text-muted-foreground line-clamp-5 whitespace-normal"
+                        title={template.description}
+                      >
+                        {template.description}
+                      </span>
                     )}
                   </div>
                 </div>
