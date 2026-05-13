@@ -19,10 +19,14 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
   getOutput(context: PlanNodeService, node: PlanNodeRow): string {
     const content = JSON.parse(node.content ?? "{}") as FixProblemsPlanNodeContent
     const iterations = content.iterations ?? []
-    // Last iteration may not have fixProblemsResult, because problems severty may be less than minSeverityToFix
-    return (
-      iterations[iterations.length - 1]?.fixProblemsResult ?? iterations[iterations.length - 2]?.fixProblemsResult ?? ""
-    )
+    // Each iteration carries `input` (the state to fix) and an optional
+    // `fixProblemsResult` (the state after the fix). The last iteration may
+    // have no fixProblemsResult if its findProblems result had every problem
+    // below minSeverityToFix — in that case the input itself is the final
+    // result, since input N = fixProblemsResult of iteration N-1.
+    const lastIter = iterations[iterations.length - 1]
+    if (!lastIter) return ""
+    return lastIter.fixProblemsResult ?? lastIter.input ?? ""
   }
 
   async regenerate(
