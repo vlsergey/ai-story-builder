@@ -2,6 +2,7 @@
   "name": "ai-story-builder-backend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
