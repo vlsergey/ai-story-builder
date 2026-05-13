@@ -101,33 +101,21 @@ For text nodes that receive prev-outputs (full prior scenes), the prompt must ex
 
 ---
 
-## 8. Fanfic vs original branching
+## 8. Language consistency
 
-For templates that can be instantiated with both fanfic and original synopses:
+8.1. For locale-specific templates (e.g. `*.ru.json`), all prompts, descriptions, labels, and placeholders are in that language. No accidental fragments of another language inside prompt prose. Placeholders that happen to be node titles in another language are allowed since they reflect node identity; foreign-language prose inside instruction text is not.
 
-8.1. A dedicated top-level node identifies the case (canon vs original) and emits a clearly distinguishable output.
-
-8.2. Downstream nodes that need to behave differently in each case have explicit "if-canon / if-original" branches in their prompts.
-
-8.3. The fanfic branch instructs the model to be **faithful to canon** (don't invent facts that contradict source material).
+8.2. Register is consistent — e.g. either consistently informal or consistently neutral. Current convention for Russian templates: imperative neutral, no pronoun.
 
 ---
 
-## 9. Language consistency
+## 9. Output format constraints
 
-9.1. For locale-specific templates (e.g. `*.ru.json`), all prompts, descriptions, labels, and placeholders are in that language. No accidental fragments of another language inside prompt prose. Placeholders that happen to be node titles in another language are allowed since they reflect node identity; foreign-language prose inside instruction text is not.
+9.1. When the LLM should produce a specific format (numbered list, h2 headers, JSON), the prompt **explicitly** states the format.
 
-9.2. Register is consistent — e.g. either consistently informal or consistently neutral. Current convention for Russian templates: imperative neutral, no pronoun.
+9.2. Forbidden patterns are stated when relevant: "no bullets", "no numbering", "no opening or closing remarks", "output ONLY the result, no wrapper text".
 
----
-
-## 10. Output format constraints
-
-10.1. When the LLM should produce a specific format (numbered list, h2 headers, JSON), the prompt **explicitly** states the format.
-
-10.2. Forbidden patterns are stated when relevant: "no bullets", "no numbering", "no opening or closing remarks", "output ONLY the result, no wrapper text".
-
-10.3. For fix-problems' `aiUserInstructionsToFixProblems`, the prompt explicitly says "output only the corrected text" (or analog) — otherwise the model wraps with "Here is the corrected version:" prefixes.
+9.3. For fix-problems' `aiUserInstructionsToFixProblems`, the prompt explicitly says "output only the corrected text" (or analog) — otherwise the model wraps with "Here is the corrected version:" prefixes.
 
 ---
 

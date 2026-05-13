@@ -23,7 +23,7 @@ These are explicit choices made when the user said cost is not a binding constra
 ### Preparation block
 
 - `Синопсис` — text from wizard `${synopsis}` substitution.
-- `Канон / источник` — text. Identifies fanfic vs original. For fanfic: emits `Фандом: …` + canon description. For original: a one-liner "Оригинальный мир — внешнего канона нет." Feeds Setting, Plot outline, Character profile.
+- `Мир` — text. Describes the world along three axes: anchor canon (if any), borrowed elements from canon, and deviations (AU, what-if, original rules). Covers the spectrum from pure original to faithful fanfic to AU/speculative without a binary canon-vs-original branch. Feeds Setting, Plot outline, Character profile.
 - `Тема` — McKee's controlling idea.
 - `Жанр и регистр` — text.
 - `Сеттинг` — text. Reads Synopsis + Канон.
@@ -88,5 +88,5 @@ These came up while writing the template prompts and are non-obvious:
 
 - **Length-uniformity rules in the plan prompt** are mandatory. Without explicit "ровно 20 пунктов / 50–70 слов / последние не короче / перепиши если короче" the model thins the tail of the plan.
 - **`## Часть N` as first-line header on every scene** is the navigation primitive for the second pass. The polish node prompt must explicitly forbid removing/modifying this header.
-- **Канон / источник as a separate top-level node** so fanfic synopses (e.g. "Гарри и Драко находят…") get a deliberate canon-anchoring step instead of the LLM guessing or improvising.
+- **`Мир` as a separate top-level node** so synopses across the spectrum (pure original, faithful fanfic, AU, what-if speculative — e.g. "Гарри и Драко находят…", or "мир похож на HP, но магия закончилась 10 лет назад") get a deliberate world-description step. Three axes — anchor canon / borrowed / deviations — instead of a binary canon-vs-original branch.
 - **Multi-line `{{X}}` substitutions get fenced or heading-bracketed** in all prompts (see memory `feedback_template_prompt_style`). Inline single-token references like `{{Номер сцены}}` stay bare.

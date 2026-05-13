@@ -21,6 +21,7 @@
     "typecheck": "npm run typecheck --workspace=src/backend && tsc -p src/frontend/tsconfig.json",
     "package": "npm run build && electron-builder --publish never",
     "generate-schema": "npm rebuild better-sqlite3 && npm run build:backend && tsx scripts/generate-schema.ts",
+    "layout-templates": "tsx scripts/layout-templates.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --assist-enabled=true --formatter-enabled=true --write .",
     "lint:fix:unsafe": "biome check --assist-enabled=true --formatter-enabled=true --write --unsafe .",
