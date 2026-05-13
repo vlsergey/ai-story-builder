@@ -40,6 +40,7 @@ When investigating the codebase produces findings worth keeping across sessions 
 
 Rules for these notes:
 - **English only** — language of the codebase, regardless of the conversation language.
+- **Keep them tight** — aim for under ~150 lines per file. These notes are meant to save reading time on later sessions; if a note is so long it costs more to read than the code it summarizes, split it or trim it. Favor file:line pointers and surprising facts over restating code.
 - Include file paths with line numbers when referencing code, so notes stay navigable.
 - Date stamp each note and re-verify before relying on it — the code drifts faster than the notes.
 - Update or delete a note when its content becomes stale; do not let outdated notes accumulate.
