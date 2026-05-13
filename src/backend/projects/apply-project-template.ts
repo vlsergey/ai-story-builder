@@ -83,6 +83,31 @@ function resolveSource(
   return titleByTitleGlobal.get(sourceTitle)
 }
 
+// In the template format, fix-problems' instruction fields are stored as
+// `string[]` for diff-friendliness (same convention as text nodes'
+// aiUserInstructions). Runtime expects a single `string`. Convert at apply
+// time and apply wizard ${VARNAME} substitution while we're at it.
+const FIX_PROBLEMS_PROMPT_FIELDS = [
+  "aiSystemInstructionsToFindProblems",
+  "aiSystemInstructionsToFixProblems",
+  "aiUserInstructionsToFindProblems",
+  "aiUserInstructionsToFixProblems",
+] as const
+
+function normalizeFixProblemsPromptFields(
+  settings: Record<string, any>,
+  templateData: Record<string, any>,
+): Record<string, any> {
+  const out = { ...settings }
+  for (const field of FIX_PROBLEMS_PROMPT_FIELDS) {
+    const value = out[field]
+    if (Array.isArray(value)) {
+      out[field] = normalizeAndReplaceContent(value as string[], templateData)
+    }
+  }
+  return out
+}
+
 /**
  * Translate a fix-problems template's nodeTypeSettings (which references the source by title)
  * back into runtime form (referencing the source by DB id). Uses the same
@@ -95,8 +120,10 @@ function translateFixProblemsSettingsToRuntime(
   titleByParent: Map<ParentKey, Map<string, number>>,
   titleByTitleGlobal: Map<string, number>,
   fixProblemsTitle: string,
+  templateData: Record<string, any>,
 ): Record<string, any> {
-  const { sourceNodeTitleToFix, ...rest } = templateSettings
+  const normalized = normalizeFixProblemsPromptFields(templateSettings, templateData)
+  const { sourceNodeTitleToFix, ...rest } = normalized
   if (sourceNodeTitleToFix === undefined || sourceNodeTitleToFix === null) {
     return rest
   }
@@ -256,6 +283,7 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
       titleByParent,
       titleByTitleGlobal,
       fp.title,
+      templateData,
     )
     planRepo.patch(fp.newId, { node_type_settings: JSON.stringify(runtimeSettings) })
   }

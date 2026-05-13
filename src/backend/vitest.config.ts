@@ -10,6 +10,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
+    // After `build:backend` tsup also emits compiled .test.ts under dist/ —
+    // exclude so we never run two copies of the same test (or the dist copy
+    // alone after a partial cleanup).
+    exclude: ["**/node_modules/**", "**/dist/**"],
     globals: true,
   },
 })

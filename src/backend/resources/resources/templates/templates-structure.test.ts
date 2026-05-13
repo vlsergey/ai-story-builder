@@ -251,7 +251,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     expect(dupes, `for-each-index titles must be globally unique; duplicates: ${dupes.join(", ")}`).toEqual([])
   })
 
-  it("every ${VARNAME} in content/aiUserInstructions has a wizard field", () => {
+  it("every wizard variable used in content/aiUserInstructions has a matching wizard field declaration", () => {
     const wizardNames = new Set(
       (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => f.name)),
     )
@@ -297,6 +297,35 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
         (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => [f.name, "stub"])),
       )
       expect(() => applyProjectTemplate(template, wizardData)).not.toThrow()
+    })
+
+    it("fix-problems nodes' prompt fields are strings (not arrays) after apply", async () => {
+      const wizardData = Object.fromEntries(
+        (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => [f.name, "stub"])),
+      )
+      applyProjectTemplate(template, wizardData)
+
+      const { PlanNodeRepository } = await import("../../../plan/nodes/plan-node-repository.js")
+      const nodes = new PlanNodeRepository().findAll()
+      const fixNodes = nodes.filter((n) => n.type === "fix-problems")
+      const failures: string[] = []
+      const stringFields = [
+        "aiSystemInstructionsToFindProblems",
+        "aiSystemInstructionsToFixProblems",
+        "aiUserInstructionsToFindProblems",
+        "aiUserInstructionsToFixProblems",
+      ] as const
+      for (const node of fixNodes) {
+        const settings = JSON.parse(node.node_type_settings || "{}") as Record<string, unknown>
+        for (const field of stringFields) {
+          const value = settings[field]
+          if (value === undefined) continue
+          if (Array.isArray(value)) {
+            failures.push(`${node.title} (id=${node.id}): ${field} stored as array, runtime expects string`)
+          }
+        }
+      }
+      expect(failures).toEqual([])
     })
 
     it("nodes whose content is filled from wizard get status MANUAL (not EMPTY)", async () => {
