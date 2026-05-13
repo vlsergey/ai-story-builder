@@ -261,5 +261,23 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       )
       expect(() => applyProjectTemplate(template, wizardData)).not.toThrow()
     })
+
+    it("nodes whose content is filled from wizard get status MANUAL (not EMPTY)", async () => {
+      const wizardData = Object.fromEntries(
+        (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => [f.name, "non-blank stub"])),
+      )
+      applyProjectTemplate(template, wizardData)
+
+      const { PlanNodeRepository } = await import("../../../plan/nodes/plan-node-repository.js")
+      const nodes = new PlanNodeRepository().findAll()
+      const failures: string[] = []
+      for (const node of nodes) {
+        const hasNonBlankContent = node.content != null && node.content.trim().length > 0
+        if (hasNonBlankContent && node.status === "EMPTY") {
+          failures.push(`${node.title} (id=${node.id}): non-blank content but status=EMPTY`)
+        }
+      }
+      expect(failures).toEqual([])
+    })
   })
 })

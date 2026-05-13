@@ -266,6 +266,25 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
   }
 }
 
+// LLM-calling node types need a non-blank userPrompt to have anything to
+// generate from. A text node populated from a wizard substitution (e.g. the
+// "Synopsis" node in fiction-arc.ru.json) has content but no prompt — it's the
+// SOURCE of generation, not a target. Skip such nodes during regeneration.
+export function hasRegenerationCriteria(node: PlanNodeRow): boolean {
+  if (node.type === "text" || node.type === "split" || node.type === "lore") {
+    let userPrompt: unknown = null
+    if (node.node_type_settings) {
+      try {
+        userPrompt = (JSON.parse(node.node_type_settings) as { userPrompt?: unknown }).userPrompt
+      } catch {
+        // ignore — treat as no prompt
+      }
+    }
+    if (typeof userPrompt !== "string" || userPrompt.trim().length === 0) return false
+  }
+  return true
+}
+
 /**
  * Generate content for all nodes in topological order, respecting dependencies.
  */
@@ -333,7 +352,7 @@ export async function regenerateSubtreeNodesContents(
       continue
     }
 
-    const willRegenerate = shouldRegenerate[node.status]
+    const willRegenerate = shouldRegenerate[node.status] && hasRegenerationCriteria(node)
     console.log(
       `[regenerateSubtreeNodesContents] willRegenerate=${willRegenerate} (regenerateManual=${context.options.regenerateManual})`,
     )

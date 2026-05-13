@@ -180,6 +180,13 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
         }
       }
 
+      const finalContent = content ? normalizeAndReplaceContent(content, templateData) : null
+      // Non-blank content from wizard substitution makes the node ready-to-use,
+      // not pending regeneration. Status defaults to EMPTY otherwise — matching
+      // PlanNodeService.create's branch.
+      const hasContent = finalContent != null && finalContent.trim().length > 0
+      const status = hasContent ? "MANUAL" : "EMPTY"
+
       const insertedId = planRepo.insert({
         title,
         type,
@@ -189,8 +196,9 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
         y: y ?? 0,
         width: width ?? null,
         height: height ?? null,
-        content: content ? normalizeAndReplaceContent(content, templateData) : null,
+        content: finalContent,
         node_type_settings: initialSettings ? JSON.stringify(initialSettings) : null,
+        status,
       })
 
       recordTitle(parentNewId, title, type, insertedId)

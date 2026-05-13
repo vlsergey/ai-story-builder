@@ -8,36 +8,46 @@ This file is the canonical checklist for the parts that genuinely need an LLM to
 
 ---
 
-## 1. Output sizing
+## 1. Template description
 
-1.1. Every LLM-calling text-generating node states an explicit output size target in its `aiUserInstructions` ("100–150 words", "200–400 words", "target ~1500 words" — in the language of the template). No node leaves the model free to pick output length.
+1.1. The top-level `description` field is **outcome-oriented**: it tells the user what they'll get and when to reach for this template. Not what the template's internals look like.
 
-1.2. The target is framed as a **soft goal**, not a hard floor. Phrasing like "target ~1500 words, shorter is fine if it's dense" is correct; phrasing like "exactly 1500 words, otherwise regenerate" is wrong for prose. Hard counts are reserved for *structural* lists (item 5).
+1.2. Good signal: "Получаете повесть прозой около 30 000 слов из одного короткого синопсиса. Подходит, когда…". Bad signal: "Шаблон содержит узел A, потом узел B, потом цикл по битам, потом merge…".
 
-1.3. **Upper bounds below the model's output cap need a reason.** When a node's purpose can scale with content (a profile, a world description, a setting, a scene plan), prefer "up to ~1500 words, write what's needed, don't pad" over an arbitrary tight cap like "200–400 words". Tight caps are reserved for nodes whose output is naturally short by construction (a one-line classification, a fixed-length list).
-
-1.4. No single node's target exceeds the model's per-call output cap (~1500 words for Grok). If the target is above ~1400 words, the node should be split into smaller pieces or the target lowered.
+1.3. The description includes at minimum: the form of the output ("повесть прозой", "роман в виде глав", "набор рекламных заголовков"), the rough scale ("~30 000 слов", "5 заголовков по 10 слов"), and the use cases / scenarios the template fits.
 
 ---
 
-## 2. Prompt ordering for cache friendliness
+## 2. Output sizing
+
+2.1. Every LLM-calling text-generating node states an explicit output size target in its `aiUserInstructions` ("100–150 words", "200–400 words", "target ~1500 words" — in the language of the template). No node leaves the model free to pick output length.
+
+2.2. The target is framed as a **soft goal**, not a hard floor. Phrasing like "target ~1500 words, shorter is fine if it's dense" is correct; phrasing like "exactly 1500 words, otherwise regenerate" is wrong for prose. Hard counts are reserved for *structural* lists (item 6).
+
+2.3. **Upper bounds below the model's output cap need a reason.** When a node's purpose can scale with content (a profile, a world description, a setting, a scene plan), prefer "up to ~1500 words, write what's needed, don't pad" over an arbitrary tight cap like "200–400 words". Tight caps are reserved for nodes whose output is naturally short by construction (a one-line classification, a fixed-length list).
+
+2.4. No single node's target exceeds the model's per-call output cap (~1500 words for Grok). If the target is above ~1400 words, the node should be split into smaller pieces or the target lowered.
+
+---
+
+## 3. Prompt ordering for cache friendliness
 
 The LLM's prompt cache keys on the longest matching **prefix** of the user message. Cross-call cache hits maximize when static content sits at the top and dynamic content at the bottom.
 
-2.1. Within each prompt, sections referencing static-across-iterations inputs come **before** sections referencing dynamic-per-iteration inputs.
+3.1. Within each prompt, sections referencing static-across-iterations inputs come **before** sections referencing dynamic-per-iteration inputs.
 
    - Static-across-iterations (for a node inside a for-each): cross-parent inputs (style guide, cast bible, setting, plot outline, setup/payoff registry) — they don't change while iterating.
    - Dynamic-per-iteration: sibling inputs from the same for-each (current beat, scene plan, director notes, the prev-outputs merge, the iteration index) — they all change with the iteration.
 
-2.2. Within each prompt, the task block (the instruction itself — static text, typically introduced by a "what to do" h2 heading) sits AFTER all input sections. Placing it dead-last means the cache benefit on the prefix is captured by everything above it.
+3.2. Within each prompt, the task block (the instruction itself — static text, typically introduced by a "what to do" h2 heading) sits AFTER all input sections. Placing it dead-last means the cache benefit on the prefix is captured by everything above it.
 
-2.3. For nodes NOT inside a for-each (project-once nodes), this rule still applies as a guideline against later edits: inputs that the author is more likely to tweak (like style guide) go below inputs that are more likely to stay frozen (like the original synopsis).
+3.3. For nodes NOT inside a for-each (project-once nodes), this rule still applies as a guideline against later edits: inputs that the author is more likely to tweak (like style guide) go below inputs that are more likely to stay frozen (like the original synopsis).
 
 ---
 
-## 3. Delimitation of substituted content
+## 4. Delimitation of substituted content
 
-3.1. Every `{{X}}` placeholder bringing in **multi-line** content is visually delimited from surrounding instructions. Two acceptable mechanisms (pick one per placeholder, don't mix on the same one):
+4.1. Every `{{X}}` placeholder bringing in **multi-line** content is visually delimited from surrounding instructions. Two acceptable mechanisms (pick one per placeholder, don't mix on the same one):
 
    - Triple-backtick fence around the placeholder:
      ```
@@ -47,77 +57,79 @@ The LLM's prompt cache keys on the longest matching **prefix** of the user messa
      ```
    - Heading-bracketed section: a `##` heading before, the placeholder on its own paragraph, then a different `##` heading after.
 
-3.2. **Single-token / inline** placeholders are bare. For example, an inline reference like `find the section `## Part {{SceneNumber}}`` keeps `{{SceneNumber}}` inline because the surrounding text is the delimiter.
+4.2. **Single-token / inline** placeholders are bare. For example, an inline reference like `find the section `## Part {{SceneNumber}}`` keeps `{{SceneNumber}}` inline because the surrounding text is the delimiter.
 
-3.3. Inside a fenced block, the placeholder is on its own line — never `\`\`\`{{X}}\`\`\`` on one line, because the model often parses that as code, not a substitution.
+4.3. Inside a fenced block, the placeholder is on its own line — never `\`\`\`{{X}}\`\`\`` on one line, because the model often parses that as code, not a substitution.
 
 ---
 
-## 4. Wizard field copy
+## 5. Wizard field copy
 
-4.1. Wizard field `description` is one helpful sentence that tells the user what concretely to write — not the field type or repeating the label.
+5.1. Wizard field `description` is one helpful sentence that tells the user what concretely to write — not the field type or repeating the label.
 
-4.2. Wizard field `placeholder` is a **concrete example** that fits the field's purpose, not a meta description like "Enter text here".
+5.2. Wizard field `placeholder` is a **concrete example** that fits the field's purpose, not a meta description like "Enter text here".
 
 (Existence and non-emptiness of `label`/`description`/`placeholder` are checked by the structural test — judge here only whether the copy is helpful.)
 
 ---
 
-## 5. Structured-list generation safeguards
+## 6. Structured-list generation safeguards
 
 For text nodes whose output is a fixed-count structured list (e.g. "exactly 20 beats"), all of the following must appear in the prompt:
 
-5.1. **Exact count** — "exactly N items" stated unambiguously.
+6.1. **Exact count** — "exactly N items" stated unambiguously.
 
-5.2. **Length range per item** — "X to Y words per item" (with the upper bound chosen so that count × upper ≤ ~1400 words to stay under the output cap).
+6.2. **Length range per item** — "X to Y words per item" (with the upper bound chosen so that count × upper ≤ ~1400 words to stay under the output cap).
 
-5.3. **Uniformity** — "all items equally detailed".
+6.3. **Uniformity** — "all items equally detailed".
 
-5.4. **Tail-not-shorter rule** — "the last items must NOT be shorter than the first". Without this, the model thins the tail.
+6.4. **Tail-not-shorter rule** — "the last items must NOT be shorter than the first". Without this, the model thins the tail.
 
-5.5. **Auto-rewrite-if-short** — "if any item is shorter than the lower bound, automatically rewrite it".
+6.5. **Auto-rewrite-if-short** — "if any item is shorter than the lower bound, automatically rewrite it".
 
-5.6. **No-meta-word-count** — "do not include word count in the output". Otherwise the model emits "(50 words)" annotations into output.
+6.6. **No-meta-word-count** — "do not include word count in the output". Otherwise the model emits "(50 words)" annotations into output.
 
 ---
 
-## 6. Header / structural preservation across nodes
+## 7. Header / structural preservation across nodes
 
 For pipelines where downstream nodes navigate by header (e.g. "find `## Part {{Index}}`"):
 
-6.1. The header-producing node's prompt **explicitly** instructs: first line is `## Part {{Index}}`, exact format, no variation.
+7.1. The header-producing node's prompt **explicitly** instructs: first line is `## Part {{Index}}`, exact format, no variation.
 
-6.2. Polish / review / fix-problems nodes downstream of the header-producing node **explicitly** instruct: do not remove, modify, or shift the level of the header.
+7.2. Polish / review / fix-problems nodes downstream of the header-producing node **explicitly** instruct: do not remove, modify, or shift the level of the header.
 
-6.3. Merge nodes between them are configured `fixHeaders: false`, `includeNodeTitle: false`, `includeInputTitles: false` (so they don't reshape the embedded headers).
+7.3. Merge nodes between them are configured `fixHeaders: false`, `includeNodeTitle: false`, `includeInputTitles: false` (so they don't reshape the embedded headers).
 
 ---
 
-## 7. Continuity-without-mimicry instructions
+## 8. Continuity-without-mimicry instructions
 
 For text nodes that receive prev-outputs (full prior scenes), the prompt must explicitly state:
 
-7.1. The prior scenes are for **meaning / continuity**, **not** for copying stylistics or fragments verbatim. Without this, the model produces echo-prose by lifting phrasings.
+8.1. The prior scenes are for **meaning / continuity**, **not** for copying stylistics or fragments verbatim. Without this, the model produces echo-prose by lifting phrasings.
 
-7.2. The prompt also names what the prev-outputs are for in practical terms: "to avoid contradicting what was already written, to avoid repeating metaphors, to keep names straight".
-
----
-
-## 8. Language consistency
-
-8.1. For locale-specific templates (e.g. `*.ru.json`), all prompts, descriptions, labels, and placeholders are in that language. No accidental fragments of another language inside prompt prose. Placeholders that happen to be node titles in another language are allowed since they reflect node identity; foreign-language prose inside instruction text is not.
-
-8.2. Register is consistent — e.g. either consistently informal or consistently neutral. Current convention for Russian templates: imperative neutral, no pronoun.
+8.2. The prompt also names what the prev-outputs are for in practical terms: "to avoid contradicting what was already written, to avoid repeating metaphors, to keep names straight".
 
 ---
 
-## 9. Output format constraints
+## 9. Language consistency
 
-9.1. When the LLM should produce a specific format (numbered list, h2 headers, JSON), the prompt **explicitly** states the format.
+9.1. For locale-specific templates (e.g. `*.ru.json`), all prompts, descriptions, labels, and placeholders are in that language. No accidental fragments of another language inside prompt prose. Placeholders that happen to be node titles in another language are allowed since they reflect node identity; foreign-language prose inside instruction text is not.
 
-9.2. Forbidden patterns are stated when relevant: "no bullets", "no numbering", "no opening or closing remarks", "output ONLY the result, no wrapper text".
+9.2. Register is consistent — e.g. either consistently informal or consistently neutral. Current convention for Russian templates: imperative neutral, no pronoun.
 
-9.3. For fix-problems' `aiUserInstructionsToFixProblems`, the prompt explicitly says "output only the corrected text" (or analog) — otherwise the model wraps with "Here is the corrected version:" prefixes.
+9.3. No `if / если` branches in instruction text. Conditional behaviour is a known cause of LLM confusion. Rewrite imperatively: state the desired action for each case as a separate sentence ("Caconic characters — canonical voice. New characters — invent.") instead of "if X then A, if Y then B".
+
+---
+
+## 10. Output format constraints
+
+10.1. When the LLM should produce a specific format (numbered list, h2 headers, JSON), the prompt **explicitly** states the format.
+
+10.2. Forbidden patterns are stated when relevant: "no bullets", "no numbering", "no opening or closing remarks", "output ONLY the result, no wrapper text".
+
+10.3. For fix-problems' `aiUserInstructionsToFixProblems`, the prompt explicitly says "output only the corrected text" (or analog) — otherwise the model wraps with "Here is the corrected version:" prefixes.
 
 ---
 
@@ -125,7 +137,7 @@ For text nodes that receive prev-outputs (full prior scenes), the prompt must ex
 
 When auditing:
 - Walk through every LLM-calling node of the template.
-- For each rule, note pass / fail / N/A (e.g. rule 5 is N/A for nodes that don't generate structured lists).
+- For each rule, note pass / fail / N/A (e.g. rule 6 is N/A for nodes that don't generate structured lists).
 - Report failures with file:node:rule and the minimal change to pass.
 - Don't fix in the same pass as the audit — first write the findings, then fix them (so the audit can be reviewed before changes).
 
