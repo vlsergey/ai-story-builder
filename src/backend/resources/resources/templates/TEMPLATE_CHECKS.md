@@ -131,6 +131,8 @@ For text nodes that receive prev-outputs (full prior scenes), the prompt must ex
 
 10.3. For fix-problems' `aiUserInstructionsToFixProblems`, the prompt explicitly says "output only the corrected text" (or analog) — otherwise the model wraps with "Here is the corrected version:" prefixes.
 
+10.4. **Classification / analysis / planning nodes (anything whose job is to describe ABOUT the work rather than write the work) explicitly forbid story prose.** Without this, when the prompt includes a synopsis or scene plan, the model can slide into writing the story itself — especially when given high word ceilings or the word "prose" anywhere in the instruction. The forbidding sentence should name the slippage concretely: "это классификация, а не текст произведения — не пиши прозу, не сочиняй сцены, не приводи диалоги". Applies to: theme, genre, world description, character profile, scene plan, director notes, plot outline, setup/payoff registry, fix-problems find-step.
+
 ---
 
 ## How to use this list
