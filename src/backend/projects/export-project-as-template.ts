@@ -11,9 +11,29 @@ import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
+// for-each-input / for-each-output are auto-managed by the engine. Their
+// fixed titles ("Input" / "Output") legitimately repeat across multiple
+// for-each containers and they are never referenced from outside their own
+// for-each. They are exempt from global plan-title uniqueness.
+const INTERNAL_PLAN_NODE_TYPES = new Set<string>(["for-each-input", "for-each-output"])
+
+function checkPlanTitlesGloballyUnique(rows: ReadonlyArray<PlanNodeRow>): void {
+  const seen = new Map<string, number>()
+  for (const row of rows) {
+    if (INTERNAL_PLAN_NODE_TYPES.has(row.type)) continue
+    const prev = seen.get(row.title)
+    if (prev !== undefined) {
+      throw new Error(
+        `Cannot export template: two plan nodes share the title "${row.title}" (#${prev} and #${row.id}). Plan titles must be globally unique. Rename one of them before exporting.`,
+      )
+    }
+    seen.set(row.title, row.id)
+  }
+}
+
 function checkSiblingTitlesUnique(
   rows: ReadonlyArray<{ id: number; parent_id: number | null; title: string }>,
-  kind: "plan" | "lore",
+  kind: "lore",
 ): void {
   const seen = new Map<string, number>()
   for (const row of rows) {
@@ -92,7 +112,7 @@ export async function exportProjectAsTemplate(options: ExportProjectAsTemplateOp
   const edges = new PlanEdgeRepository().findAll()
   const projectTitle = SettingsRepository.getProjectTitle() || ""
 
-  checkSiblingTitlesUnique(nodes, "plan")
+  checkPlanTitlesGloballyUnique(nodes)
 
   const idToTitle = new Map<number, string>(nodes.map((n) => [n.id, n.title]))
   const rawNodesById = new Map<number, PlanNodeRow>(nodes.map((n) => [n.id, n]))
@@ -111,16 +131,13 @@ export async function exportProjectAsTemplate(options: ExportProjectAsTemplateOp
     parent.children.push(exportedById.get(node.id)!)
   }
 
-  // Wire up inputs (edges); enforce same-parent constraint
+  // Wire up inputs (edges). Cross-parent edges are allowed — apply-side
+  // resolution does sibling-first then a global title lookup, which works as
+  // long as plan titles are globally unique (enforced above).
   for (const edge of edges) {
     const sourceRaw = rawNodesById.get(edge.from_node_id)
     const targetRaw = rawNodesById.get(edge.to_node_id)
     if (!sourceRaw || !targetRaw) continue
-    if (sourceRaw.parent_id !== targetRaw.parent_id) {
-      throw new Error(
-        `Cannot export template: edge from #${sourceRaw.id} ('${sourceRaw.title}') to #${targetRaw.id} ('${targetRaw.title}') crosses parent boundaries, which the template format does not support.`,
-      )
-    }
     const target = exportedById.get(edge.to_node_id)!
     target.inputs = target.inputs ?? []
     target.inputs.push({ sourceNodeTitle: sourceRaw.title, type: edge.type })

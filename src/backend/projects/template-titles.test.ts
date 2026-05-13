@@ -149,4 +149,136 @@ describe("project template title-based references", () => {
     }
     expect(() => applyProjectTemplate(template, {})).toThrow(/Nonexistent/)
   })
+
+  it("resolves cross-parent input references via global title lookup on apply", () => {
+    // Top-level "Style" feeds into "Inner" nested inside for-each "FE".
+    const template: ProjectTemplate = {
+      label: "Tpl",
+      description: "",
+      plan: {
+        nodes: [
+          { title: "Style", type: "text", content: ["a style"] },
+          {
+            title: "FE",
+            type: "for-each",
+            children: [
+              { title: "Input", type: "for-each-input" },
+              { title: "Output", type: "for-each-output" },
+              {
+                title: "Inner",
+                type: "text",
+                inputs: [{ sourceNodeTitle: "Style", type: "text" }],
+              },
+            ],
+          },
+        ],
+      },
+    }
+    applyProjectTemplate(template, {})
+
+    const planRepo = new PlanNodeRepository()
+    const edgeRepo = new PlanEdgeRepository()
+    const style = planRepo.findAll().find((n) => n.title === "Style")!
+    const inner = planRepo.findAll().find((n) => n.title === "Inner")!
+    const inputs = edgeRepo.findByToNodeId(inner.id)
+    expect(inputs).toHaveLength(1)
+    expect(inputs[0].from_node_id).toBe(style.id)
+    expect(style.parent_id).toBeNull()
+    expect(inner.parent_id).not.toBeNull()
+  })
+
+  it("exports cross-parent edges without complaint", async () => {
+    const planRepo = new PlanNodeRepository()
+    const edgeRepo = new PlanEdgeRepository()
+    const styleId = planRepo.insert({ title: "Style", type: "text", x: 0, y: 0 })
+    const feId = planRepo.insert({ title: "FE", type: "for-each", x: 0, y: 0 })
+    planRepo.insert({ title: "Input", type: "for-each-input", parent_id: feId, x: 0, y: 0 })
+    planRepo.insert({ title: "Output", type: "for-each-output", parent_id: feId, x: 0, y: 0 })
+    const innerId = planRepo.insert({ title: "Inner", type: "text", parent_id: feId, x: 0, y: 0 })
+    edgeRepo.insert({ from_node_id: styleId, to_node_id: innerId, type: "text" })
+
+    await exportProjectAsTemplate({ filePath: tempFile, exportLoreStructure: false })
+    const written = JSON.parse(await fs.readFile(tempFile, "utf8")) as ProjectTemplate
+
+    const fe = written.plan.nodes.find((n) => n.title === "FE")!
+    const inner = fe.children!.find((n) => n.title === "Inner")!
+    expect(inner.inputs).toEqual([{ sourceNodeTitle: "Style", type: "text" }])
+  })
+
+  it("round-trips a graph with a cross-parent edge", async () => {
+    const planRepo = new PlanNodeRepository()
+    const edgeRepo = new PlanEdgeRepository()
+    const styleId = planRepo.insert({ title: "Style", type: "text", x: 0, y: 0, content: "STYLE" })
+    const feId = planRepo.insert({ title: "FE", type: "for-each", x: 0, y: 0 })
+    planRepo.insert({ title: "Input", type: "for-each-input", parent_id: feId, x: 0, y: 0 })
+    planRepo.insert({ title: "Output", type: "for-each-output", parent_id: feId, x: 0, y: 0 })
+    const innerId = planRepo.insert({ title: "Inner", type: "text", parent_id: feId, x: 0, y: 0 })
+    edgeRepo.insert({ from_node_id: styleId, to_node_id: innerId, type: "text" })
+
+    await exportProjectAsTemplate({ filePath: tempFile, exportLoreStructure: false })
+    const written = JSON.parse(await fs.readFile(tempFile, "utf8")) as ProjectTemplate
+
+    tearDownTestDb()
+    setUpTestDb()
+    applyProjectTemplate(written, {})
+
+    const newNodes = new PlanNodeRepository().findAll()
+    const newEdges = new PlanEdgeRepository().findAll()
+    const newStyle = newNodes.find((n) => n.title === "Style")!
+    const newInner = newNodes.find((n) => n.title === "Inner")!
+    expect(newInner.parent_id).not.toBeNull()
+    expect(newStyle.parent_id).toBeNull()
+    expect(newEdges).toHaveLength(1)
+    expect(newEdges[0].from_node_id).toBe(newStyle.id)
+    expect(newEdges[0].to_node_id).toBe(newInner.id)
+  })
+
+  it("exports a graph with two for-each blocks sharing Input/Output titles", async () => {
+    const planRepo = new PlanNodeRepository()
+    const fe1 = planRepo.insert({ title: "FE1", type: "for-each", x: 0, y: 0 })
+    planRepo.insert({ title: "Input", type: "for-each-input", parent_id: fe1, x: 0, y: 0 })
+    planRepo.insert({ title: "Output", type: "for-each-output", parent_id: fe1, x: 0, y: 0 })
+    const fe2 = planRepo.insert({ title: "FE2", type: "for-each", x: 0, y: 0 })
+    planRepo.insert({ title: "Input", type: "for-each-input", parent_id: fe2, x: 0, y: 0 })
+    planRepo.insert({ title: "Output", type: "for-each-output", parent_id: fe2, x: 0, y: 0 })
+
+    // Duplicate "Input"/"Output" titles should not trip the global uniqueness check
+    // because for-each-input / for-each-output are exempt.
+    await expect(exportProjectAsTemplate({ filePath: tempFile, exportLoreStructure: false })).resolves.toBeUndefined()
+  })
+
+  it("rejects export when two non-internal plan nodes share a title across parents", async () => {
+    const planRepo = new PlanNodeRepository()
+    planRepo.insert({ title: "Shared", type: "text", x: 0, y: 0 })
+    const feId = planRepo.insert({ title: "FE", type: "for-each", x: 0, y: 0 })
+    planRepo.insert({ title: "Input", type: "for-each-input", parent_id: feId, x: 0, y: 0 })
+    planRepo.insert({ title: "Output", type: "for-each-output", parent_id: feId, x: 0, y: 0 })
+    planRepo.insert({ title: "Shared", type: "text", parent_id: feId, x: 0, y: 0 })
+
+    await expect(
+      exportProjectAsTemplate({ filePath: tempFile, exportLoreStructure: false }),
+    ).rejects.toThrow(/Shared/)
+  })
+
+  it("rejects apply when a template has duplicate non-internal titles across parents", () => {
+    const template: ProjectTemplate = {
+      label: "Tpl",
+      description: "",
+      plan: {
+        nodes: [
+          { title: "Shared", type: "text" },
+          {
+            title: "FE",
+            type: "for-each",
+            children: [
+              { title: "Input", type: "for-each-input" },
+              { title: "Output", type: "for-each-output" },
+              { title: "Shared", type: "text" },
+            ],
+          },
+        ],
+      },
+    }
+    expect(() => applyProjectTemplate(template, {})).toThrow(/Shared/)
+  })
 })

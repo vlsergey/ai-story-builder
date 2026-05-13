@@ -22,9 +22,35 @@ function keyFor(parentId: number | null): ParentKey {
   return parentId ?? "root"
 }
 
+// for-each-input / for-each-output are auto-managed by the engine: their fixed
+// titles ("Input" / "Output") legitimately repeat across multiple for-each
+// containers. They are addressed only by siblings inside their own for-each,
+// never globally. Excluded from global-uniqueness checks and from the global
+// title→id map.
+const INTERNAL_PLAN_NODE_TYPES = new Set<string>(["for-each-input", "for-each-output"])
+
+function assertPlanTitlesGloballyUnique(nodes: TemplateProjectPlanNode[] | undefined): void {
+  if (!nodes) return
+  const seen = new Set<string>()
+  function walk(arr: TemplateProjectPlanNode[]): void {
+    for (const node of arr) {
+      if (!INTERNAL_PLAN_NODE_TYPES.has(node.type)) {
+        if (seen.has(node.title)) {
+          throw new Error(
+            `Template is invalid: two plan nodes share the title "${node.title}". Plan titles must be globally unique (auto-managed for-each-input / for-each-output are exempt).`,
+          )
+        }
+        seen.add(node.title)
+      }
+      if (node.children) walk(node.children)
+    }
+  }
+  walk(nodes)
+}
+
 function assertSiblingTitlesUnique<T extends { title: string; children?: T[] }>(
   nodes: T[] | undefined,
-  kind: "plan" | "lore",
+  kind: "lore",
   parentTitle: string | null,
 ): void {
   if (!nodes) return
@@ -42,26 +68,42 @@ function assertSiblingTitlesUnique<T extends { title: string; children?: T[] }>(
 }
 
 /**
+ * Resolve a referenced node title to its inserted DB id. Sibling lookup first
+ * (so internal for-each-input / for-each-output stays addressable), then a
+ * global fallback so cross-parent references work without relative paths.
+ */
+function resolveSource(
+  parentNewId: number | null,
+  sourceTitle: string,
+  titleByParent: Map<ParentKey, Map<string, number>>,
+  titleByTitleGlobal: Map<string, number>,
+): number | undefined {
+  const sibling = titleByParent.get(keyFor(parentNewId))?.get(sourceTitle)
+  if (sibling !== undefined) return sibling
+  return titleByTitleGlobal.get(sourceTitle)
+}
+
+/**
  * Translate a fix-problems template's nodeTypeSettings (which references the source by title)
- * back into runtime form (referencing the source by DB id). Looks up the sibling of the
- * fix-problems node whose title matches sourceNodeTitleToFix.
+ * back into runtime form (referencing the source by DB id). Uses the same
+ * sibling-then-global resolution as edge inputs.
  */
 function translateFixProblemsSettingsToRuntime(
   templateSettings: Record<string, any>,
-  fixProblemsNewId: number,
+  _fixProblemsNewId: number,
   fixProblemsParentNewId: number | null,
   titleByParent: Map<ParentKey, Map<string, number>>,
+  titleByTitleGlobal: Map<string, number>,
   fixProblemsTitle: string,
 ): Record<string, any> {
   const { sourceNodeTitleToFix, ...rest } = templateSettings
   if (sourceNodeTitleToFix === undefined || sourceNodeTitleToFix === null) {
     return rest
   }
-  const siblings = titleByParent.get(keyFor(fixProblemsParentNewId))
-  const sourceId = siblings?.get(sourceNodeTitleToFix)
+  const sourceId = resolveSource(fixProblemsParentNewId, sourceNodeTitleToFix, titleByParent, titleByTitleGlobal)
   if (sourceId === undefined) {
     throw new Error(
-      `Template is invalid: fix-problems node "${fixProblemsTitle}" references missing sibling "${sourceNodeTitleToFix}" via sourceNodeTitleToFix.`,
+      `Template is invalid: fix-problems node "${fixProblemsTitle}" references missing node "${sourceNodeTitleToFix}" via sourceNodeTitleToFix.`,
     )
   }
   return { ...rest, sourceNodeIdToFix: sourceId }
@@ -77,14 +119,19 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
   const loreRepo = new LoreNodeRepository()
 
   if (projectTemplate.plan?.nodes) {
-    assertSiblingTitlesUnique(projectTemplate.plan.nodes, "plan", null)
+    assertPlanTitlesGloballyUnique(projectTemplate.plan.nodes)
   }
   if (projectTemplate.lore?.nodes) {
     assertSiblingTitlesUnique(projectTemplate.lore.nodes, "lore", null)
   }
 
-  // Index inserted plan nodes by (parent_id, title) for sibling lookups (edges, fix-problems settings).
+  // Index inserted plan nodes by (parent_id, title) for sibling lookups
+  // (covers auto-managed for-each-input / for-each-output that share titles
+  // across containers).
   const titleByParent = new Map<ParentKey, Map<string, number>>()
+  // Flat map of non-internal plan titles → id for cross-parent reference
+  // resolution. Excludes for-each-input / for-each-output.
+  const titleByTitleGlobal = new Map<string, number>()
   // Track fix-problems nodes for a post-insert settings translation pass.
   const fixProblemsToWire: Array<{
     newId: number
@@ -101,7 +148,7 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
     targetTitle: string
   }> = []
 
-  function recordTitle(parentNewId: number | null, title: string, newId: number): void {
+  function recordTitle(parentNewId: number | null, title: string, type: string, newId: number): void {
     const key = keyFor(parentNewId)
     let bucket = titleByParent.get(key)
     if (!bucket) {
@@ -109,6 +156,9 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
       titleByParent.set(key, bucket)
     }
     bucket.set(title, newId)
+    if (!INTERNAL_PLAN_NODE_TYPES.has(type)) {
+      titleByTitleGlobal.set(title, newId)
+    }
   }
 
   function createPlanNodes(nodes: TemplateProjectPlanNode[], parentNewId: number | null): void {
@@ -143,7 +193,7 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
         node_type_settings: initialSettings ? JSON.stringify(initialSettings) : null,
       })
 
-      recordTitle(parentNewId, title, insertedId)
+      recordTitle(parentNewId, title, type, insertedId)
 
       if (type === "fix-problems" && nodeTypeSettings) {
         fixProblemsToWire.push({
@@ -177,10 +227,10 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
   }
 
   for (const edge of edgesToInsert) {
-    const sourceId = titleByParent.get(keyFor(edge.parentNewId))?.get(edge.sourceNodeTitle)
+    const sourceId = resolveSource(edge.parentNewId, edge.sourceNodeTitle, titleByParent, titleByTitleGlobal)
     if (sourceId === undefined) {
       throw new Error(
-        `Template is invalid: node "${edge.targetTitle}" references missing sibling "${edge.sourceNodeTitle}" in inputs.`,
+        `Template is invalid: node "${edge.targetTitle}" references missing node "${edge.sourceNodeTitle}" in inputs.`,
       )
     }
     edgeRepo.insert({
@@ -196,6 +246,7 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
       fp.newId,
       fp.parentNewId,
       titleByParent,
+      titleByTitleGlobal,
       fp.title,
     )
     planRepo.patch(fp.newId, { node_type_settings: JSON.stringify(runtimeSettings) })
