@@ -8,9 +8,23 @@ Gaps in the node/edge primitive set that surfaced while designing the fiction ge
 
 ### LLM-driven split (commit `fbdbe20`)
 
-The `split` node now does an LLM call returning `{parts: string[]}` with retry-on-invalid-JSON. The "how to split" prompt lives in `plan_nodes.ai_user_prompt` like other LLM-powered nodes. Implementation in [`src/backend/plan/nodes/graph/split-processor.ts`](../../src/backend/plan/nodes/graph/split-processor.ts) + helper [`src/backend/ai/generate-split-parts.ts`](../../src/backend/ai/generate-split-parts.ts). Migration 027 ([`src/backend/db/migrations/027.ts`](../../src/backend/db/migrations/027.ts)) translates legacy regex configs to natural-language prompts.
+The `split` node now does an LLM call returning `{parts: string[]}` with retry-on-invalid-JSON. The "how to split" prompt lives in `node_type_settings.userPrompt` (post commit `a9aaed8`). Implementation in [`src/backend/plan/nodes/graph/split-processor.ts`](../../src/backend/plan/nodes/graph/split-processor.ts) + helper [`src/backend/ai/generate-split-parts.ts`](../../src/backend/ai/generate-split-parts.ts). Migration 027 ([`src/backend/db/migrations/027.ts`](../../src/backend/db/migrations/027.ts)) translates legacy regex configs to natural-language prompts.
 
-Why this was the priority: regex split is fragile when the upstream format drifts; LLM split absorbs that drift. The fiction pipeline needs to split free-prose outlines into beats, where the prose may number them as "1.", or as "Beat 1:", or as h3 headings — regex can't generalize across forms.
+### Prompts moved off `plan_nodes` row into `node_type_settings` (commit `a9aaed8`)
+
+`ai_user_prompt` / `ai_system_prompt` dropped as columns. For `text` / `split` / `lore` types they live in `node_type_settings.userPrompt` / `.systemPrompt`. Migration 028 ([`src/backend/db/migrations/028.ts`](../../src/backend/db/migrations/028.ts)) does the data move; non-LLM types (merge, for-each*) warn-and-drop on stale prompt values. `ai_settings` stays at the row level (engine-determined, not node-type-determined).
+
+### `partDescription` on `split` nodes (commit `94794eb`)
+
+`SplitSettings.partDescription?: string` injected into the response schema as `items.description`. Lets the template author describe one array element ("one plot beat, 80–100 words, prose, no headers") without duplicating it in the user prompt — keeps the creative pass and the contract pass separate, in the spirit of [[project-json-schema-dumbs-models]].
+
+### Cross-parent edges in templates (commit `7ba71c8`)
+
+Apply now uses sibling-first then a flat global-title map to resolve `sourceNodeTitle`. Export drops the cross-parent throw and validates global plan-title uniqueness instead. for-each-input / for-each-output are exempt from global uniqueness (their fixed "Input"/"Output" titles repeat across containers). This unblocked the fiction-arc template — `Style`, `Cast bible`, `Plot outline split` and friends are now visible from inside the scene for-each loops.
+
+### `for-each-index` node type (commit `4de6157`)
+
+User-placed leaf node inside a for-each that emits the current 1-based iteration position as text via `getOutput`. No override storage, no regeneration — pure function of the parent for-each's `currentIndex`. Used in fiction-arc so each scene's prose starts with `## Часть {{Номер сцены}}` — the second-draft pass then re-locates each scene in the merged first draft by header without re-splitting.
 
 ## Open — deferred but planned
 
@@ -20,21 +34,21 @@ The current `llm-split` (post-refactor) asks the LLM to **emit each chunk verbat
 
 Solution: a separate node type that asks the LLM only for **boundary markers** (line indices, or "the line that starts each piece"), then the runtime does the cutting against the original input. Output stays small (20 anchors × 20 words = 400 words), input fidelity is exact.
 
-Status: **not blocking** for the fiction pipeline (every input in that pipeline is small enough for the regular `llm-split`). Deferred until a workflow actually needs it.
+Status: **not blocking** for the fiction-arc pipeline — second-draft pass uses `## Часть {{Index}}` header navigation, not re-splitting. Deferred until a workflow actually needs to ingest large external drafts.
 
 ### Global variables / shared context
 
-`{{Style guide}}` currently propagates to ~25 downstream nodes via 25 edges. That clutters the canvas. Want: named globals visible to every node by reference, not via edge.
+`{{Style guide}}` and `{{Cast bible}}` each fan out to ~6–10 nodes via individual edges. That clutters the canvas. Want: named globals visible to every node by reference, not via edge.
 
 Implementation sketch: a small key-value store on the project, with `{{global:name}}` substitution in `replaceTemplates`. The "global" prefix avoids collisions with node-title placeholders.
 
-Status: nice-to-have, doesn't block anything functionally. Worth doing once template authors hit the spaghetti threshold (~10 fan-out edges from one node).
+Status: nice-to-have, doesn't block anything functionally — fiction-arc works with explicit edges thanks to cross-parent resolution. Worth doing once template authors actually hit the spaghetti threshold.
 
 ### Retry-on-invalid-JSON for general `text` nodes
 
-Currently `text` nodes with `responseSchema` that return invalid JSON throw and the node lands in `ERROR`. The new `llm-split` has retry baked in. Other places that want structured output (e.g. the JSON-reformat stage in the two-step pattern from [[project-json-schema-dumbs-models]]) would benefit from the same.
+Currently `text` nodes with `responseSchema` that return invalid JSON throw and the node lands in `ERROR`. The new `llm-split` has retry baked in. Other places that want structured output (e.g. a future JSON-reformat stage) would benefit from the same.
 
-Status: small, isolated change. Worth doing before the fiction pipeline goes to production. Implementation: extract the retry loop from `generateSplitParts` into a helper, reuse from `generatePlanNodeTextContent` when `responseSchema` is set.
+Status: small, isolated change. Not blocking fiction-arc (it doesn't use `responseSchema` on text nodes — the `llm-split` with `partDescription` absorbs that need). Implementation if needed: extract the retry loop from `generateSplitParts` into a helper, reuse from `generatePlanNodeTextContent` when `responseSchema` is set.
 
 ## Open — speculative
 
@@ -45,10 +59,6 @@ A node type whose content comes from an uploaded file (synopsis.md, existing dra
 ### Best-of-N / branching
 
 Generate N alternative versions of a scene, let the user pick. Graph doesn't support this — would need new edge semantics (textArray-of-alternatives) or a UI for selection over multiple iterations. Niche enough to ignore until someone asks.
-
-### Cross-parent edges in templates
-
-Edges that cross container boundaries (e.g. a top-level node feeding into a node inside a for-each) are rejected during template export — see [`project-templates.md`](project-templates.md). If a real use case appears, the template format will need path-based references (`ParentTitle/ChildTitle`) instead of sibling-scoped lookup. Currently rejected with a clear error, sufficient for now.
 
 ## Explicitly NOT planned
 
