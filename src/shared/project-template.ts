@@ -45,7 +45,6 @@ export interface TemplateProjectLore {
 }
 
 export interface TemplateProjectLoreNode {
-  id: number
   title: string
   content?: string[]
   children?: TemplateProjectLoreNode[]
@@ -56,7 +55,6 @@ export interface TemplateProjectPlan {
 }
 
 export interface TemplateProjectPlanNode {
-  id: number
   title: string
   type: PlanNodeType
   x?: number
@@ -71,6 +69,6 @@ export interface TemplateProjectPlanNode {
 }
 
 export interface TemplateProjectPlanNodeInput {
-  sourceNodeId: number
+  sourceNodeTitle: string
   type: PlanEdgeType
 }

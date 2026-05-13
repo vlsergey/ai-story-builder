@@ -18,13 +18,11 @@
   "plan": {
     "nodes": [
       {
-        "id": 1,
         "title": "Основная инструкция",
         "type": "text",
         "content": ["${instructions}"]
       },
       {
-        "id": 2,
         "title": "Стиль",
         "type": "text",
         "aiUserInstructions": [
@@ -40,13 +38,12 @@
         ],
         "inputs": [
           {
-            "sourceNodeId": 1,
+            "sourceNodeTitle": "Основная инструкция",
             "type": "text"
           }
         ]
       },
       {
-        "id": 3,
         "title": "Персонажи (черновик)",
         "type": "text",
         "aiUserInstructions": [
@@ -66,21 +63,20 @@
         ],
         "inputs": [
           {
-            "sourceNodeId": 1,
+            "sourceNodeTitle": "Основная инструкция",
             "type": "text"
           },
           {
-            "sourceNodeId": 2,
+            "sourceNodeTitle": "Стиль",
             "type": "text"
           }
         ]
       },
       {
-        "id": 4,
         "title": "Персонажи",
         "type": "fix-problems",
         "nodeTypeSettings": {
-          "sourceNodeIdToFix": 3,
+          "sourceNodeTitleToFix": "Персонажи (черновик)",
           "maxIterations": 5,
           "minSeverityToFix": 30,
           "foundProblemsTemplate": "{{Found Problems}}",
@@ -118,15 +114,15 @@
         },
         "inputs": [
           {
-            "sourceNodeId": 1,
+            "sourceNodeTitle": "Основная инструкция",
             "type": "text"
           },
           {
-            "sourceNodeId": 2,
+            "sourceNodeTitle": "Стиль",
             "type": "text"
           },
           {
-            "sourceNodeId": 3,
+            "sourceNodeTitle": "Персонажи (черновик)",
             "type": "text"
           }
         ]

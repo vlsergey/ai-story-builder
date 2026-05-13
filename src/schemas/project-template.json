@@ -68,9 +68,8 @@
     },
     "TemplateProjectLoreNode": {
       "type": "object",
-      "required": ["id", "title"],
+      "required": ["title"],
       "properties": {
-        "id": { "type": "number" },
         "title": { "type": "string" },
         "content": { "type": "array", "items": { "type": "string" } },
         "children": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectLoreNode" } }
@@ -87,9 +86,8 @@
     },
     "TemplateProjectPlanNode": {
       "type": "object",
-      "required": ["id", "title", "type"],
+      "required": ["title", "type"],
       "properties": {
-        "id": { "type": "number" },
         "title": { "type": "string" },
         "type": { "$ref": "plan-node-types.json#" },
         "x": { "type": "number" },
@@ -109,9 +107,9 @@
     },
     "TemplateProjectPlanNodeInput": {
       "type": "object",
-      "required": ["sourceNodeId", "type"],
+      "required": ["sourceNodeTitle", "type"],
       "properties": {
-        "sourceNodeId": { "type": "number" },
+        "sourceNodeTitle": { "type": "string" },
         "type": { "$ref": "plan-edge-types.json#" }
       },
       "additionalProperties": false

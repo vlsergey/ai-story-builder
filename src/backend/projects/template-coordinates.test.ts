@@ -56,7 +56,6 @@ describe("project template coordinates round-trip", () => {
       plan: {
         nodes: [
           {
-            id: 1,
             title: "A",
             type: "text",
             x: 10,
@@ -65,7 +64,6 @@ describe("project template coordinates round-trip", () => {
             height: 80,
           },
           {
-            id: 2,
             title: "B",
             type: "text",
             x: -30,
