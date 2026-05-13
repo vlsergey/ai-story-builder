@@ -12,9 +12,11 @@ This file is the canonical checklist for the parts that genuinely need an LLM to
 
 1.1. Every LLM-calling text-generating node states an explicit output size target in its `aiUserInstructions` ("100–150 words", "200–400 words", "target ~1500 words" — in the language of the template). No node leaves the model free to pick output length.
 
-1.2. The target is framed as a **soft goal**, not a hard floor. Phrasing like "target ~1500 words, shorter is fine if it's dense" is correct; phrasing like "exactly 1500 words, otherwise regenerate" is wrong for prose. Hard counts are reserved for *structural* lists (item 7).
+1.2. The target is framed as a **soft goal**, not a hard floor. Phrasing like "target ~1500 words, shorter is fine if it's dense" is correct; phrasing like "exactly 1500 words, otherwise regenerate" is wrong for prose. Hard counts are reserved for *structural* lists (item 5).
 
-1.3. No single node's target exceeds the model's per-call output cap (~1500 words for Grok). If the target is above ~1400 words, the node should be split into smaller pieces or the target lowered.
+1.3. **Upper bounds below the model's output cap need a reason.** When a node's purpose can scale with content (a profile, a world description, a setting, a scene plan), prefer "up to ~1500 words, write what's needed, don't pad" over an arbitrary tight cap like "200–400 words". Tight caps are reserved for nodes whose output is naturally short by construction (a one-line classification, a fixed-length list).
+
+1.4. No single node's target exceeds the model's per-call output cap (~1500 words for Grok). If the target is above ~1400 words, the node should be split into smaller pieces or the target lowered.
 
 ---
 
