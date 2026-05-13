@@ -99,6 +99,7 @@
   "planGraph.addNode.for-each-input": "For-each Cycle Input",
   "planGraph.addNode.for-each-output": "For-each Cycle Output",
   "planGraph.addNode.for-each-prev-outputs": "For-each Cycle Prev Outputs",
+  "planGraph.addNode.for-each-index": "For-each Iteration Index",
   "planGraph.addNode.text": "Text",
   "planGraph.addNode.lore": "Lore",
   "planGraph.addNode.merge": "Merge",

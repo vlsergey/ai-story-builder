@@ -99,6 +99,7 @@
   "planGraph.addNode.for-each-input": "Входной узел for‑each",
   "planGraph.addNode.for-each-output": "Выходной узел for‑each",
   "planGraph.addNode.for-each-prev-outputs": "Предыдущие выходы for-each",
+  "planGraph.addNode.for-each-index": "Номер итерации for-each",
   "planGraph.addNode.lore": "Лор",
   "planGraph.addNode.merge": "Объединение",
   "planGraph.addNode.split": "Разделение",

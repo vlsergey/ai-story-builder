@@ -120,6 +120,16 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     confined: true,
     canRegenerate: true,
   },
+  {
+    id: "for-each-index",
+    allowedContainers: ["for-each"],
+    allowedIncomingEdgeTypes: [],
+    allowedOutgoingEdgeTypes: ["text"],
+    canCreate: true,
+    canDelete: true,
+    confined: true,
+    canRegenerate: false,
+  },
 ] as const
 
 // Edge type definitions

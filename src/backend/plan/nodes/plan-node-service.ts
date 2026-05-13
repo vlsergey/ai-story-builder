@@ -20,6 +20,7 @@ import { SettingsRepository } from "../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../edges/plan-edge-repository.js"
 import type { RegenerationNodeContext } from "./generate/RegenerationContext.js"
 import { FixProblemsProcessor } from "./graph/fix-problems-processor.js"
+import { ForEachIndexProcessor } from "./graph/for-each-index-processor.js"
 import { ForEachInputProcessor } from "./graph/for-each-input-processor.js"
 import { ForEachOutputProcessor } from "./graph/for-each-output-processor.js"
 import { ForEachPrevOutputsProcessor } from "./graph/for-each-prev-outputs-processor.js"
@@ -42,6 +43,7 @@ export type NodeUpdateEvent = {
 export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   "fix-problems": new FixProblemsProcessor(),
   "for-each": new ForEachProcessor(),
+  "for-each-index": new ForEachIndexProcessor(),
   "for-each-input": new ForEachInputProcessor(),
   "for-each-output": new ForEachOutputProcessor(),
   "for-each-prev-outputs": new ForEachPrevOutputsProcessor(),

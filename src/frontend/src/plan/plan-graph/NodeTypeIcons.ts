@@ -3,6 +3,7 @@ import {
   BookOpenCheckIcon,
   FileCheck2Icon,
   FileTextIcon,
+  HashIcon,
   type LucideProps,
   MergeIcon,
   RepeatIcon,
@@ -19,6 +20,7 @@ const NodeTypeIcons: Record<
 > = {
   "fix-problems": FileCheck2Icon,
   "for-each": RepeatIcon,
+  "for-each-index": HashIcon,
   "for-each-input": SquareArrowRightExitIcon,
   "for-each-output": SquareArrowRightEnterIcon,
   "for-each-prev-outputs": SquareArrowRightRepeatIcon,

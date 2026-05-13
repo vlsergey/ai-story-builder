@@ -15,6 +15,7 @@ export const PLAN_NON_CONTAINER_NODE_TYPE_VALUES = [
   "for-each-input",
   "for-each-output",
   "for-each-prev-outputs",
+  "for-each-index",
 ] as const
 
 export type PlanNonContainerNodeType = (typeof PLAN_NON_CONTAINER_NODE_TYPE_VALUES)[number]
