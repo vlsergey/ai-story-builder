@@ -143,10 +143,13 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       if (node.type === "fix-problems") {
         for (const p of extractPlaceholders(nts.aiUserInstructionsToFindProblems as string[] | undefined)) collected.add(p)
         for (const p of extractPlaceholders(nts.aiUserInstructionsToFixProblems as string[] | undefined)) collected.add(p)
-        // foundProblemsTemplate is a self-supplied placeholder; remove from required-via-edge set
+        // foundProblemsTemplate is the bare name of a self-supplied placeholder
+        // (the engine wraps it in {{...}} when injecting). Tolerate both bare
+        // and accidentally-wrapped forms — strip the wrapping if present.
         const tpl = nts.foundProblemsTemplate
         if (typeof tpl === "string") {
-          for (const m of tpl.matchAll(PLACEHOLDER_RE)) collected.delete(m[1])
+          const bareName = tpl.replace(/^\{\{/, "").replace(/\}\}$/, "")
+          collected.delete(bareName)
         }
       }
 
@@ -212,24 +215,36 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     )
   })
 
-  describe("fix-problems foundProblemsTemplate appears in fix prompt", () => {
+  describe("fix-problems foundProblemsTemplate is a bare name and is referenced in fix prompt", () => {
     const fixNodes = allNodes.filter(({ node }) => node.type === "fix-problems")
     if (fixNodes.length === 0) {
       it.skip("no fix-problems nodes in this template", () => {})
     }
     it.each(fixNodes.map(({ node }) => [node.title]))(
-      "fix-problems %s wires foundProblemsTemplate into its fix prompt",
+      "fix-problems %s — foundProblemsTemplate is a bare name (no {{ }}) and {{<name>}} appears in the fix prompt",
       (title) => {
         const node = fixNodes.find((n) => n.node.title === title)!.node
         const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
         const tpl = nts.foundProblemsTemplate as string | undefined
-        if (!tpl) {
-          // Optional — if there's no foundProblemsTemplate the fix prompt
-          // simply doesn't have problem-list injection. That's allowed.
+        if (tpl === undefined) {
+          // Optional — without foundProblemsTemplate the fix prompt simply
+          // doesn't inject the problem list. That's allowed.
           return
         }
+        // Must be a bare placeholder name. The runtime wraps it in `{{...}}`
+        // itself when building replacements; storing it already wrapped
+        // produces `{{{{name}}}}` which never matches anything.
+        expect(
+          tpl.includes("{") || tpl.includes("}"),
+          `${title}: foundProblemsTemplate must be a bare name (e.g. "Найденные проблемы"), without surrounding {{ }}. Got: "${tpl}"`,
+        ).toBe(false)
+
+        const expectedPlaceholder = `{{${tpl}}}`
         const fixPrompt = (nts.aiUserInstructionsToFixProblems as string[] | undefined)?.join("\n") ?? ""
-        expect(fixPrompt.includes(tpl), `${title}: foundProblemsTemplate "${tpl}" not referenced in aiUserInstructionsToFixProblems`).toBe(true)
+        expect(
+          fixPrompt.includes(expectedPlaceholder),
+          `${title}: fix prompt must reference the found-problems placeholder as ${expectedPlaceholder}, but it's absent`,
+        ).toBe(true)
       },
     )
   })

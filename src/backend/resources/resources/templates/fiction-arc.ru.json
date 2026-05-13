@@ -464,7 +464,7 @@
               "sourceNodeTitleToFix": "Профиль персонажа",
               "maxIterations": 3,
               "minSeverityToFix": 40,
-              "foundProblemsTemplate": "{{Найденные проблемы}}",
+              "foundProblemsTemplate": "Найденные проблемы",
               "aiUserInstructionsToFindProblems": [
                 "## Стиль (для справки)",
                 "```",
@@ -708,7 +708,7 @@
           "sourceNodeTitleToFix": "План сюжета",
           "maxIterations": 3,
           "minSeverityToFix": 40,
-          "foundProblemsTemplate": "{{Найденные проблемы}}",
+          "foundProblemsTemplate": "Найденные проблемы",
           "aiUserInstructionsToFindProblems": [
             "## Реестр сетапов и пэйоффов",
             "```",
@@ -1060,7 +1060,7 @@
               "sourceNodeTitleToFix": "Проза сцены",
               "maxIterations": 2,
               "minSeverityToFix": 50,
-              "foundProblemsTemplate": "{{Найденные проблемы}}",
+              "foundProblemsTemplate": "Найденные проблемы",
               "aiUserInstructionsToFindProblems": [
                 "## Стиль",
                 "```",
@@ -1283,7 +1283,7 @@
               "sourceNodeTitleToFix": "Переписывание сцены",
               "maxIterations": 2,
               "minSeverityToFix": 50,
-              "foundProblemsTemplate": "{{Найденные проблемы}}",
+              "foundProblemsTemplate": "Найденные проблемы",
               "aiUserInstructionsToFindProblems": [
                 "## Стиль",
                 "```",
