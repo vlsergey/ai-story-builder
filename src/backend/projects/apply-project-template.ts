@@ -116,6 +116,20 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
       const node = nodes[i]
       const { title, type, x, y, width, height, aiUserInstructions, nodeTypeSettings, children, content, inputs } = node
 
+      // For LLM-calling types (text, split, lore), aiUserInstructions from the
+      // template goes into node_type_settings.userPrompt. Other settings from the
+      // template (if any) merge in as well. fix-problems is patched later with
+      // sibling-id translation, so it gets a stub here.
+      let initialSettings: Record<string, any> | null = null
+      if (type === "fix-problems") {
+        initialSettings = {}
+      } else if (nodeTypeSettings || aiUserInstructions) {
+        initialSettings = { ...(nodeTypeSettings ?? {}) }
+        if (aiUserInstructions) {
+          initialSettings.userPrompt = normalizeAndReplaceContent(aiUserInstructions, templateData)
+        }
+      }
+
       const insertedId = planRepo.insert({
         title,
         type,
@@ -125,15 +139,8 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
         y: y ?? 0,
         width: width ?? null,
         height: height ?? null,
-        ai_user_prompt: aiUserInstructions ? normalizeAndReplaceContent(aiUserInstructions, templateData) : null,
         content: content ? normalizeAndReplaceContent(content, templateData) : null,
-        // fix-problems settings are patched after all siblings are inserted; store a stub for now.
-        node_type_settings:
-          nodeTypeSettings && type !== "fix-problems"
-            ? JSON.stringify(nodeTypeSettings)
-            : type === "fix-problems"
-              ? JSON.stringify({})
-              : null,
+        node_type_settings: initialSettings ? JSON.stringify(initialSettings) : null,
       })
 
       recordTitle(parentNewId, title, insertedId)

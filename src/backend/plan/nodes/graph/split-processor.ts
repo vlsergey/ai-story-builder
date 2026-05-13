@@ -9,8 +9,9 @@ import type { NodeProcessor } from "./node-processor.js"
  * Processor for 'split' nodes.
  *
  * Splitting is now LLM-driven: the user describes how to split via the node's
- * `ai_user_prompt`, and the model returns a JSON array of parts. Pure-regex
- * splitting has been removed — see migration 027 for the legacy data path.
+ * `node_type_settings.userPrompt`, and the model returns a JSON array of parts.
+ * Pure-regex splitting has been removed — see migration 027 for the legacy data
+ * path; migration 028 moved prompts off the row into node_type_settings.
  */
 export class SplitProcessor implements NodeProcessor<SplitSettings> {
   readonly defaultSettings: SplitSettings = {}

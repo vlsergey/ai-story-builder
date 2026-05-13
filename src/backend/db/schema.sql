@@ -64,7 +64,6 @@ CREATE TABLE plan_nodes (
   type TEXT NOT NULL DEFAULT 'text',
   x REAL DEFAULT 0,
   y REAL DEFAULT 0,
-  ai_user_prompt TEXT,
   summary TEXT,
   ai_sync_info TEXT,
   word_count INTEGER NOT NULL DEFAULT 0,
@@ -76,7 +75,6 @@ CREATE TABLE plan_nodes (
   status TEXT NOT NULL DEFAULT 'EMPTY',
   ai_settings TEXT,
   in_review INTEGER NOT NULL DEFAULT 0,
-  ai_system_prompt TEXT NULL,
   width INTEGER NULL,
   height INTEGER NULL
 );

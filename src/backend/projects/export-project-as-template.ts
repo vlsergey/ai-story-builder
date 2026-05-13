@@ -57,10 +57,6 @@ function buildExportedPlanNode(node: PlanNodeRow, idToTitle: Map<number, string>
   if (node.width !== null) exported.width = node.width
   if (node.height !== null) exported.height = node.height
 
-  if (node.ai_user_prompt) {
-    exported.aiUserInstructions = node.ai_user_prompt.split("\n").filter((line) => line.trim() !== "")
-  }
-
   if (node.node_type_settings) {
     let parsed: Record<string, any> | null = null
     try {
@@ -69,7 +65,18 @@ function buildExportedPlanNode(node: PlanNodeRow, idToTitle: Map<number, string>
       // ignore invalid JSON
     }
     if (parsed && typeof parsed === "object") {
-      const settings = node.type === "fix-problems" ? translateFixProblemsSettings(parsed, idToTitle, node.id, node.title) : parsed
+      let settings: Record<string, any> =
+        node.type === "fix-problems" ? translateFixProblemsSettings(parsed, idToTitle, node.id, node.title) : { ...parsed }
+
+      // userPrompt is exported as the multi-line `aiUserInstructions` array so
+      // templates stay diff-friendly. systemPrompt currently has no template-level
+      // equivalent, so it stays inside nodeTypeSettings.
+      if (typeof settings.userPrompt === "string" && settings.userPrompt.length > 0) {
+        exported.aiUserInstructions = settings.userPrompt.split("\n").filter((line) => line.trim() !== "")
+        const { userPrompt: _drop, ...rest } = settings
+        settings = rest
+      }
+
       if (Object.keys(settings).length > 0) {
         exported.nodeTypeSettings = settings
       }

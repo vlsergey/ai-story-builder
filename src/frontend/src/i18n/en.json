@@ -54,7 +54,8 @@
   "splitNode.input": "Input",
   "splitNode.settings": "Split",
   "splitNode.parts": "Parts",
-  "splitNode.promptHint": "In the «User» tab above, describe how the input should be split. For example: «Split into 20 plot beats, one beat per item» or «Split by scenes, each scene is one item».",
+  "splitNode.promptHint": "Describe how the input should be split. For example: «Split into 20 plot beats, one beat per item» or «Split by scenes, each scene is one item».",
+  "splitNode.promptPlaceholder": "Split into … each … is one array element.",
 
   "planNode.title.label": "Node Title",
   "planNode.title.description": "Short human-readable node title. Displayed in plan graph and also used as placeholder template name in linked nodes instructions (<code>{{Title}}</code>).",

@@ -1,4 +1,25 @@
 /**
+ * Extract userPrompt and systemPrompt from a plan_node's node_type_settings JSON.
+ * Returns nulls when the column is null, the JSON is invalid, or the keys are absent.
+ * Centralized here so every LLM-call site stays consistent.
+ */
+export function getNodePrompts(nodeTypeSettings: string | null): {
+  userPrompt: string | null
+  systemPrompt: string | null
+} {
+  if (!nodeTypeSettings) return { userPrompt: null, systemPrompt: null }
+  try {
+    const parsed = JSON.parse(nodeTypeSettings) as { userPrompt?: unknown; systemPrompt?: unknown }
+    return {
+      userPrompt: typeof parsed.userPrompt === "string" ? parsed.userPrompt : null,
+      systemPrompt: typeof parsed.systemPrompt === "string" ? parsed.systemPrompt : null,
+    }
+  } catch {
+    return { userPrompt: null, systemPrompt: null }
+  }
+}
+
+/**
  * Merge node_type_settings JSON with default settings.
  * @param defaultSettings Default settings object (all required fields)
  * @param nodeTypeSettings JSON string from database (may be null)

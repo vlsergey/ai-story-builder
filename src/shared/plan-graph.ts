@@ -11,8 +11,6 @@ export interface PlanNodeRow {
   parent_id: number | null
   position: number | null
   content: string | null
-  ai_user_prompt: string | null
-  ai_system_prompt: string | null
   summary: string | null
   ai_sync_info: string | null
   node_type_settings: string | null
@@ -36,8 +34,6 @@ type PlanNodeInsert = Omit<PlanNodeRow, "id" | "created_at">
 export const PlanNodeRowDefaults: Partial<PlanNodeInsert> = {
   parent_id: null,
   position: null,
-  ai_user_prompt: null,
-  ai_system_prompt: null,
   summary: null,
   ai_sync_info: null,
   node_type_settings: null,

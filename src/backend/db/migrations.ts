@@ -29,6 +29,7 @@ import migration024 from "./migrations/024.js"
 import migration025 from "./migrations/025.js"
 import migration026 from "./migrations/026.js"
 import migration027 from "./migrations/027.js"
+import migration028 from "./migrations/028.js"
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -86,9 +87,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration026,
   // version 26 → 27: convert legacy regex-based split nodes to LLM-driven splits
   migration027,
+  // version 27 → 28: move ai_user_prompt/ai_system_prompt from plan_nodes columns into node_type_settings (for LLM-calling types only)
+  migration028,
 ]
 
-export const CURRENT_VERSION = 27
+export const CURRENT_VERSION = 28
 
 function loadSchemaFromFile(db: Database): void {
   for (const candidate of [

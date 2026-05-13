@@ -2,10 +2,13 @@ import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/ui-components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui-components/card"
+import { Textarea } from "@/ui-components/textarea"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import type { SplitSettings } from "@shared/node-settings"
 
 export default function SplitNodeEditor({
+  nodeTypeSettings,
+  onNodeTypeSettingsChange,
   onRegenerate,
   value,
 }: TypedPlanNodeEditorProps<SplitSettings>) {
@@ -28,8 +31,20 @@ export default function SplitNodeEditor({
         <CardHeader>
           <CardTitle>{t("splitNode.settings")}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-3">{t("splitNode.promptHint")}</p>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">{t("splitNode.promptHint")}</p>
+          <Textarea
+            value={nodeTypeSettings.userPrompt ?? ""}
+            onChange={(e) =>
+              onNodeTypeSettingsChange({
+                ...nodeTypeSettings,
+                userPrompt: e.currentTarget.value,
+              })
+            }
+            placeholder={t("splitNode.promptPlaceholder")}
+            rows={4}
+            className="resize-y"
+          />
           <Button onClick={onRegenerate} className="w-full">
             {t("common.update")}
           </Button>

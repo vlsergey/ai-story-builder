@@ -88,8 +88,7 @@ describe("PlanNodeService — full plan content generation", () => {
       type: "text",
       title: "Text Node",
       content: "First par.\n\nSecond par.",
-      ai_user_prompt: "Generate text",
-      ai_system_prompt: "You are AI helper",
+      node_type_settings: JSON.stringify({ userPrompt: "Generate text", systemPrompt: "You are AI helper" }),
       status: "EMPTY",
     })
     expect(textNode).toBeDefined()
@@ -101,7 +100,7 @@ describe("PlanNodeService — full plan content generation", () => {
       title: "Split Node",
       content: null,
       status: "OUTDATED",
-      ai_user_prompt: "Split the input by paragraphs.",
+      node_type_settings: JSON.stringify({ userPrompt: "Split the input by paragraphs." }),
     })
     const splitNodeId = splitNode.id
 
@@ -141,8 +140,7 @@ describe("PlanNodeService — full plan content generation", () => {
       type: "text",
       title: "Inner Text",
       content: null,
-      ai_user_prompt: "Process input: {{Input}}",
-      ai_system_prompt: "You are AI helper",
+      node_type_settings: JSON.stringify({ userPrompt: "Process input: {{Input}}", systemPrompt: "You are AI helper" }),
       status: "EMPTY",
       parent_id: forEachNodeId,
     })

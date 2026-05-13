@@ -254,8 +254,6 @@ export class PlanNodeService {
       x: parentX - 50,
       y: parentY + 50,
       content: null,
-      ai_user_prompt: null,
-      ai_system_prompt: null,
       summary: null,
       ai_sync_info: null,
       node_type_settings: JSON.stringify({}),
@@ -275,8 +273,6 @@ export class PlanNodeService {
       x: parentX + 50,
       y: parentY + 50,
       content: null,
-      ai_user_prompt: null,
-      ai_system_prompt: null,
       summary: null,
       ai_sync_info: null,
       node_type_settings: JSON.stringify({}),
@@ -380,7 +376,7 @@ export class PlanNodeService {
           }
         }
       }
-      if (update.status === undefined && (update.ai_user_prompt !== undefined || update.ai_user_prompt !== undefined)) {
+      if (update.status === undefined && update.node_type_settings !== undefined) {
         update.status = "OUTDATED"
       }
     }

@@ -21,13 +21,12 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     changedInputNodeId: number,
     settings: TextSettings,
   ): Promise<PlanNodeUpdate | null> {
-    // Check if the changed input is referenced in ai_instructions via template
     const changedNode = service.getById(changedInputNodeId)
     if (!changedNode) {
       return null
     }
 
-    const instructions = data.ai_user_prompt
+    const instructions = settings.userPrompt
     if (!instructions) {
       return null
     }

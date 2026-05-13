@@ -2,6 +2,7 @@ import type OpenAI from "openai"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
+import { getNodePrompts } from "../plan/nodes/graph/settings-helper.js"
 import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
@@ -31,7 +32,8 @@ export async function generateSplitParts(
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string[]> {
   const planNodeService = new PlanNodeService()
-  const { ai_user_prompt: aiUserPrompt, ai_system_prompt: aiSystemPrompt, ai_settings: nodeAiSettings } = node
+  const { userPrompt: aiUserPrompt, systemPrompt: aiSystemPrompt } = getNodePrompts(node.node_type_settings)
+  const nodeAiSettings = node.ai_settings
 
   const inputs = planNodeService.findNodeInputsByType(node.id, "text")
   if (inputs.length === 0) {

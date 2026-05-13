@@ -1,7 +1,17 @@
-// Split nodes carry no type-specific settings.
-// The "how to split" instruction lives in `plan_nodes.ai_user_prompt`,
-// the same column other LLM-powered node types use.
-export type SplitSettings = unknown
+// LLM-calling node types (text, split, lore) carry their user/system prompts
+// in node_type_settings. Non-LLM types (merge, for-each*, fix-problems —
+// which keeps its own prompt fields in node_type_settings under different keys)
+// do not.
+//
+// `ai_settings` (model + engine knobs) lives at the plan_nodes row level
+// because its shape is engine-determined, not node-type-determined.
+
+interface LlmCallPrompts {
+  userPrompt?: string | null
+  systemPrompt?: string | null
+}
+
+export interface SplitSettings extends LlmCallPrompts {}
 
 export interface MergeSettings {
   /** Whether to include the node's own title as an H1 header */
@@ -12,9 +22,9 @@ export interface MergeSettings {
   fixHeaders: boolean
 }
 
-// No settings so far
-export type TextSettings = unknown
-export type LoreSettings = unknown
+export interface TextSettings extends LlmCallPrompts {}
+export interface LoreSettings extends LlmCallPrompts {}
+
 export type ForEachSettings = unknown
 export type ForEachInputSettings = unknown
 export type ForEachOutputSettings = unknown

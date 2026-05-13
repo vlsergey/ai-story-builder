@@ -15,15 +15,16 @@ function seededDbAt26(): Database.Database {
 }
 
 function setupAt26(db: Database.Database) {
-  // Manually run migrations 0..26 so we can insert split rows in their legacy
-  // shape, then apply 027 in isolation to assert translation.
+  // Manually run migrations 0..CURRENT_VERSION so we can insert split rows in
+  // their legacy shape, then apply 027 in isolation to assert translation.
   db.pragma("foreign_keys = OFF")
-  // Apply schema by running all migrations from 0 (enforceMigrations=true),
-  // then rewind user_version to 26 and the 027 step will re-apply.
   migrateDatabase(db, true)
-  // Now we're at CURRENT_VERSION. Wipe any post-27 expectations by clearing data
-  // and resetting user_version to 26 before re-running 027 on test data.
+  // Now we're at CURRENT_VERSION. Wipe data and resurrect any columns dropped
+  // by migrations >27 so seeding pre-027 rows still works.
   db.exec("DELETE FROM plan_nodes")
+  const cols = (db.pragma("table_info(plan_nodes)") as { name: string }[]).map((c) => c.name)
+  if (!cols.includes("ai_user_prompt")) db.exec("ALTER TABLE plan_nodes ADD COLUMN ai_user_prompt TEXT")
+  if (!cols.includes("ai_system_prompt")) db.exec("ALTER TABLE plan_nodes ADD COLUMN ai_system_prompt TEXT")
   db.pragma("user_version = 26")
 }
 

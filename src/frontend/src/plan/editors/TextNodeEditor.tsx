@@ -2,11 +2,52 @@ import type { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
 import { trpc } from "@/ipcClient"
 import NodeEditor, { type EditorMode } from "@/nodes/NodeEditor"
 import type { PlanNodeRow } from "@shared/plan-graph"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
 
 type StatusOverride = null | "GENERATING" | "IMPROVING"
+
+// NodeEditor was designed around lore-style row columns (ai_user_prompt /
+// ai_system_prompt). For plan nodes the prompts now live inside
+// node_type_settings JSON. We adapt the value in/out here so NodeEditor's
+// shape stays unchanged for any future lore revival.
+type EditorValue = PlanNodeRow & {
+  ai_user_prompt: string | null
+  ai_system_prompt: string | null
+}
+
+function readPrompts(nodeTypeSettings: string | null): { userPrompt: string | null; systemPrompt: string | null } {
+  if (!nodeTypeSettings) return { userPrompt: null, systemPrompt: null }
+  try {
+    const parsed = JSON.parse(nodeTypeSettings) as { userPrompt?: unknown; systemPrompt?: unknown }
+    return {
+      userPrompt: typeof parsed.userPrompt === "string" ? parsed.userPrompt : null,
+      systemPrompt: typeof parsed.systemPrompt === "string" ? parsed.systemPrompt : null,
+    }
+  } catch {
+    return { userPrompt: null, systemPrompt: null }
+  }
+}
+
+function writePrompts(nodeTypeSettings: string | null, userPrompt: string | null, systemPrompt: string | null): string | null {
+  let base: Record<string, unknown> = {}
+  if (nodeTypeSettings) {
+    try {
+      const parsed = JSON.parse(nodeTypeSettings)
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        base = parsed as Record<string, unknown>
+      }
+    } catch {
+      // ignore, start fresh
+    }
+  }
+  if (userPrompt) base.userPrompt = userPrompt
+  else delete base.userPrompt
+  if (systemPrompt) base.systemPrompt = systemPrompt
+  else delete base.systemPrompt
+  return Object.keys(base).length > 0 ? JSON.stringify(base) : null
+}
 
 export default function TextNodeEditor({
   initialValue,
@@ -110,8 +151,27 @@ export default function TextNodeEditor({
     setImprovingStarted(true)
   }, [])
 
+  const editorValue = useMemo<EditorValue>(() => {
+    const { userPrompt, systemPrompt } = readPrompts(value.node_type_settings)
+    return {
+      ...value,
+      content: tempContent || value.content,
+      ai_user_prompt: userPrompt,
+      ai_system_prompt: systemPrompt,
+    }
+  }, [value, tempContent])
+
+  const handleEditorChange = useCallback(
+    (edited: EditorValue) => {
+      const { ai_user_prompt, ai_system_prompt, ...rest } = edited
+      const nextSettings = writePrompts(rest.node_type_settings, ai_user_prompt, ai_system_prompt)
+      onChange({ ...(rest as PlanNodeRow), node_type_settings: nextSettings })
+    },
+    [onChange],
+  )
+
   return (
-    <NodeEditor<PlanNodeRow>
+    <NodeEditor<EditorValue>
       aiThinkinPanelRef={aiThinkinPanelRef}
       editorMode={editorMode}
       onEditorModeChange={setEditorMode}
@@ -119,12 +179,9 @@ export default function TextNodeEditor({
       i18nPrefix="plan"
       onImprove={handleImprove}
       onAcceptChanges={handleAcceptChanges}
-      onChange={onChange}
+      onChange={handleEditorChange}
       status={statusOverride || status}
-      value={{
-        ...value,
-        content: tempContent || value.content,
-      }}
+      value={editorValue}
     />
   )
 }
