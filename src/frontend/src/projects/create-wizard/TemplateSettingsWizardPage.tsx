@@ -132,7 +132,7 @@ function ControllableFieldRenderer<T extends FieldValues>({
       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
       {type === "input" && (
         <Input
-          className="w-28"
+          className="w-full"
           id={htmlId}
           name={field.name}
           placeholder={placeholder}
@@ -143,7 +143,7 @@ function ControllableFieldRenderer<T extends FieldValues>({
       )}
       {type === "textarea" && (
         <Textarea
-          className="w-28"
+          className="w-full max-h-64 overflow-y-auto"
           id={htmlId}
           name={field.name}
           placeholder={placeholder}
