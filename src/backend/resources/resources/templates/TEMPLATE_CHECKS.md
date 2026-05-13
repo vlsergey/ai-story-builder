@@ -28,6 +28,8 @@ This file is the canonical checklist for the parts that genuinely need an LLM to
 
 2.4. No single node's target exceeds the model's per-call output cap (~1500 words for Grok). If the target is above ~1400 words, the node should be split into smaller pieces or the target lowered.
 
+2.5. **Anywhere a word count appears in the prompt** (target, range, or ceiling), explicitly forbid emitting the count in the output: "количество слов в выводе не указывай" (or analog). Without this guard, the model treats the number as something to report back and emits "(123 слова)" annotations into the result.
+
 ---
 
 ## 3. Prompt ordering for cache friendliness
