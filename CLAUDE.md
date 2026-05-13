@@ -1,18 +1,5 @@
 # Project Rules
 
-## Read the docs first — always
-
-**Before doing anything**, read the relevant files in `/docs/`. They are the authoritative source for architecture, data model, requirements, and coding conventions. Update them as part of every feature or fix.
-
-Key files:
-- `coding_guidelines.md` — code style, TypeScript build architecture, test conventions, CI pipeline
-- `backend_requirements.md` — backend tech stack, API structure, AI engine architecture
-- `frontend_requirements.md` — frontend tech stack, UI conventions
-- `data_model.md` — database schema and entity relationships
-- `use_cases.md` — product requirements and user scenarios
-- `ai_yandex.md` — Yandex Cloud AI integration reference
-- `ai_grok.md` — Grok (xAI) integration reference
-
 ## Non-negotiable rules
 
 **Bug fixes:**
@@ -49,9 +36,7 @@ Do not change directories with `cd` — this ensures proper dependency resolutio
 
 ## References
 
-- [Root README](../README.md) — general project description.
-- [Documentation in /docs/](../docs/) — detailed guides.
-- [CLAUDE.md](../CLAUDE.md) — instructions for Claude.
+- [Root README](README.md) — general project description.
 
 ---
 *This document should be clear to a development agent and serve as a quick reference when performing tasks.*
