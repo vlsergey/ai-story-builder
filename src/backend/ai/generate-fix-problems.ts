@@ -18,6 +18,7 @@ export async function findProblems(
   abortSignal: AbortSignal,
   node: PlanNodeRow,
   source: string,
+  iteration: number,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<FindProblemsResult> {
   const planNodeService = new PlanNodeService()
@@ -74,6 +75,7 @@ export async function findProblems(
       (settings.aiSystemInstructionsToFindProblems ?? "").length,
     node: { title: node.title, type: node.type },
     purpose: "find-problems",
+    iterationIndex: iteration,
     onEvent,
   })
   return JSON.parse(aiResult) as FindProblemsResult
@@ -85,6 +87,7 @@ export async function fixProblems(
   source: string,
   foundProblemsTemplateTitle: string,
   foundProblems: FindProblemsResult,
+  iteration: number,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string> {
   const planNodeService = new PlanNodeService()
@@ -140,6 +143,7 @@ export async function fixProblems(
       (settings.aiSystemInstructionsToFixProblems ?? "").length,
     node: { title: node.title, type: node.type },
     purpose: "fix-problems",
+    iterationIndex: iteration,
     onEvent,
   })
 }

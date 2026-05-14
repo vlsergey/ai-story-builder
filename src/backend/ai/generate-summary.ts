@@ -1,6 +1,9 @@
 import { type AiEngineKey, BUILTIN_ENGINES } from "../../shared/ai-engines.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
-import { getCurrentEngineGenerateSummaryInstructions } from "../settings/ai-settings.js"
+import {
+  getCurrentEngineDefaultAiGenerationSettings,
+  getCurrentEngineGenerateSummaryInstructions,
+} from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import type { JsonSchemaSpec } from "./ai-engine-adapter.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
@@ -67,6 +70,10 @@ export async function generateSummary(
       promptCacheKeys: ["generate-summary", ...promptCacheKeys],
       includeExistingLore,
       engineFileIds,
+      // Pass engine defaults explicitly so telemetry can record the model.
+      // The adapter would fall back to the same defaults internally, but the
+      // wrapper only sees what's in the request.
+      aiGenerationSettings: getCurrentEngineDefaultAiGenerationSettings(),
     },
     // The static part of the summary call is just the instructions; the rest
     // (the content being summarised) is dynamic input.

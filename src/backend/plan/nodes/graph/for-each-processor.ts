@@ -85,7 +85,8 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
             word_count: null,
             char_count: null,
             byte_count: null,
-            status: "GENERATED",
+            // mark it outdated to regenerate summary
+            status: "OUTDATED",
           }
         } else if (inputUnchanged && priorForIter[idStr]) {
           overrideForIter[idStr] = priorForIter[idStr]

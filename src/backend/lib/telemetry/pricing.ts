@@ -22,6 +22,11 @@ interface ModelPricing {
 // Source: xAI public pricing page, approximate as of late 2025. xAI applies
 // a 25% rate to cached prompt tokens across the line.
 const GROK_PRICING: Record<string, ModelPricing> = {
+  "grok-4": { inputPerMTokens: 3.0, cachedInputPerMTokens: 0.75, outputPerMTokens: 15.0 },
+  "grok-4-fast-reasoning": { inputPerMTokens: 0.2, cachedInputPerMTokens: 0.05, outputPerMTokens: 0.5 },
+  "grok-4-fast-non-reasoning": { inputPerMTokens: 0.2, cachedInputPerMTokens: 0.05, outputPerMTokens: 0.5 },
+  "grok-4-1-fast-reasoning": { inputPerMTokens: 0.2, cachedInputPerMTokens: 0.05, outputPerMTokens: 0.5 },
+  "grok-4-1-fast-non-reasoning": { inputPerMTokens: 0.2, cachedInputPerMTokens: 0.05, outputPerMTokens: 0.5 },
   "grok-3": { inputPerMTokens: 3.0, cachedInputPerMTokens: 0.75, outputPerMTokens: 15.0 },
   "grok-3-fast": { inputPerMTokens: 5.0, cachedInputPerMTokens: 1.25, outputPerMTokens: 25.0 },
   "grok-3-mini": { inputPerMTokens: 0.3, cachedInputPerMTokens: 0.075, outputPerMTokens: 0.5 },

@@ -2,6 +2,10 @@ import type OpenAI from "openai"
 import { recordCall } from "../lib/telemetry/telemetry.js"
 import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapter.js"
 
+function pickNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
 /**
  * Wraps `adapter.generateResponse` with per-call telemetry recording.
  *
@@ -27,19 +31,46 @@ export async function generateWithTelemetry(args: {
    * key) so the telemetry can still tell them apart.
    */
   purpose?: string
+  /**
+   * Zero-based iteration index for callers that loop (currently fix-problems).
+   * Passed through to `recordCall` for the aggregator's "iterations per visit"
+   * analysis.
+   */
+  iterationIndex?: number | null
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void
 }): Promise<string> {
-  const { engineId, adapter, request, instructionsTemplateChars, node, purpose: purposeOverride, onEvent } = args
+  const {
+    engineId,
+    adapter,
+    request,
+    instructionsTemplateChars,
+    node,
+    purpose: purposeOverride,
+    iterationIndex,
+    onEvent,
+  } = args
   const t0 = Date.now()
 
-  // Holder object instead of a bare `let` so TS doesn't narrow `usage` to
+  // Holder objects instead of bare `let`s so TS doesn't narrow values to
   // `null` through control-flow analysis (the reassignment happens inside a
   // closure that TS treats as opaque).
   const usageHolder: { current: Partial<OpenAI.Responses.ResponseUsage> | null } = { current: null }
+  const reportedCostHolder: { current: number | null } = { current: null }
   const onEventWrapped = (event: OpenAI.Responses.ResponseStreamEvent) => {
     if (event.type === "response.completed") {
-      const u = (event as any).response?.usage
-      if (u) usageHolder.current = u
+      const response: any = (event as any).response
+      if (response?.usage) usageHolder.current = response.usage
+      // xAI reports the API-side cost on the response itself (and/or on the
+      // usage sub-object). Prefer it over our local pricing-table estimate
+      // because it accounts for every billing detail (deferred completions,
+      // reasoning surcharges, web-search add-ons) the table doesn't model.
+      const provider_cost =
+        pickNumber(response?.usage?.total_cost) ??
+        pickNumber(response?.usage?.cost) ??
+        pickNumber(response?.total_cost) ??
+        pickNumber(response?.cost) ??
+        null
+      if (provider_cost != null) reportedCostHolder.current = provider_cost
     }
     onEvent?.(event)
   }
@@ -83,6 +114,8 @@ export async function generateWithTelemetry(args: {
       duration_ms,
       success,
       error_message,
+      reported_cost_usd: reportedCostHolder.current,
+      iteration_index: iterationIndex ?? null,
     })
   }
 }

@@ -82,7 +82,8 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
         newContent.iterations.push(iterationResult)
 
         await cycleContext.asNode(iteration, async (nodeContext) => {
-          const findProblemsResult = await findProblems(context.abortSignal, node, input, (event) => {
+          const findIteration = iteration
+          const findProblemsResult = await findProblems(context.abortSignal, node, input, findIteration, (event) => {
             nodeContext.onResponseStreamEvent([iteration, "findProblemsResult"], event)
           })
           iterationResult.findProblemsResult = findProblemsResult
@@ -100,6 +101,7 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
               input,
               foundProblemsTemplate,
               findProblemsResult,
+              findIteration,
               (event) => {
                 nodeContext.onResponseStreamEvent([iteration, "fixProblemsResult"], event)
               },

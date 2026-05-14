@@ -20,7 +20,8 @@ CREATE TABLE ai_call_stats (
   duration_ms INTEGER NOT NULL,
   cost_usd REAL,
   success INTEGER NOT NULL,
-  error_message TEXT
+  error_message TEXT,
+  iteration_index INTEGER
 );
 
 CREATE TABLE ai_run_stats (

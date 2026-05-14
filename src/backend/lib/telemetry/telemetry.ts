@@ -36,6 +36,20 @@ export interface RecordCallArgs {
   duration_ms: number
   success: boolean
   error_message?: string | null
+  /**
+   * Cost reported by the provider on the API response (xAI, for one, returns
+   * this on `response.completed`). When present it overrides the local
+   * pricing-table estimate because the provider accounts for every billing
+   * surcharge (reasoning, web-search, deferred completion) that the table
+   * doesn't model.
+   */
+  reported_cost_usd?: number | null
+  /**
+   * Zero-based iteration index within a per-node loop. Currently set by the
+   * fix-problems processor (find-/fix-problems calls). Enables the aggregator
+   * to compute "median fix-iterations to converge" per (node_type, purpose).
+   */
+  iteration_index?: number | null
 }
 
 interface PerRunAccumulator {
@@ -125,11 +139,13 @@ export function recordCall(args: RecordCallArgs): void {
   }
 
   const ts = new Date()
-  const cost = estimateCostUsd(args.engine_id, args.model, {
-    input_tokens: args.input_tokens,
-    output_tokens: args.output_tokens,
-    cached_prompt_tokens: args.cached_prompt_tokens,
-  })
+  const cost =
+    args.reported_cost_usd ??
+    estimateCostUsd(args.engine_id, args.model, {
+      input_tokens: args.input_tokens,
+      output_tokens: args.output_tokens,
+      cached_prompt_tokens: args.cached_prompt_tokens,
+    })
 
   activeRun.engines.add(args.engine_id)
   activeRun.models.add(args.model)
@@ -146,11 +162,13 @@ export function recordCall(args: RecordCallArgs): void {
 }
 
 function recordOrphanCall(args: RecordCallArgs): void {
-  const cost = estimateCostUsd(args.engine_id, args.model, {
-    input_tokens: args.input_tokens,
-    output_tokens: args.output_tokens,
-    cached_prompt_tokens: args.cached_prompt_tokens,
-  })
+  const cost =
+    args.reported_cost_usd ??
+    estimateCostUsd(args.engine_id, args.model, {
+      input_tokens: args.input_tokens,
+      output_tokens: args.output_tokens,
+      cached_prompt_tokens: args.cached_prompt_tokens,
+    })
   // Synthetic run_id so the row is still queryable, but it doesn't get an
   // ai_run_stats counterpart. "orphan-<uuid>" is the convention.
   writeCallRecord(`orphan-${randomUUID()}`, new Date(), cost, args)
@@ -168,8 +186,8 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
         node_title, node_type,
         instructions_chars, input_chars, output_chars,
         input_tokens, output_tokens, cached_prompt_tokens,
-        duration_ms, cost_usd, success, error_message
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        duration_ms, cost_usd, success, error_message, iteration_index
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         tsIso,
         run_id,
         args.engine_id,
@@ -188,6 +206,7 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
         cost,
         args.success ? 1 : 0,
         args.error_message ?? null,
+        args.iteration_index ?? null,
       )
     } catch (err) {
       console.warn("[telemetry] failed to write ai_call_stats:", err)
@@ -213,6 +232,7 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
     cost_usd: cost,
     success: args.success,
     error_message: args.error_message ?? null,
+    iteration_index: args.iteration_index ?? null,
   })
 }
 
