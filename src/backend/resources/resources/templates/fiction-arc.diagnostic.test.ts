@@ -53,10 +53,7 @@ vi.mock("../../../ai/generate-fix-problems.js", () => ({
   fixProblems: vi.fn(async (_signal: AbortSignal, _node: any, source: string) => source),
 }))
 
-const TEMPLATE_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "fiction-arc.ru.json",
-)
+const TEMPLATE_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "fiction-arc.ru.json")
 
 describe("fiction-arc end-to-end (stubbed LLM)", () => {
   let template: ProjectTemplate
@@ -127,7 +124,10 @@ describe("fiction-arc end-to-end (stubbed LLM)", () => {
 
     console.log("--- DIAGNOSTIC OUTPUT ---")
     console.log("Cycle content:", JSON.stringify(cycleContent, null, 2))
-    console.log("Children of cycle:", cycleChildren.map((c) => ({ title: c.title, status: c.status, content: c.content?.slice(0, 80) })))
+    console.log(
+      "Children of cycle:",
+      cycleChildren.map((c) => ({ title: c.title, status: c.status, content: c.content?.slice(0, 80) })),
+    )
     console.log("Per-iteration outputs:", outputs)
     console.log("--- END DIAGNOSTIC ---")
 

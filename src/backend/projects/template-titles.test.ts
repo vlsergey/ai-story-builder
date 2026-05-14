@@ -76,7 +76,10 @@ describe("project template title-based references", () => {
     const b = byTitle.get("B")!
     const c = byTitle.get("C")!
 
-    const edgeKeys = newEdges.map((e) => `${byTitle.get(newNodes.find((n) => n.id === e.from_node_id)!.title)!.title}->${byTitle.get(newNodes.find((n) => n.id === e.to_node_id)!.title)!.title}`)
+    const edgeKeys = newEdges.map(
+      (e) =>
+        `${byTitle.get(newNodes.find((n) => n.id === e.from_node_id)!.title)!.title}->${byTitle.get(newNodes.find((n) => n.id === e.to_node_id)!.title)!.title}`,
+    )
     expect(edgeKeys.sort()).toEqual(["A->B", "A->C", "B->C"])
     expect(a.id).not.toBe(b.id)
   })
@@ -255,9 +258,7 @@ describe("project template title-based references", () => {
     planRepo.insert({ title: "Output", type: "for-each-output", parent_id: feId, x: 0, y: 0 })
     planRepo.insert({ title: "Shared", type: "text", parent_id: feId, x: 0, y: 0 })
 
-    await expect(
-      exportProjectAsTemplate({ filePath: tempFile, exportLoreStructure: false }),
-    ).rejects.toThrow(/Shared/)
+    await expect(exportProjectAsTemplate({ filePath: tempFile, exportLoreStructure: false })).rejects.toThrow(/Shared/)
   })
 
   it("rejects apply when a template has duplicate non-internal titles across parents", () => {

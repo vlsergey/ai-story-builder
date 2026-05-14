@@ -54,9 +54,8 @@ export default function migration(db: Database): void {
     const dropLast = toNonNegInt(parsedSettings.dropLast)
 
     const translated = translateRegexToPrompt(separator, dropFirst, dropLast)
-    const combined = row.ai_user_prompt && row.ai_user_prompt.trim().length > 0
-      ? `${row.ai_user_prompt}\n\n${translated}`
-      : translated
+    const combined =
+      row.ai_user_prompt && row.ai_user_prompt.trim().length > 0 ? `${row.ai_user_prompt}\n\n${translated}` : translated
 
     update.run({ id: row.id, ai_user_prompt: combined })
   }

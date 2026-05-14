@@ -166,9 +166,10 @@ describe("migration 027: regex split → LLM split", () => {
 
     migration027(db)
 
-    const row = db
-      .prepare(`SELECT node_type_settings, ai_user_prompt FROM plan_nodes WHERE id = 99`)
-      .get() as { node_type_settings: string | null; ai_user_prompt: string | null }
+    const row = db.prepare(`SELECT node_type_settings, ai_user_prompt FROM plan_nodes WHERE id = 99`).get() as {
+      node_type_settings: string | null
+      ai_user_prompt: string | null
+    }
     expect(row.node_type_settings).toBe(JSON.stringify({ foo: "bar" }))
     expect(row.ai_user_prompt).toBe("Keep me intact")
     db.close()

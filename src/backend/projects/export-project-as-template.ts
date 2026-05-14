@@ -86,7 +86,9 @@ function buildExportedPlanNode(node: PlanNodeRow, idToTitle: Map<number, string>
     }
     if (parsed && typeof parsed === "object") {
       let settings: Record<string, any> =
-        node.type === "fix-problems" ? translateFixProblemsSettings(parsed, idToTitle, node.id, node.title) : { ...parsed }
+        node.type === "fix-problems"
+          ? translateFixProblemsSettings(parsed, idToTitle, node.id, node.title)
+          : { ...parsed }
 
       // userPrompt is exported as the multi-line `aiUserInstructions` array so
       // templates stay diff-friendly. systemPrompt currently has no template-level

@@ -30,7 +30,11 @@ function readPrompts(nodeTypeSettings: string | null): { userPrompt: string | nu
   }
 }
 
-function writePrompts(nodeTypeSettings: string | null, userPrompt: string | null, systemPrompt: string | null): string | null {
+function writePrompts(
+  nodeTypeSettings: string | null,
+  userPrompt: string | null,
+  systemPrompt: string | null,
+): string | null {
   let base: Record<string, unknown> = {}
   if (nodeTypeSettings) {
     try {

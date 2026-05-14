@@ -14,7 +14,6 @@ import TemplateSettingsWizardPage from "./TemplateSettingsWizardPage"
 import AiSettingsWizardPage from "./AiSettingsWizardPage"
 import ConfirmWizardPage from "./ConfirmWizardPage"
 import { ButtonGroup } from "@/ui-components/button-group"
-import { SettingsRepository } from "../../../../backend/settings/settings-repository"
 
 type StepImpl = Step & {
   title: string

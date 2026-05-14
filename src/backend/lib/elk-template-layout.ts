@@ -58,11 +58,7 @@ function walk(
   }
 }
 
-function resolveSource(
-  sourceTitle: string,
-  targetParentTitle: string | null,
-  flat: FlatEntry[],
-): string | undefined {
+function resolveSource(sourceTitle: string, targetParentTitle: string | null, flat: FlatEntry[]): string | undefined {
   const sibling = flat.find((e) => e.title === sourceTitle && e.parentTitle === targetParentTitle)
   if (sibling) return sibling.id
   const global = flat.find((e) => e.title === sourceTitle && !INTERNAL_PLAN_NODE_TYPES.has(e.type))
@@ -142,9 +138,9 @@ export async function computeTemplateLayout(template: ProjectTemplate): Promise<
  * Convenience: returns a flat array of expected positions paired with the
  * original template node, so callers can compare against the stored x/y/w/h.
  */
-export async function computeTemplateLayoutWithEntries(template: ProjectTemplate): Promise<
-  Array<{ node: TemplateProjectPlanNode; expected: ComputedNodePosition }>
-> {
+export async function computeTemplateLayoutWithEntries(
+  template: ProjectTemplate,
+): Promise<Array<{ node: TemplateProjectPlanNode; expected: ComputedNodePosition }>> {
   const flat: FlatEntry[] = []
   walk(template.plan?.nodes, null, null, flat, { n: 0 })
   const positions = await computeTemplateLayout(template)

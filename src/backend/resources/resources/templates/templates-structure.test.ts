@@ -72,15 +72,14 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     if (splitNodes.length === 0) {
       it.skip("no split nodes in this template", () => {})
     }
-    it.each(splitNodes.map(({ node }) => [node.title]))(
-      "split node %s declares nodeTypeSettings.partDescription",
-      (title) => {
-        const node = splitNodes.find((n) => n.node.title === title)!.node
-        const desc = (node.nodeTypeSettings as { partDescription?: unknown } | undefined)?.partDescription
-        expect(typeof desc, `${title}: partDescription must be a non-empty string`).toBe("string")
-        expect((desc as string).trim().length, `${title}: partDescription must be non-empty`).toBeGreaterThan(0)
-      },
-    )
+    it.each(
+      splitNodes.map(({ node }) => [node.title]),
+    )("split node %s declares nodeTypeSettings.partDescription", (title) => {
+      const node = splitNodes.find((n) => n.node.title === title)!.node
+      const desc = (node.nodeTypeSettings as { partDescription?: unknown } | undefined)?.partDescription
+      expect(typeof desc, `${title}: partDescription must be a non-empty string`).toBe("string")
+      expect((desc as string).trim().length, `${title}: partDescription must be non-empty`).toBeGreaterThan(0)
+    })
   })
 
   // For text / split / lore / fix-problems, an input edge only matters if the
@@ -141,8 +140,10 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       // fix-problems: find/fix prompts, plus foundProblemsTemplate as known-internal
       const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
       if (node.type === "fix-problems") {
-        for (const p of extractPlaceholders(nts.aiUserInstructionsToFindProblems as string[] | undefined)) collected.add(p)
-        for (const p of extractPlaceholders(nts.aiUserInstructionsToFixProblems as string[] | undefined)) collected.add(p)
+        for (const p of extractPlaceholders(nts.aiUserInstructionsToFindProblems as string[] | undefined))
+          collected.add(p)
+        for (const p of extractPlaceholders(nts.aiUserInstructionsToFixProblems as string[] | undefined))
+          collected.add(p)
         // foundProblemsTemplate is the bare name of a self-supplied placeholder
         // (the engine wraps it in {{...}} when injecting). Tolerate both bare
         // and accidentally-wrapped forms — strip the wrapping if present.
@@ -172,17 +173,22 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     if (fixNodes.length === 0) {
       it.skip("no fix-problems nodes in this template", () => {})
     }
-    it.each(fixNodes.map(({ node }) => [node.title]))(
-      "fix-problems node %s declares both find- and fix-prompt arrays",
-      (title) => {
-        const node = fixNodes.find((n) => n.node.title === title)!.node
-        const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
-        const find = nts.aiUserInstructionsToFindProblems
-        const fix = nts.aiUserInstructionsToFixProblems
-        expect(Array.isArray(find) && (find as string[]).length > 0, `${title}: missing aiUserInstructionsToFindProblems`).toBe(true)
-        expect(Array.isArray(fix) && (fix as string[]).length > 0, `${title}: missing aiUserInstructionsToFixProblems`).toBe(true)
-      },
-    )
+    it.each(
+      fixNodes.map(({ node }) => [node.title]),
+    )("fix-problems node %s declares both find- and fix-prompt arrays", (title) => {
+      const node = fixNodes.find((n) => n.node.title === title)!.node
+      const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
+      const find = nts.aiUserInstructionsToFindProblems
+      const fix = nts.aiUserInstructionsToFixProblems
+      expect(
+        Array.isArray(find) && (find as string[]).length > 0,
+        `${title}: missing aiUserInstructionsToFindProblems`,
+      ).toBe(true)
+      expect(
+        Array.isArray(fix) && (fix as string[]).length > 0,
+        `${title}: missing aiUserInstructionsToFixProblems`,
+      ).toBe(true)
+    })
   })
 
   describe("every for-each has a for-each-input child", () => {
@@ -190,14 +196,13 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     if (forEachNodes.length === 0) {
       it.skip("no for-each nodes in this template", () => {})
     }
-    it.each(forEachNodes.map(({ node }) => [node.title]))(
-      "for-each %s has at least one for-each-input child",
-      (title) => {
-        const node = forEachNodes.find((n) => n.node.title === title)!.node
-        const inputs = (node.children ?? []).filter((c) => c.type === "for-each-input")
-        expect(inputs.length, `${title}: must have ≥1 for-each-input child`).toBeGreaterThan(0)
-      },
-    )
+    it.each(
+      forEachNodes.map(({ node }) => [node.title]),
+    )("for-each %s has at least one for-each-input child", (title) => {
+      const node = forEachNodes.find((n) => n.node.title === title)!.node
+      const inputs = (node.children ?? []).filter((c) => c.type === "for-each-input")
+      expect(inputs.length, `${title}: must have ≥1 for-each-input child`).toBeGreaterThan(0)
+    })
   })
 
   describe("every for-each-output has exactly one incoming text edge", () => {
@@ -205,14 +210,13 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     if (outputs.length === 0) {
       it.skip("no for-each-output nodes in this template", () => {})
     }
-    it.each(outputs.map(({ node }) => [node.title]))(
-      "for-each-output %s has exactly one text-typed input edge",
-      (title) => {
-        const node = outputs.find((n) => n.node.title === title)!.node
-        const inputs = (node.inputs ?? []).filter((i) => i.type === "text")
-        expect(inputs.length, `${title}: must have exactly one incoming text edge`).toBe(1)
-      },
-    )
+    it.each(
+      outputs.map(({ node }) => [node.title]),
+    )("for-each-output %s has exactly one text-typed input edge", (title) => {
+      const node = outputs.find((n) => n.node.title === title)!.node
+      const inputs = (node.inputs ?? []).filter((i) => i.type === "text")
+      expect(inputs.length, `${title}: must have exactly one incoming text edge`).toBe(1)
+    })
   })
 
   describe("fix-problems foundProblemsTemplate is a bare name and is referenced in fix prompt", () => {
@@ -220,33 +224,32 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     if (fixNodes.length === 0) {
       it.skip("no fix-problems nodes in this template", () => {})
     }
-    it.each(fixNodes.map(({ node }) => [node.title]))(
-      "fix-problems %s — foundProblemsTemplate is a bare name (no {{ }}) and {{<name>}} appears in the fix prompt",
-      (title) => {
-        const node = fixNodes.find((n) => n.node.title === title)!.node
-        const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
-        const tpl = nts.foundProblemsTemplate as string | undefined
-        if (tpl === undefined) {
-          // Optional — without foundProblemsTemplate the fix prompt simply
-          // doesn't inject the problem list. That's allowed.
-          return
-        }
-        // Must be a bare placeholder name. The runtime wraps it in `{{...}}`
-        // itself when building replacements; storing it already wrapped
-        // produces `{{{{name}}}}` which never matches anything.
-        expect(
-          tpl.includes("{") || tpl.includes("}"),
-          `${title}: foundProblemsTemplate must be a bare name (e.g. "Найденные проблемы"), without surrounding {{ }}. Got: "${tpl}"`,
-        ).toBe(false)
+    it.each(
+      fixNodes.map(({ node }) => [node.title]),
+    )("fix-problems %s — foundProblemsTemplate is a bare name (no {{ }}) and {{<name>}} appears in the fix prompt", (title) => {
+      const node = fixNodes.find((n) => n.node.title === title)!.node
+      const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
+      const tpl = nts.foundProblemsTemplate as string | undefined
+      if (tpl === undefined) {
+        // Optional — without foundProblemsTemplate the fix prompt simply
+        // doesn't inject the problem list. That's allowed.
+        return
+      }
+      // Must be a bare placeholder name. The runtime wraps it in `{{...}}`
+      // itself when building replacements; storing it already wrapped
+      // produces `{{{{name}}}}` which never matches anything.
+      expect(
+        tpl.includes("{") || tpl.includes("}"),
+        `${title}: foundProblemsTemplate must be a bare name (e.g. "Найденные проблемы"), without surrounding {{ }}. Got: "${tpl}"`,
+      ).toBe(false)
 
-        const expectedPlaceholder = `{{${tpl}}}`
-        const fixPrompt = (nts.aiUserInstructionsToFixProblems as string[] | undefined)?.join("\n") ?? ""
-        expect(
-          fixPrompt.includes(expectedPlaceholder),
-          `${title}: fix prompt must reference the found-problems placeholder as ${expectedPlaceholder}, but it's absent`,
-        ).toBe(true)
-      },
-    )
+      const expectedPlaceholder = `{{${tpl}}}`
+      const fixPrompt = (nts.aiUserInstructionsToFixProblems as string[] | undefined)?.join("\n") ?? ""
+      expect(
+        fixPrompt.includes(expectedPlaceholder),
+        `${title}: fix prompt must reference the found-problems placeholder as ${expectedPlaceholder}, but it's absent`,
+      ).toBe(true)
+    })
   })
 
   it("plan titles are globally unique (excluding for-each-input/output)", () => {
@@ -268,9 +271,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   })
 
   it("every wizard variable used in content/aiUserInstructions has a matching wizard field declaration", () => {
-    const wizardNames = new Set(
-      (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => f.name)),
-    )
+    const wizardNames = new Set((template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => f.name)))
     const used = new Set<string>()
     for (const { node } of allNodes) {
       const all = [...(node.content ?? []), ...(node.aiUserInstructions ?? [])].join("\n")
@@ -285,15 +286,14 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     if (fields.length === 0) {
       it.skip("no wizard fields in this template", () => {})
     }
-    it.each(fields.map((f) => [`${f.page}.${f.name}`, f]))(
-      "wizard field %s has non-empty label, description and placeholder",
-      (_id, field) => {
-        const f = field as { label?: string; description?: string; placeholder?: string }
-        expect(f.label?.trim() ?? "", "label").not.toBe("")
-        expect(f.description?.trim() ?? "", "description").not.toBe("")
-        expect(f.placeholder?.trim() ?? "", "placeholder").not.toBe("")
-      },
-    )
+    it.each(
+      fields.map((f) => [`${f.page}.${f.name}`, f]),
+    )("wizard field %s has non-empty label, description and placeholder", (_id, field) => {
+      const f = field as { label?: string; description?: string; placeholder?: string }
+      expect(f.label?.trim() ?? "", "label").not.toBe("")
+      expect(f.description?.trim() ?? "", "description").not.toBe("")
+      expect(f.placeholder?.trim() ?? "", "placeholder").not.toBe("")
+    })
   })
 
   // ─── Coordinate freshness — author hasn't forgotten to run layout ────────

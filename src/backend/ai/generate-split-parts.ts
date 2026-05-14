@@ -39,7 +39,7 @@ function readPartDescription(nodeTypeSettings: string | null): string | null {
 }
 
 const SYSTEM_PROMPT_FALLBACK =
-  "You are splitting input text into discrete parts. Respond with a JSON object {\"parts\": [...]} where parts is an array of strings. Each element must be a complete, self-contained piece of the input. Do not add commentary, do not omit content. If the user prompt does not specify a number of parts, choose what is natural."
+  'You are splitting input text into discrete parts. Respond with a JSON object {"parts": [...]} where parts is an array of strings. Each element must be a complete, self-contained piece of the input. Do not add commentary, do not omit content. If the user prompt does not specify a number of parts, choose what is natural.'
 
 const MAX_ATTEMPTS = 3
 
