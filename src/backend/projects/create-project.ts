@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
-import { AGE_RATING_INFO } from "@shared/ai-engines.js"
 import type { ProjectTemplate } from "@shared/project-template.js"
+import { AGE_RATING_INFO } from "../../shared/ai-engines.js"
 import type { ProjectCreateOptions } from "../../shared/project-create-options.js"
 import { openProjectDatabase } from "../db/index.js"
 import { setCurrentDbPath } from "../db/state.js"
