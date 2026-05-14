@@ -11,28 +11,34 @@ import { withDbRead, withDbWrite } from "../../db/connection.js"
 export class PlanNodeRepository {
   applyForEachNodeIterationToChildren(forEachNodeId: number, overrides: Record<string, NodeOverride>) {
     return withDbWrite((db) => {
+      // LEFT JOIN against json_each(overrides) so children of the for-each that
+      // are absent from the override map are still updated — reset to empty +
+      // OUTDATED — rather than left carrying the previous iteration's state.
       db.prepare(`UPDATE plan_nodes
-        SET 
+        SET
             content    = data.content,
             summary    = data.summary,
-            word_count = COALESCE(CAST(data.word_count AS INTEGER), 0),
-            char_count = COALESCE(CAST(data.char_count AS INTEGER), 0),
-            byte_count = COALESCE(CAST(data.byte_count AS INTEGER), 0),
-            status     = COALESCE(data.status, 'EMPTY')
+            word_count = data.word_count,
+            char_count = data.char_count,
+            byte_count = data.byte_count,
+            status     = data.status
         FROM (
-            SELECT 
-                CAST(sub.key AS INTEGER) AS target_id,
-                sub.value->>'content'    AS content,
-                sub.value->>'summary'    AS summary,
-                sub.value->>'word_count' AS word_count,
-                sub.value->>'char_count' AS char_count,
-                sub.value->>'byte_count' AS byte_count,
-                sub.value->>'status'     AS status
-            FROM plan_nodes
-            JOIN json_each(?) AS sub
+            SELECT
+                pn.id AS target_id,
+                sub.value->>'content'                                  AS content,
+                sub.value->>'summary'                                  AS summary,
+                COALESCE(CAST(sub.value->>'word_count' AS INTEGER), 0) AS word_count,
+                COALESCE(CAST(sub.value->>'char_count' AS INTEGER), 0) AS char_count,
+                COALESCE(CAST(sub.value->>'byte_count' AS INTEGER), 0) AS byte_count,
+                COALESCE(
+                    sub.value->>'status',
+                    CASE WHEN sub.key IS NULL THEN 'OUTDATED' ELSE 'EMPTY' END
+                ) AS status
+            FROM plan_nodes AS pn
+            LEFT JOIN json_each(?) AS sub ON CAST(sub.key AS INTEGER) = pn.id
+            WHERE pn.parent_id = ?
         ) AS data
-        WHERE plan_nodes.id = data.target_id 
-          AND plan_nodes.parent_id = ?`).run(JSON.stringify(overrides), forEachNodeId)
+        WHERE plan_nodes.id = data.target_id`).run(JSON.stringify(overrides), forEachNodeId)
     })
   }
 

@@ -1,4 +1,4 @@
-import type { ForEachNodeContent } from "../../../../shared/for-each-plan-node.js"
+import type { ForEachNodeContent, NodeOverride } from "../../../../shared/for-each-plan-node.js"
 import type { ForEachSettings } from "../../../../shared/node-settings.js"
 import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
@@ -60,17 +60,47 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
       `[ForEachProcessor] Updating node ${nodeData.id} for new input content (${inputs.length} items) as content overrides for for-each-input node ${internalInputNodeId}`,
     )
 
-    const newOverrides = [...(parsedContent.overrides || [])]
+    const allChildren = service.findByParentId(nodeData.id)
+    const internalInputIdStr = `${internalInputNodeId}`
+    const priorOverrides = parsedContent.overrides || []
+
+    // Build a fresh overrides array. For every iteration we explicitly write an
+    // entry for every child of the for-each — not just the for-each-input row.
+    // This is what lets `applyForEachNodeIterationToChildren` reset user-defined
+    // children when navigating to a not-yet-regenerated iteration; otherwise
+    // those children would silently retain the previous iteration's GENERATED
+    // content and the regen scheduler would skip them.
+    const newOverrides: Record<string, NodeOverride>[] = []
     for (let iteration: number = 0; iteration < inputs.length; iteration++) {
-      const currentOverride = newOverrides[iteration] || {}
-      newOverrides[iteration] = {
-        ...currentOverride,
-        [`${internalInputNodeId}`]: {
-          ...currentOverride[`${internalInputNodeId}`],
-          content: inputs[iteration],
-          status: "GENERATED",
-        },
+      const priorForIter = priorOverrides[iteration] || {}
+      const inputUnchanged = priorForIter[internalInputIdStr]?.content === inputs[iteration]
+
+      const overrideForIter: Record<string, NodeOverride> = {}
+      for (const child of allChildren) {
+        const idStr = `${child.id}`
+        if (child.id === internalInputNodeId) {
+          overrideForIter[idStr] = {
+            content: inputs[iteration],
+            summary: null,
+            word_count: null,
+            char_count: null,
+            byte_count: null,
+            status: "GENERATED",
+          }
+        } else if (inputUnchanged && priorForIter[idStr]) {
+          overrideForIter[idStr] = priorForIter[idStr]
+        } else {
+          overrideForIter[idStr] = {
+            content: null,
+            summary: null,
+            word_count: null,
+            char_count: null,
+            byte_count: null,
+            status: "OUTDATED",
+          }
+        }
       }
+      newOverrides.push(overrideForIter)
     }
 
     // replace current input
@@ -120,8 +150,10 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
           )
           service.changeForEachNodePage(node.id, iteration)
           await regenerateSubtreeNodesContents(childContext, node.id)
-          // After regenerating child nodes, save their content into overrides for this iteration
-          service.changeForEachNodePage(node.id, iteration)
+          // The just-generated iteration's children are persisted into
+          // overrides[iteration] by the next page change — either the next loop
+          // iteration's `changeForEachNodePage(iteration+1)` or the final
+          // restore-to-oldPage call below. No explicit save needed here.
           console.info(
             `Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`,
           )

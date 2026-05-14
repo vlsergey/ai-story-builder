@@ -25,9 +25,36 @@ vi.mock("../../../settings/ai-settings.js", () => ({
 }))
 
 vi.mock("../../../ai/generate-plan-node-text-content.js", () => ({
-  generatePlanNodeTextContent: vi.fn(async (_signal: AbortSignal, node: { title: string }) => {
-    return `[stub generated content for "${node.title}"]`
-  }),
+  generatePlanNodeTextContent: vi.fn(
+    async (_signal: AbortSignal, node: { id: number; title: string; parent_id: number | null }) => {
+      // Профиль персонажа is the load-bearing case: each for-each iteration
+      // must see a different character via the sibling «Персонаж» (for-each-input)
+      // and produce a profile that mentions that character. If the for-each is
+      // broken and only one iteration fires, both profiles will name the same
+      // character — assertions further down will catch that.
+      if (node.title === "Профиль персонажа") {
+        const { PlanNodeRepository } = await import("../../../plan/nodes/plan-node-repository.js")
+        const repo = new PlanNodeRepository()
+        const siblings = repo.findByParentId(node.parent_id)
+        const personInput = siblings.find((n) => n.title === "Персонаж")
+        const rawInput = personInput?.content ?? "<no input>"
+        // Input shape after the recent block-format change: "Имя — фраза" OR
+        // "Имя, поле: значение, … — фраза". Pull the leading name segment.
+        const charName = rawInput.split(/[,—-]/)[0]?.trim() || "<unnamed>"
+        return [
+          `# ${charName}`,
+          ``,
+          `## Анкета`,
+          `- Возраст: 19`,
+          `- Пол: М`,
+          ``,
+          `## Профиль`,
+          `Профиль персонажа ${charName}, развёрнутый из анкеты выше. Вход: ${rawInput}.`,
+        ].join("\n")
+      }
+      return `[stub generated content for "${node.title}"]`
+    },
+  ),
 }))
 
 vi.mock("../../../ai/generate-split-parts.js", () => ({
@@ -139,5 +166,26 @@ describe("fiction-arc end-to-end (stubbed LLM)", () => {
 
     // The crucial check: 2 iterations should produce 2 outputs
     expect(outputs.filter((o) => o.length > 0).length, "Expected 2 non-empty per-iteration outputs").toBe(2)
+
+    // Per-character expansion check: each iteration's profile must name its OWN
+    // character. If the for-each is broken (only first iteration fires, or all
+    // iterations share state), both profiles will name the same person.
+    const castBibleText = castBible?.content || ""
+    console.log("--- CAST BIBLE ---")
+    console.log(castBibleText)
+    console.log("--- END CAST BIBLE ---")
+
+    expect(castBibleText, "Cast bible must mention Анна").toMatch(/Анна/)
+    expect(castBibleText, "Cast bible must mention Борис").toMatch(/Борис/)
+
+    // Also: every iteration's profile must be DISTINCT (not the same stub
+    // copy-pasted). Compare the two outputs directly.
+    const [firstOut, secondOut] = outputs
+    expect(firstOut, "Iteration 0 output must be non-empty").not.toBe("")
+    expect(secondOut, "Iteration 1 output must be non-empty").not.toBe("")
+    expect(
+      firstOut,
+      "Iteration outputs must differ — same content for both iterations means for-each did not iterate per character",
+    ).not.toBe(secondOut)
   })
 })
