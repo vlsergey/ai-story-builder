@@ -15,5 +15,17 @@
   "ExportProjectAsTemplateDialog.exportLoreStructure.label": "Export lore structure",
   "ExportProjectAsTemplateDialog.filePath.label": "Save to file",
   "ExportProjectAsTemplateDialog.filePath.placeholder": "Select a file path",
-  "ExportProjectAsTemplateDialog.title": "Export Project as Template"
+  "ExportProjectAsTemplateDialog.title": "Export Project as Template",
+  "UpdateFromTemplateDialog.analysing": "Comparing project against the latest template…",
+  "UpdateFromTemplateDialog.apply": "Apply",
+  "UpdateFromTemplateDialog.applying": "Applying…",
+  "UpdateFromTemplateDialog.cancel": "Cancel",
+  "UpdateFromTemplateDialog.disclaimer": "Generated and manually-edited node contents are not touched. Nodes and edges that exist only in this project are not removed.",
+  "UpdateFromTemplateDialog.newEdgesHeader": "{{count}} edge(s) will be added",
+  "UpdateFromTemplateDialog.newNodesHeader": "{{count}} node(s) will be added",
+  "UpdateFromTemplateDialog.noChanges": "The template hasn't changed since it was applied. Nothing to do.",
+  "UpdateFromTemplateDialog.title": "Template {{file}} has updates. Apply to this project?",
+  "UpdateFromTemplateDialog.titleLoading": "Update from template",
+  "UpdateFromTemplateDialog.unchangedCount": "{{count}} node(s) stay unchanged.",
+  "UpdateFromTemplateDialog.updatedNodesHeader": "{{count}} node(s) will get refreshed instructions (status → OUTDATED)"
 }

@@ -20,6 +20,7 @@ const MENU_STRINGS = {
     file: "File",
     closeProject: "Close Project",
     exportProjectAsTemplate: "Export as template...",
+    updateFromTemplate: "Update from template...",
     view: "View",
     settings: "Settings",
     resetLayouts: "Reset layouts",
@@ -41,6 +42,7 @@ const MENU_STRINGS = {
     file: "Файл",
     closeProject: "Закрыть проект",
     exportProjectAsTemplate: "Экспортировать как шаблон...",
+    updateFromTemplate: "Обновить из шаблона...",
     view: "Вид",
     settings: "Настройки",
     resetLayouts: "Сбросить разметку",
@@ -184,6 +186,10 @@ function buildApplicationMenu() {
         {
           label: s.exportProjectAsTemplate,
           click: () => menuEventsEmitter.emit("backToFrontMenuAction", "export-project-as-template"),
+        },
+        {
+          label: s.updateFromTemplate,
+          click: () => menuEventsEmitter.emit("backToFrontMenuAction", "update-from-template"),
         },
         { type: "separator" },
         {

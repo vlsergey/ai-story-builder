@@ -18,6 +18,7 @@ import PlanNodeEditor from "./plan/editors/PlanNodeEditor"
 import PlanGraph from "./plan/plan-graph/PlanGraph"
 import RegenerationPanel from "./plan/RegenerationPanel"
 import ExportProjectAsTemplateDialog from "./projects/ExportProjectAsTemplateDialog"
+import UpdateFromTemplateDialog from "./projects/UpdateFromTemplateDialog"
 import { EditorSettingsProvider } from "./settings/editor-settings"
 import { LoreSettingsProvider } from "./settings/lore-settings"
 import SettingsPanel from "./settings/SettingsPanel"
@@ -431,6 +432,7 @@ export default function Layout() {
           </div>
         </div>
         <ExportProjectAsTemplateDialog />
+        <UpdateFromTemplateDialog />
       </EditorSettingsProvider>
     </LoreSettingsProvider>
   )

@@ -18,6 +18,11 @@ export const SettingsMap = {
   aiRegenerateManual: defineSetting<boolean>("ai_regenerate_manual", z.boolean(), false),
   allAiEnginesConfig: defineSetting<AllAiEnginesConfig>("ai_config", z.any(), {}),
   appliedTemplateFile: defineSetting<string | null>("applied_template_file", z.string().nullable(), null),
+  appliedTemplateWizardData: defineSetting<Record<string, string>>(
+    "applied_template_wizard_data",
+    z.record(z.string(), z.string()),
+    {},
+  ),
   currentBackend: defineSetting<AiEngineKey | null>("current_backend", z.enum(AI_ENGINES_KEYS).nullable(), null),
   autoGenerateSummary: defineSetting<boolean>("auto_generate_summary", z.boolean(), false),
   locale: defineSetting<Locale>("locale", z.enum(LOCALE_VALUES), "en"),

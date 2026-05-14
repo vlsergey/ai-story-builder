@@ -10,6 +10,7 @@ import { applyProjectSettings, getProjectSettings } from "./project-settings.js"
 import { closeProject, getProjectStatus, openProject } from "./project-state.js"
 import { findTemplates, getTemplate, getTemplateFolders } from "./project-templates.js"
 import { deleteRecentProject, getRecentProjects } from "./recent-projects.js"
+import { analyzeTemplateUpdate, applyTemplateUpdate } from "./template-update.js"
 
 export function buildProjectRoutes(t: RouteBuilder) {
   return t.router({
@@ -32,5 +33,7 @@ export function buildProjectRoutes(t: RouteBuilder) {
     getProjectsFolder: t.procedure.query(() => getProjectsFolder()),
     getTemplate: t.procedure.input(z.string()).query(({ input }) => getTemplate(input)),
     getTemplatesFolders: t.procedure.query(() => getTemplateFolders()),
+    analyzeTemplateUpdate: t.procedure.query(() => analyzeTemplateUpdate()),
+    applyTemplateUpdate: t.procedure.mutation(() => applyTemplateUpdate()),
   })
 }

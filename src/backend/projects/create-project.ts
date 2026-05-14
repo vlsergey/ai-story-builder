@@ -54,4 +54,11 @@ function importProjectFromTemplate(templateFilePath: string, templateData: Recor
   const projectTemplate = JSON.parse(fs.readFileSync(templateFilePath, "utf8")) as ProjectTemplate
   applyProjectTemplate(projectTemplate, templateData)
   SettingsRepository.setAppliedTemplateFile(path.basename(templateFilePath))
+  // Stringify everything so re-substitution during a later "update from
+  // template" produces the same output as the initial apply did.
+  const stringWizardData: Record<string, string> = {}
+  for (const [k, v] of Object.entries(templateData)) {
+    stringWizardData[k] = v == null ? "" : String(v)
+  }
+  SettingsRepository.setAppliedTemplateWizardData(stringWizardData)
 }

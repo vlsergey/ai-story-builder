@@ -11,7 +11,7 @@ import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
  * Join all template lines into single line with line breaks (concatenate with \n)
  * and replace all "${VALUE}" templates with template data.
  */
-function normalizeAndReplaceContent(templateValue: string[], templateData: Record<string, any>) {
+export function normalizeAndReplaceContent(templateValue: string[], templateData: Record<string, any>) {
   return templateValue.join("\n").replace(/\${([^}]+)}/g, (_match, key) => {
     return templateData[key] || ""
   })
