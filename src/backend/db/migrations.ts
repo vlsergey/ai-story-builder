@@ -30,6 +30,7 @@ import migration025 from "./migrations/025.js"
 import migration026 from "./migrations/026.js"
 import migration027 from "./migrations/027.js"
 import migration028 from "./migrations/028.js"
+import migration029 from "./migrations/029.js"
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -89,9 +90,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration027,
   // version 27 → 28: move ai_user_prompt/ai_system_prompt from plan_nodes columns into node_type_settings (for LLM-calling types only)
   migration028,
+  // version 28 → 29: add ai_call_stats and ai_run_stats tables for local telemetry
+  migration029,
 ]
 
-export const CURRENT_VERSION = 28
+export const CURRENT_VERSION = 29
 
 function loadSchemaFromFile(db: Database): void {
   for (const candidate of [

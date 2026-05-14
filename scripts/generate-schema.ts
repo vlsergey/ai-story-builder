@@ -11,14 +11,22 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 function getSchema(db: Database.Database): string {
-  // Query all CREATE statements from sqlite_master, excluding internal tables
+  // Query all CREATE statements from sqlite_master, excluding internal tables.
+  // Order tables before indexes so reloading schema.sql on a fresh DB doesn't
+  // try to create an index against a table that hasn't been defined yet.
   const rows = db
     .prepare(`
       SELECT type, name, sql
       FROM sqlite_master
       WHERE sql IS NOT NULL
         AND name NOT LIKE 'sqlite_%'
-      ORDER BY type, name
+      ORDER BY
+        CASE type
+          WHEN 'table' THEN 0
+          WHEN 'index' THEN 1
+          ELSE 2
+        END,
+        name
   `)
     .all() as Array<{ type: string; name: string; sql: string }>
 

@@ -4,6 +4,7 @@ import { getCurrentEngineGenerateSummaryInstructions } from "../settings/ai-sett
 import { SettingsRepository } from "../settings/settings-repository.js"
 import type { JsonSchemaSpec } from "./ai-engine-adapter.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
+import { generateWithTelemetry } from "./generate-with-telemetry.js"
 
 // Unused but kept for type compat
 void (undefined as unknown as JsonSchemaSpec)
@@ -56,12 +57,19 @@ export async function generateSummary(
 
   const userPrompt = `${generateSummaryInstructions.trim()}\n\n${content.trim()}`
 
-  return await adapter.generateResponse({
-    abortSignal,
-    userPrompt,
-    systemPrompt: null,
-    promptCacheKeys: ["generate-summary", ...promptCacheKeys],
-    includeExistingLore,
-    engineFileIds,
+  return await generateWithTelemetry({
+    engineId: engine,
+    adapter,
+    request: {
+      abortSignal,
+      userPrompt,
+      systemPrompt: null,
+      promptCacheKeys: ["generate-summary", ...promptCacheKeys],
+      includeExistingLore,
+      engineFileIds,
+    },
+    // The static part of the summary call is just the instructions; the rest
+    // (the content being summarised) is dynamic input.
+    instructionsTemplateChars: generateSummaryInstructions.length,
   })
 }

@@ -11,6 +11,7 @@ import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
+import { generateWithTelemetry } from "./generate-with-telemetry.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
 export async function findProblems(
@@ -51,8 +52,10 @@ export async function findProblems(
     ...nodeEngineAiSettings,
   }
 
-  const aiResult = await adapter.generateResponse(
-    {
+  const aiResult = await generateWithTelemetry({
+    engineId,
+    adapter,
+    request: {
       abortSignal,
       userPrompt: finalUserPrompt,
       systemPrompt: finalSystemPrompt,
@@ -66,8 +69,13 @@ export async function findProblems(
       promptCacheKeys: ["generate-plan-node-text-content", String(node.id)],
       engineFileIds,
     },
+    instructionsTemplateChars:
+      (settings.aiUserInstructionsToFindProblems ?? "").length +
+      (settings.aiSystemInstructionsToFindProblems ?? "").length,
+    node: { title: node.title, type: node.type },
+    purpose: "find-problems",
     onEvent,
-  )
+  })
   return JSON.parse(aiResult) as FindProblemsResult
 }
 
@@ -114,8 +122,10 @@ export async function fixProblems(
     ...nodeEngineAiSettings,
   }
 
-  return await adapter.generateResponse(
-    {
+  return await generateWithTelemetry({
+    engineId,
+    adapter,
+    request: {
       abortSignal,
       userPrompt: finalUserPrompt,
       systemPrompt: finalSystemPrompt,
@@ -125,6 +135,11 @@ export async function fixProblems(
       promptCacheKeys: ["generate-plan-node-text-content", String(node.id)],
       engineFileIds,
     },
+    instructionsTemplateChars:
+      (settings.aiUserInstructionsToFixProblems ?? "").length +
+      (settings.aiSystemInstructionsToFixProblems ?? "").length,
+    node: { title: node.title, type: node.type },
+    purpose: "fix-problems",
     onEvent,
-  )
+  })
 }

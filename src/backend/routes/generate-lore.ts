@@ -2,6 +2,7 @@ import type OpenAI from "openai"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import type { JsonSchemaSpec } from "../ai/ai-engine-adapter.js"
 import { getEngineAdapter } from "../ai/ai-engine-adapter.js"
+import { generateWithTelemetry } from "../ai/generate-with-telemetry.js"
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
@@ -83,8 +84,10 @@ export async function generateLore(
     ...nodeEngineAiSettings,
   }
 
-  return await adapter.generateResponse(
-    {
+  return await generateWithTelemetry({
+    engineId,
+    adapter,
+    request: {
       abortSignal,
       userPrompt: aiUserPrompt!.trim(),
       systemPrompt: aiSystemPrompt?.trim() ?? null,
@@ -96,6 +99,8 @@ export async function generateLore(
       engineFileIds: [],
       responseSchema,
     },
+    instructionsTemplateChars: (aiUserPrompt ?? "").length + (aiSystemPrompt ?? "").length,
+    node: { title: node.title, type: "lore" },
     onEvent,
-  )
+  })
 }

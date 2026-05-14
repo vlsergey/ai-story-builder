@@ -53,4 +53,5 @@ function importProjectFromTemplate(templateFilePath: string, templateData: Recor
   }
   const projectTemplate = JSON.parse(fs.readFileSync(templateFilePath, "utf8")) as ProjectTemplate
   applyProjectTemplate(projectTemplate, templateData)
+  SettingsRepository.setAppliedTemplateFile(path.basename(templateFilePath))
 }

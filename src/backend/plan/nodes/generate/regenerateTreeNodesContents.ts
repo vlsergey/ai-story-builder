@@ -9,6 +9,7 @@ import type {
 } from "../../../../shared/RegenerateEvent.js"
 import { emitterToObservable, emitterToSingleArgObservable } from "../../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../../lib/make-errors.js"
+import { finishRun, startRun } from "../../../lib/telemetry/telemetry.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeService } from "../plan-node-service.js"
@@ -108,6 +109,8 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
   }
 
   console.info("[regenerateTreeNodesContents] Starting regeneration")
+  startRun()
+  let runSucceeded = true
   try {
     const containerContext: RegenerationContainerContext = {
       abortSignal: myAbortController.signal,
@@ -259,7 +262,11 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
         }
       }
     }
+  } catch (err) {
+    runSucceeded = false
+    throw err
   } finally {
+    finishRun({ success: runSucceeded })
     inProcess = false
     abortController = null
     emitRegenerateStatusEvent()

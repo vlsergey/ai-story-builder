@@ -17,6 +17,7 @@ export const SettingsMap = {
   aiRegenerateGenerated: defineSetting<boolean>("ai_regenerate_generated", z.boolean(), false),
   aiRegenerateManual: defineSetting<boolean>("ai_regenerate_manual", z.boolean(), false),
   allAiEnginesConfig: defineSetting<AllAiEnginesConfig>("ai_config", z.any(), {}),
+  appliedTemplateFile: defineSetting<string | null>("applied_template_file", z.string().nullable(), null),
   currentBackend: defineSetting<AiEngineKey | null>("current_backend", z.enum(AI_ENGINES_KEYS).nullable(), null),
   autoGenerateSummary: defineSetting<boolean>("auto_generate_summary", z.boolean(), false),
   locale: defineSetting<Locale>("locale", z.enum(LOCALE_VALUES), "en"),

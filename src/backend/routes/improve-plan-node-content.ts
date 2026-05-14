@@ -2,6 +2,7 @@ import type OpenAI from "openai"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { getEngineAdapter } from "../ai/ai-engine-adapter.js"
+import { generateWithTelemetry } from "../ai/generate-with-telemetry.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
@@ -48,8 +49,10 @@ export async function improvePlanNodeContent(
     ...nodeEngineAiSettings,
   }
 
-  const newContent = await adapter.generateResponse(
-    {
+  const newContent = await generateWithTelemetry({
+    engineId,
+    adapter,
+    request: {
       abortSignal,
       userPrompt,
       systemPrompt,
@@ -59,8 +62,13 @@ export async function improvePlanNodeContent(
       includeExistingLore: false,
       engineFileIds: [],
     },
+    // For improve calls the system prompt IS the static instruction template;
+    // the user prompt is the node's current content (dynamic input).
+    instructionsTemplateChars: systemPrompt.length,
+    node: { title: planNode.title, type: planNode.type },
+    purpose: "improve-plan-node-content",
     onEvent,
-  )
+  })
 
   return {
     oldNode: planNode,

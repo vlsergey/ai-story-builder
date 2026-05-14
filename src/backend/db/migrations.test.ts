@@ -76,7 +76,13 @@ describe("migrateDatabase", () => {
       FROM sqlite_master
       WHERE sql IS NOT NULL
         AND name NOT LIKE 'sqlite_%'
-      ORDER BY type, name
+      ORDER BY
+        CASE type
+          WHEN 'table' THEN 0
+          WHEN 'index' THEN 1
+          ELSE 2
+        END,
+        name
     `)
       .all() as Array<{ type: string; name: string; sql: string }>
 

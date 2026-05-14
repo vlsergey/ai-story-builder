@@ -7,6 +7,7 @@ import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
+import { generateWithTelemetry } from "./generate-with-telemetry.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
 export async function generatePlanNodeTextContent(
@@ -54,8 +55,10 @@ export async function generatePlanNodeTextContent(
     ...nodeEngineAiSettings,
   }
 
-  return await adapter.generateResponse(
-    {
+  return await generateWithTelemetry({
+    engineId,
+    adapter,
+    request: {
       abortSignal,
       userPrompt: finalUserPrompt,
       systemPrompt: finalSystemPrompt,
@@ -65,6 +68,8 @@ export async function generatePlanNodeTextContent(
       promptCacheKeys: ["generate-plan-node-text-content", String(node.id)],
       engineFileIds,
     },
+    instructionsTemplateChars: (aiUserPrompt ?? "").length + (aiSystemPrompt ?? "").length,
+    node: { title: node.title, type: node.type },
     onEvent,
-  )
+  })
 }

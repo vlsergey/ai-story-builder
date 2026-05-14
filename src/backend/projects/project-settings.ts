@@ -56,6 +56,9 @@ export function applyProjectSettings(settings: Partial<SettingsTypes>): { ok: bo
   if (settings.allAiEnginesConfig !== undefined) {
     SettingsRepository.setAllAiEnginesConfig(settings.allAiEnginesConfig)
   }
+  if (settings.appliedTemplateFile !== undefined) {
+    SettingsRepository.setAppliedTemplateFile(settings.appliedTemplateFile)
+  }
   if (settings.currentBackend !== undefined) {
     SettingsRepository.setCurrentBackend(settings.currentBackend)
   }

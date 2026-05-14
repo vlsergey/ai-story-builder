@@ -8,6 +8,7 @@ import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
+import { generateWithTelemetry } from "./generate-with-telemetry.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
 export function buildSplitResponseSchema(partDescription: string | null): Record<string, unknown> {
@@ -77,8 +78,10 @@ export async function generateSplitParts(
   let lastError: unknown = null
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (abortSignal.aborted) throw new Error("aborted")
-    const aiResult = await adapter.generateResponse(
-      {
+    const aiResult = await generateWithTelemetry({
+      engineId,
+      adapter,
+      request: {
         abortSignal,
         userPrompt: finalUserPrompt,
         systemPrompt: finalSystemPrompt,
@@ -91,8 +94,10 @@ export async function generateSplitParts(
         promptCacheKeys: ["generate-split-parts", String(node.id)],
         engineFileIds: [],
       },
+      instructionsTemplateChars: (aiUserPrompt ?? "").length + (aiSystemPrompt ?? "").length,
+      node: { title: node.title, type: node.type },
       onEvent,
-    )
+    })
     try {
       const parsed = JSON.parse(aiResult)
       const parts = parsed?.parts
