@@ -1,6 +1,6 @@
 # Data model and persistence
 
-> Last verified: 2026-05-13. Re-check before relying on file paths and line numbers.
+> Last verified: 2026-05-14. Re-check before relying on file paths and line numbers.
 
 ## Storage
 
@@ -10,7 +10,10 @@ SQLite via `better-sqlite3`. One DB file per project, in `<userData>/projects/<s
 
 [`src/backend/db/schema.sql`](../../src/backend/db/schema.sql) is the **fresh-database** schema. **Auto-generated** by `npm run generate-schema` — do not hand-edit. For changes, write a new migration in [`src/backend/db/migrations/NNN.ts`](../../src/backend/db/migrations/), bump `CURRENT_VERSION` in [`migrations.ts`](../../src/backend/db/migrations.ts), then regenerate `schema.sql`.
 
-26 migrations exist as of this writing. The "no migrations until first release" rule from older docs no longer applies — there is no longer a single editable initial schema.
+28 migrations exist as of this writing. The "no migrations until first release" rule from older docs no longer applies — there is no longer a single editable initial schema. The two most recent reshape how prompts and split configs are stored:
+
+- **027** — legacy regex-based `split` nodes converted to LLM-driven splits; `node_type_settings.separator/dropFirst/dropLast` translated into a natural-language prompt and moved to `ai_user_prompt` (later relocated again — see 028).
+- **028** — `ai_user_prompt` and `ai_system_prompt` columns **dropped** from both `plan_nodes` and `lore_nodes`. For LLM-call types (`text`, `split`, `lore`) those values now live inside `node_type_settings.userPrompt` / `.systemPrompt`. `fix-problems` keeps its own named prompt fields in its settings. Other node types warn-and-drop on any stale prompt value.
 
 ## Tables in active use
 
@@ -23,17 +26,14 @@ SQLite via `better-sqlite3`. One DB file per project, in `<userData>/projects/<s
 
 - `card_definitions`, `card_values`, `story_parts` — from an earlier card-driven design. Created by migration 001, never referenced outside the initial schema and migration tests. Safe to consider dead.
 
-## Uniqueness summary (relevant to template refactor)
+## Uniqueness summary
 
 | Table | Unique constraint on title? |
 |---|---|
-| `lore_nodes` | yes — `UNIQUE (parent_id, title)` |
-| `plan_nodes` | **no** |
+| `lore_nodes` | yes — `UNIQUE (parent_id, title)` at SQL level |
+| `plan_nodes` | **no** SQL constraint; templates enforce **global uniqueness** in code (except `for-each-input` / `for-each-output` which are exempt by design) |
 
-If the templates refactor switches plan-node references from id to title, plan-node titles will need to become unique. Three options to enforce:
-1. Add a DB-level `UNIQUE (parent_id, title)` constraint to `plan_nodes` (new migration) — mirrors lore behavior.
-2. Application-level validation in export and apply paths only — leaves the DB tolerant but the format strict.
-3. Sibling-scoped uniqueness with path disambiguation (`Parent/Child`) for cross-container references.
+The application-side strategy (option 2 from the original three-way choice) was the one taken — see [`project-templates.md`](project-templates.md) for the resolution rules used by export and apply.
 
 ## Tests
 

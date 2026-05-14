@@ -1,6 +1,6 @@
 # AI integration: providers, prompt building, streaming
 
-> Last verified: 2026-05-13. Re-check before relying on file paths and line numbers.
+> Last verified: 2026-05-14. Re-check before relying on file paths and line numbers.
 
 ## Provider adapter pattern
 
@@ -33,11 +33,14 @@ Both adapters speak the OpenAI Responses API shape internally (they reuse OpenAI
 
 ## Prompt building for plan nodes
 
-Entry point: [`generatePlanNodeTextContent`](../../src/backend/ai/generate-plan-node-text-content.ts). Called by `TextProcessor.regenerate` ([text-processor.ts:62](../../src/backend/plan/nodes/graph/text-processor.ts#L62)).
+Entry point: [`generatePlanNodeTextContent`](../../src/backend/ai/generate-plan-node-text-content.ts). Called by `TextProcessor.regenerate`.
+
+Prompt source: for `text` / `split` / `lore` the userPrompt and systemPrompt live inside `node_type_settings`, read via [`getNodePrompts`](../../src/backend/plan/nodes/graph/settings-helper.ts) (post commit `a9aaed8` / migration 028). For `fix-problems` they live in dedicated named fields within its own settings shape.
 
 Substitution mechanic — [`replaceTemplates.ts`](../../src/backend/ai/replaceTemplates.ts):
 - Tokens `{{NodeTitle}}` in prompts are replaced with the resolved output of the input node with that title.
-- This is **title-based**, not id-based, in the runtime. The plan templates currently use id-based references, which is the divergence we're about to fix.
+- References are title-based both in the runtime AND in the template format — see [`project-templates.md`](project-templates.md).
+- `split` nodes get the same `{{NodeTitle}}` substitution as `text` nodes (commit `106724d`), with a structural lint warning if a split has incoming edges whose titles do not appear as placeholders.
 
 ## Streaming lifecycle
 

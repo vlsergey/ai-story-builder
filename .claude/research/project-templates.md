@@ -1,6 +1,6 @@
 # Project templates: export and apply
 
-> Last verified: 2026-05-13. Re-check before relying on file paths and line numbers.
+> Last verified: 2026-05-14. Re-check before relying on file paths and line numbers.
 
 ## What templates are for
 
@@ -72,8 +72,16 @@ Set up by commit `7ba71c8`. Apply/export use the same model:
 
 `${VARNAME}` is expanded only in `content` and `aiUserInstructions` ([apply-project-template.ts:142, :129](../../src/backend/projects/apply-project-template.ts)) — NOT in titles or arbitrary `nodeTypeSettings` fields. If a template wants wizard data in `nodeTypeSettings.aiUserInstructionsToFindProblems` of a fix-problems node, that field is NOT currently substituted. Worth a future check if a real template needs it.
 
+## fix-problems prompt shape at apply time
+
+Two non-obvious normalizations happen during apply for `fix-problems` nodes:
+
+- **`string[]` → `string`** (commit `8cf29b4`): the template lists prompt bodies as arrays of lines for readability, e.g. `"aiUserInstructionsToFindProblems": ["...", "..."]`. Apply joins them with `\n` before storing in `node_type_settings`.
+- **`{{Foo}}` → `Foo`** for `foundProblemsTemplate` (commit `b89a50f`): template authors naturally write `"foundProblemsTemplate": "{{Found Problems}}"`. Apply strips the wrapping so the stored value is just `"Found Problems"` — the runtime then re-wraps it as a placeholder when needed. The structural check rejects unwrapped use elsewhere.
+
 ## Tests
 
-- [`src/backend/projects/template-titles.test.ts`](../../src/backend/projects/template-titles.test.ts) — covers title-based references, sibling-uniqueness, global-uniqueness, cross-parent edges, round-trips.
-- [`src/backend/projects/template-coordinates.test.ts`](../../src/backend/projects/template-coordinates.test.ts) — coordinate persistence (x/y/width/height).
-- [`src/backend/resources/resources/templates/fiction-arc.test.ts`](../../src/backend/resources/resources/templates/fiction-arc.test.ts) — loads and applies the bundled fiction-arc template end-to-end, validates fix-problems source resolution and for-each-index multiplicity.
+- [`src/backend/projects/template-titles.test.ts`](../../src/backend/projects/template-titles.test.ts) — title-based references, sibling-uniqueness, global-uniqueness, cross-parent edges, round-trips.
+- [`src/backend/projects/template-coordinates.test.ts`](../../src/backend/projects/template-coordinates.test.ts) — coordinate persistence (x/y/width/height) + freshness check on bundled templates (commit `6063d0b`).
+- [`src/backend/resources/resources/templates/templates-structure.test.ts`](../../src/backend/resources/resources/templates/templates-structure.test.ts) — generic structural lints applied to every bundled template (checklist in [`TEMPLATE_CHECKS.md`](../../src/backend/resources/resources/templates/TEMPLATE_CHECKS.md)).
+- [`src/backend/resources/resources/templates/fiction-arc.diagnostic.test.ts`](../../src/backend/resources/resources/templates/fiction-arc.diagnostic.test.ts) — fiction-arc-specific diagnostics (fix-problems source resolution, for-each-index multiplicity, header navigation between drafts).

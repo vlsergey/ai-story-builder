@@ -1,6 +1,6 @@
 # Project overview
 
-> Last verified: 2026-05-13. Re-check before relying on file paths and line numbers.
+> Last verified: 2026-05-14. Re-check before relying on file paths and line numbers.
 
 AI Story Builder is an Electron desktop app for AI-assisted creative writing. The core idea is a **node-and-edge graph of LLM operations**: users compose pipelines like "outline → split into chapters → for-each chapter generate prose → merge to manuscript", and a regeneration engine pushes content through that graph reactively.
 
@@ -18,7 +18,7 @@ AI Story Builder is an Electron desktop app for AI-assisted creative writing. Th
 src/
   backend/
     ai/             # provider adapters + prompt building + streaming
-    db/             # better-sqlite3 wiring, schema.sql, migrations/001..026
+    db/             # better-sqlite3 wiring, schema.sql, migrations/001..028
     lore/           # lore tree CRUD (mostly TODO — see lore.md)
     plan/
       edges/        # plan_edges repository + routes
@@ -49,7 +49,9 @@ src/
 ## Things that drifted from older notes
 
 - **Transport is tRPC over Electron IPC**, not a custom `invoke` wrapper. `electron-trpc/main` is used in [main.ts:357](../../src/backend/main.ts#L357); frontend uses `ipcLink` from `electron-trpc/renderer` ([App.tsx:9](../../src/frontend/src/App.tsx#L9)).
-- **Migrations exist and number 26** (as of this writing) — the "no migrations until first release" rule from older docs no longer applies. Fresh DBs load `schema.sql` directly; existing DBs go through numbered migration steps. See [`data-model.md`](data-model.md).
+- **Migrations number 28** (as of this writing) — the "no migrations until first release" rule from older docs no longer applies. Fresh DBs load `schema.sql` directly; existing DBs go through numbered migration steps. See [`data-model.md`](data-model.md).
+- **Prompts moved off `plan_nodes` columns into `node_type_settings`** in migration 028. `ai_user_prompt` / `ai_system_prompt` no longer exist as columns; read prompts via [`getNodePrompts(node_type_settings)`](../../src/backend/plan/nodes/graph/settings-helper.ts).
+- **Split is LLM-driven, not regex** (commit `fbdbe20`). Old regex configs were migrated to natural-language prompts in migration 027.
 - **Lore integration is a TODO**, not "minimal implementation": there is a `LoreProcessor` in the registry but it does not actually inject lore content into prompts. See [`lore.md`](lore.md).
 - **Legacy tables linger**: `card_definitions`, `card_values`, `story_parts` are in the initial schema but only used in migration 001 and migration tests. Unused by the app.
 
@@ -57,6 +59,8 @@ src/
 
 - [`plan-graph.md`](plan-graph.md) — node types, edges, processors, regeneration engine
 - [`ai-integration.md`](ai-integration.md) — providers, prompt building, streaming
-- [`project-templates.md`](project-templates.md) — export/apply format (target of imminent refactor)
+- [`project-templates.md`](project-templates.md) — export/apply format (title-based references, fix-problems normalization)
+- [`fiction-arc-pipeline.md`](fiction-arc-pipeline.md) — design + shipped layout of the bundled novella template
+- [`graph-primitives-gaps.md`](graph-primitives-gaps.md) — engine extensions: done, deferred, explicitly dropped
 - [`data-model.md`](data-model.md) — DB schema, uniqueness, legacy tables
 - [`lore.md`](lore.md) — lore tree (mostly TODO)

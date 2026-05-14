@@ -1,6 +1,6 @@
 # Plan graph: nodes, edges, processors, regeneration engine
 
-> Last verified: 2026-05-13. Re-check before relying on file paths and line numbers.
+> Last verified: 2026-05-14. Re-check before relying on file paths and line numbers.
 
 ## Data model
 
@@ -8,12 +8,11 @@ Two SQLite tables drive the plan graph: `plan_nodes` and `plan_edges`. TypeScrip
 
 `plan_nodes` fields worth remembering:
 - `id`, `parent_id` — primary key and self-reference for containers (e.g. for-each children).
-- `title` — human label. **No DB-level uniqueness** (`lore_nodes` has `UNIQUE(parent_id, title)` but `plan_nodes` does not).
+- `title` — human label. **No DB-level uniqueness** in SQL (`lore_nodes` has `UNIQUE(parent_id, title)` but `plan_nodes` does not). Templates enforce uniqueness application-side — see [`project-templates.md`](project-templates.md).
 - `type` — one of the values in [`src/shared/plan-node-types.ts`](../../src/shared/plan-node-types.ts).
 - `content` — current output (string for most types; JSON-encoded `ForEachNodeContent` for `for-each`).
-- `ai_user_prompt`, `ai_system_prompt` — prompt template strings.
-- `node_type_settings` — JSON, per-type settings (e.g. split regex, merge headers).
-- `ai_settings` — JSON, per-node AI overrides (model, max tokens, etc.).
+- `node_type_settings` — JSON, per-type settings. **For LLM-call types (`text`, `split`, `lore`) this is also where `userPrompt` and `systemPrompt` live** as of migration 028 — see "Prompts live in settings now" below.
+- `ai_settings` — JSON, per-node AI overrides (model, max tokens, etc.). Engine-determined, not node-type-determined, so it stays at the row level.
 - `x`, `y`, `width`, `height` — React Flow canvas coordinates.
 - `status` — `EMPTY | GENERATING | GENERATED | MANUAL | OUTDATED | ERROR`.
 - `in_review`, `review_base_content` — review workflow for accept/reject.
@@ -30,15 +29,16 @@ Defined as TypeScript constants in [`src/shared/plan-node-types.ts`](../../src/s
 
 | Type | Container? | Purpose |
 |---|---|---|
-| `text` | no | LLM-generated text. The workhorse. Reads inputs via `{{NodeTitle}}` placeholders in prompts. |
-| `split` | no | Splits a `text` input into a `textArray` by a regex separator. |
+| `text` | no | LLM-generated text. The workhorse. Reads inputs via `{{NodeTitle}}` placeholders in `settings.userPrompt`. |
+| `split` | no | **LLM-driven** split (commit `fbdbe20`): asks the model for `{parts: string[]}` with retry-on-invalid-JSON. The split instruction lives in `settings.userPrompt`. Optional `settings.partDescription` becomes `items.description` in the response schema. |
 | `merge` | no | Concatenates multiple `text` inputs (or a `textArray`) into one `text`. Settings control optional section headers. |
 | `for-each` | **yes** | Iterates over a `textArray` input. Holds child nodes that run per element. Stores per-iteration overrides in its `content` JSON. |
-| `for-each-input` | no, confined | Auto-created inside `for-each`. Exposes the current array element as a `text` output. |
-| `for-each-output` | no, confined | Auto-created inside `for-each`. Collects per-iteration outputs into a `textArray`. |
+| `for-each-input` | no, confined | Auto-created inside `for-each`. Exposes the current array element as a `text` output. Exempt from global title uniqueness in templates. |
+| `for-each-output` | no, confined | Auto-created inside `for-each`. Collects per-iteration outputs into a `textArray`. Exempt from global title uniqueness in templates. |
 | `for-each-prev-outputs` | no, confined | Access previously generated outputs during iteration (for sequence-aware generation). |
+| `for-each-index` | no | User-placed inside a for-each. Pure read: emits the parent's current 1-based iteration index as text. No regeneration, no overrides. Added in commit `4de6157`. |
 | `lore` | no | Should inject lore content. Currently passthrough — see [`lore.md`](lore.md). |
-| `fix-problems` | no | Re-runs an LLM call to fix validation errors flagged by a downstream check. |
+| `fix-problems` | no | Iterative LLM call that finds and fixes problems flagged by structured search. Its prompts live in `node_type_settings.aiUserInstructionsToFindProblems` / `aiUserInstructionsToFixProblems` (single strings post commit `8cf29b4`, not `string[]`). Source-to-fix is referenced by sibling title (`sourceNodeIdToFix` at runtime, `sourceNodeTitleToFix` in templates). |
 
 Container vs non-container split is enforced in the schema and used by the UI to allow nesting. Confined nodes can't be moved out of their parent ([plan-node-service.ts:339-342](../../src/backend/plan/nodes/plan-node-service.ts#L339-L342)).
 
@@ -70,11 +70,23 @@ NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
 
 Processor files live in [`src/backend/plan/nodes/graph/`](../../src/backend/plan/nodes/graph/), one per node type.
 
+## Prompts live in `node_type_settings` now
+
+Migration 028 (commit `a9aaed8`) **dropped the `ai_user_prompt` and `ai_system_prompt` columns** from `plan_nodes` / `lore_nodes`. For LLM-call node types (`text`, `split`, `lore`) the prompts now live inside `node_type_settings`:
+
+```json
+{ "userPrompt": "...", "systemPrompt": "...", ... }
+```
+
+Read them through the helper [`getNodePrompts(node_type_settings)`](../../src/backend/plan/nodes/graph/settings-helper.ts) so every LLM-call site stays consistent. The `fix-problems` type does NOT use this shape — its prompts are in named fields (`aiUserInstructionsToFindProblems`, etc.) within its own settings shape.
+
+`ai_settings` (model / temperature / max tokens) stays at the row level — engine-determined, not node-type-determined.
+
 ## Title-based input references in prompts
 
-**Important for the templates refactor**: prompt strings reference inputs by **title**, not id. The `text` processor checks `instructions.includes('{{${title}}}')` in `onInputContentChange` ([text-processor.ts:36](../../src/backend/plan/nodes/graph/text-processor.ts#L36)). So titles already act as a stable identity inside prompts — switching templates from id-based to title-based references is in line with how the runtime already works.
+Prompt strings reference inputs by **title**: `{{NodeTitle}}`. The `text` processor checks `settings.userPrompt.includes('{{${title}}}')` in `onInputContentChange` to decide whether an upstream change should propagate ([text-processor.ts](../../src/backend/plan/nodes/graph/text-processor.ts)). Substitution happens during generation in [`src/backend/ai/generate-plan-node-text-content.ts`](../../src/backend/ai/generate-plan-node-text-content.ts) via [`src/backend/ai/replaceTemplates.ts`](../../src/backend/ai/replaceTemplates.ts).
 
-The actual prompt substitution happens during generation in [`src/backend/ai/generate-plan-node-text-content.ts`](../../src/backend/ai/generate-plan-node-text-content.ts) via [`src/backend/ai/replaceTemplates.ts`](../../src/backend/ai/replaceTemplates.ts).
+For `split` nodes specifically (commit `106724d`): incoming text edges are wired into the userPrompt the same way as `text` nodes, AND there's an automated lint that warns the template author if a split node has incoming edges whose titles do not appear as `{{Title}}` placeholders.
 
 ## Regeneration engine
 
