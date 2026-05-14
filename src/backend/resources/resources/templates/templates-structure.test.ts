@@ -323,6 +323,100 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     })
   })
 
+  // ─── Prompt cache discipline — dynamic placeholders must be at the bottom ─
+  // Provider prompt caches match the prefix of identical requests. The first
+  // place where two iterations' prompts diverge breaks the cache from there
+  // on. So any placeholder that varies per iteration (anything that's filled
+  // by a for-each-input, a per-iteration for-each-output, or by another node
+  // that itself sits inside the same for-each) must come AFTER all
+  // project-wide placeholders within the same prompt.
+  //
+  // Rule applied here: for every LLM-call node inside (or downstream from) a
+  // for-each, the for-each's input-alias placeholder — by template convention
+  // titled "Персонаж" / similar local title — must appear strictly LATER in
+  // the prompt than any project-level placeholder it references. Concretely:
+  // if the prompt mentions both {{<for-each-input alias>}} and any
+  // project-level placeholder X (set once per project, e.g. wizard fields),
+  // X must come first.
+  describe("dynamic per-iteration placeholders sit below project-wide placeholders", () => {
+    // Project-wide titles are nodes outside any for-each. Cross-iteration
+    // dynamic titles are nodes inside a for-each (children that vary per iter)
+    // plus the for-each-input alias.
+    const ancestors = new Map<TemplateProjectPlanNode, TemplateProjectPlanNode | null>()
+    for (const { node, parent } of allNodes) ancestors.set(node, parent)
+    function isInsideForEach(n: TemplateProjectPlanNode | null): boolean {
+      let cur = n
+      while (cur != null) {
+        if (cur.type === "for-each") return true
+        cur = ancestors.get(cur) ?? null
+      }
+      return false
+    }
+
+    const dynamicTitles = new Set<string>()
+    const allNodeTitles = new Set<string>()
+    for (const { node } of allNodes) {
+      allNodeTitles.add(node.title)
+      if (isInsideForEach(node)) dynamicTitles.add(node.title)
+    }
+
+    function gatherPromptFields(node: TemplateProjectPlanNode): Array<{ field: string; lines: string[] }> {
+      const out: Array<{ field: string; lines: string[] }> = []
+      if (Array.isArray(node.aiUserInstructions))
+        out.push({ field: "aiUserInstructions", lines: node.aiUserInstructions })
+      const s = node.nodeTypeSettings as Record<string, unknown> | undefined
+      for (const k of [
+        "aiUserInstructionsToFindProblems",
+        "aiUserInstructionsToFixProblems",
+        "aiSystemInstructionsToFindProblems",
+        "aiSystemInstructionsToFixProblems",
+      ]) {
+        const v = s?.[k]
+        if (Array.isArray(v) && v.every((x): x is string => typeof x === "string")) {
+          out.push({ field: k, lines: v as string[] })
+        }
+      }
+      return out
+    }
+
+    const offenders: string[] = []
+    for (const { node } of allNodes) {
+      for (const { field, lines } of gatherPromptFields(node)) {
+        const joined = lines.join("\n")
+        const matches = [...joined.matchAll(PLACEHOLDER_RE)]
+        // First-occurrence offset per placeholder name within this prompt.
+        const firstPos = new Map<string, number>()
+        for (const m of matches) {
+          if (!firstPos.has(m[1])) firstPos.set(m[1], m.index ?? 0)
+        }
+        const projectPlaceholders: Array<[string, number]> = []
+        const dynamicPlaceholders: Array<[string, number]> = []
+        for (const [name, pos] of firstPos) {
+          // Skip placeholders that don't correspond to any node — they're
+          // virtual vars like fix-problems' foundProblemsTemplate, which has
+          // its own (fix-iteration) dynamism orthogonal to the for-each
+          // iteration the check is about.
+          if (!allNodeTitles.has(name)) continue
+          if (dynamicTitles.has(name)) dynamicPlaceholders.push([name, pos])
+          else projectPlaceholders.push([name, pos])
+        }
+        if (projectPlaceholders.length === 0 || dynamicPlaceholders.length === 0) continue
+        const earliestDynamic = Math.min(...dynamicPlaceholders.map(([, p]) => p))
+        const latestProject = Math.max(...projectPlaceholders.map(([, p]) => p))
+        if (earliestDynamic < latestProject) {
+          const dynName = dynamicPlaceholders.find(([, p]) => p === earliestDynamic)![0]
+          const projName = projectPlaceholders.find(([, p]) => p === latestProject)![0]
+          offenders.push(
+            `${node.title}.${field}: dynamic {{${dynName}}} appears before project-wide {{${projName}}} — breaks prompt-cache prefix`,
+          )
+        }
+      }
+    }
+    it("no dynamic placeholder appears before a project-wide one", () => {
+      expect(offenders).toEqual([])
+    })
+  })
+
   // ─── Apply-time check — the whole template applies into a fresh DB ───────
   // Catches things the pure-JSON checks above can't: cross-parent references
   // that don't resolve, fix-problems sourceNodeTitleToFix pointing nowhere,

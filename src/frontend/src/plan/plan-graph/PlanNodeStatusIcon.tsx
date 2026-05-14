@@ -15,7 +15,7 @@ const STATUS_COLORS = {
   GENERATING: "text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-900",
   GENERATED: "text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-900",
   MANUAL: "text-blue-800 bg-blue-100 dark:text-blue-200 dark:bg-blue-900",
-  OUTDATED: "text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-900",
+  OUTDATED: "text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-900",
   ERROR: "text-red-800 bg-red-100 dark:text-red-200 dark:bg-red-900",
 } as const
 
