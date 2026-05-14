@@ -1,4 +1,5 @@
 import z, { type ZodObject, type ZodType } from "zod"
+import { AGE_RATING_ORDER } from "./ai-engines"
 import type { WizardField } from "./project-template"
 
 export function buildFormSchema(wizardFields: WizardField[]): ZodObject<Record<string, ZodType>> {
@@ -11,6 +12,11 @@ export function buildFormSchema(wizardFields: WizardField[]): ZodObject<Record<s
           break
         case "textarea":
           result = z.string()
+          break
+        case "select-age-rating":
+          // Values come from shared/ai-engines.ts AGE_RATING_ORDER, not from
+          // the template — the template only picks a default.
+          result = z.enum(AGE_RATING_ORDER as readonly string[] as [string, ...string[]])
           break
       }
       return [field.name, result]

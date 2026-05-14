@@ -38,7 +38,12 @@ export interface WizardInputField extends BaseWizardField {
   placeholder?: string
 }
 
-export type WizardField = WizardInputField | WizardTextAreaField
+export interface WizardSelectAgeRatingField extends BaseWizardField {
+  type: "select-age-rating"
+  defaultValue?: string
+}
+
+export type WizardField = WizardInputField | WizardTextAreaField | WizardSelectAgeRatingField
 
 export interface TemplateProjectLore {
   nodes: TemplateProjectLoreNode[]

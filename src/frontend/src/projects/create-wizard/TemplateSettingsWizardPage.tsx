@@ -8,11 +8,14 @@ import {
   FieldSet,
 } from "@/ui-components/field"
 import { Input } from "@/ui-components/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui-components/select"
 import { Textarea } from "@/ui-components/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { AGE_RATING_INFO, AGE_RATING_ORDER } from "@shared/ai-engines"
 import type { WizardField, WizardPage } from "@shared/project-template"
 import { buildFormSchema } from "@shared/project-template-form"
 import { useCallback, useId, type ReactElement, type SetStateAction } from "react"
+import { useTranslation } from "react-i18next"
 import {
   Controller,
   useForm,
@@ -90,67 +93,61 @@ function ControllableWizardFieldRenderer<T extends FieldValues>({
   fieldState,
   wizardField,
 }: ControllableWizardFieldRendererProps<T>): ReactElement {
-  return (
-    <ControllableFieldRenderer
-      type={wizardField.type}
-      label={wizardField.label}
-      description={wizardField.description}
-      placeholder={wizardField.placeholder}
-      field={field}
-      fieldState={fieldState}
-    />
-  )
-}
-
-interface ControllableFieldRendererProps<
-  TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
-> {
-  type: "input" | "textarea"
-  label: string
-  description?: string
-  placeholder?: string
-  field: ControllerRenderProps<TFieldValues, TName>
-  fieldState: ControllerFieldState
-}
-
-function ControllableFieldRenderer<T extends FieldValues>({
-  type,
-  field,
-  fieldState,
-  label,
-  description,
-  placeholder,
-}: ControllableFieldRendererProps<T>): ReactElement {
   const htmlId = useId()
+  const { t } = useTranslation("ai-engines")
   return (
     <Field data-invalid={fieldState.invalid}>
       <FieldContent>
-        <FieldLabel htmlFor={htmlId}>{label}</FieldLabel>
-        <FieldDescription>{description}</FieldDescription>
+        <FieldLabel htmlFor={htmlId}>{wizardField.label}</FieldLabel>
+        <FieldDescription>{wizardField.description}</FieldDescription>
       </FieldContent>
       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-      {type === "input" && (
+      {wizardField.type === "input" && (
         <Input
           className="w-full"
           id={htmlId}
           name={field.name}
-          placeholder={placeholder}
+          placeholder={wizardField.placeholder}
           value={field.value}
           onChange={field.onChange}
           onBlur={field.onBlur}
         />
       )}
-      {type === "textarea" && (
+      {wizardField.type === "textarea" && (
         <Textarea
           className="w-full max-h-64 overflow-y-auto"
           id={htmlId}
           name={field.name}
-          placeholder={placeholder}
+          placeholder={wizardField.placeholder}
           value={field.value}
           onChange={field.onChange}
           onBlur={field.onBlur}
         />
+      )}
+      {wizardField.type === "select-age-rating" && (
+        <Select value={field.value ?? ""} onValueChange={field.onChange}>
+          <SelectTrigger id={htmlId} className="w-full" onBlur={field.onBlur}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {AGE_RATING_ORDER.map((rating) => {
+              const info = AGE_RATING_INFO[rating]
+              return (
+                <SelectItem key={rating} value={rating}>
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ backgroundColor: info.bg, color: info.fg }}
+                    >
+                      {info.label}
+                    </span>
+                    <span>{t(`ageRating.${rating}.longLabel`)}</span>
+                  </span>
+                </SelectItem>
+              )
+            })}
+          </SelectContent>
+        </Select>
       )}
     </Field>
   )

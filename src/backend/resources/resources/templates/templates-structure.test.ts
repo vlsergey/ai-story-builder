@@ -272,6 +272,13 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
 
   it("every wizard variable used in content/aiUserInstructions has a matching wizard field declaration", () => {
     const wizardNames = new Set((template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => f.name)))
+    // Derived wizard vars — auto-computed by the apply pipeline and exposed
+    // to templates alongside the user-entered values. See enrichWizardData()
+    // in src/backend/projects/create-project.ts.
+    const hasAgeRatingField = (template.wizardPages ?? []).some((p) =>
+      p.fields.some((f) => f.type === "select-age-rating"),
+    )
+    if (hasAgeRatingField) wizardNames.add("ageRatingLabel")
     const used = new Set<string>()
     for (const { node } of allNodes) {
       const all = [...(node.content ?? []), ...(node.aiUserInstructions ?? [])].join("\n")
@@ -288,11 +295,15 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     }
     it.each(
       fields.map((f) => [`${f.page}.${f.name}`, f]),
-    )("wizard field %s has non-empty label, description and placeholder", (_id, field) => {
-      const f = field as { label?: string; description?: string; placeholder?: string }
+    )("wizard field %s has non-empty label and description", (_id, field) => {
+      const f = field as { type: string; label?: string; description?: string; placeholder?: string }
       expect(f.label?.trim() ?? "", "label").not.toBe("")
       expect(f.description?.trim() ?? "", "description").not.toBe("")
-      expect(f.placeholder?.trim() ?? "", "placeholder").not.toBe("")
+      // `placeholder` is meaningful for text inputs/textareas but not for
+      // typed selects (the options ARE the prompt).
+      if (f.type === "input" || f.type === "textarea") {
+        expect(f.placeholder?.trim() ?? "", "placeholder").not.toBe("")
+      }
     })
   })
 

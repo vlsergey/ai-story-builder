@@ -55,8 +55,24 @@
       "required": ["type"],
       "unevaluatedProperties": false
     },
+    "WizardSelectAgeRatingField": {
+      "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
+      "properties": {
+        "type": { "const": "select-age-rating" },
+        "defaultValue": {
+          "description": "One of the AGE_RATING_ORDER values from shared/ai-engines.ts: G, PG, 12, 16, 18, NC21.",
+          "type": "string"
+        }
+      },
+      "required": ["type"],
+      "unevaluatedProperties": false
+    },
     "WizardField": {
-      "oneOf": [{ "$ref": "#/definitions/WizardInputField" }, { "$ref": "#/definitions/WizardTextAreaField" }]
+      "oneOf": [
+        { "$ref": "#/definitions/WizardInputField" },
+        { "$ref": "#/definitions/WizardTextAreaField" },
+        { "$ref": "#/definitions/WizardSelectAgeRatingField" }
+      ]
     },
     "TemplateProjectLore": {
       "type": "object",
