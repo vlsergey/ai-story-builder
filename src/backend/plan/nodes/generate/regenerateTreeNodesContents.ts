@@ -13,6 +13,7 @@ import { finishRun, startRun } from "../../../lib/telemetry/telemetry.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeService } from "../plan-node-service.js"
+import { propagateStaleStatus } from "./propagateStaleStatus.js"
 import type {
   PlanNodeAiGenerationStatus,
   RegenerationContainerContext,
@@ -109,6 +110,16 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
   }
 
   console.info("[regenerateTreeNodesContents] Starting regeneration")
+  // Propagate stale status before the scheduler starts. Without this, a
+  // GENERATED downstream node looks ready to run while an upstream (or a
+  // for-each container's descendant) still has OUTDATED/ERROR/EMPTY status.
+  const { markedNodeIds } = propagateStaleStatus({
+    regenerateManual: options.regenerateManual,
+    regenerateGenerated: options.regenerateGenerated,
+  })
+  if (markedNodeIds.length > 0) {
+    console.info(`[regenerateTreeNodesContents] pre-marked OUTDATED via propagation: ${markedNodeIds.join(",")}`)
+  }
   startRun()
   let runSucceeded = true
   try {
