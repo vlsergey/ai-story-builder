@@ -103,6 +103,8 @@ For pipelines where downstream nodes navigate by header (e.g. "find `## Part {{I
 
 7.3. Merge nodes between them are configured `fixHeaders: false`, `includeNodeTitle: false`, `includeInputTitles: false` (so they don't reshape the embedded headers).
 
+7.4. **Header-producing nodes that emit ONE block per call explicitly forbid emitting more than one.** When a per-iteration node writes "Part `{{Index}}`" and the model has been given prior parts as context (assembled prev-outputs, or the full prior draft for a rewrite pass), the model often treats the `## Part 1 … ## Part 2 …` pattern in the context as a template to continue and emits Parts `{{Index}}`, `{{Index}}+1`, `{{Index}}+2` … in a single response. The prompt must explicitly state: "exactly ONE Part — Part `{{Index}}` — stop after its last sentence; no `## Part {{Index}}+1`, no epilogue, no teaser for following parts". And the downstream find-problems node (if any) must list "more than one `## Part N` header in the output" as a problem with severity ≥ 90 so the fix step truncates the excess.
+
 ---
 
 ## 8. Continuity-without-mimicry instructions
