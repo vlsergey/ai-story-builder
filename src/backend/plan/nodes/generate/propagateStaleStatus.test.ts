@@ -107,4 +107,51 @@ describe("propagateStaleStatus", () => {
     // root has no upstream stale source — stays GENERATED.
     expect(nodes.findById(root)!.status).toBe("GENERATED")
   })
+
+  it("does NOT bottom-up promote a container whose only stale descendant is EMPTY", () => {
+    // Reproduces the «Сборка предыдущих сцен» trap: a merge node inside a for-each
+    // is legitimately EMPTY on iteration 0 because it has no previous iterations
+    // to aggregate. Bottom-up propagation must not treat that EMPTY as work-pending
+    // and promote the (correctly GENERATED) for-each container to OUTDATED.
+    const nodes = new PlanNodeRepository()
+    new PlanEdgeRepository()
+    const container = nodes.insert({ title: "ForEach", type: "for-each", parent_id: null, status: "GENERATED" })
+    nodes.insert({ title: "PrevAgg", type: "merge", parent_id: container, status: "EMPTY" })
+    nodes.insert({ title: "Real child", type: "text", parent_id: container, status: "GENERATED" })
+
+    const result = propagateStaleStatus()
+
+    expect(result.markedNodeIds).toEqual([])
+    expect(nodes.findById(container)!.status).toBe("GENERATED")
+  })
+
+  it("still bottom-up promotes a container when a descendant is OUTDATED or ERROR", () => {
+    // Sanity check that the EMPTY exemption above didn't accidentally turn off
+    // bottom-up entirely. OUTDATED / ERROR descendants must still promote.
+    const nodes = new PlanNodeRepository()
+    new PlanEdgeRepository()
+    const c1 = nodes.insert({ title: "C1", type: "for-each", parent_id: null, status: "GENERATED" })
+    nodes.insert({ title: "OldChild", type: "text", parent_id: c1, status: "OUTDATED" })
+    const c2 = nodes.insert({ title: "C2", type: "for-each", parent_id: null, status: "GENERATED" })
+    nodes.insert({ title: "BrokenChild", type: "text", parent_id: c2, status: "ERROR" })
+
+    propagateStaleStatus()
+
+    expect(nodes.findById(c1)!.status).toBe("OUTDATED")
+    expect(nodes.findById(c2)!.status).toBe("OUTDATED")
+  })
+
+  it("EMPTY upstream still propagates forward through edges (forward rule unchanged)", () => {
+    // The exemption is bottom-up-only. An EMPTY node still blocks anything that
+    // reads from it via an input edge — downstream can't be considered fresh.
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const empty = nodes.insert({ title: "Empty", type: "text", parent_id: null, status: "EMPTY" })
+    const downstream = nodes.insert({ title: "D", type: "text", parent_id: null, status: "GENERATED" })
+    edges.insert({ from_node_id: empty, to_node_id: downstream, type: "text" })
+
+    propagateStaleStatus()
+
+    expect(nodes.findById(downstream)!.status).toBe("OUTDATED")
+  })
 })

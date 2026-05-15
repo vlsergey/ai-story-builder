@@ -15,8 +15,13 @@ import { PlanNodeRepository } from "../plan-node-repository.js"
  *      mark the GENERATED container OUTDATED (so the scheduler enters it
  *      and its regenerate method handles the inner sub-tree).
  *
- * Stale-source set:
- *   - always: ERROR, OUTDATED, EMPTY
+ * Stale-source set per rule:
+ *   - forward: ERROR, OUTDATED, EMPTY  (EMPTY upstream means downstream got
+ *     no real input — must refresh)
+ *   - bottom-up: ERROR, OUTDATED only  (EMPTY descendants do NOT propagate
+ *     to their container — for-each-internal merge nodes like «Сборка
+ *     предыдущих сцен» are legitimately EMPTY on iter 0, and that is not a
+ *     sign of pending work)
  *   - + MANUAL  when `regenerateManual` is on (user wants their edits redone)
  *   - + GENERATED when `regenerateGenerated` is on (user wants a full re-run)
  *
@@ -34,9 +39,16 @@ export function propagateStaleStatus(
 ): {
   markedNodeIds: number[]
 } {
-  const staleStatuses = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR", "EMPTY"])
-  if (options.regenerateManual) staleStatuses.add("MANUAL")
-  if (options.regenerateGenerated) staleStatuses.add("GENERATED")
+  const forwardStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR", "EMPTY"])
+  const bottomUpStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR"])
+  if (options.regenerateManual) {
+    forwardStale.add("MANUAL")
+    bottomUpStale.add("MANUAL")
+  }
+  if (options.regenerateGenerated) {
+    forwardStale.add("GENERATED")
+    bottomUpStale.add("GENERATED")
+  }
 
   const nodeRepo = new PlanNodeRepository()
   const edgeRepo = new PlanEdgeRepository()
@@ -71,13 +83,13 @@ export function propagateStaleStatus(
         for (const [fromId, outs] of downstream) {
           if (outs.includes(node.id)) {
             const src = byId.get(fromId)
-            if (src && staleStatuses.has(src.status)) return true
+            if (src && forwardStale.has(src.status)) return true
           }
         }
         return false
       })()
 
-      const childStale = (childrenByParent.get(node.id) ?? []).some((c) => staleStatuses.has(c.status))
+      const childStale = (childrenByParent.get(node.id) ?? []).some((c) => bottomUpStale.has(c.status))
 
       if (upstreamStale || childStale) {
         nodeRepo.patch(node.id, { status: "OUTDATED" })
