@@ -63,4 +63,18 @@ describe("ForEachIndexProcessor", () => {
     const out = new ForEachIndexProcessor().getOutput(service, service.getById(id))
     expect(out).toBe("")
   })
+
+  it("regenerate returns summary = the index, status = GENERATED — short-circuits the LLM summary call", async () => {
+    const service = new PlanNodeService()
+    const fe = service.create({
+      type: "for-each",
+      title: "FE",
+      content: JSON.stringify({ currentIndex: 6, length: 10, overrides: [] }),
+    })
+    const idx = service.create({ type: "for-each-index", title: "Index", parent_id: fe.id })
+
+    const patch = await new ForEachIndexProcessor().regenerate(service, undefined, service.getById(idx.id))
+    expect(patch.summary, "summary must be present so PlanNodeService.regenerate skips LLM auto-summary").toBe("7")
+    expect(patch.status).toBe("GENERATED")
+  })
 })

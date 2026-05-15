@@ -113,9 +113,16 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
       }
     })
 
+    // fix-problems is "improved version of the source": its summary equals
+    // the source's summary. We populate it here so PlanNodeService.regenerate
+    // sees patch.summary !== undefined and skips the LLM auto-summary call —
+    // saves an unnecessary generate-summary on every fix-problems node.
+    // If some future template needs a different summary, add a setting to
+    // override; default is to inherit from the source being fixed.
     return {
       content: JSON.stringify(newContent),
       status: "GENERATED",
+      summary: inputToFix.sourceNode.summary ?? null,
     }
   }
 }
