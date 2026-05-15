@@ -330,11 +330,6 @@ export async function regenerateSubtreeNodesContents(
   const checked = new Set<number>()
   // Queue of nodes to check (initialized with nodes that have no incoming edges)
   const queue: number[] = nodeIds.filter((id) => incomingEdges.get(id)!.length === 0)
-  // Map from node id to its data
-  const nodeMap = new Map<number, PlanNodeRow>()
-  for (const node of nodes) {
-    nodeMap.set(node.id, node)
-  }
 
   const shouldRegenerate: Record<PlanNodeRow["status"], boolean> = {
     ERROR: true,
@@ -345,12 +340,51 @@ export async function regenerateSubtreeNodesContents(
     MANUAL: context.options.regenerateManual,
   }
 
+  const nodeRepo = new PlanNodeRepository()
+  // Guard against pathological loops caused by repeated cascade demotions.
+  // Realistic ceiling: every node may be re-processed a small constant
+  // number of times. 10× the node count is generous.
+  let safetyCounter = nodeIds.length * 10
+
   while (queue.length > 0 && !context.abortSignal.aborted) {
+    if (safetyCounter-- <= 0) {
+      console.error(
+        `[regenerateSubtreeNodesContents] safety counter exhausted at parentId=${parentId}, queue=${queue.join(",")}`,
+      )
+      break
+    }
     const nodeId = queue.shift()!
-    const node = nodeMap.get(nodeId)!
+    // Refetch the live row — sibling regenerations earlier in this loop may
+    // have fired markAsOutdatedAndNotifyDownstreamNodes cascades that demoted
+    // this node's status (e.g. for-each-prev-outputs regen → merge demoted →
+    // scene demoted), and we must NOT decide based on a stale snapshot.
+    const node = nodeRepo.findById(nodeId)
+    if (!node) continue
+
+    // Sources may also have been demoted by intervening cascades. If a source
+    // was checked but is now stale again, un-check it so it re-runs before
+    // we process this node.
+    const sources = incomingEdges.get(nodeId)!
+    let anySourceDemoted = false
+    for (const srcId of sources) {
+      if (!checked.has(srcId)) continue
+      const liveSrc = nodeRepo.findById(srcId)
+      if (liveSrc && shouldRegenerate[liveSrc.status] && hasRegenerationCriteria(liveSrc)) {
+        console.log(
+          `[regenerateSubtreeNodesContents] source ${srcId} demoted to ${liveSrc.status} since it was processed; re-queueing it before ${nodeId}`,
+        )
+        checked.delete(srcId)
+        if (!queue.includes(srcId)) queue.push(srcId)
+        anySourceDemoted = true
+      }
+    }
+    if (anySourceDemoted) {
+      // Defer current node until the demoted sources catch up.
+      queue.push(nodeId)
+      continue
+    }
 
     // Check if all sources are already checked
-    const sources = incomingEdges.get(nodeId)!
     const allSourcesChecked = sources.every((srcId) => checked.has(srcId))
     if (!allSourcesChecked) {
       // Not ready yet, put back at the end of queue (will be revisited later)
