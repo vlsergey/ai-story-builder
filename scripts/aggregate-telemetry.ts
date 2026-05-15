@@ -50,28 +50,38 @@ type BucketKey = "engine" | "model" | "purpose" | "node_type" | "node_title"
 
 const ALLOWED_KEYS: BucketKey[] = ["engine", "model", "purpose", "node_type", "node_title"]
 
+/**
+ * For each numeric metric we report two percentiles: p50 (median) and p90
+ * (90th percentile). The pair shows both "typical cost/duration" and the
+ * tail — useful when the tail is what determines whether a template run
+ * will or won't fit in the user's budget.
+ */
+interface PercentilePair {
+  p50: number
+  p90: number
+}
 interface BucketStats {
   key: Partial<Record<BucketKey, string | null>>
   count: number
   failed: number
-  median_duration_ms: number
-  median_input_tokens: number | null
-  median_output_tokens: number | null
-  median_cached_prompt_tokens: number | null
+  duration_ms: PercentilePair
+  input_tokens: PercentilePair | null
+  output_tokens: PercentilePair | null
+  cached_prompt_tokens: PercentilePair | null
   median_cached_fraction: number | null
-  median_instructions_chars: number
-  median_input_chars: number
-  median_output_chars: number
-  median_cost_usd: number | null
+  instructions_chars: PercentilePair
+  input_chars: PercentilePair
+  output_chars: PercentilePair
+  cost_usd: PercentilePair | null
   total_cost_usd: number | null
   /**
-   * Median number of iterations per visit, for buckets that include records
-   * with `iteration_index`. A "visit" is a contiguous run of records sharing
+   * Iterations per visit, for buckets that include records with
+   * `iteration_index`. A "visit" is a contiguous run of records sharing
    * (run_id, node_title) within this bucket whose iteration_index starts at
    * 0; max(iteration_index)+1 within the visit = iterations to converge.
    * `null` when the bucket has no records carrying iteration_index.
    */
-  median_iterations_per_visit: number | null
+  iterations_per_visit: PercentilePair | null
   visits_count: number | null
 }
 
@@ -146,16 +156,30 @@ function loadTelemetry(jsonlPath: string): CallRecord[] {
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 
-function median(values: number[]): number {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+function percentile(sortedValues: number[], p: number): number {
+  if (sortedValues.length === 0) return 0
+  if (sortedValues.length === 1) return sortedValues[0]
+  // Linear interpolation between closest ranks (R-7 / Excel / numpy default).
+  const rank = (sortedValues.length - 1) * p
+  const lo = Math.floor(rank)
+  const hi = Math.ceil(rank)
+  if (lo === hi) return sortedValues[lo]
+  return sortedValues[lo] + (sortedValues[hi] - sortedValues[lo]) * (rank - lo)
 }
 
-function medianOrNull(values: Array<number | null | undefined>): number | null {
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  return percentile(sorted, 0.5)
+}
+
+function pair(values: number[]): PercentilePair {
+  const sorted = [...values].sort((a, b) => a - b)
+  return { p50: percentile(sorted, 0.5), p90: percentile(sorted, 0.9) }
+}
+
+function pairOrNull(values: Array<number | null | undefined>): PercentilePair | null {
   const filtered = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v))
-  return filtered.length === 0 ? null : median(filtered)
+  return filtered.length === 0 ? null : pair(filtered)
 }
 
 function sumOrNull(values: Array<number | null | undefined>): number | null {
@@ -175,11 +199,11 @@ function sumOrNull(values: Array<number | null | undefined>): number | null {
  * single-shot purposes like `generate-plan-node-text-content` won't have it.
  */
 function analyseVisits(records: CallRecord[]): {
-  median_iterations_per_visit: number | null
+  iterations_per_visit: PercentilePair | null
   visits_count: number | null
 } {
   const tagged = records.filter((r) => typeof r.iteration_index === "number")
-  if (tagged.length === 0) return { median_iterations_per_visit: null, visits_count: null }
+  if (tagged.length === 0) return { iterations_per_visit: null, visits_count: null }
 
   // Group by (run_id, node_title), sort each group by ts, walk and split into
   // visits on iteration_index === 0 boundaries.
@@ -207,9 +231,9 @@ function analyseVisits(records: CallRecord[]): {
     if (currentMax !== -1) visitIterations.push(currentMax + 1)
   }
 
-  if (visitIterations.length === 0) return { median_iterations_per_visit: null, visits_count: null }
+  if (visitIterations.length === 0) return { iterations_per_visit: null, visits_count: null }
   return {
-    median_iterations_per_visit: median(visitIterations),
+    iterations_per_visit: pair(visitIterations),
     visits_count: visitIterations.length,
   }
 }
@@ -251,22 +275,22 @@ function aggregate(records: CallRecord[], by: BucketKey[]): BucketStats[] {
       )
       .filter((v): v is number => typeof v === "number")
 
-    const { median_iterations_per_visit, visits_count } = analyseVisits(ok)
+    const { iterations_per_visit, visits_count } = analyseVisits(ok)
     buckets.push({
       key,
       count: list.length,
       failed,
-      median_duration_ms: median(ok.map((r) => r.duration_ms)),
-      median_input_tokens: medianOrNull(ok.map((r) => r.input_tokens)),
-      median_output_tokens: medianOrNull(ok.map((r) => r.output_tokens)),
-      median_cached_prompt_tokens: medianOrNull(ok.map((r) => r.cached_prompt_tokens)),
+      duration_ms: pair(ok.map((r) => r.duration_ms)),
+      input_tokens: pairOrNull(ok.map((r) => r.input_tokens)),
+      output_tokens: pairOrNull(ok.map((r) => r.output_tokens)),
+      cached_prompt_tokens: pairOrNull(ok.map((r) => r.cached_prompt_tokens)),
       median_cached_fraction: cachedFraction.length > 0 ? median(cachedFraction) : null,
-      median_instructions_chars: Math.round(median(ok.map((r) => r.instructions_chars))),
-      median_input_chars: Math.round(median(ok.map((r) => r.input_chars))),
-      median_output_chars: Math.round(median(ok.map((r) => r.output_chars))),
-      median_cost_usd: medianOrNull(ok.map((r) => r.cost_usd)),
+      instructions_chars: pair(ok.map((r) => r.instructions_chars)),
+      input_chars: pair(ok.map((r) => r.input_chars)),
+      output_chars: pair(ok.map((r) => r.output_chars)),
+      cost_usd: pairOrNull(ok.map((r) => r.cost_usd)),
       total_cost_usd: sumOrNull(ok.map((r) => r.cost_usd)),
-      median_iterations_per_visit,
+      iterations_per_visit,
       visits_count,
     })
   }
@@ -306,6 +330,29 @@ function padLeft(s: string, n: number): string {
   return s.length >= n ? s : " ".repeat(n - s.length) + s
 }
 
+/**
+ * Render a p50–p90 pair through a single-value formatter. Collapses to a
+ * single value when p50 === p90 (single sample or degenerate distribution).
+ */
+function formatPair(p: PercentilePair | null, fmt: (v: number) => string): string {
+  if (p == null) return "—"
+  const lo = fmt(p.p50)
+  const hi = fmt(p.p90)
+  return lo === hi ? lo : `${lo}–${hi}`
+}
+function formatPairInt(p: PercentilePair | null): string {
+  return formatPair(p, (v) => String(Math.round(v)))
+}
+function formatPairDuration(p: PercentilePair | null): string {
+  return formatPair(p, formatDuration)
+}
+function formatPairCost(p: PercentilePair | null): string {
+  return formatPair(p, (v) => formatCost(v))
+}
+function formatPairFloat1(p: PercentilePair | null): string {
+  return formatPair(p, (v) => v.toFixed(1))
+}
+
 function printTable(by: BucketKey[], buckets: BucketStats[]): void {
   const keyWidths: Partial<Record<BucketKey, number>> = {}
   for (const k of by) {
@@ -315,16 +362,16 @@ function printTable(by: BucketKey[], buckets: BucketStats[]): void {
     ...by.map((k) => ({ name: k, width: keyWidths[k]!, right: false })),
     { name: "n", width: 5, right: true },
     { name: "fail", width: 5, right: true },
-    { name: "dur", width: 8, right: true },
-    { name: "in_tok", width: 8, right: true },
-    { name: "out_tok", width: 8, right: true },
+    { name: "dur p50–p90", width: 14, right: true },
+    { name: "in_tok p50–p90", width: 16, right: true },
+    { name: "out_tok p50–p90", width: 16, right: true },
     { name: "cached", width: 7, right: true },
-    { name: "instr_ch", width: 8, right: true },
-    { name: "in_ch", width: 7, right: true },
-    { name: "out_ch", width: 7, right: true },
-    { name: "cost", width: 9, right: true },
+    { name: "instr_ch p50–p90", width: 18, right: true },
+    { name: "in_ch p50–p90", width: 17, right: true },
+    { name: "out_ch p50–p90", width: 17, right: true },
+    { name: "cost p50–p90", width: 16, right: true },
     { name: "Σ cost", width: 9, right: true },
-    { name: "iter/v", width: 7, right: true },
+    { name: "iter/v p50–p90", width: 14, right: true },
     { name: "visits", width: 7, right: true },
   ]
   function row(values: string[]): string {
@@ -337,16 +384,16 @@ function printTable(by: BucketKey[], buckets: BucketStats[]): void {
       ...by.map((k) => b.key[k] ?? "—"),
       String(b.count),
       b.failed > 0 ? String(b.failed) : "0",
-      formatDuration(b.median_duration_ms),
-      b.median_input_tokens != null ? String(Math.round(b.median_input_tokens)) : "—",
-      b.median_output_tokens != null ? String(Math.round(b.median_output_tokens)) : "—",
+      formatPairDuration(b.duration_ms),
+      formatPairInt(b.input_tokens),
+      formatPairInt(b.output_tokens),
       fmtPercent(b.median_cached_fraction),
-      String(b.median_instructions_chars),
-      String(b.median_input_chars),
-      String(b.median_output_chars),
-      formatCost(b.median_cost_usd),
+      formatPairInt(b.instructions_chars),
+      formatPairInt(b.input_chars),
+      formatPairInt(b.output_chars),
+      formatPairCost(b.cost_usd),
       formatCost(b.total_cost_usd),
-      b.median_iterations_per_visit != null ? b.median_iterations_per_visit.toFixed(1) : "—",
+      formatPairFloat1(b.iterations_per_visit),
       b.visits_count != null ? String(b.visits_count) : "—",
     ]
     console.log(row(values))
@@ -395,11 +442,13 @@ function main(): void {
   if (opts.since) console.log(`Since:   ${opts.since.toISOString()}`)
   console.log(`Group by: ${opts.by.join(", ")}`)
   console.log("")
-  console.log("Columns: n=successful+failed call count, fail=failed, dur=median duration,")
-  console.log("  in_tok/out_tok=median tokens, cached=median cached fraction of input,")
-  console.log("  instr_ch=median chars of static prompt template, in_ch/out_ch=median rendered chars,")
-  console.log("  cost=median per-call cost, Σ cost=sum cost across calls in the bucket,")
-  console.log("  iter/v=median iterations per visit (for loops like fix-problems), visits=visit count.")
+  console.log("Columns: n=successful+failed call count, fail=failed.")
+  console.log("  Numeric metrics are shown as p50–p90 (median–90th percentile) — collapsed to one")
+  console.log("  value when p50==p90. Specifically: dur=duration, in_tok/out_tok=tokens, instr_ch=")
+  console.log("  static prompt template chars, in_ch/out_ch=rendered chars, cost=per-call cost,")
+  console.log("  iter/v=iterations per visit (for loops like fix-problems).")
+  console.log("  cached=median cached fraction of input, Σ cost=sum across calls in the bucket,")
+  console.log("  visits=visit count (number of distinct (run_id, node_title) groups in the bucket).")
   console.log("")
   printTable(opts.by, buckets)
 }
