@@ -67,6 +67,70 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   const template = loadTemplate(file)
   const allNodes = walkPlanNodes(template.plan?.nodes)
 
+  // ── Shared classifiers used by the prompt-cache discipline tests below ───
+  // A node is "dynamic" iff it lives anywhere inside a for-each — its content
+  // varies per iteration. "Growing" is a refinement: a merge node whose
+  // direct input is a for-each-prev-outputs sibling — its content is the
+  // prefix of the next iteration's content (append-only).
+  const parentOf = new Map<TemplateProjectPlanNode, TemplateProjectPlanNode | null>()
+  for (const { node, parent } of allNodes) parentOf.set(node, parent)
+  function insideForEach(n: TemplateProjectPlanNode): boolean {
+    let cur: TemplateProjectPlanNode | null = parentOf.get(n) ?? null
+    while (cur != null) {
+      if (cur.type === "for-each") return true
+      cur = parentOf.get(cur) ?? null
+    }
+    return false
+  }
+  function directSiblings(n: TemplateProjectPlanNode): TemplateProjectPlanNode[] {
+    const p = parentOf.get(n) ?? null
+    return allNodes.filter(({ node }) => (parentOf.get(node) ?? null) === p).map(({ node }) => node)
+  }
+  const allNodeTitles = new Set<string>(allNodes.map(({ node }) => node.title))
+  const dynamicTitles = new Set<string>(allNodes.filter(({ node }) => insideForEach(node)).map(({ node }) => node.title))
+  const growingTitles = new Set<string>(
+    allNodes
+      .filter(({ node }) => {
+        if (node.type !== "merge") return false
+        const sibs = directSiblings(node)
+        return (node.inputs ?? []).some((inp) => {
+          const src = sibs.find((s) => s.title === inp.sourceNodeTitle)
+          return src?.type === "for-each-prev-outputs"
+        })
+      })
+      .map(({ node }) => node.title),
+  )
+
+  function gatherPromptFields(node: TemplateProjectPlanNode): Array<{ field: string; lines: string[] }> {
+    const out: Array<{ field: string; lines: string[] }> = []
+    if (Array.isArray(node.aiUserInstructions))
+      out.push({ field: "aiUserInstructions", lines: node.aiUserInstructions })
+    const s = node.nodeTypeSettings as Record<string, unknown> | undefined
+    for (const k of [
+      "aiUserInstructionsToFindProblems",
+      "aiUserInstructionsToFixProblems",
+      "aiSystemInstructionsToFindProblems",
+      "aiSystemInstructionsToFixProblems",
+    ]) {
+      const v = s?.[k]
+      if (Array.isArray(v) && v.every((x): x is string => typeof x === "string")) {
+        out.push({ field: k, lines: v as string[] })
+      }
+    }
+    return out
+  }
+
+  /** First-occurrence offset for every node-title placeholder in a prompt. */
+  function placeholderPositions(lines: string[]): Map<string, number> {
+    const joined = lines.join("\n")
+    const out = new Map<string, number>()
+    for (const m of joined.matchAll(PLACEHOLDER_RE)) {
+      if (!allNodeTitles.has(m[1])) continue // skip virtual vars like foundProblemsTemplate
+      if (!out.has(m[1])) out.set(m[1], m.index ?? 0)
+    }
+    return out
+  }
+
   describe("split nodes have partDescription", () => {
     const splitNodes = allNodes.filter(({ node }) => node.type === "split")
     if (splitNodes.length === 0) {
@@ -350,73 +414,20 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   // project-level placeholder X (set once per project, e.g. wizard fields),
   // X must come first.
   describe("dynamic per-iteration placeholders sit below project-wide placeholders", () => {
-    // Project-wide titles are nodes outside any for-each. Cross-iteration
-    // dynamic titles are nodes inside a for-each (children that vary per iter)
-    // plus the for-each-input alias.
-    const ancestors = new Map<TemplateProjectPlanNode, TemplateProjectPlanNode | null>()
-    for (const { node, parent } of allNodes) ancestors.set(node, parent)
-    function isInsideForEach(n: TemplateProjectPlanNode | null): boolean {
-      let cur = n
-      while (cur != null) {
-        if (cur.type === "for-each") return true
-        cur = ancestors.get(cur) ?? null
-      }
-      return false
-    }
-
-    const dynamicTitles = new Set<string>()
-    const allNodeTitles = new Set<string>()
-    for (const { node } of allNodes) {
-      allNodeTitles.add(node.title)
-      if (isInsideForEach(node)) dynamicTitles.add(node.title)
-    }
-
-    function gatherPromptFields(node: TemplateProjectPlanNode): Array<{ field: string; lines: string[] }> {
-      const out: Array<{ field: string; lines: string[] }> = []
-      if (Array.isArray(node.aiUserInstructions))
-        out.push({ field: "aiUserInstructions", lines: node.aiUserInstructions })
-      const s = node.nodeTypeSettings as Record<string, unknown> | undefined
-      for (const k of [
-        "aiUserInstructionsToFindProblems",
-        "aiUserInstructionsToFixProblems",
-        "aiSystemInstructionsToFindProblems",
-        "aiSystemInstructionsToFixProblems",
-      ]) {
-        const v = s?.[k]
-        if (Array.isArray(v) && v.every((x): x is string => typeof x === "string")) {
-          out.push({ field: k, lines: v as string[] })
-        }
-      }
-      return out
-    }
-
     const offenders: string[] = []
     for (const { node } of allNodes) {
       for (const { field, lines } of gatherPromptFields(node)) {
-        const joined = lines.join("\n")
-        const matches = [...joined.matchAll(PLACEHOLDER_RE)]
-        // First-occurrence offset per placeholder name within this prompt.
-        const firstPos = new Map<string, number>()
-        for (const m of matches) {
-          if (!firstPos.has(m[1])) firstPos.set(m[1], m.index ?? 0)
+        const proj: Array<[string, number]> = []
+        const dyn: Array<[string, number]> = []
+        for (const [name, pos] of placeholderPositions(lines)) {
+          ;(dynamicTitles.has(name) ? dyn : proj).push([name, pos])
         }
-        const projectPlaceholders: Array<[string, number]> = []
-        const dynamicPlaceholders: Array<[string, number]> = []
-        for (const [name, pos] of firstPos) {
-          // Skip placeholders that don't correspond to any node — they're
-          // virtual vars like fix-problems' foundProblemsTemplate, which has
-          // its own (fix-iteration) dynamism orthogonal to the for-each
-          // iteration the check is about.
-          if (!allNodeTitles.has(name)) continue
-          if (dynamicTitles.has(name)) dynamicPlaceholders.push([name, pos])
-          else projectPlaceholders.push([name, pos])
-        }
-        if (projectPlaceholders.length === 0 || dynamicPlaceholders.length === 0) continue
-        const earliestDynamic = Math.min(...dynamicPlaceholders.map(([, p]) => p))
-        const latestProject = Math.max(...projectPlaceholders.map(([, p]) => p))
-        if (earliestDynamic < latestProject) {
-          const dynName = dynamicPlaceholders.find(([, p]) => p === earliestDynamic)![0]
-          const projName = projectPlaceholders.find(([, p]) => p === latestProject)![0]
+        if (proj.length === 0 || dyn.length === 0) continue
+        const earliestDyn = Math.min(...dyn.map(([, p]) => p))
+        const latestProj = Math.max(...proj.map(([, p]) => p))
+        if (earliestDyn < latestProj) {
+          const dynName = dyn.find(([, p]) => p === earliestDyn)![0]
+          const projName = proj.find(([, p]) => p === latestProj)![0]
           offenders.push(
             `${node.title}.${field}: dynamic {{${dynName}}} appears before project-wide {{${projName}}} — breaks prompt-cache prefix`,
           )
@@ -425,6 +436,45 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     }
     it("no dynamic placeholder appears before a project-wide one", () => {
       expect(offenders).toEqual([])
+    })
+  })
+
+  // ─── Prompt cache discipline (intra-iteration order) ─────────────────────
+  // Within a for-each, some placeholders are append-only across iterations —
+  // a merge node fed by for-each-prev-outputs is the canonical case: its
+  // content on iter N is the prefix of its content on iter N+1. Such
+  // placeholders should appear BEFORE other per-iteration-fresh placeholders
+  // in the prompt — otherwise a fresh placeholder breaks the cache prefix
+  // BEFORE the growing one, and the growing one's prefix gains nothing.
+  //
+  // The cost of getting this wrong is real: in fiction-arc «Проза сцены»
+  // had {{План сцены}} (fresh) above {{Сборка предыдущих сцен}} (growing),
+  // and observed cached% on text-gen 8k–32k bucket was 5% instead of the
+  // 50%+ it would have been with correct order.
+  describe("growing (append-only) placeholders precede fresh-per-iter ones", () => {
+    const violations: string[] = []
+    for (const { node } of allNodes) {
+      for (const { field, lines } of gatherPromptFields(node)) {
+        const growing: Array<[string, number]> = []
+        const fresh: Array<[string, number]> = []
+        for (const [name, pos] of placeholderPositions(lines)) {
+          if (!dynamicTitles.has(name)) continue // project-wide is the other test's concern
+          ;(growingTitles.has(name) ? growing : fresh).push([name, pos])
+        }
+        if (growing.length === 0 || fresh.length === 0) continue
+        const latestGrowing = Math.max(...growing.map(([, p]) => p))
+        const earliestFresh = Math.min(...fresh.map(([, p]) => p))
+        if (latestGrowing > earliestFresh) {
+          const growName = growing.find(([, p]) => p === latestGrowing)![0]
+          const freshName = fresh.find(([, p]) => p === earliestFresh)![0]
+          violations.push(
+            `${node.title}.${field}: growing {{${growName}}} appears after fresh-per-iter {{${freshName}}} — cache prefix breaks at {{${freshName}}} before the growing block contributes`,
+          )
+        }
+      }
+    }
+    it("no growing placeholder sits below a fresh-per-iter one", () => {
+      expect(violations).toEqual([])
     })
   })
 
