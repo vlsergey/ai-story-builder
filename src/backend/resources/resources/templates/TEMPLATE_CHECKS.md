@@ -41,7 +41,9 @@ The LLM's prompt cache keys on the longest matching **prefix** of the user messa
    - Static-across-iterations (for a node inside a for-each): cross-parent inputs (style guide, cast bible, setting, plot outline, setup/payoff registry) — they don't change while iterating.
    - Dynamic-per-iteration: sibling inputs from the same for-each (current beat, scene plan, director notes, the prev-outputs merge, the iteration index) — they all change with the iteration.
 
-3.2. Within each prompt, the task block (the instruction itself — static text, typically introduced by a "what to do" h2 heading) sits AFTER all input sections. Placing it dead-last means the cache benefit on the prefix is captured by everything above it.
+3.2. Within each prompt for a **content-generating** text/split/lore node, the task block (the instruction itself — static text, typically introduced by a "what to do" h2 heading) sits AFTER all input substitution sections. The cache benefit is marginal in production (the cache always breaks at the first dynamic placeholder regardless of task position) — the real win is at **template authoring time**: when the author iterates on the task wording but inputs stay constant, task-at-bottom keeps the cached prefix valid right up to the task.
+
+   For **fix-problems** prompts the convention is reversed: a short task block on top, then the (typically large) substituted material. This is by design — the model needs to know the task before reading a multi-thousand-token block of content. Don't shoehorn fix-problems into the text-node ordering.
 
 3.3. For nodes NOT inside a for-each (project-once nodes), this rule still applies as a guideline against later edits: inputs that the author is more likely to tweak (like style guide) go below inputs that are more likely to stay frozen (like the original synopsis).
 
@@ -103,17 +105,24 @@ For pipelines where downstream nodes navigate by header (e.g. "find `## Part {{I
 
 7.3. Merge nodes between them are configured `fixHeaders: false`, `includeNodeTitle: false`, `includeInputTitles: false` (so they don't reshape the embedded headers).
 
-7.4. **Per-iteration nodes that emit ONE element of a sequence (one scene, one chapter, one part) explicitly forbid emitting more than one.** When such a node has been given prior elements of the sequence as context (assembled prev-outputs, or the full prior draft for a rewrite pass), the model often treats the `## Part 1 … ## Part 2 …` pattern in that context as a template to continue and emits Parts `{{Index}}`, `{{Index}}+1`, `{{Index}}+2` … in a single response. The prompt must explicitly state: "exactly ONE Part — Part `{{Index}}` — stop after its last sentence; no `## Part {{Index}}+1`, no epilogue, no teaser for following parts". And the downstream find-problems node (if any) must list "more than one `## Part N` header in the output" as a problem with severity ≥ 90 so the fix step truncates the excess.
-
 ---
 
-## 8. Continuity-without-mimicry instructions
+## 8. Continuity instructions
 
-For text nodes that receive prev-outputs (full prior scenes), the prompt must explicitly state:
+For text nodes that receive prev-outputs (full prior scenes / chapters / sections), the prompt must explicitly state both what NOT to do with the prior content AND what to actively USE from it. Without the active-use clause, the model treats prior content as inert reference and produces episodes that feel like standalone stories. Without the no-mimicry clause, the model produces echo-prose by lifting phrasings.
 
-8.1. The prior scenes are for **meaning / continuity**, **not** for copying stylistics or fragments verbatim. Without this, the model produces echo-prose by lifting phrasings.
+8.1. **No mimicry.** Prior content is for meaning / continuity, NOT for copying stylistics or fragments verbatim. Reference events, not text.
 
-8.2. The prompt also names what the prev-outputs are for in practical terms: "to avoid contradicting what was already written, to avoid repeating metaphors, to keep names straight".
+8.2. **Practical purpose named.** Spell out what prev-outputs are for in concrete terms: "to avoid contradicting what was already written, to avoid repeating metaphors, to keep names straight".
+
+8.3. **Active engagement required.** The prompt names specific behaviours that must connect the new piece to prior pieces, not just permit it. Concrete demands that have proven necessary in practice:
+
+   - **Emotional carry-over** — the new piece starts from the emotional state the previous piece ended in (not "back to neutral").
+   - **Named callbacks** — at least one explicit reference to a specific event, decision, line, or object from prior pieces (not vague "earlier"; named anchors).
+   - **Relationship memory** — characters' interactions carry the weight of prior interactions in subtext, even if not spelled out.
+   - **Open setups tracking** — unresolved setups from prior pieces either pay off in this one or remain visibly charged.
+
+   The model can fulfil 8.1 + 8.2 without doing any of 8.3 — it simply writes a clean standalone episode in the right style and gets it past the mimicry check. 8.3 is what makes the arc feel like an arc.
 
 ---
 
@@ -140,6 +149,46 @@ For text nodes that receive prev-outputs (full prior scenes), the prompt must ex
 10.5. **Profile / character-sheet nodes explicitly forbid invented example quotes.** When a profile describes how a character speaks, listing example phrases ("often says: …", "favourite line: …") causes the model to recycle those exact strings verbatim into every later scene that character appears in. Describe voice as tendencies and techniques (rhythm, vocabulary, defensive verbal habits), not as a catalog of stock phrases. Quotes from an established canon (when the character is borrowed from a source named in the world description) are fine — they must already exist in the wider corpus the model has access to and should be marked as such (e.g. with a "canon:" prefix).
 
 10.6. **Classification / analysis / planning nodes (anything whose job is to describe ABOUT the work rather than write the work) explicitly forbid story prose.** Without this, when the prompt includes a synopsis or scene plan, the model can slide into writing the story itself — especially when given high word ceilings or the word "prose" anywhere in the instruction. The forbidding sentence should name the slippage concretely — e.g. "this is classification, not the work itself: do not write prose, do not compose scenes, do not produce dialogue" (in the template's language). Applies to: theme, genre, world description, character profile, scene plan, director notes, plot outline, setup/payoff registry, fix-problems find-step.
+
+---
+
+## 11. Per-iteration generation discipline
+
+For per-iteration nodes inside a for-each — the ones that emit ONE element of a sequence per call (one scene, one chapter, one section):
+
+11.1. **Exactly one element per call, explicitly stated.** When such a node has prior elements assembled in its context (a prev-outputs merge, or the full prior draft for a rewrite pass), the model often reads the `## Part 1 … ## Part 2 …` pattern there as a template to continue and emits Parts `{{Index}}`, `{{Index}}+1`, `{{Index}}+2` … in one response. The prompt must explicitly state: "exactly ONE Part — Part `{{Index}}` — stop after its last sentence; no `## Part {{Index}}+1`, no epilogue, no teaser for following parts". The downstream find-problems node (if any) must list "more than one `## Part N` header in the output" as a problem with severity ≥ 90 so the fix step truncates the excess.
+
+11.2. **Iteration index appears prominently as a placeholder.** The current iteration index is part of every header (`## Part {{Index}}`) and ideally also in the task block ("write Part `{{Index}}` and only it"). Burying the index inside a sentence three paragraphs in invites the model to miss it.
+
+11.3. **The header format is identical in the producer prompt and downstream consumer prompts.** If producer says `## Часть {{Index}}` and consumer looks for `## Часть {{Index}}`, that's fine. If consumer looks for `## Part {{Index}}` (drift), the navigation by header in the downstream node silently breaks. See also 7.1 / 7.2.
+
+---
+
+## 12. Age-rating gate
+
+12.1. Templates that declare an age-rating wizard field (`select-age-rating`) receive a derived `${ageRatingLabel}` variable that the apply pipeline substitutes into prompts. Every LLM-call node's prompt fields must reference this variable. Without it, the model:
+   - refuses on a content filter for genuinely-allowed-by-rating topics (CSAM-class false positives — the model can't tell mature is OK if you never told it), OR
+   - over-corrects toward sanitised prose even on permitted topics.
+
+   Typical pattern at the very top of each prompt: `## Возрастной рейтинг произведения\n\n${ageRatingLabel}. <one sentence saying the content must stay in range>.`
+
+   This rule is enforced by [`templates-structure.test.ts`](./templates-structure.test.ts) — see "LLM-call nodes reference the ageRatingLabel wizard var". The reverse is not enforced: templates without an age-rating field skip the check.
+
+---
+
+## 13. Severity bands for fix-problems
+
+For `fix-problems` nodes, the find-step prompt asks the model to assign severity 0–100 to each problem and the engine fixes everything ≥ `minSeverityToFix`. Internal consistency matters: if the find-step's enumerated problem types all use severity 60–95 but `minSeverityToFix: 40`, the threshold is meaningless. If find-step assigns severities of 30 to real issues but `minSeverityToFix: 50`, those issues are detected and silently discarded.
+
+13.1. **Document the severity bands the find-step uses** in the prompt itself, so the model has a consistent reference. A reasonable convention is:
+   - 80–100: blocker. Structural / safety / "the output is unusable as-is" problems. (Wrong header. Wrong character. Foreign language insertion. Multi-scene overrun.)
+   - 60–79: significant. Reader will notice and judge the work for it.
+   - 40–59: polish. Worth fixing if cheap, not worth blocking on.
+   - < 40: noise; don't surface.
+
+13.2. **`minSeverityToFix` is at or below the bottom of the bands the find-step actually uses.** If find-step never assigns < 50, setting `minSeverityToFix: 30` just means the threshold is decorative.
+
+13.3. **`maxIterations` matches the cost-benefit:** profile / setup nodes (cheap, low-risk) can afford 2–3 iterations; arc-spanning plan polish that's worth grinding can go to 10; scene-level polish where the fifth round adds nothing should cap at 2.
 
 ---
 

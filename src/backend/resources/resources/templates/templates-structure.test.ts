@@ -480,6 +480,53 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     })
   })
 
+  // ─── Age-rating boilerplate ──────────────────────────────────────────────
+  // Templates that declare an age-rating wizard field (select-age-rating) get
+  // a derived `${ageRatingLabel}` variable substituted into prompts at apply
+  // time. Without it, the LLM has no idea what content range is OK and either
+  // (a) refuses on a content filter for risky topics, or (b) over-corrects
+  // toward sanitised prose. If the author wired up the wizard field but
+  // forgot to thread `${ageRatingLabel}` into prompts, the apply-time
+  // substitution silently drops the variable and the prompt loses the gate.
+  //
+  // Rule: if any wizard field has type `select-age-rating`, every LLM-call
+  // node's prompts must reference `${ageRatingLabel}` at least once.
+  describe("LLM-call nodes reference the ageRatingLabel wizard var when template has age-rating field", () => {
+    const hasAgeRatingField = (template.wizardPages ?? []).some((p) =>
+      p.fields.some((f) => f.type === "select-age-rating"),
+    )
+    if (!hasAgeRatingField) {
+      it.skip("template has no age-rating wizard field — rule N/A", () => {})
+      return
+    }
+    const llmCallTypes = new Set(["text", "split", "lore", "fix-problems"])
+    const candidates = allNodes.filter(({ node }) => llmCallTypes.has(node.type))
+    if (candidates.length === 0) {
+      it.skip("no LLM-call nodes in this template", () => {})
+      return
+    }
+
+    const failures: string[] = []
+    for (const { node } of candidates) {
+      const fields = gatherPromptFields(node)
+      if (fields.length === 0) continue
+      for (const { field, lines } of fields) {
+        const joined = lines.join("\n")
+        if (!joined.includes("${" + "ageRatingLabel}")) {
+          failures.push(`${node.title}.${field}`)
+        }
+      }
+    }
+    it("every prompt field of every LLM-call node references the age-rating wizard var", () => {
+      expect(
+        failures,
+        `Missing \${ageRatingLabel} reference in: ${failures.join(", ")}. ` +
+          `Either add the substitution at the top of each prompt (typical pattern: "## Возрастной рейтинг ... \${ageRatingLabel}. ..."), ` +
+          `or drop the select-age-rating wizard field if rating isn't meaningful for this template.`,
+      ).toEqual([])
+    })
+  })
+
   // ─── Apply-time check — the whole template applies into a fresh DB ───────
   // Catches things the pure-JSON checks above can't: cross-parent references
   // that don't resolve, fix-problems sourceNodeTitleToFix pointing nowhere,
