@@ -130,8 +130,7 @@ export const GROK_ENGINE_DEF = {
       // "default" is a UI-only sentinel meaning "don't send the parameter,
       // let the provider pick its model-specific default". "none" / "low" /
       // "medium" / "high" are all valid provider values and are forwarded
-      // literally. xAI honours "none", "low" and "high" today; "medium" is
-      // included for forward-compat with newer reasoning APIs.
+      // literally — xAI accepts all four.
       schema: z
         .enum(["default", "none", "low", "medium", "high"])
         .optional()
