@@ -158,6 +158,37 @@ export class PlanNodeService {
   }
 
   /**
+   * Demote a node to OUTDATED, recursively bubbling up through parent
+   * containers so each container can perform type-specific bookkeeping.
+   *
+   * For a plain `for-each` parent the container also has per-iteration
+   * snapshots in `content.overrides` that mirror children — flipping only
+   * the child's DB row would leave stale GENERATED snapshots that the user
+   * would see the moment they switch the for-each page. The container
+   * processor's `onChildDemoted` hook handles that mirror; this method
+   * orchestrates the walk: demote the row → ask parent processor to
+   * mirror → recurse on the parent.
+   *
+   * Idempotent: a row that isn't GENERATED is left alone, but we still
+   * bubble up because an ancestor's snapshots may yet need attention.
+   */
+  async demoteToOutdated(nodeId: number): Promise<void> {
+    const node = this.getById(nodeId)
+    if (!node) return
+    if (node.status === "GENERATED") {
+      await this.patch(nodeId, false, { status: "OUTDATED" })
+    }
+    if (node.parent_id !== null) {
+      const parent = this.getById(node.parent_id)
+      if (parent) {
+        const proc = this.getProcessor(parent.type)
+        await proc?.onChildDemoted?.(this, parent, nodeId)
+        await this.demoteToOutdated(parent.id)
+      }
+    }
+  }
+
+  /**
    * Notify all downstream nodes that a node's content has changed.
    * This calls each downstream node's onInputContentChange method (if defined).
    * If the processor returns updated PlanNodeRow, the node will be updated (if content changed)

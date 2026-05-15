@@ -67,7 +67,7 @@ function baseTemplate(): ProjectTemplate {
 
 describe("template-update", () => {
   let analyzeTemplateUpdate: () => TemplateUpdateAnalysis
-  let applyTemplateUpdate: () => { updatedNodeCount: number; newNodeCount: number; newEdgeCount: number }
+  let applyTemplateUpdate: () => Promise<{ updatedNodeCount: number; newNodeCount: number; newEdgeCount: number }>
 
   beforeEach(async () => {
     setUpTestDb()
@@ -94,7 +94,7 @@ describe("template-update", () => {
     expect(analysis.unchangedCount).toBe(2)
   })
 
-  it("detects updated instructions and bumps status to OUTDATED on apply", () => {
+  it("detects updated instructions and bumps status to OUTDATED on apply", async () => {
     const initial = baseTemplate()
     applyProjectTemplate(initial, {})
     SettingsRepository.setAppliedTemplateFile("updated.json")
@@ -114,7 +114,7 @@ describe("template-update", () => {
     expect(analysis.updatedNodes.map((n) => n.title)).toEqual(["Root"])
     expect(analysis.unchangedCount).toBe(1)
 
-    const result = applyTemplateUpdate()
+    const result = await applyTemplateUpdate()
     expect(result.updatedNodeCount).toBe(1)
 
     const after = new PlanNodeRepository().findAll().find((n) => n.title === "Root")!
@@ -124,7 +124,7 @@ describe("template-update", () => {
     expect(settings.userPrompt).toBe("BRAND NEW root instructions")
   })
 
-  it("adds new template nodes and new edges; does not touch project-only nodes/edges", () => {
+  it("adds new template nodes and new edges; does not touch project-only nodes/edges", async () => {
     const initial = baseTemplate()
     applyProjectTemplate(initial, {})
     SettingsRepository.setAppliedTemplateFile("added.json")
@@ -162,7 +162,7 @@ describe("template-update", () => {
     expect(analysis.newNodes.map((n) => n.title)).toEqual(["Sibling"])
     expect(analysis.newEdges.map((e) => `${e.sourceTitle}->${e.targetTitle}`)).toEqual(["Root->Sibling"])
 
-    const result = applyTemplateUpdate()
+    const result = await applyTemplateUpdate()
     expect(result.newNodeCount).toBe(1)
     expect(result.newEdgeCount).toBe(1)
 
@@ -175,6 +175,84 @@ describe("template-update", () => {
     expect(after.find((n) => n.title === "Project-only")?.content).toBe("kept")
     const edges = new PlanEdgeRepository().findAll()
     expect(edges.some((e) => e.from_node_id === rootId && e.to_node_id === orphanId)).toBe(true)
+  })
+
+  it("demotes a for-each child across ALL iterations and demotes the for-each itself", async () => {
+    // Template: for-each "Loop" with one user-defined child "Loop child".
+    const initial: ProjectTemplate = {
+      label: "loop",
+      description: "loop",
+      wizardPages: [],
+      plan: {
+        nodes: [
+          { title: "Source", type: "text", aiUserInstructions: ["src"], inputs: [] },
+          {
+            title: "Loop",
+            type: "for-each",
+            inputs: [{ sourceNodeTitle: "Source", type: "textArray" }],
+            children: [
+              { title: "Iter input", type: "for-each-input" },
+              {
+                title: "Loop child",
+                type: "text",
+                aiUserInstructions: ["Original child instructions"],
+                inputs: [{ sourceNodeTitle: "Iter input", type: "text" }],
+              },
+            ],
+          },
+        ],
+      },
+    } as any
+    applyProjectTemplate(initial, {})
+    SettingsRepository.setAppliedTemplateFile("loop.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+
+    const planRepo = new PlanNodeRepository()
+    const all = planRepo.findAll()
+    const loop = all.find((n) => n.title === "Loop")!
+    const child = all.find((n) => n.title === "Loop child")!
+
+    // Seed the for-each with 3 iterations. Iter 0 and iter 2 snapshots
+    // both have Child as GENERATED. Current iter is 1, also GENERATED.
+    const mkOverride = (s: string) => ({
+      [`${child.id}`]: {
+        status: "GENERATED",
+        content: s,
+        summary: null,
+        word_count: null,
+        char_count: null,
+        byte_count: null,
+      },
+    })
+    const overrides = [mkOverride("iter0"), mkOverride("iter1"), mkOverride("iter2")]
+    planRepo.patch(loop.id, {
+      content: JSON.stringify({ length: 3, currentIndex: 1, overrides }),
+      status: "GENERATED",
+    })
+    planRepo.patch(child.id, { status: "GENERATED", content: "iter1" })
+
+    // Template changes Child's instructions.
+    const updated = JSON.parse(JSON.stringify(initial)) as ProjectTemplate
+    ;(updated.plan as any).nodes[1].children[1].aiUserInstructions = ["BRAND NEW child instructions"]
+    writeTemplate("loop.json", updated)
+
+    const analysis = analyzeTemplateUpdate()
+    expect(analysis.updatedNodes.map((n) => n.title)).toEqual(["Loop child"])
+
+    await applyTemplateUpdate()
+
+    const afterAll = new PlanNodeRepository().findAll()
+    const afterChild = afterAll.find((n) => n.id === child.id)!
+    const afterLoop = afterAll.find((n) => n.id === loop.id)!
+
+    expect(afterChild.status, "child row OUTDATED").toBe("OUTDATED")
+    expect(afterLoop.status, "for-each itself OUTDATED").toBe("OUTDATED")
+    const loopContent = JSON.parse(afterLoop.content || "{}")
+    expect(loopContent.overrides).toHaveLength(3)
+    loopContent.overrides.forEach((ov: any, i: number) => {
+      const entry = ov[`${child.id}`]
+      expect(entry?.status, `iter ${i} override status`).toBe("OUTDATED")
+    })
   })
 
   it("re-substitutes wizard variables when comparing", () => {

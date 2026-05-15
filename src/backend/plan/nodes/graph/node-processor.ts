@@ -55,4 +55,18 @@ export interface NodeProcessor<S = unknown> {
     node: PlanNodeRow,
     settings: S,
   ): Promise<PlanNodeUpdate | null>
+
+  /**
+   * Called when one of this node's direct children was just demoted to
+   * OUTDATED via `PlanNodeService.demoteToOutdated`. The container processor
+   * is responsible for any container-local bookkeeping that mirrors the
+   * child's status — e.g. for-each must flip GENERATED → OUTDATED in every
+   * iteration's snapshot in `overrides`, because those snapshots are the
+   * authority for non-current iterations and would otherwise restore stale
+   * GENERATED content when the user switches pages.
+   *
+   * The demoteToOutdated caller bubbles up afterwards on its own — this hook
+   * should NOT recurse to grandparents.
+   */
+  onChildDemoted?(service: PlanNodeService, parentNode: PlanNodeRow, childId: number): Promise<void>
 }

@@ -166,6 +166,29 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     return service.changeForEachNodePage(node.id, oldPage)
   }
 
+  async onChildDemoted(service: PlanNodeService, parentNode: PlanNodeRow, childId: number): Promise<void> {
+    // Mirror the child's demotion into every iteration's snapshot. The
+    // currently-mounted iteration's row was already patched by the caller;
+    // here we only touch the override snapshots so navigating to another
+    // page doesn't restore GENERATED content for a node whose instructions
+    // (or upstream contract) have changed.
+    const parsed = (JSON.parse(parentNode.content || "{}") || {}) as ForEachNodeContent
+    const overrides = parsed.overrides ?? []
+    let changed = false
+    for (const ov of overrides) {
+      if (!ov) continue
+      const entry = ov[`${childId}`]
+      if (entry && entry.status === "GENERATED") {
+        ov[`${childId}`] = { ...entry, status: "OUTDATED" }
+        changed = true
+      }
+    }
+    if (changed) {
+      parsed.overrides = overrides
+      await service.patch(parentNode.id, false, { content: JSON.stringify(parsed) })
+    }
+  }
+
   private getExpandedInputs(context: PlanNodeService, nodeId: number): string[] {
     const nodeInputs = context.findNodeInputs(nodeId)
     const inputs: string[] = []
