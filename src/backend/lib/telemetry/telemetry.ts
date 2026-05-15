@@ -48,6 +48,14 @@ export interface RecordCallArgs {
    * to compute "median fix-iterations to converge" per (node_type, purpose).
    */
   iteration_index?: number | null
+  /**
+   * Reasoning effort that was requested for this call (xAI: "low" | "medium"
+   * | "high"). Null when the parameter wasn't sent (provider default).
+   * Reasoning models bill reasoning tokens separately and their duration
+   * scales with effort, so aggregator buckets without this dimension mix
+   * "low" and "high" calls and look spuriously wide.
+   */
+  reasoning_effort?: string | null
 }
 
 interface PerRunAccumulator {
@@ -172,8 +180,8 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
         node_title, node_type,
         instructions_chars, input_chars, output_chars,
         input_tokens, output_tokens, cached_prompt_tokens,
-        duration_ms, cost_usd, success, error_message, iteration_index
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        duration_ms, cost_usd, success, error_message, iteration_index, reasoning_effort
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         tsIso,
         run_id,
         args.engine_id,
@@ -193,6 +201,7 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
         args.success ? 1 : 0,
         args.error_message ?? null,
         args.iteration_index ?? null,
+        args.reasoning_effort ?? null,
       )
     } catch (err) {
       console.warn("[telemetry] failed to write ai_call_stats:", err)
@@ -219,6 +228,7 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
     success: args.success,
     error_message: args.error_message ?? null,
     iteration_index: args.iteration_index ?? null,
+    reasoning_effort: args.reasoning_effort ?? null,
   })
 }
 

@@ -91,6 +91,8 @@ export async function generateWithTelemetry(args: {
     const inputChars = (request.systemPrompt ?? "").length + (request.userPrompt ?? "").length
     const outputChars = text.length
     const model = request.aiGenerationSettings?.model ?? "unknown"
+    const reasoningEffort = (request.aiGenerationSettings as { reasoning_effort?: string } | undefined)
+      ?.reasoning_effort
     const usage = usageHolder.current
     const cachedPromptTokens =
       (usage as any)?.input_tokens_details?.cached_tokens ??
@@ -115,6 +117,7 @@ export async function generateWithTelemetry(args: {
       error_message,
       reported_cost_usd: reportedCostHolder.current,
       iteration_index: iterationIndex ?? null,
+      reasoning_effort: reasoningEffort ?? null,
     })
   }
 }

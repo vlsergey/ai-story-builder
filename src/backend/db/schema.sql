@@ -21,7 +21,8 @@ CREATE TABLE ai_call_stats (
   cost_usd REAL,
   success INTEGER NOT NULL,
   error_message TEXT,
-  iteration_index INTEGER
+  iteration_index INTEGER,
+  reasoning_effort TEXT
 );
 
 CREATE TABLE ai_run_stats (

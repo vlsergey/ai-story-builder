@@ -18,7 +18,9 @@
  *   --by <keys>         Aggregation keys, comma-separated. Allowed: engine,
  *                       model, purpose, node_type, node_title,
  *                       input_tokens_bucket (<2k / 2k–8k / 8k–32k / >32k;
- *                       records with no input_tokens land in '?').
+ *                       records with no input_tokens land in '?'),
+ *                       reasoning_effort (none / low / medium / high; calls
+ *                       that didn't pass the parameter land in '(default)').
  *                       Default: engine,model,purpose.
  *   --json              Emit the aggregated buckets as JSON instead of a table.
  *   --telemetry <path>  Override telemetry JSONL path.
@@ -46,11 +48,27 @@ interface CallRecord {
   cost_usd: number | null
   success: boolean
   iteration_index?: number | null
+  reasoning_effort?: string | null
 }
 
-type BucketKey = "engine" | "model" | "purpose" | "node_type" | "node_title" | "input_tokens_bucket"
+type BucketKey =
+  | "engine"
+  | "model"
+  | "purpose"
+  | "node_type"
+  | "node_title"
+  | "input_tokens_bucket"
+  | "reasoning_effort"
 
-const ALLOWED_KEYS: BucketKey[] = ["engine", "model", "purpose", "node_type", "node_title", "input_tokens_bucket"]
+const ALLOWED_KEYS: BucketKey[] = [
+  "engine",
+  "model",
+  "purpose",
+  "node_type",
+  "node_title",
+  "input_tokens_bucket",
+  "reasoning_effort",
+]
 
 /**
  * Coarse buckets over `input_tokens` so the aggregator can split a
@@ -269,6 +287,8 @@ function keyValue(r: CallRecord, k: BucketKey): string | null {
       return r.node_title
     case "input_tokens_bucket":
       return inputTokensBucket(r.input_tokens)
+    case "reasoning_effort":
+      return r.reasoning_effort ?? "(default)"
   }
 }
 

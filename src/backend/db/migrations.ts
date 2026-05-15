@@ -32,6 +32,7 @@ import migration027 from "./migrations/027.js"
 import migration028 from "./migrations/028.js"
 import migration029 from "./migrations/029.js"
 import migration030 from "./migrations/030.js"
+import migration031 from "./migrations/031.js"
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -95,9 +96,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration029,
   // version 29 → 30: add iteration_index column to ai_call_stats
   migration030,
+  // version 30 → 31: add reasoning_effort column to ai_call_stats
+  migration031,
 ]
 
-export const CURRENT_VERSION = 30
+export const CURRENT_VERSION = 31
 
 function loadSchemaFromFile(db: Database): void {
   for (const candidate of [

@@ -122,6 +122,21 @@ export const GROK_ENGINE_DEF = {
     { key: "top_p", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(1) },
     { key: "x_search", type: "checkbox", schema: z.coerce.boolean() },
     { key: "web_search", type: "checkbox", schema: z.coerce.boolean() },
+    {
+      key: "reasoning_effort",
+      type: "select",
+      defaultValue: "default",
+      options: ["default", "none", "low", "medium", "high"],
+      // "default" is a UI-only sentinel meaning "don't send the parameter,
+      // let the provider pick its model-specific default". "none" / "low" /
+      // "medium" / "high" are all valid provider values and are forwarded
+      // literally. xAI honours "none", "low" and "high" today; "medium" is
+      // included for forward-compat with newer reasoning APIs.
+      schema: z
+        .enum(["default", "none", "low", "medium", "high"])
+        .optional()
+        .transform((v) => (v === undefined || v === "default" ? undefined : v)),
+    },
   ],
   maxFilesPerRequest: 10,
 } as const satisfies AiEngineDefinition

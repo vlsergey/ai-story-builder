@@ -50,6 +50,12 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       top_p: onlyIfPositiveNumber(actualAiSettings.top_p),
     }
 
+    // Reasoning effort: only for reasoning-capable models. xAI accepts
+    // "low" and "high". Empty/undefined means provider default — don't send.
+    if (actualAiSettings.reasoning_effort) {
+      requestParams.reasoning = { effort: actualAiSettings.reasoning_effort }
+    }
+
     const tools: Array<Tool> = []
     if (actualAiSettings.x_search) {
       tools.push({ type: "x_search" } as unknown as Tool)
