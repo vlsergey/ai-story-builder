@@ -87,7 +87,9 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     return allNodes.filter(({ node }) => (parentOf.get(node) ?? null) === p).map(({ node }) => node)
   }
   const allNodeTitles = new Set<string>(allNodes.map(({ node }) => node.title))
-  const dynamicTitles = new Set<string>(allNodes.filter(({ node }) => insideForEach(node)).map(({ node }) => node.title))
+  const dynamicTitles = new Set<string>(
+    allNodes.filter(({ node }) => insideForEach(node)).map(({ node }) => node.title),
+  )
   const growingTitles = new Set<string>(
     allNodes
       .filter(({ node }) => {

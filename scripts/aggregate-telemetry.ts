@@ -16,7 +16,9 @@
  *   --model <name>      Filter to this model (default: include all).
  *   --since <iso>       Only include records with ts >= this ISO date.
  *   --by <keys>         Aggregation keys, comma-separated. Allowed: engine,
- *                       model, purpose, node_type, node_title.
+ *                       model, purpose, node_type, node_title,
+ *                       input_tokens_bucket (<2k / 2k–8k / 8k–32k / >32k;
+ *                       records with no input_tokens land in '?').
  *                       Default: engine,model,purpose.
  *   --json              Emit the aggregated buckets as JSON instead of a table.
  *   --telemetry <path>  Override telemetry JSONL path.
@@ -46,9 +48,24 @@ interface CallRecord {
   iteration_index?: number | null
 }
 
-type BucketKey = "engine" | "model" | "purpose" | "node_type" | "node_title"
+type BucketKey = "engine" | "model" | "purpose" | "node_type" | "node_title" | "input_tokens_bucket"
 
-const ALLOWED_KEYS: BucketKey[] = ["engine", "model", "purpose", "node_type", "node_title"]
+const ALLOWED_KEYS: BucketKey[] = ["engine", "model", "purpose", "node_type", "node_title", "input_tokens_bucket"]
+
+/**
+ * Coarse buckets over `input_tokens` so the aggregator can split a
+ * heterogeneous (engine, model, purpose) cluster into size-tiers — short
+ * profile reviews vs whole-scene polish reviews land in different buckets
+ * and get accurate p50–p90 each. Boundaries chosen by inspection of fiction-
+ * arc data; can be made configurable later if more granularity is needed.
+ */
+function inputTokensBucket(tokens: number | null | undefined): string {
+  if (typeof tokens !== "number" || !Number.isFinite(tokens)) return "?"
+  if (tokens < 2000) return "<2k"
+  if (tokens < 8000) return "2k–8k"
+  if (tokens < 32000) return "8k–32k"
+  return ">32k"
+}
 
 /**
  * For each numeric metric we report two percentiles: p50 (median) and p90
@@ -250,6 +267,8 @@ function keyValue(r: CallRecord, k: BucketKey): string | null {
       return r.node_type
     case "node_title":
       return r.node_title
+    case "input_tokens_bucket":
+      return inputTokensBucket(r.input_tokens)
   }
 }
 

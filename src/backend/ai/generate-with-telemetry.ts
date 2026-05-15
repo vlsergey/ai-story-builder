@@ -61,9 +61,8 @@ export async function generateWithTelemetry(args: {
       const response: any = (event as any).response
       if (response?.usage) usageHolder.current = response.usage
       // xAI reports the API-side cost on the response itself (and/or on the
-      // usage sub-object). Prefer it over our local pricing-table estimate
-      // because it accounts for every billing detail (deferred completions,
-      // reasoning surcharges, web-search add-ons) the table doesn't model.
+      // usage sub-object). This is the only source we use for cost_usd —
+      // see RecordCallArgs.reported_cost_usd for why no hardcoded fallback.
       const provider_cost =
         pickNumber(response?.usage?.total_cost) ??
         pickNumber(response?.usage?.cost) ??

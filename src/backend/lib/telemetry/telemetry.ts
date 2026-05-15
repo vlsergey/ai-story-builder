@@ -3,7 +3,6 @@ import fs from "node:fs"
 import path from "node:path"
 import { getCurrentDb, getDataDir, isOpen } from "../../db/state.js"
 import { SettingsRepository } from "../../settings/settings-repository.js"
-import { estimateCostUsd } from "./pricing.js"
 
 /**
  * Local-only telemetry for LLM calls and regenerate-tree runs.
@@ -37,11 +36,10 @@ export interface RecordCallArgs {
   success: boolean
   error_message?: string | null
   /**
-   * Cost reported by the provider on the API response (xAI, for one, returns
-   * this on `response.completed`). When present it overrides the local
-   * pricing-table estimate because the provider accounts for every billing
-   * surcharge (reasoning, web-search, deferred completion) that the table
-   * doesn't model.
+   * Cost reported by the provider on the API response (xAI returns this on
+   * `response.completed`). When null the call is recorded with cost_usd = null
+   * — we don't try to second-guess the provider with a hardcoded pricing
+   * table that would rot every time a model is added or its tariff changes.
    */
   reported_cost_usd?: number | null
   /**
@@ -139,13 +137,7 @@ export function recordCall(args: RecordCallArgs): void {
   }
 
   const ts = new Date()
-  const cost =
-    args.reported_cost_usd ??
-    estimateCostUsd(args.engine_id, args.model, {
-      input_tokens: args.input_tokens,
-      output_tokens: args.output_tokens,
-      cached_prompt_tokens: args.cached_prompt_tokens,
-    })
+  const cost = args.reported_cost_usd ?? null
 
   activeRun.engines.add(args.engine_id)
   activeRun.models.add(args.model)
@@ -162,13 +154,7 @@ export function recordCall(args: RecordCallArgs): void {
 }
 
 function recordOrphanCall(args: RecordCallArgs): void {
-  const cost =
-    args.reported_cost_usd ??
-    estimateCostUsd(args.engine_id, args.model, {
-      input_tokens: args.input_tokens,
-      output_tokens: args.output_tokens,
-      cached_prompt_tokens: args.cached_prompt_tokens,
-    })
+  const cost = args.reported_cost_usd ?? null
   // Synthetic run_id so the row is still queryable, but it doesn't get an
   // ai_run_stats counterpart. "orphan-<uuid>" is the convention.
   writeCallRecord(`orphan-${randomUUID()}`, new Date(), cost, args)

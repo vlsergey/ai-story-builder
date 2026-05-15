@@ -31,6 +31,7 @@ describe("telemetry", () => {
       cached_prompt_tokens: 4000,
       duration_ms: 24500,
       success: true,
+      reported_cost_usd: 0.03,
     })
     finishRun()
 
@@ -53,8 +54,8 @@ describe("telemetry", () => {
       duration_ms: 24500,
       success: 1,
     })
-    // cost_usd: 1000 uncached @ $3/M + 4000 cached @ $0.75/M + 1600 output @ $15/M
-    // = 0.003 + 0.003 + 0.024 = 0.030
+    // cost_usd is whatever the provider reported via reported_cost_usd —
+    // no local pricing-table calculation any more.
     expect(callRows[0].cost_usd).toBeCloseTo(0.03, 4)
 
     const runRows = db.prepare("SELECT * FROM ai_run_stats").all() as any[]
@@ -74,6 +75,31 @@ describe("telemetry", () => {
       "generate-plan-node-text-content": 1,
     })
     expect(runRows[0].cost_usd).toBeCloseTo(0.03, 4)
+  })
+
+  it("persists cost_usd = null when the provider didn't report one (no local fallback)", () => {
+    startRun()
+    recordCall({
+      engine_id: "grok",
+      model: "grok-3",
+      purpose: "generate-plan-node-text-content",
+      instructions_chars: 100,
+      input_chars: 100,
+      output_chars: 100,
+      input_tokens: 50,
+      output_tokens: 30,
+      cached_prompt_tokens: 0,
+      duration_ms: 1000,
+      success: true,
+      // reported_cost_usd intentionally omitted
+    })
+    finishRun()
+
+    const db = getCurrentDb()
+    const row = db.prepare("SELECT cost_usd FROM ai_call_stats").get() as { cost_usd: number | null }
+    expect(row.cost_usd).toBeNull()
+    const runRow = db.prepare("SELECT cost_usd FROM ai_run_stats").get() as { cost_usd: number | null }
+    expect(runRow.cost_usd).toBeNull()
   })
 
   it("marks the run as failed when at least one call fails", () => {
