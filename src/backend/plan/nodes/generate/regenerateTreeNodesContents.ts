@@ -12,7 +12,9 @@ import { makeErrorWithStatus } from "../../../lib/make-errors.js"
 import { finishRun, startRun } from "../../../lib/telemetry/telemetry.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
+import { PlanNodeRepository } from "../plan-node-repository.js"
 import { PlanNodeService } from "../plan-node-service.js"
+import { computeLevelDependencies } from "./computeLevelDependencies.js"
 import { propagateStaleStatus } from "./propagateStaleStatus.js"
 import type {
   PlanNodeAiGenerationStatus,
@@ -312,28 +314,17 @@ export async function regenerateSubtreeNodesContents(
 ): Promise<void> {
   console.info(`[regenerateSubtreeNodesContents] Starting regeneration for parentId=${parentId}`)
 
-  const planEdgeRepository = new PlanEdgeRepository()
   const planNodeService = new PlanNodeService()
-
-  // Get nodes with specific parent_id
-  const nodes = planNodeService.findByParentId(parentId)
+  // Build the dependency graph for this level using a projection that maps
+  // every edge to the sibling-level it belongs to. Crucially, an edge whose
+  // target lives INSIDE one of this level's containers is still attributed
+  // to that container — otherwise the scheduler would happily process the
+  // container before its cross-boundary input is ready.
+  // See computeLevelDependencies for details and the concrete bug it fixes.
+  const allNodes = new PlanNodeRepository().findAll()
+  const allEdges = new PlanEdgeRepository().findAll()
+  const { nodes, incomingEdges, outgoingEdges } = computeLevelDependencies({ parentId, allNodes, allEdges })
   const nodeIds = nodes.map((n) => n.id)
-  const incomingEdges = new Map<number, number[]>()
-  const outgoingEdges = new Map<number, number[]>()
-
-  for (const nodeId of nodeIds) {
-    incomingEdges.set(nodeId, [])
-    outgoingEdges.set(nodeId, [])
-  }
-
-  // Fill adjacency from edges, but only edges where both nodes are in our node set
-  const edgeRows = planEdgeRepository.findAll()
-  for (const edge of edgeRows) {
-    if (nodeIds.includes(edge.from_node_id) && nodeIds.includes(edge.to_node_id)) {
-      incomingEdges.get(edge.to_node_id)!.push(edge.from_node_id)
-      outgoingEdges.get(edge.from_node_id)!.push(edge.to_node_id)
-    }
-  }
 
   // Set of nodes that have been checked (processed)
   const checked = new Set<number>()
