@@ -40,6 +40,7 @@ interface CliArgs {
   nodeId?: number
   nodeTitle?: string
   checkPrereqs: boolean
+  printContent: boolean
 }
 
 function parseCli(): CliArgs {
@@ -49,6 +50,7 @@ function parseCli(): CliArgs {
       "node-id": { type: "string" },
       "node-title": { type: "string" },
       "check-prereqs": { type: "boolean", default: false },
+      "print-content": { type: "boolean", default: false },
     },
   })
   if (!values.project || (!values["node-id"] && !values["node-title"])) {
@@ -56,7 +58,7 @@ function parseCli(): CliArgs {
       "usage: tsx scripts/regenerate-node.ts " +
         "--project <name-or-path> " +
         "(--node-id <n> | --node-title <title>) " +
-        "[--check-prereqs]\n",
+        "[--check-prereqs] [--print-content]\n",
     )
     process.exit(2)
   }
@@ -77,6 +79,7 @@ function parseCli(): CliArgs {
     nodeId,
     nodeTitle: values["node-title"],
     checkPrereqs: !!values["check-prereqs"],
+    printContent: !!values["print-content"],
   }
 }
 
@@ -144,6 +147,14 @@ async function main(): Promise<void> {
     `Done. status=${after.status}, content=${(after.content ?? "").length} chars` +
       (after.summary ? `, summary=${after.summary.slice(0, 80)}…` : ""),
   )
+
+  if (args.printContent) {
+    const body = after.content ?? ""
+    process.stdout.write(`\n===== BEGIN CONTENT #${after.id} '${after.title}' (${after.type}) =====\n`)
+    process.stdout.write(body)
+    if (body.length > 0 && !body.endsWith("\n")) process.stdout.write("\n")
+    process.stdout.write(`===== END CONTENT #${after.id} =====\n`)
+  }
 }
 
 main().catch((err: unknown) => {
