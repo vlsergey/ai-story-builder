@@ -11,7 +11,7 @@ These are produced by [`scripts/export-project-to-md.ts`](../scripts/export-proj
 ## Filename convention
 
 ```
-<projectName> [<templateSlug>, <genre>, <partsCount> частей, <model>, <lang>].md
+<projectName> [<templateSlug>, <genre>, <partsCount> parts, <model>, <lang>].md
 ```
 
 Tags are dropped when the underlying value is missing (older projects without persisted wizard data don't get a `<partsCount>` tag, etc.). Windows-illegal characters are stripped from the final filename.
@@ -21,4 +21,4 @@ Tags are dropped when the underlying value is missing (older projects without pe
 Examples are **not** curated showcases — they're representative runs warts and all, useful for:
 - Seeing how the template handles a specific genre / part-count combination.
 - Reading the LLM settings + cost that produced this output, so you can predict your own run.
-- Reproducing — synopsis is in the preamble; paste it into the wizard with the same settings.
+- Reproducing — every wizard input the template asked for is in the preamble, alongside the LLM settings. Paste them into the same template's wizard to reproduce.

@@ -160,7 +160,37 @@ function languageFromTemplate(templateFile: string): string {
   return m ? m[1] : "?"
 }
 
-function loadTemplateLabel(filename: string): string {
+interface TemplateWizardField {
+  name: string
+  label: string
+  type: string
+}
+
+interface TemplatePlanNode {
+  title: string
+  type: string
+  content?: string[]
+  aiUserInstructions?: string[]
+  nodeTypeSettings?: Record<string, unknown>
+  children?: TemplatePlanNode[]
+}
+
+interface TemplateSummary {
+  label: string
+  fields: TemplateWizardField[]
+  planNodes: TemplatePlanNode[]
+}
+
+function flattenPlanNodes(nodes: TemplatePlanNode[] | undefined, out: TemplatePlanNode[] = []): TemplatePlanNode[] {
+  if (!nodes) return out
+  for (const n of nodes) {
+    out.push(n)
+    if (n.children) flattenPlanNodes(n.children, out)
+  }
+  return out
+}
+
+function loadTemplate(filename: string): TemplateSummary {
   const candidates = [
     path.join("src/backend/resources/resources/templates", filename),
     path.join(os.homedir(), "AppData", "Roaming", "ai-story-builder", "templates", filename),
@@ -168,14 +198,130 @@ function loadTemplateLabel(filename: string): string {
   for (const c of candidates) {
     if (fs.existsSync(c)) {
       try {
-        const tpl = JSON.parse(fs.readFileSync(c, "utf8")) as { label?: string }
-        if (tpl.label) return tpl.label
+        const tpl = JSON.parse(fs.readFileSync(c, "utf8")) as {
+          label?: string
+          wizardPages?: Array<{ fields?: TemplateWizardField[] }>
+          plan?: { nodes?: TemplatePlanNode[] }
+        }
+        const fields: TemplateWizardField[] = []
+        for (const page of tpl.wizardPages ?? []) {
+          for (const f of page.fields ?? []) {
+            fields.push(f)
+          }
+        }
+        return {
+          label: tpl.label ?? filename,
+          fields,
+          planNodes: flattenPlanNodes(tpl.plan?.nodes),
+        }
       } catch {
         // fall through
       }
     }
   }
-  return filename
+  return { label: filename, fields: [], planNodes: [] }
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/**
+ * Build a regex pattern from a template string by replacing every `${ident}`
+ * with a named capture group. Returns null if the template contains a
+ * non-trivial expression (formulas like `${round(1400/N)}`) or has zero
+ * placeholders.
+ */
+function templateToPattern(template: string): string | null {
+  const re = /\${([^}]+)}/g
+  let pattern = "^"
+  let lastIdx = 0
+  let captures = 0
+  const seen = new Set<string>()
+  for (const m of template.matchAll(re)) {
+    pattern += escapeRegex(template.slice(lastIdx, m.index))
+    const inner = m[1].trim()
+    if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(inner)) return null
+    if (seen.has(inner)) {
+      // Backreference: must match the same captured value.
+      pattern += `\\k<${inner}>`
+    } else {
+      pattern += `(?<${inner}>[\\s\\S]+?)`
+      seen.add(inner)
+    }
+    captures += 1
+    lastIdx = (m.index ?? 0) + m[0].length
+  }
+  if (captures === 0) return null
+  pattern += escapeRegex(template.slice(lastIdx))
+  pattern += "$"
+  return pattern
+}
+
+/**
+ * Best-effort recovery of wizard inputs for projects created before wizard
+ * data was persisted (commit dceba08). Walks the template's plan nodes; for
+ * each, builds a regex from its content / aiUserInstructions and matches it
+ * against the project's resolved values. Captures values where placeholders
+ * are simple `${ident}` references — gives up silently on formulas.
+ *
+ * Then reverse-derives `ageRating` from a captured `ageRatingLabel` (the
+ * apply pipeline does the forward derivation via AGE_RATING_INFO).
+ */
+function recoverWizardValues(db: Database.Database, planNodes: TemplatePlanNode[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const tNode of planNodes) {
+    const projRow = db.prepare("SELECT content, node_type_settings FROM plan_nodes WHERE title = ?").get(tNode.title) as
+      | { content: string | null; node_type_settings: string | null }
+      | undefined
+    if (!projRow) continue
+
+    // content array → resolved content string.
+    if (tNode.content && projRow.content) {
+      tryCapture(tNode.content.join("\n"), projRow.content, out)
+    }
+
+    // aiUserInstructions array → resolved node_type_settings.userPrompt.
+    if (tNode.aiUserInstructions && projRow.node_type_settings) {
+      try {
+        const settings = JSON.parse(projRow.node_type_settings) as Record<string, unknown>
+        if (typeof settings.userPrompt === "string") {
+          tryCapture(tNode.aiUserInstructions.join("\n"), settings.userPrompt, out)
+        }
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  // Reverse derivation: ageRatingLabel ("18+") → ageRating ("18").
+  const labelToCode: Record<string, string> = {
+    G: "G",
+    PG: "PG",
+    "12+": "12",
+    "16+": "16",
+    "18+": "18",
+    "NC-21": "NC21",
+  }
+  if (out.ageRatingLabel && labelToCode[out.ageRatingLabel] && out.ageRating == null) {
+    out.ageRating = labelToCode[out.ageRatingLabel]
+  }
+  return out
+}
+
+function tryCapture(template: string, resolved: string, out: Record<string, string>): void {
+  const pattern = templateToPattern(template)
+  if (!pattern) return
+  try {
+    const re = new RegExp(pattern, "s")
+    const match = re.exec(resolved)
+    if (!match?.groups) return
+    for (const [name, value] of Object.entries(match.groups)) {
+      if (out[name] === undefined && value != null) out[name] = value
+    }
+  } catch {
+    // Pathological regex — ignore.
+  }
 }
 
 function templateSlug(templateFile: string): string {
@@ -198,14 +344,55 @@ function main() {
 
   const db = new Database(projectPath, { readonly: true, fileMustExist: true })
 
-  // Wizard data: prefer the persisted setting; fall back to plan-node content
-  // for known wizard fields (older projects didn't persist wizard data).
+  const template = loadTemplate(args.template)
+
+  // Wizard data: persisted setting is the source of truth — it's what the user
+  // typed into the wizard. We additionally extract values from the project's
+  // resolved instructions/content and warn on any mismatch (user edited a
+  // substituted prompt directly, or the persisted record is stale). Old
+  // projects predating wizard-data persistence end up with an empty record;
+  // for those, the extracted values are the only option.
   const wizardSetting = readSettingJson(db, "applied_template_wizard_data") as Record<string, unknown> | null
-  const wizardData: Record<string, unknown> =
+  const savedWizard: Record<string, unknown> =
     wizardSetting && Object.keys(wizardSetting).length > 0 ? { ...wizardSetting } : {}
-  if (wizardData.synopsis == null) {
-    const s = readNodeContent(db, "Синопсис")
-    if (s && s.trim().length > 0) wizardData.synopsis = s.trim()
+  const extractedWizard = recoverWizardValues(db, template.planNodes)
+
+  // Warn about mismatches (saved says X, project content says Y). Compare on
+  // normalized values (trim + collapse line endings) so cosmetic whitespace
+  // doesn't produce false alarms. WARN output never dumps the full values —
+  // they may be long or sensitive (project synopses).
+  const norm = (s: string): string => s.replace(/\r\n?/g, "\n").trim()
+  const shortPreview = (s: string): string => {
+    const collapsed = s.replace(/\s+/g, " ").trim()
+    return collapsed.length > 80 ? `${collapsed.slice(0, 80)}…` : collapsed
+  }
+  const conflicts: Array<{ field: string; saved: string; extracted: string }> = []
+  for (const [name, savedValue] of Object.entries(savedWizard)) {
+    const extractedValue = extractedWizard[name]
+    if (extractedValue != null && norm(String(savedValue)) !== norm(extractedValue)) {
+      conflicts.push({ field: name, saved: String(savedValue), extracted: extractedValue })
+    }
+  }
+  for (const c of conflicts) {
+    process.stderr.write(
+      `WARN: wizard field "${c.field}" mismatch — ` +
+        `saved (${c.saved.length} chars): "${shortPreview(c.saved)}"; ` +
+        `extracted (${c.extracted.length} chars): "${shortPreview(c.extracted)}". ` +
+        "Someone likely edited a substituted prompt directly. Preamble will show the saved value.\n",
+    )
+  }
+
+  // For fields missing in saved, fall back to extracted (covers pre-persistence projects).
+  const wizardData: Record<string, unknown> = { ...savedWizard }
+  for (const [name, value] of Object.entries(extractedWizard)) {
+    if (wizardData[name] == null) wizardData[name] = value
+  }
+  const usedExtractionForFields = Object.keys(extractedWizard).filter((n) => savedWizard[n] == null)
+  if (usedExtractionForFields.length > 0) {
+    process.stderr.write(
+      `INFO: project has no persisted wizard data for: ${usedExtractionForFields.join(", ")}. ` +
+        "Falling back to values extracted from the project's resolved content.\n",
+    )
   }
 
   const currentBackend = readSettingJson(db, "current_backend") as string | null
@@ -214,7 +401,6 @@ function main() {
   const textSettings = (engineConfig?.defaultAiGenerationSettings as Record<string, unknown> | undefined) ?? {}
   const summarySettings = (engineConfig?.summaryAiGenerationSettings as Record<string, unknown> | undefined) ?? {}
 
-  const templateLabel = loadTemplateLabel(args.template)
   const language = args.language ?? languageFromTemplate(args.template)
 
   const final = findFinalResult(db)
@@ -228,7 +414,7 @@ function main() {
   const tagCandidates: Array<string | null> = [
     templateSlug(args.template),
     args.genre,
-    partsCount != null ? `${partsCount} частей` : null,
+    partsCount != null ? `${partsCount} parts` : null,
     modelName,
     language && language !== "?" ? language : null,
   ]
@@ -237,43 +423,62 @@ function main() {
   const outputPath = args.output ?? path.join(projectDir, safeName)
 
   const out: string[] = []
-  out.push(`**Шаблон:** ${templateLabel} (\`${args.template}\`)  `)
-  out.push(`**Жанр:** ${args.genre}  `)
-  out.push(`**Язык:** ${language}  `)
-  if (wizardData.ageRating != null) out.push(`**Возрастной рейтинг:** ${wizardData.ageRating}  `)
-  if (wizardData.partsCount != null) out.push(`**Число частей:** ${wizardData.partsCount}  `)
+  out.push(`**Template:** ${template.label} (\`${args.template}\`)  `)
+  out.push(`**Genre:** ${args.genre}  `)
+  out.push(`**Language:** ${language}  `)
   out.push("")
-  if (wizardData.synopsis != null) {
-    out.push("**Синопсис:**")
+
+  // Wizard inputs — emit every field declared in the template's wizardPages,
+  // using the template-author's label as the heading. Long / multi-line values
+  // go into a blockquote on the next paragraph; short scalar values stay inline.
+  // Fields the user didn't fill (or that weren't persisted) are skipped.
+  if (template.fields.length > 0 && Object.keys(wizardData).length > 0) {
+    out.push("## Wizard inputs")
     out.push("")
-    out.push(quoteBlock(String(wizardData.synopsis)))
+    for (const field of template.fields) {
+      const raw = wizardData[field.name]
+      if (raw == null) continue
+      const value = String(raw)
+      const isBlock = value.includes("\n") || value.length > 120
+      if (isBlock) {
+        out.push(`**${field.label}:**`)
+        out.push("")
+        out.push(quoteBlock(value))
+        out.push("")
+      } else {
+        out.push(`**${field.label}:** ${value}  `)
+      }
+    }
     out.push("")
   }
+
   out.push(`**Engine:** ${currentBackend ?? "?"}  `)
   out.push("")
-  out.push("**LLM-параметры (текст):**")
+  out.push("**LLM settings (text):**")
   out.push("")
   out.push("```json")
   out.push(JSON.stringify(sanitizeEngineConfig(textSettings), null, 2))
   out.push("```")
   out.push("")
-  out.push("**LLM-параметры (сводка):**")
+  out.push("**LLM settings (summary):**")
   out.push("")
   out.push("```json")
   out.push(JSON.stringify(sanitizeEngineConfig(summarySettings), null, 2))
   out.push("```")
   out.push("")
-  out.push(`**Всего LLM-вызовов:** ${stats.totalCalls}  `)
-  out.push(`**Суммарное время LLM-вызовов:** ${formatDuration(stats.totalDurationMs)}  `)
+  out.push(`**Total LLM calls:** ${stats.totalCalls}  `)
+  out.push(`**Sum of LLM call durations:** ${formatDuration(stats.totalDurationMs)}  `)
   if (stats.wallTimeMs != null && stats.wallTimeMs > 0) {
-    out.push(`**Wall-clock время прогонов:** ${formatDuration(stats.wallTimeMs)}  `)
+    out.push(`**Wall-clock duration:** ${formatDuration(stats.wallTimeMs)}  `)
   }
   if (stats.totalCostUsd != null) {
     const note =
-      stats.callsWithCost < stats.totalCalls ? ` (по ${stats.callsWithCost} из ${stats.totalCalls} вызовов)` : ""
-    out.push(`**Суммарная стоимость:** $${stats.totalCostUsd.toFixed(4)}${note}  `)
+      stats.callsWithCost < stats.totalCalls
+        ? ` (provider reported cost on ${stats.callsWithCost} of ${stats.totalCalls} calls)`
+        : ""
+    out.push(`**Total cost:** $${stats.totalCostUsd.toFixed(4)}${note}  `)
   } else {
-    out.push("**Суммарная стоимость:** провайдер не отчитался о стоимости для этих вызовов  ")
+    out.push("**Total cost:** provider did not report a cost for any of these calls  ")
   }
   out.push("")
   out.push("---")
