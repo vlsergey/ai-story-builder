@@ -56,6 +56,21 @@ The template authoring quality bar lives in [`TEMPLATE_CHECKS.md`](src/backend/r
 
 A growing portion of those rules is enforced automatically by [`templates-structure.test.ts`](src/backend/resources/resources/templates/templates-structure.test.ts) on every commit.
 
+### Generated examples
+
+Real end-to-end runs — synopsis, wizard settings, LLM parameters, total time and cost, full prose output — are collected under [`examples/`](examples/). Browse the folder to see what the bundled template actually produces at different settings.
+
+Export your own run with [`scripts/export-project-to-md.ts`](scripts/export-project-to-md.ts):
+
+```bash
+npx tsx scripts/export-project-to-md.ts \
+  --project "Письмо" \
+  --template fiction-arc.ru.json \
+  --genre "литдрама"
+```
+
+The script writes `<projectName> [<tags>].md` next to your project's `.sqlite`, with a preamble of all wizard inputs, LLM settings, and aggregated telemetry, then the final assembled prose. Copy the resulting file into `examples/` to publish a run.
+
 ---
 
 ## How it works
