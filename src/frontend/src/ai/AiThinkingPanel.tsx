@@ -1,7 +1,7 @@
 import type React from "react"
 import type { ResponseOutputItem, ResponseStreamEvent } from "openai/resources/responses/responses.js"
 import { forwardRef, useImperativeHandle, useState } from "react"
-import { BrainIcon, GlobeIcon, WrenchIcon } from "lucide-react"
+import { BrainCogIcon, GlobeIcon, WrenchIcon } from "lucide-react"
 import { useLocale } from "@/i18n/locale"
 import { useTranslation } from "react-i18next"
 import { SiX } from "@icons-pack/react-simple-icons"
@@ -17,7 +17,7 @@ export interface AiThinkingPanelHandle {
 }
 
 const icons: Record<string, React.FC<{ className: string }>> = {
-  reasoning: BrainIcon,
+  reasoning: BrainCogIcon,
   web_search_call: GlobeIcon,
   "custom_tool_call.x_semantic_search": SiX,
   "custom_tool_call.x_keyword_search": SiX,
