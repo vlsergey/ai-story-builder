@@ -1,6 +1,13 @@
 import fs from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import type { Database } from "better-sqlite3"
+
+// The package is ESM (`"type": "module"`), where Node doesn't define
+// `__dirname` automatically. Vitest happens to shim it, and `tsup` rewrites
+// it when bundling for Electron — but a direct `tsx` run (e.g. from
+// scripts/) needs the real ESM equivalent.
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 import migration001 from "./migrations/001.js"
 import migration002 from "./migrations/002.js"

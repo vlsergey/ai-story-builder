@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
 import fs from "node:fs"
-import os from "node:os"
 import path from "node:path"
 import process from "node:process"
 import { parseArgs } from "node:util"
@@ -38,6 +37,7 @@ import { parseArgs } from "node:util"
  * caller.
  */
 import Database from "better-sqlite3"
+import { getProjectsFolder, resolveProjectPath } from "./lib/project-paths.js"
 
 interface CliArgs {
   project: string
@@ -75,20 +75,6 @@ function parseCli(): CliArgs {
     language: values.language,
     output: values.output,
   }
-}
-
-function defaultProjectsDir(): string {
-  // Mirrors the Electron `app.getPath("userData")/projects` location.
-  return path.join(os.homedir(), "AppData", "Roaming", "ai-story-builder", "projects")
-}
-
-function resolveProjectPath(spec: string): string {
-  if (fs.existsSync(spec) && fs.statSync(spec).isFile()) return spec
-  const dir = defaultProjectsDir()
-  for (const candidate of [path.join(dir, spec), path.join(dir, `${spec}.sqlite`)]) {
-    if (fs.existsSync(candidate)) return candidate
-  }
-  throw new Error(`Project not found: tried ${spec} and ${dir}\\${spec}{,.sqlite}`)
 }
 
 function readSettingJson(db: Database.Database, key: string): unknown {
@@ -202,7 +188,8 @@ function flattenPlanNodes(nodes: TemplatePlanNode[] | undefined, out: TemplatePl
 function loadTemplate(filename: string): TemplateSummary {
   const candidates = [
     path.join("src/backend/resources/resources/templates", filename),
-    path.join(os.homedir(), "AppData", "Roaming", "ai-story-builder", "templates", filename),
+    // User templates live next to the projects directory under the same data root.
+    path.join(getProjectsFolder(), "..", "templates", filename),
   ]
   for (const c of candidates) {
     if (fs.existsSync(c)) {

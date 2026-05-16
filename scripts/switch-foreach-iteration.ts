@@ -21,15 +21,13 @@
  *
  * Iteration index is zero-based: pass 0 for the first iteration.
  */
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
 import process from "node:process"
 import { parseArgs } from "node:util"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { PlanNodeRepository } from "../src/backend/plan/nodes/plan-node-repository.js"
 import { PlanNodeService } from "../src/backend/plan/nodes/plan-node-service.js"
 import type { ForEachNodeContent } from "../src/shared/for-each-plan-node.js"
+import { resolveProjectPath } from "./lib/project-paths.js"
 
 interface CliArgs {
   project: string
@@ -79,19 +77,6 @@ function parseCli(): CliArgs {
     nodeTitle: values["node-title"],
     iteration,
   }
-}
-
-function defaultProjectsDir(): string {
-  return path.join(os.homedir(), "AppData", "Roaming", "ai-story-builder", "projects")
-}
-
-function resolveProjectPath(spec: string): string {
-  if (fs.existsSync(spec) && fs.statSync(spec).isFile()) return spec
-  const dir = defaultProjectsDir()
-  for (const candidate of [path.join(dir, spec), path.join(dir, `${spec}.sqlite`)]) {
-    if (fs.existsSync(candidate)) return candidate
-  }
-  throw new Error(`Project not found: tried ${spec} and ${path.join(dir, spec)}{,.sqlite}`)
 }
 
 function resolveNodeId(args: CliArgs): number {
