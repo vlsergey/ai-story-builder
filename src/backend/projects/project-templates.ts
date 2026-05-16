@@ -1,12 +1,43 @@
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import type { ProjectTemplate } from "@shared/project-template"
-import { app } from "electron"
+import electron from "electron"
 import fs from "fs-extra"
+import { getDataDir } from "../db/state.js"
 
-const SYSTEM_TEMPLATES = app.isPackaged
-  ? path.join(process.resourcesPath, "templates")
-  : path.join(__dirname, "resources", "templates")
-const USER_TEMPLATES = path.join(app.getPath("userData"), "templates")
+// The package is ESM (`"type": "module"`); Node won't define __dirname for us
+// and electron's named exports aren't available from a plain `tsx` run either.
+// Resolve both via lazy fallbacks so this module can be imported from scripts.
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+function systemTemplatesDir(): string {
+  // In packaged Electron the templates live next to the resources bundle.
+  // Outside Electron (tsx scripts, tests) fall back to whichever path exists.
+  try {
+    const app = (electron as unknown as { app?: { isPackaged?: boolean } }).app
+    if (app?.isPackaged) {
+      return path.join((process as { resourcesPath?: string }).resourcesPath ?? "", "templates")
+    }
+  } catch {
+    // No Electron context — fall through to dev location.
+  }
+  // dev under tsup-bundled `dist/backend/`: templates at `./resources/templates`.
+  // dev under raw tsx (scripts/, tests): templates at the source-tree location
+  // `src/backend/resources/resources/templates/`, which is two levels up from
+  // this file's directory.
+  const candidates = [
+    path.join(__dirname, "resources", "templates"),
+    path.join(__dirname, "..", "resources", "resources", "templates"),
+  ]
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c
+  }
+  return candidates[0]
+}
+
+function userTemplatesDir(): string {
+  return path.join(getDataDir(), "templates")
+}
 
 type TemplateInfo = {
   filePath: string
@@ -14,8 +45,8 @@ type TemplateInfo = {
 } & Pick<ProjectTemplate, "label" | "description">
 
 export const getTemplateFolders = () => ({
-  system: SYSTEM_TEMPLATES,
-  user: USER_TEMPLATES,
+  system: systemTemplatesDir(),
+  user: userTemplatesDir(),
 })
 
 export async function getTemplate(templatePath: string): Promise<ProjectTemplate> {
@@ -23,8 +54,8 @@ export async function getTemplate(templatePath: string): Promise<ProjectTemplate
 }
 
 export async function findTemplates(): Promise<TemplateInfo[]> {
-  const systemTemplatesPromise = findTemplatesImpl(SYSTEM_TEMPLATES, "system")
-  const userTemplatesPromise = findTemplatesImpl(USER_TEMPLATES, "user")
+  const systemTemplatesPromise = findTemplatesImpl(systemTemplatesDir(), "system")
+  const userTemplatesPromise = findTemplatesImpl(userTemplatesDir(), "user")
 
   const allTemplates = [...(await systemTemplatesPromise), ...(await userTemplatesPromise)]
   return allTemplates.sort((a, b) => a.label.localeCompare(b.label))
