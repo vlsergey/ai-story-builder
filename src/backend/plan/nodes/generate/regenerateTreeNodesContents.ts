@@ -362,16 +362,25 @@ export async function regenerateSubtreeNodesContents(
     if (!node) continue
 
     // Sources may also have been demoted by intervening cascades. If a source
-    // was checked but is now stale again, un-check it so it re-runs before
-    // we process this node.
+    // was checked but its live status indicates an external demotion, un-check
+    // it so it re-runs before we process this node.
+    //
+    // A source counts as "demoted" only when its status is OUTDATED — that's
+    // the value markAsOutdatedAndNotifyDownstreamNodes / TextProcessor.onInputContentChange
+    // assign when a cascade fires. EMPTY is NOT a demotion: it's a valid
+    // terminal state for a merge whose input was legitimately empty (e.g., a
+    // for-each-prev-outputs on iteration 0), and counting it as one creates
+    // an infinite re-queue loop where the merge re-runs every time its
+    // downstream consumer tries to process it. ERROR is excluded for the same
+    // reason — retrying tends to hit the same failure.
     const sources = incomingEdges.get(nodeId)!
     let anySourceDemoted = false
     for (const srcId of sources) {
       if (!checked.has(srcId)) continue
       const liveSrc = nodeRepo.findById(srcId)
-      if (liveSrc && shouldRegenerate[liveSrc.status] && hasRegenerationCriteria(liveSrc)) {
+      if (liveSrc && liveSrc.status === "OUTDATED" && hasRegenerationCriteria(liveSrc)) {
         console.log(
-          `[regenerateSubtreeNodesContents] source ${srcId} demoted to ${liveSrc.status} since it was processed; re-queueing it before ${nodeId}`,
+          `[regenerateSubtreeNodesContents] source ${srcId} demoted to OUTDATED since it was processed; re-queueing it before ${nodeId}`,
         )
         checked.delete(srcId)
         if (!queue.includes(srcId)) queue.push(srcId)
