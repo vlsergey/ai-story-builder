@@ -168,12 +168,12 @@ function CreateProjectWizardImpl<FieldNames extends string>({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl" showCloseButton>
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col" showCloseButton>
+        <DialogHeader className="shrink-0">
           <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
-        <Separator className="w-full" />
-        <div className="flex gap-5 items-begin w-full">
+        <Separator className="w-full shrink-0" />
+        <div className="flex gap-5 items-begin w-full flex-1 min-h-0">
           <Tabs className="shrink-0" value={stepper.state.current.data.id} orientation="vertical" aria-readonly>
             <TabsList variant="line">
               {stepper.state.all.map((step) => (
@@ -183,10 +183,10 @@ function CreateProjectWizardImpl<FieldNames extends string>({
               ))}
             </TabsList>
           </Tabs>
-          <div className="flex-1 min-h-64">{stepper.flow.switch(flowSwitch)}</div>
+          <div className="flex-1 min-h-64 overflow-y-auto pr-2">{stepper.flow.switch(flowSwitch)}</div>
         </div>
-        <Separator className="w-full" />
-        <ButtonGroup className="flex justify-between w-full">
+        <Separator className="w-full shrink-0" />
+        <ButtonGroup className="flex justify-between w-full shrink-0">
           <ButtonGroup>
             <Button type="button" onClick={() => onOpenChange(false)}>
               {t("navigation.cancel")}
