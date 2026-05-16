@@ -168,13 +168,13 @@ For per-iteration nodes inside a for-each — the ones that emit ONE element of 
 
 ## 12. Age-rating gate
 
-12.1. Templates that declare an age-rating wizard field (`select-age-rating`) receive a derived `${ageRatingLabel}` variable that the apply pipeline substitutes into prompts. Every LLM-call node's prompt fields must reference this variable. Without it, the model:
+12.1. Templates that declare an age-rating wizard field (`select-age-rating`) store the human-readable badge label ("G", "PG", "12+", "16+", "18+", "NC-21") under the field's name. Every LLM-call node's prompt fields must reference that field via `${<field-name>}` substitution. Without it, the model:
    - refuses on a content filter for genuinely-allowed-by-rating topics (CSAM-class false positives — the model can't tell mature is OK if you never told it), OR
    - over-corrects toward sanitised prose even on permitted topics.
 
-   Typical pattern at the very top of each prompt: `## Возрастной рейтинг произведения\n\n${ageRatingLabel}. <one sentence saying the content must stay in range>.`
+   Typical pattern at the very top of each prompt (assuming the field is named `ageRating`): `## Возрастной рейтинг произведения\n\n${ageRating}. <one sentence saying the content must stay in range>.`
 
-   This rule is enforced by [`templates-structure.test.ts`](./templates-structure.test.ts) — see "LLM-call nodes reference the ageRatingLabel wizard var". The reverse is not enforced: templates without an age-rating field skip the check.
+   This rule is enforced by [`templates-structure.test.ts`](./templates-structure.test.ts) — see "LLM-call nodes reference the age-rating wizard var". The reverse is not enforced: templates without an age-rating field skip the check.
 
 ---
 

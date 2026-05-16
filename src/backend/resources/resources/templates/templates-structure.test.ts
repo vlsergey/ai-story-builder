@@ -338,13 +338,6 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
 
   it("every wizard variable used in content/aiUserInstructions has a matching wizard field declaration", () => {
     const wizardNames = new Set((template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => f.name)))
-    // Derived wizard vars — auto-computed by the apply pipeline and exposed
-    // to templates alongside the user-entered values. See enrichWizardData()
-    // in src/backend/projects/create-project.ts.
-    const hasAgeRatingField = (template.wizardPages ?? []).some((p) =>
-      p.fields.some((f) => f.type === "select-age-rating"),
-    )
-    if (hasAgeRatingField) wizardNames.add("ageRatingLabel")
     // `${...}` content may be a bare identifier OR an arithmetic expression
     // (e.g. `${round(1400/partsCount)}` — see normalizeAndReplaceContent).
     // For each `${expr}`, extract identifier tokens that look like variable
@@ -490,21 +483,23 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   })
 
   // ─── Age-rating boilerplate ──────────────────────────────────────────────
-  // Templates that declare an age-rating wizard field (select-age-rating) get
-  // a derived `${ageRatingLabel}` variable substituted into prompts at apply
-  // time. Without it, the LLM has no idea what content range is OK and either
-  // (a) refuses on a content filter for risky topics, or (b) over-corrects
-  // toward sanitised prose. If the author wired up the wizard field but
-  // forgot to thread `${ageRatingLabel}` into prompts, the apply-time
-  // substitution silently drops the variable and the prompt loses the gate.
+  // Templates that declare a `select-age-rating` wizard field store the badge
+  // label ("G", "PG", "12+", "16+", "18+", "NC-21") under the field's name
+  // and substitute it via `${<fieldName>}`. Without that reference somewhere
+  // in each LLM-call node's prompt, the LLM has no idea what content range
+  // is OK and either (a) refuses on a content filter for risky topics, or
+  // (b) over-corrects toward sanitised prose.
   //
   // Rule: if any wizard field has type `select-age-rating`, every LLM-call
-  // node's prompts must reference `${ageRatingLabel}` at least once.
-  describe("LLM-call nodes reference the ageRatingLabel wizard var when template has age-rating field", () => {
-    const hasAgeRatingField = (template.wizardPages ?? []).some((p) =>
-      p.fields.some((f) => f.type === "select-age-rating"),
-    )
-    if (!hasAgeRatingField) {
+  // node's prompts must reference `${<that-field-name>}` at least once.
+  describe("LLM-call nodes reference the age-rating wizard var when template has age-rating field", () => {
+    const ageRatingFieldNames: string[] = []
+    for (const page of template.wizardPages ?? []) {
+      for (const f of page.fields) {
+        if (f.type === "select-age-rating") ageRatingFieldNames.push(f.name)
+      }
+    }
+    if (ageRatingFieldNames.length === 0) {
       it.skip("template has no age-rating wizard field — rule N/A", () => {})
       return
     }
@@ -521,16 +516,16 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       if (fields.length === 0) continue
       for (const { field, lines } of fields) {
         const joined = lines.join("\n")
-        if (!joined.includes("${" + "ageRatingLabel}")) {
-          failures.push(`${node.title}.${field}`)
-        }
+        const hit = ageRatingFieldNames.some((n) => joined.includes(`\${${n}}`))
+        if (!hit) failures.push(`${node.title}.${field}`)
       }
     }
     it("every prompt field of every LLM-call node references the age-rating wizard var", () => {
+      const placeholders = ageRatingFieldNames.map((n) => `\${${n}}`).join(" or ")
       expect(
         failures,
-        `Missing \${ageRatingLabel} reference in: ${failures.join(", ")}. ` +
-          `Either add the substitution at the top of each prompt (typical pattern: "## Возрастной рейтинг ... \${ageRatingLabel}. ..."), ` +
+        `Missing ${placeholders} reference in: ${failures.join(", ")}. ` +
+          `Add the substitution at the top of each prompt (typical pattern: "## Возрастной рейтинг ... ${placeholders}. ..."), ` +
           `or drop the select-age-rating wizard field if rating isn't meaningful for this template.`,
       ).toEqual([])
     })

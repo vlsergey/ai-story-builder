@@ -16,7 +16,7 @@ describe("normalizeAndReplaceContent — wizard variable substitution", () => {
 
   it("passes non-numeric string values through bare-identifier path (no expr-eval)", () => {
     // expr-eval can't evaluate raw strings, so the bare-identifier shortcut
-    // is what makes `${ageRatingLabel}` → "18+" work.
+    // is what makes `${ageRating}` → "18+" work.
     expect(normalizeAndReplaceContent(["[${rating}]"], { rating: "18+" })).toBe("[18+]")
   })
 

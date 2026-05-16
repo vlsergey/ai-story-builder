@@ -16,7 +16,7 @@ const EXPR_PARSER = new Parser()
  * and replace `${...}` templates with values from wizard data.
  *
  * Two flavors of `${...}`:
- * - Bare identifier (`${ageRatingLabel}`) — looked up directly in templateData.
+ * - Bare identifier (`${ageRating}`) — looked up directly in templateData.
  *   Falsy values substitute as empty string (existing convention; keeps backward
  *   compatibility for `defaultValue ?? ""` semantics in old templates).
  * - Expression (anything else — has operators, parens, function calls, digits):

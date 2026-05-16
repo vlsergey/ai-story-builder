@@ -157,7 +157,7 @@ function ControllableWizardFieldRenderer<T extends FieldValues>({
             {AGE_RATING_ORDER.map((rating) => {
               const info = AGE_RATING_INFO[rating]
               return (
-                <SelectItem key={rating} value={rating}>
+                <SelectItem key={rating} value={info.label}>
                   <span className="inline-flex items-center gap-2">
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5 rounded"
