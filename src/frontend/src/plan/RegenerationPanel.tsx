@@ -6,9 +6,11 @@ import type {
 } from "@shared/RegenerateEvent"
 import type { DockviewPanelApi } from "dockview"
 import { PlayIcon, SquareIcon } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { trpc } from "../ipcClient"
 import { useTranslation } from "react-i18next"
+import AiThinkingPanel, { type AiThinkingPanelHandle } from "../ai/AiThinkingPanel"
 import { Button } from "../ui-components/button"
 import { Card } from "../ui-components/card"
 import RegenerateOptionsForm from "./RegenerateOptionsForm"
@@ -25,6 +27,24 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   trpc.plan.nodes.aiGenerate.subscribeToStatusEvents.useSubscription(undefined, {
     onData: setEvent,
   })
+
+  const aiThinkingPanelRef = useRef<AiThinkingPanelHandle>(null)
+  trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
+    onData({ event }) {
+      aiThinkingPanelRef.current?.onEvent(event as ResponseStreamEvent)
+    },
+  })
+
+  // Reset the panel when batch regeneration stops (inProcess flips true → false)
+  // so the next run starts with a clean panel instead of leftover items.
+  const prevInProcessRef = useRef(false)
+  useEffect(() => {
+    const nowInProcess = event?.inProcess ?? false
+    if (prevInProcessRef.current && !nowInProcess) {
+      aiThinkingPanelRef.current?.onComplete()
+    }
+    prevInProcessRef.current = nowInProcess
+  }, [event?.inProcess])
 
   const startMutation = trpc.plan.nodes.aiGenerate.startForAll.useMutation()
   const stopMutation = trpc.plan.nodes.aiGenerate.stop.useMutation()
@@ -139,6 +159,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
           {renderStats()}
         </div>
       )}
+      <AiThinkingPanel ref={aiThinkingPanelRef} className="shrink-0 text-muted-foreground" />
       <ResponseStreamWatcher className="flex-1 min-h-0 text-muted-foreground text-xs" />
     </div>
   )

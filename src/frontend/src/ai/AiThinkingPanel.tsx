@@ -37,9 +37,25 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
             newItems[event.output_index] = event.item
             return newItems
           })
+          break
+        case "response.reasoning_summary_text.delta":
+          // Grok and similar reasoning-capable models stream reasoning text
+          // chunk-by-chunk after the reasoning output_item arrives. Accumulate
+          // into the item's summary[summary_index].text so the panel can show
+          // the live "what the model is thinking" stream.
+          setItems((items) => {
+            const item = items[event.output_index]
+            if (!item || item.type !== "reasoning") return items
+            const summary = [...(item.summary ?? [])]
+            const existing = summary[event.summary_index]
+            const prevText = existing?.type === "summary_text" ? existing.text : ""
+            summary[event.summary_index] = { type: "summary_text", text: prevText + event.delta }
+            const newItems = [...items]
+            newItems[event.output_index] = { ...item, summary }
+            return newItems
+          })
+          break
       }
-      console.log(event)
-      return
     },
     onComplete: () => {
       setItems([])
@@ -75,6 +91,25 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
                     {validKey && t(i18nKey)}
                     {!validKey && `${item.type}; ${(item as any)?.action?.type ? `.${(item as any).action.type}` : ""}`}
                   </span>
+
+                  {item.type === "reasoning" &&
+                    item.summary &&
+                    item.summary.length > 0 &&
+                    (() => {
+                      const joined = item.summary
+                        .map((s) => (s.type === "summary_text" ? s.text : ""))
+                        .join(" ")
+                        .replace(/\s+/g, " ")
+                        .trim()
+                      if (!joined) return null
+                      const tail = joined.length > 160 ? `…${joined.slice(-160)}` : joined
+                      return (
+                        <span className="ml-1 italic">
+                          {": "}
+                          {tail}
+                        </span>
+                      )
+                    })()}
 
                   {item.type === "custom_tool_call" && (
                     <span>
