@@ -104,10 +104,15 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
       newOverrides.push(overrideForIter)
     }
 
-    // replace current input
+    // Replace current input. The per-iteration overrides above already mark
+    // for-each-input with summary: null + status: OUTDATED so each iteration
+    // gets a fresh summary; the mounted row must mirror that — otherwise the
+    // currently-visible iteration shows the previous run's stale summary
+    // after upstream contents changed.
     await new PlanNodeService().patch(internalInputNodeId, false, {
       content: inputs[parsedContent.currentIndex || 0],
-      status: "GENERATED",
+      status: "OUTDATED",
+      summary: null,
     })
 
     const newContent: ForEachNodeContent = {

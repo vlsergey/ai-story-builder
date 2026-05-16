@@ -8,12 +8,18 @@ import { PlanNodeRepository } from "../plan-node-repository.js"
  * GENERATED downstream node ready to run while one of its (transitively)
  * upstream inputs still needs to regenerate.
  *
- * Two rules, applied repeatedly to fixpoint:
+ * Three rules, applied repeatedly to fixpoint:
  *   1. Forward via input edges — if any upstream node has a stale status,
  *      mark this GENERATED node OUTDATED.
  *   2. Bottom-up via parent_id — if any descendant of a container is stale,
  *      mark the GENERATED container OUTDATED (so the scheduler enters it
  *      and its regenerate method handles the inner sub-tree).
+ *   3. Top-down for for-each-input — these helper nodes are populated by
+ *      their parent for-each container, not by edges or self-regeneration,
+ *      so neither rule 1 nor rule 2 ever fires. If the container is stale,
+ *      the mounted iteration's input row inherits the stale status — without
+ *      that the row sits GENERATED with the previous iteration's content
+ *      and summary, blocks summary regen, and confuses the UI.
  *
  * Stale-source set per rule:
  *   - forward: ERROR, OUTDATED, EMPTY  (EMPTY upstream means downstream got
@@ -22,6 +28,8 @@ import { PlanNodeRepository } from "../plan-node-repository.js"
  *     to their container — for-each-internal merge nodes like «Сборка
  *     предыдущих сцен» are legitimately EMPTY on iter 0, and that is not a
  *     sign of pending work)
+ *   - top-down (for-each-input): ERROR, OUTDATED only — same rationale as
+ *     bottom-up; an EMPTY container is not pending work
  *   - + MANUAL  when `regenerateManual` is on (user wants their edits redone)
  *   - + GENERATED when `regenerateGenerated` is on (user wants a full re-run)
  *
@@ -41,13 +49,18 @@ export function propagateStaleStatus(
 } {
   const forwardStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR", "EMPTY"])
   const bottomUpStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR"])
+  // top-down mirrors bottom-up's "real work pending" set — EMPTY container
+  // does not warrant demoting the input row.
+  const topDownStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR"])
   if (options.regenerateManual) {
     forwardStale.add("MANUAL")
     bottomUpStale.add("MANUAL")
+    topDownStale.add("MANUAL")
   }
   if (options.regenerateGenerated) {
     forwardStale.add("GENERATED")
     bottomUpStale.add("GENERATED")
+    topDownStale.add("GENERATED")
   }
 
   const nodeRepo = new PlanNodeRepository()
@@ -91,7 +104,14 @@ export function propagateStaleStatus(
 
       const childStale = (childrenByParent.get(node.id) ?? []).some((c) => bottomUpStale.has(c.status))
 
-      if (upstreamStale || childStale) {
+      const parentStale = (() => {
+        if (node.type !== "for-each-input") return false
+        if (node.parent_id == null) return false
+        const parent = byId.get(node.parent_id)
+        return parent != null && topDownStale.has(parent.status)
+      })()
+
+      if (upstreamStale || childStale || parentStale) {
         nodeRepo.patch(node.id, { status: "OUTDATED" })
         node.status = "OUTDATED"
         marked.push(node.id)

@@ -141,6 +141,28 @@ describe("propagateStaleStatus", () => {
     expect(nodes.findById(c2)!.status).toBe("OUTDATED")
   })
 
+  it("for-each-input child of a stale for-each container is demoted", () => {
+    // for-each-input has no incoming edges (its content is populated by the
+    // parent for-each container) and no children, so neither forward nor
+    // bottom-up rule fires for it. Without an explicit top-down rule it
+    // stays GENERATED while the rest of the iteration tree is OUTDATED —
+    // looks confusing in the UI and blocks summary regeneration on the
+    // mounted iteration row.
+    const nodes = new PlanNodeRepository()
+    new PlanEdgeRepository()
+    const container = nodes.insert({ title: "Loop", type: "for-each", parent_id: null, status: "OUTDATED" })
+    const internalInput = nodes.insert({
+      title: "Element",
+      type: "for-each-input",
+      parent_id: container,
+      status: "GENERATED",
+    })
+
+    propagateStaleStatus()
+
+    expect(nodes.findById(internalInput)!.status).toBe("OUTDATED")
+  })
+
   it("EMPTY upstream still propagates forward through edges (forward rule unchanged)", () => {
     // The exemption is bottom-up-only. An EMPTY node still blocks anything that
     // reads from it via an input edge — downstream can't be considered fresh.
