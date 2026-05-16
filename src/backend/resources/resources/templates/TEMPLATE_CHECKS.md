@@ -194,31 +194,40 @@ For `fix-problems` nodes, the find-step prompt asks the model to assign severity
 
 ---
 
-## 14. Multi-beat plot plan structure
+## 14. Plot plan structure
 
-Templates whose pipeline includes a node that produces a numbered sequence of N plot beats (each iterated downstream into a scene) need these guards. The model's default is to write N consecutive interior-reflection beats with a smooth emotional gradient and no concrete events. The result reads as one long thought, not an arc.
+**Vocabulary used in sections 14–17.** Long-form-prose templates have two distinct units, and confusing them produces wrong rules:
 
-14.1. **Beat-type variety.** The plot-plan prompt should declare beat types and require that no more than one consecutive beat be of the same type. Types worth distinguishing: interior-only (POV alone, no dialogue, no external event), dialogue with one other character, dialogue with a group, action-without-dialogue, rendered flashback (not "she remembered" but a scene with location and lines). Without this rule the LLM lands every beat in interior-only — it's the cheapest type to write.
+- **Scene** — a narrative unit with one Goal/Conflict/Disaster (Swain) and one emotional shift (McKee). The smallest self-contained dramatic step. A scene's length is whatever the story needs.
+- **Chunk / output part** — one LLM call's worth of generated prose, bounded by the model's per-call output cap (~1500 words on most current providers). A purely technical unit.
 
-14.2. **Beat-ending must be eventful, not affective.** When the plot-plan prompt asks for Goal/Conflict/Disaster (Swain) or any equivalent, "Disaster" (the beat's ending) must be defined explicitly as a SHOWABLE event — a gesture, a line, an object appearing or disappearing, a movement, a change in surroundings. Forbid endings phrased as internal recognition ("she felt", "realized", "decided to think later"). The downstream find-problems node lists "beat ends on affect, not event" as a severity ≥ 70 problem.
+These should NOT be fused at the template-architecture level. A template that hard-codes "one chunk = one scene" loses the ability to write long scenes (which must span multiple chunks) and short scenes (which could be grouped into one chunk). The plan node MUST describe scenes as the dramatic unit; the chunking layer MUST be a separate concern.
 
-14.3. **Final beat carries a concrete gesture.** The plot-plan prompt must require the final beat to contain a single, in-the-moment physical action symbolizing the protagonist's choice. Forbid endings of the form "decides to think about it later", "leaves without resolving", "still doesn't understand". Without this, novellas end on internal recognition that doesn't satisfy.
+The rules below operate at **scene** granularity. The chunking layer is a separate concern; how a template wires it (1 chunk per scene, multi-chunk per scene via a nested for-each, dynamic per-scene budget) is the template author's call.
 
-14.4. **Material follow-up for key reveals.** When the plot plan reveals a key piece of information (name, fact, artifact, confession) in beat N, at least one later beat must re-touch that information through a physical proof: object, second document, third-party line, external event. Repeated POV reflection on the same information is retelling, not a payoff.
+The failure mode these rules guard against: the model writes consecutive interior-reflection scenes with a smooth emotional gradient and no concrete events. The result reads as one long thought, not an arc.
 
-14.5. **On-stage characters only get full profiles.** Templates with a character-profiles for-each must not produce full profiles for characters who never appear on stage. Either (a) generate the plot first and derive the cast from beats where characters actually act/speak/are seen, or (b) instruct the cast-extraction node to filter to on-stage characters and emit a one-line reference for the rest. Otherwise the for-each burns LLM cycles on character development the prose can't consume, and the plot-review find-step should flag "character with full profile never appears on stage" as severity ≥ 60.
+14.1. **Scene-type variety.** The plot-plan prompt should declare scene types and require that no more than one consecutive scene be of the same type. Types worth distinguishing: interior-only (POV alone, no dialogue, no external event), dialogue with one other character, dialogue with a group, action-without-dialogue, rendered flashback (not "she remembered" but a scene with location and lines). Without this rule the LLM lands every scene in interior-only — it's the cheapest type to write.
 
-14.6. **Deadline pressure must register in beats.** If the setting establishes a time constraint (an event, a deadline, a closing window), the plot-plan prompt must require that 2+ beats reflect it — thought of approaching event, accelerated pace, objective time marker, or conversation about time. Otherwise the deadline is decoration.
+14.2. **Scene ending must be eventful, not affective.** When the plot-plan prompt asks for Goal/Conflict/Disaster (Swain) or any equivalent, "Disaster" (the scene's ending) must be defined explicitly as a SHOWABLE event — a gesture, a line, an object appearing or disappearing, a movement, a change in surroundings. Forbid endings phrased as internal recognition ("she felt", "realized", "decided to think later"). The downstream find-problems node lists "scene ends on affect, not event" as a severity ≥ 70 problem.
+
+14.3. **Final scene carries a concrete gesture.** The plot-plan prompt must require the final scene to contain a single, in-the-moment physical action symbolizing the protagonist's choice. Forbid endings of the form "decides to think about it later", "leaves without resolving", "still doesn't understand". Without this, novellas end on internal recognition that doesn't satisfy.
+
+14.4. **Material follow-up for key reveals.** When the plot plan reveals a key piece of information (name, fact, artifact, confession) in scene N, at least one later scene must re-touch that information through a physical proof: object, second document, third-party line, external event. Repeated POV reflection on the same information is retelling, not a payoff.
+
+14.5. **On-stage characters only get full profiles.** Templates with a character-profiles for-each must not produce full profiles for characters who never appear on stage. Either (a) generate the plot first and derive the cast from scenes where characters actually act/speak/are seen, or (b) instruct the cast-extraction node to filter to on-stage characters and emit a one-line reference for the rest. Otherwise the for-each burns LLM cycles on character development the prose can't consume, and the plot-review find-step should flag "character with full profile never appears on stage" as severity ≥ 60.
+
+14.6. **Deadline pressure must register in scenes.** If the setting establishes a time constraint (an event, a deadline, a closing window), the plot-plan prompt must require that 2+ scenes reflect it — thought of approaching event, accelerated pace, objective time marker, or conversation about time. Otherwise the deadline is decoration.
 
 ## 15. Setup / payoff registry distribution
 
 If the template generates a setup/payoff registry alongside the plot plan, the prompt must constrain its shape:
 
-15.1. **Every beat after the first gets at least one payoff.** A beat without any prior-setup payoff is exposition, not a scene. Find-step severity ≥ 60.
+15.1. **Every scene after the first gets at least one payoff.** A scene without any prior-setup payoff is exposition, not drama. Find-step severity ≥ 60.
 
-15.2. **No star-graph to the final beat.** No more than ~half of all rows may have the final beat as their payoff target. If most setups converge on the finale, the middle beats are filler. Find-step severity ≥ 65.
+15.2. **No star-graph to the final scene.** No more than ~half of all rows may have the final scene as their payoff target. If most setups converge on the finale, the middle scenes are filler. Find-step severity ≥ 65.
 
-15.3. **Setups have a payoff distance bound.** A setup planted in beat K should pay off no later than K + ⌈N / 3⌉ (where N is the plan's beat count). Longer-distance "setups" are world-building context, not active promises — remove from the registry to avoid the model treating them as Chekhov's guns that must fire.
+15.3. **Setups have a payoff distance bound.** A setup planted in scene K should pay off no later than K + ⌈N / 3⌉ (where N is the plan's scene count). Longer-distance "setups" are world-building context, not active promises — remove from the registry to avoid the model treating them as Chekhov's guns that must fire.
 
 15.4. **No duplicate rows.** Two rows describing the same setup→payoff in different words is one row. Find-step severity ≥ 55.
 
