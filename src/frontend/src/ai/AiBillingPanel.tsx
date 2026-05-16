@@ -100,10 +100,12 @@ export default function AiBillingPanel() {
         </div>
         {lastRequest != null ? (
           <div className="rounded border border-border bg-muted/30 px-3 py-2 space-y-1">
-            {/* <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('billing.cost')}</span>
-              <span className="font-mono font-semibold text-foreground">{formatCost(lastRequest.costUsdTicks)}</span>
-            </div> */}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t("billing.cost")}</span>
+              <span className="font-mono font-semibold text-foreground">
+                {formatCost((lastRequest as Record<string, unknown>).cost_in_usd_ticks as number | null | undefined)}
+              </span>
+            </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("billing.total_tokens")}</span>
               <span className="font-mono text-foreground">{formatTokensWithUnit(lastRequest.total_tokens)}</span>

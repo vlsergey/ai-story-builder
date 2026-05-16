@@ -7,6 +7,34 @@ function pickNumber(value: unknown): number | null {
 }
 
 /**
+ * xAI Grok exposes per-call cost in `response.usage.cost_in_usd_ticks` —
+ * integer count of "ticks", where one tick is 1e-10 USD (matching the
+ * `USD_PER_TICK` constant the frontend's `AiBillingPanel` uses to render
+ * the same value).
+ *
+ * Historically the field was sometimes named `usage.total_cost` (already
+ * in USD) or just `total_cost` — keep those known paths as fallbacks for
+ * older Grok versions and other OpenAI-compatible providers.
+ *
+ * Returns USD as a regular number, or null when the response carries no
+ * cost field we recognise. Callers must NOT substitute a calculated price —
+ * cost_usd in telemetry is intentionally `null` if the provider didn't
+ * report.
+ */
+const USD_PER_TICK = 1e-10
+
+export function extractProviderCostUsd(response: unknown): number | null {
+  if (response == null || typeof response !== "object") return null
+  const r = response as { usage?: Record<string, unknown> } & Record<string, unknown>
+  const usage = r.usage
+  const ticks = pickNumber(usage?.cost_in_usd_ticks)
+  if (ticks != null) return ticks * USD_PER_TICK
+  return (
+    pickNumber(usage?.total_cost) ?? pickNumber(usage?.cost) ?? pickNumber(r.total_cost) ?? pickNumber(r.cost) ?? null
+  )
+}
+
+/**
  * Wraps `adapter.generateResponse` with per-call telemetry recording.
  *
  * Captures duration and output text length around the call, captures token
@@ -60,15 +88,10 @@ export async function generateWithTelemetry(args: {
     if (event.type === "response.completed") {
       const response: any = (event as any).response
       if (response?.usage) usageHolder.current = response.usage
-      // xAI reports the API-side cost on the response itself (and/or on the
-      // usage sub-object). This is the only source we use for cost_usd —
-      // see RecordCallArgs.reported_cost_usd for why no hardcoded fallback.
-      const provider_cost =
-        pickNumber(response?.usage?.total_cost) ??
-        pickNumber(response?.usage?.cost) ??
-        pickNumber(response?.total_cost) ??
-        pickNumber(response?.cost) ??
-        null
+      // Provider-reported cost. See `extractProviderCostUsd` for the path /
+      // scale lookup and `RecordCallArgs.reported_cost_usd` for why we do
+      // not substitute a calculated fallback when the provider stays silent.
+      const provider_cost = extractProviderCostUsd(response)
       if (provider_cost != null) reportedCostHolder.current = provider_cost
     }
     onEvent?.(event)
