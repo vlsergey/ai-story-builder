@@ -19,7 +19,20 @@ export function applyRuntimeSettings(dbPath: string): void {
  * Opens a project by filename, loads all its settings, and returns them.
  * Ensures the project is closed afterwards (in a finally block).
  * Throws an error if a project is already open.
+ *
+ * Per-project identity fields (project title, applied template + wizard data,
+ * dock layout) are stripped — those describe THAT project's state and would
+ * clobber the new project's title / wizard inputs when applied back. The
+ * import flow keeps only the transferable surface: AI engines config,
+ * current backend, theme, locale, runtime flags.
  */
+const NON_TRANSFERABLE_SETTING_KEYS = [
+  "projectTitle",
+  "appliedTemplateFile",
+  "appliedTemplateWizardData",
+  "layout",
+] as const
+
 export function getProjectSettings(filename: string): SettingsTypes {
   if (isOpen()) {
     throw makeErrorWithStatus("A project is already open", 400)
@@ -29,8 +42,11 @@ export function getProjectSettings(filename: string): SettingsTypes {
     // Open the project
     openProject(filename)
 
-    // Load all settings
-    return SettingsRepository.getAll()
+    const all = SettingsRepository.getAll() as Record<string, unknown>
+    for (const k of NON_TRANSFERABLE_SETTING_KEYS) {
+      delete all[k]
+    }
+    return all as SettingsTypes
   } finally {
     // Ensure project is closed
     closeProject()

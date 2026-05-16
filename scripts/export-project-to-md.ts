@@ -26,10 +26,16 @@ import { parseArgs } from "node:util"
  *     --project "Письмо" \
  *     --template fiction-arc.ru.json \
  *     --genre "литдрама" \
+ *     --final-node "Сборка драфта" \
  *     [--language ru] \
  *     [--output <path>]
  *
  * Or pass a full path to the .sqlite as --project.
+ *
+ * `--final-node` is required: the script can't reliably guess which plan node
+ * holds the finished prose — different templates use different titles
+ * («Сборка драфта», «Сборка финала», …) and the safe path is to ask the
+ * caller.
  */
 import Database from "better-sqlite3"
 
@@ -37,6 +43,7 @@ interface CliArgs {
   project: string
   template: string
   genre: string
+  finalNode: string
   language?: string
   output?: string
 }
@@ -47,19 +54,27 @@ function parseCli(): CliArgs {
       project: { type: "string" },
       template: { type: "string" },
       genre: { type: "string" },
+      "final-node": { type: "string" },
       language: { type: "string" },
       output: { type: "string" },
     },
   })
-  if (!values.project || !values.template || !values.genre) {
+  if (!values.project || !values.template || !values.genre || !values["final-node"]) {
     process.stderr.write(
       "usage: tsx scripts/export-project-to-md.ts " +
-        "--project <name-or-path> --template <fiction-arc.ru.json> " +
-        "--genre <genre> [--language <code>] [--output <path>]\n",
+        '--project <name-or-path> --template <fiction-arc.ru.json> --genre <genre> --final-node "<plan-node title>" ' +
+        "[--language <code>] [--output <path>]\n",
     )
     process.exit(2)
   }
-  return values as CliArgs
+  return {
+    project: values.project,
+    template: values.template,
+    genre: values.genre,
+    finalNode: values["final-node"],
+    language: values.language,
+    output: values.output,
+  }
 }
 
 function defaultProjectsDir(): string {
@@ -98,19 +113,13 @@ interface FinalResult {
   content: string
 }
 
-/**
- * Try the most downstream merge node first; fall through to upstream drafts.
- * Whichever has non-empty content wins.
- */
-function findFinalResult(db: Database.Database): FinalResult {
-  const candidates = ["Сборка финала", "Сборка прозы", "Сборка второго драфта", "Сборка первого драфта"]
-  for (const title of candidates) {
-    const c = readNodeContent(db, title)
-    if (c && c.trim().length > 0) return { title, content: c }
-  }
+/** Caller passes the title of the plan node that holds the finished prose. */
+function findFinalResult(db: Database.Database, title: string): FinalResult {
+  const c = readNodeContent(db, title)
+  if (c && c.trim().length > 0) return { title, content: c }
   throw new Error(
-    `No final merge node has content. Tried: ${candidates.join(", ")}. ` +
-      `Make sure the generation pipeline ran end-to-end and the final merge was refreshed.`,
+    `Plan node "${title}" has no content. ` +
+      `Make sure the title is right and the generation pipeline ran end-to-end and refreshed this node.`,
   )
 }
 
@@ -403,7 +412,7 @@ function main() {
 
   const language = args.language ?? languageFromTemplate(args.template)
 
-  const final = findFinalResult(db)
+  const final = findFinalResult(db, args.finalNode)
   const stats = aggregateStats(db)
 
   const partsCount = wizardData.partsCount

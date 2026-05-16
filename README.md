@@ -66,8 +66,11 @@ Export your own run with [`scripts/export-project-to-md.ts`](scripts/export-proj
 npx tsx scripts/export-project-to-md.ts \
   --project "Письмо" \
   --template fiction-arc.ru.json \
-  --genre "литдрама"
+  --genre "литдрама" \
+  --final-node "Сборка драфта"
 ```
+
+`--final-node` is the title of the plan node that holds the finished prose — different templates use different titles, so the script asks you explicitly.
 
 The script writes `<projectName> [<tags>].md` next to your project's `.sqlite`, with a preamble of all wizard inputs, LLM settings, and aggregated telemetry, then the final assembled prose. Copy the resulting file into `examples/` to publish a run.
 
