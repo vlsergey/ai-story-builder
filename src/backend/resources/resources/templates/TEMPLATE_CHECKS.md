@@ -130,6 +130,8 @@ For text nodes that receive prev-outputs (full prior scenes / chapters / section
 
 9.1. For locale-specific templates (e.g. `*.ru.json`), all prompts, descriptions, labels, and placeholders are in that language. No accidental fragments of another language inside prompt prose. Placeholders that happen to be node titles in another language are allowed since they reflect node identity; foreign-language prose inside instruction text is not.
 
+   **Instruction language leaks into output.** The LLM mirrors the vocabulary it sees in the prompt — English terms ("setup", "payoff", "callback", "POV", "Disaster", "flashback", "action", "engage") in instructions show up as the same English words inside the model's generated prose, even when an explicit "write in Russian" rule is present at the end. Acceptable exceptions: methodology proper nouns ("Save the Cat", "Свейн") *with* localized attribution (`по Свейну`), and code identifiers inside fenced blocks. Mixing English meta-vocabulary with target-language content prose in the same instruction is the most common leak source. When you reach for an English term to describe an authoring concept, find or coin a target-language word for it instead.
+
 9.2. Register is consistent — e.g. either consistently informal or consistently neutral. Current convention for Russian templates: imperative neutral, no pronoun.
 
 9.3. No `if`-style branches in instruction text (in any language — "if X then A, otherwise B" patterns confuse the model). Rewrite imperatively: state the desired action for each case as a separate sentence ("Canonical characters — canonical voice. New characters — invent.") instead of "if X then A, if Y then B".
@@ -189,6 +191,54 @@ For `fix-problems` nodes, the find-step prompt asks the model to assign severity
 13.2. **`minSeverityToFix` is at or below the bottom of the bands the find-step actually uses.** If find-step never assigns < 50, setting `minSeverityToFix: 30` just means the threshold is decorative.
 
 13.3. **`maxIterations` matches the cost-benefit:** profile / setup nodes (cheap, low-risk) can afford 2–3 iterations; arc-spanning plan polish that's worth grinding can go to 10; scene-level polish where the fifth round adds nothing should cap at 2.
+
+---
+
+## 14. Multi-beat plot plan structure
+
+Templates whose pipeline includes a node that produces a numbered sequence of N plot beats (each iterated downstream into a scene) need these guards. The model's default is to write N consecutive interior-reflection beats with a smooth emotional gradient and no concrete events. The result reads as one long thought, not an arc.
+
+14.1. **Beat-type variety.** The plot-plan prompt should declare beat types and require that no more than one consecutive beat be of the same type. Types worth distinguishing: interior-only (POV alone, no dialogue, no external event), dialogue with one other character, dialogue with a group, action-without-dialogue, rendered flashback (not "she remembered" but a scene with location and lines). Without this rule the LLM lands every beat in interior-only — it's the cheapest type to write.
+
+14.2. **Beat-ending must be eventful, not affective.** When the plot-plan prompt asks for Goal/Conflict/Disaster (Swain) or any equivalent, "Disaster" (the beat's ending) must be defined explicitly as a SHOWABLE event — a gesture, a line, an object appearing or disappearing, a movement, a change in surroundings. Forbid endings phrased as internal recognition ("she felt", "realized", "decided to think later"). The downstream find-problems node lists "beat ends on affect, not event" as a severity ≥ 70 problem.
+
+14.3. **Final beat carries a concrete gesture.** The plot-plan prompt must require the final beat to contain a single, in-the-moment physical action symbolizing the protagonist's choice. Forbid endings of the form "decides to think about it later", "leaves without resolving", "still doesn't understand". Without this, novellas end on internal recognition that doesn't satisfy.
+
+14.4. **Material follow-up for key reveals.** When the plot plan reveals a key piece of information (name, fact, artifact, confession) in beat N, at least one later beat must re-touch that information through a physical proof: object, second document, third-party line, external event. Repeated POV reflection on the same information is retelling, not a payoff.
+
+14.5. **On-stage characters only get full profiles.** Templates with a character-profiles for-each must not produce full profiles for characters who never appear on stage. Either (a) generate the plot first and derive the cast from beats where characters actually act/speak/are seen, or (b) instruct the cast-extraction node to filter to on-stage characters and emit a one-line reference for the rest. Otherwise the for-each burns LLM cycles on character development the prose can't consume, and the plot-review find-step should flag "character with full profile never appears on stage" as severity ≥ 60.
+
+14.6. **Deadline pressure must register in beats.** If the setting establishes a time constraint (an event, a deadline, a closing window), the plot-plan prompt must require that 2+ beats reflect it — thought of approaching event, accelerated pace, objective time marker, or conversation about time. Otherwise the deadline is decoration.
+
+## 15. Setup / payoff registry distribution
+
+If the template generates a setup/payoff registry alongside the plot plan, the prompt must constrain its shape:
+
+15.1. **Every beat after the first gets at least one payoff.** A beat without any prior-setup payoff is exposition, not a scene. Find-step severity ≥ 60.
+
+15.2. **No star-graph to the final beat.** No more than ~half of all rows may have the final beat as their payoff target. If most setups converge on the finale, the middle beats are filler. Find-step severity ≥ 65.
+
+15.3. **Setups have a payoff distance bound.** A setup planted in beat K should pay off no later than K + ⌈N / 3⌉ (where N is the plan's beat count). Longer-distance "setups" are world-building context, not active promises — remove from the registry to avoid the model treating them as Chekhov's guns that must fire.
+
+15.4. **No duplicate rows.** Two rows describing the same setup→payoff in different words is one row. Find-step severity ≥ 55.
+
+15.5. **Concrete naming.** Both "what's planted" and "what fires" must name specific things — characters, objects, lines, actions. Abstractions like "the protagonist's loyalty / lets go of the burden" are theme restatements, not setup/payoff pairs.
+
+## 16. Character voice distinguishability
+
+For templates with a character-profile node (per-character profile with a "voice" / "speech" field):
+
+16.1. **The voice field must contain a distinguishing marker.** At minimum one of: era of speech (vocabulary period, generation), profession (specialized jargon), formal/colloquial register, regional or social variant, specific verbal tic (interrupts / repeats / quotes / uses proverbs / drifts into elaboration). Without this constraint, every profile lands on the same default — "short phrases, pauses, concrete vocabulary" — and on the page all characters sound identical.
+
+16.2. **Voices in the cast must not be synonymously described.** If two profiles in the same cast describe voice with paraphrases of the same idea, rewrite one. Best enforced by the plot-/cast-review find-step as severity ≥ 70: "two characters' voices share the same marker — pick a different axis for one."
+
+16.3. **Profile prompts forbid invented example quotes.** Already covered by rule 10.5. The quote-trap is the most common failure mode for voice consistency — listing example lines causes the model to recycle them verbatim into every scene.
+
+## 17. Scene plan engages with setting
+
+For templates that have a per-scene planning node (between the plot plan and the prose generator):
+
+17.1. **Each scene plan must engage with at least one concrete element of the setting** — a named object, location, time-of-day detail, weather marker. Generic references ("in the house", "outside") don't count. Without this, scenes float in unanchored space and feel interchangeable. For interior-only beats, the setting element appears as the anchor for the character's perception.
 
 ---
 
