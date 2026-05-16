@@ -55,7 +55,8 @@
       "suspicious": {
         "noArrayIndexKey": "off",
         "noExplicitAny": "off",
-        "noControlCharactersInRegex": "off"
+        "noControlCharactersInRegex": "off",
+        "noTemplateCurlyInString": "off"
       }
     }
   },
