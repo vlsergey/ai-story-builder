@@ -43,7 +43,14 @@ export interface WizardSelectAgeRatingField extends BaseWizardField {
   defaultValue?: string
 }
 
-export type WizardField = WizardInputField | WizardTextAreaField | WizardSelectAgeRatingField
+export interface WizardIntegerField extends BaseWizardField {
+  type: "integer"
+  min: number
+  max: number
+  defaultValue?: number
+}
+
+export type WizardField = WizardInputField | WizardTextAreaField | WizardSelectAgeRatingField | WizardIntegerField
 
 export interface TemplateProjectLore {
   nodes: TemplateProjectLoreNode[]

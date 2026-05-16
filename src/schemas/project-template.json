@@ -67,11 +67,23 @@
       "required": ["type"],
       "unevaluatedProperties": false
     },
+    "WizardIntegerField": {
+      "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
+      "properties": {
+        "type": { "const": "integer" },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" },
+        "defaultValue": { "type": "integer" }
+      },
+      "required": ["type", "min", "max"],
+      "unevaluatedProperties": false
+    },
     "WizardField": {
       "oneOf": [
         { "$ref": "#/definitions/WizardInputField" },
         { "$ref": "#/definitions/WizardTextAreaField" },
-        { "$ref": "#/definitions/WizardSelectAgeRatingField" }
+        { "$ref": "#/definitions/WizardSelectAgeRatingField" },
+        { "$ref": "#/definitions/WizardIntegerField" }
       ]
     },
     "TemplateProjectLore": {

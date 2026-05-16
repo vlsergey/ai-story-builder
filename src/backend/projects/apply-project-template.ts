@@ -1,3 +1,4 @@
+import { Parser } from "expr-eval"
 import type {
   ProjectTemplate,
   TemplateProjectLoreNode,
@@ -7,13 +8,36 @@ import { LoreNodeRepository } from "../lore/lore-node-repository.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 
+const PLAIN_IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/
+const EXPR_PARSER = new Parser()
+
 /**
  * Join all template lines into single line with line breaks (concatenate with \n)
- * and replace all "${VALUE}" templates with template data.
+ * and replace `${...}` templates with values from wizard data.
+ *
+ * Two flavors of `${...}`:
+ * - Bare identifier (`${ageRatingLabel}`) — looked up directly in templateData.
+ *   Falsy values substitute as empty string (existing convention; keeps backward
+ *   compatibility for `defaultValue ?? ""` semantics in old templates).
+ * - Expression (anything else — has operators, parens, function calls, digits):
+ *   evaluated by expr-eval with templateData as the variable scope. Functions
+ *   available: round / floor / ceil / min / max / abs / pow. Result is coerced
+ *   to string. Use this for formulas keyed off slider values, e.g.
+ *   `${round(1400/partsCount)}`.
  */
 export function normalizeAndReplaceContent(templateValue: string[], templateData: Record<string, any>) {
-  return templateValue.join("\n").replace(/\${([^}]+)}/g, (_match, key) => {
-    return templateData[key] || ""
+  return templateValue.join("\n").replace(/\${([^}]+)}/g, (_match, expr: string) => {
+    const trimmed = expr.trim()
+    if (PLAIN_IDENT_RE.test(trimmed)) {
+      return templateData[trimmed] || ""
+    }
+    try {
+      const result = EXPR_PARSER.parse(trimmed).evaluate(templateData)
+      return String(result)
+    } catch (err) {
+      console.warn(`[template] failed to evaluate \${${trimmed}}: ${(err as Error).message}`)
+      return ""
+    }
   })
 }
 

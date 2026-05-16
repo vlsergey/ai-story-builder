@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { ProjectTemplate, TemplateProjectPlanNode } from "../../../../shared/project-template.js"
+import type { ProjectTemplate, TemplateProjectPlanNode, WizardField } from "../../../../shared/project-template.js"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
 import { computeTemplateLayoutWithEntries } from "../../../lib/elk-template-layout.js"
 import { applyProjectTemplate } from "../../../projects/apply-project-template.js"
@@ -345,10 +345,19 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       p.fields.some((f) => f.type === "select-age-rating"),
     )
     if (hasAgeRatingField) wizardNames.add("ageRatingLabel")
+    // `${...}` content may be a bare identifier OR an arithmetic expression
+    // (e.g. `${round(1400/partsCount)}` — see normalizeAndReplaceContent).
+    // For each `${expr}`, extract identifier tokens that look like variable
+    // references — anything NOT followed by `(` (which would be a function
+    // call into expr-eval's built-ins like round/floor/min/max).
+    const IDENT_NOT_CALL_RE = /\b[A-Za-z_$][A-Za-z0-9_$]*\b(?!\s*\()/g
     const used = new Set<string>()
     for (const { node } of allNodes) {
       const all = [...(node.content ?? []), ...(node.aiUserInstructions ?? [])].join("\n")
-      for (const m of all.matchAll(WIZARD_VAR_RE)) used.add(m[1])
+      for (const m of all.matchAll(WIZARD_VAR_RE)) {
+        const inner = m[1].trim()
+        for (const im of inner.matchAll(IDENT_NOT_CALL_RE)) used.add(im[0])
+      }
     }
     const missing = [...used].filter((v) => !wizardNames.has(v))
     expect(missing, `wizard variables used but not declared: ${missing.join(", ")}`).toEqual([])
@@ -539,9 +548,16 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       tearDownTestDb()
     })
 
+    // Numeric fields need a numeric stub so formula substitution
+    // (`${round(1400/partsCount)}`) evaluates to a real number instead of NaN.
+    function stubFor(f: WizardField): unknown {
+      if (f.type === "integer") return f.defaultValue ?? f.min
+      return "stub"
+    }
+
     it("apply succeeds with stub wizard data", () => {
       const wizardData = Object.fromEntries(
-        (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => [f.name, "stub"])),
+        (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => [f.name, stubFor(f)])),
       )
       expect(() => applyProjectTemplate(template, wizardData)).not.toThrow()
     })

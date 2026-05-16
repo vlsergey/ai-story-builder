@@ -18,6 +18,9 @@ export function buildFormSchema(wizardFields: WizardField[]): ZodObject<Record<s
           // the template — the template only picks a default.
           result = z.enum(AGE_RATING_ORDER as readonly string[] as [string, ...string[]])
           break
+        case "integer":
+          result = z.coerce.number().int().min(field.min).max(field.max)
+          break
       }
       return [field.name, result]
     }),

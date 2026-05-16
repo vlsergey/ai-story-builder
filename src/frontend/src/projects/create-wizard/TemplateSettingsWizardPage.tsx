@@ -46,9 +46,19 @@ export default function TemplateSettingsWizardPage<T extends string, R extends R
 }: TemplateSettingsWizardPageProps<T, R>) {
   const formSchema = buildFormSchema(wizardPage.fields)
 
+  // Seed missing form values from each field's defaultValue (if declared).
+  // Fields without a defaultValue in the template stay undefined; fields the
+  // user already filled on a prior visit keep their entered value.
+  const seededValues = { ...(values as Record<string, any>) }
+  for (const f of wizardPage.fields) {
+    if (seededValues[f.name] === undefined && "defaultValue" in f && f.defaultValue !== undefined) {
+      seededValues[f.name] = f.defaultValue
+    }
+  }
+
   const form = useForm({
     resolver: zodResolver(formSchema),
-    defaultValues: values as any,
+    defaultValues: seededValues as any,
   })
 
   const afterSubmit = useCallback(
@@ -121,6 +131,20 @@ function ControllableWizardFieldRenderer<T extends FieldValues>({
           placeholder={wizardField.placeholder}
           value={field.value}
           onChange={field.onChange}
+          onBlur={field.onBlur}
+        />
+      )}
+      {wizardField.type === "integer" && (
+        <Input
+          className="w-24"
+          id={htmlId}
+          name={field.name}
+          type="number"
+          min={wizardField.min}
+          max={wizardField.max}
+          step={1}
+          value={field.value ?? wizardField.defaultValue ?? wizardField.min}
+          onChange={(e) => field.onChange(Number(e.target.value))}
           onBlur={field.onBlur}
         />
       )}
