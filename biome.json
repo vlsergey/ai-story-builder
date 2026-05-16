@@ -55,8 +55,7 @@
       "suspicious": {
         "noArrayIndexKey": "off",
         "noExplicitAny": "off",
-        "noControlCharactersInRegex": "off",
-        "noTemplateCurlyInString": "off"
+        "noControlCharactersInRegex": "off"
       }
     }
   },
@@ -64,5 +63,17 @@
     "formatter": {
       "semicolons": "asNeeded"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/backend/projects/apply-project-template.test.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noTemplateCurlyInString": "off"
+          }
+        }
+      }
+    }
+  ]
 }
