@@ -28,19 +28,41 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
     onData: setEvent,
   })
 
+  // Three-phase live view per LLM call: "Запрос отправлен" → thinking → streaming.
+  // Transitions are one-way per call (mid-stream reasoning events do not flip
+  // back to thinking — text is the more important signal); next response.created
+  // resets the cycle. Inactive between calls / on stop.
+  type Mode = "idle" | "dispatched" | "thinking" | "streaming"
+  const [mode, setMode] = useState<Mode>("idle")
   const aiThinkingPanelRef = useRef<AiThinkingPanelHandle>(null)
   trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
     onData({ event }) {
-      aiThinkingPanelRef.current?.onEvent(event as ResponseStreamEvent)
+      if (event.type === "response.created") {
+        setMode("dispatched")
+        aiThinkingPanelRef.current?.onComplete()
+        return
+      }
+      if (event.type === "response.output_text.delta") {
+        setMode("streaming")
+        return
+      }
+      if (
+        event.type === "response.output_item.added" ||
+        event.type === "response.output_item.done" ||
+        event.type === "response.reasoning_summary_text.delta"
+      ) {
+        setMode((m) => (m === "streaming" ? m : "thinking"))
+        aiThinkingPanelRef.current?.onEvent(event as ResponseStreamEvent)
+      }
     },
   })
 
-  // Reset the panel when batch regeneration stops (inProcess flips true → false)
-  // so the next run starts with a clean panel instead of leftover items.
+  // Reset to idle when batch regeneration stops (inProcess flips true → false).
   const prevInProcessRef = useRef(false)
   useEffect(() => {
     const nowInProcess = event?.inProcess ?? false
     if (prevInProcessRef.current && !nowInProcess) {
+      setMode("idle")
       aiThinkingPanelRef.current?.onComplete()
     }
     prevInProcessRef.current = nowInProcess
@@ -159,8 +181,21 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
           {renderStats()}
         </div>
       )}
-      <AiThinkingPanel ref={aiThinkingPanelRef} className="shrink-0 text-muted-foreground" />
-      <ResponseStreamWatcher className="flex-1 min-h-0 text-muted-foreground text-xs" />
+      {event?.inProcess && mode === "dispatched" && (
+        <p className="shrink-0 text-xs text-muted-foreground animate-pulse">{t("regeneration.dispatched")}</p>
+      )}
+      {/*
+        Both panels stay mounted regardless of `mode` so their tRPC subscriptions
+        (ResponseStreamWatcher) and accumulated state (AiThinkingPanel) keep
+        up with events that arrive while they're not currently displayed.
+        CSS-level hiding is intentional — re-mounting would miss early deltas.
+      */}
+      <div className={mode === "thinking" ? "shrink-0" : "hidden"}>
+        <AiThinkingPanel ref={aiThinkingPanelRef} className="text-muted-foreground" />
+      </div>
+      <div className={mode === "streaming" ? "flex-1 min-h-0 flex flex-col" : "hidden"}>
+        <ResponseStreamWatcher className="flex-1 min-h-0 text-muted-foreground text-xs" />
+      </div>
     </div>
   )
 }

@@ -209,6 +209,7 @@
   "regeneration.in_progress": "In progress",
   "regeneration.idle": "Idle",
   "regeneration.no_data": "No generation activity",
+  "regeneration.dispatched": "Request sent to LLM, awaiting response…",
   "regeneration.current_nodes": "Currently processing:",
   "regeneration.error": "Error",
   "regeneration.processed": "Processed",

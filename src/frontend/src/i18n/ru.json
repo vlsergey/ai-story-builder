@@ -217,6 +217,7 @@
   "regeneration.in_progress": "В процессе",
   "regeneration.idle": "Бездействует",
   "regeneration.no_data": "Нет активности генерации",
+  "regeneration.dispatched": "Запрос отправлен в LLM, ожидаю ответ…",
   "regeneration.current_nodes": "Сейчас обрабатываются:",
   "regeneration.error": "Ошибка",
   "regeneration.processed": "Обработано",
