@@ -38,7 +38,7 @@
         "title": "Синопсис",
         "type": "text",
         "x": 40,
-        "y": 262,
+        "y": 100,
         "content": ["${synopsis}"],
         "width": 200,
         "height": 80
@@ -47,7 +47,7 @@
         "title": "Мир",
         "type": "text",
         "x": 600,
-        "y": 201,
+        "y": 900,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -86,7 +86,7 @@
         "title": "Тема",
         "type": "text",
         "x": 320,
-        "y": 891,
+        "y": 132,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -120,7 +120,7 @@
         "title": "Жанр и регистр",
         "type": "text",
         "x": 320,
-        "y": 262,
+        "y": 312,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения (задан пользователем)",
           "",
@@ -152,7 +152,7 @@
         "title": "Сеттинг",
         "type": "text",
         "x": 2925,
-        "y": 100,
+        "y": 975,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -193,7 +193,7 @@
         "title": "Стиль",
         "type": "text",
         "x": 600,
-        "y": 878,
+        "y": 279,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -232,7 +232,7 @@
         "title": "Анкета персонажа",
         "type": "text",
         "x": 880,
-        "y": 417,
+        "y": 716,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -302,7 +302,7 @@
         "title": "Персонажи (список)",
         "type": "text",
         "x": 1160,
-        "y": 955,
+        "y": 170,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -364,7 +364,7 @@
         "title": "Разбиение списка персонажей",
         "type": "split",
         "x": 1440,
-        "y": 955,
+        "y": 170,
         "nodeTypeSettings": {
           "partDescription": "Один блок персонажа: заголовок `# Имя` первой строкой, под ним `- Поле: значение` строки для каждого anchor-поля анкеты, затем пустая строка и одна фраза о роли в сюжете и ключевой внутренней черте."
         },
@@ -397,7 +397,7 @@
         "title": "Цикл по персонажам",
         "type": "for-each",
         "x": 1725,
-        "y": 518,
+        "y": 301,
         "width": 1120,
         "height": 394,
         "inputs": [
@@ -411,7 +411,7 @@
             "title": "Персонаж",
             "type": "for-each-input",
             "x": 40,
-            "y": 100,
+            "y": 111,
             "width": 200,
             "height": 80
           },
@@ -419,7 +419,7 @@
             "title": "Профиль персонажа",
             "type": "text",
             "x": 320,
-            "y": 212,
+            "y": 232,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -522,7 +522,7 @@
             "title": "Ревью персонажа",
             "type": "fix-problems",
             "x": 600,
-            "y": 169,
+            "y": 189,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Профиль персонажа",
               "maxIterations": 3,
@@ -630,7 +630,7 @@
             "title": "Выход",
             "type": "for-each-output",
             "x": 880,
-            "y": 169,
+            "y": 189,
             "inputs": [
               {
                 "sourceNodeTitle": "Ревью персонажа",
@@ -646,7 +646,7 @@
         "title": "Сводка по персонажам",
         "type": "merge",
         "x": 2925,
-        "y": 578,
+        "y": 361,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -665,7 +665,7 @@
         "title": "План сцен",
         "type": "text",
         "x": 3205,
-        "y": 256,
+        "y": 855,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -768,7 +768,7 @@
         "title": "Реестр сетапов и пэйоффов",
         "type": "text",
         "x": 3485,
-        "y": 417,
+        "y": 716,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -820,7 +820,7 @@
         "title": "Ревью плана сцен",
         "type": "fix-problems",
         "x": 3765,
-        "y": 307,
+        "y": 754,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "План сцен",
           "maxIterations": 10,
@@ -927,7 +927,7 @@
         "title": "Распределение по чанкам",
         "type": "split",
         "x": 4045,
-        "y": 307,
+        "y": 754,
         "nodeTypeSettings": {
           "partDescription": "Описание одного технического чанка прозы. Первая строка — `**Режим:** full | fragment | packed`. Затем для каждой сцены, попавшей в чанк, блок:\n\n`**Сцена N** (portion: full | first | middle | last), «<Заголовок сцены>»`\n`Цель / Конфликт / Катастрофа: <прозой>`\n`Эмоциональный сдвиг: <прозой>`\n\nДля fragment-чанка ровно одна сцена с portion ∈ {first, middle, last}. Для full-чанка ровно одна сцена с portion=full. Для packed-чанка две и более сцены, каждая с portion=full."
         },
@@ -974,10 +974,10 @@
       {
         "title": "Цикл по чанкам",
         "type": "for-each",
-        "x": 4340,
-        "y": 345,
+        "x": 4330,
+        "y": 179,
         "width": 1680,
-        "height": 546,
+        "height": 675,
         "inputs": [
           {
             "sourceNodeTitle": "Распределение по чанкам",
@@ -989,7 +989,7 @@
             "title": "Чанк",
             "type": "for-each-input",
             "x": 40,
-            "y": 239,
+            "y": 414,
             "width": 200,
             "height": 80
           },
@@ -997,7 +997,7 @@
             "title": "Номер чанка",
             "type": "for-each-index",
             "x": 600,
-            "y": 239,
+            "y": 291,
             "width": 200,
             "height": 80
           },
@@ -1005,7 +1005,7 @@
             "title": "Предыдущие чанки",
             "type": "for-each-prev-outputs",
             "x": 320,
-            "y": 100,
+            "y": 111,
             "width": 200,
             "height": 80
           },
@@ -1013,7 +1013,7 @@
             "title": "Сборка предыдущих чанков",
             "type": "merge",
             "x": 600,
-            "y": 100,
+            "y": 111,
             "nodeTypeSettings": {
               "includeNodeTitle": false,
               "includeInputTitles": false,
@@ -1032,7 +1032,7 @@
             "title": "План чанка",
             "type": "text",
             "x": 320,
-            "y": 201,
+            "y": 524,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -1116,7 +1116,7 @@
             "title": "Режиссёрские пометки чанка",
             "type": "text",
             "x": 600,
-            "y": 373,
+            "y": 473,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -1195,7 +1195,7 @@
             "title": "Проза чанка",
             "type": "text",
             "x": 880,
-            "y": 170,
+            "y": 356,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -1315,7 +1315,7 @@
             "title": "Полировка чанка",
             "type": "fix-problems",
             "x": 1160,
-            "y": 111,
+            "y": 356,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Проза чанка",
               "maxIterations": 2,
@@ -1437,7 +1437,7 @@
             "title": "Выход чанка",
             "type": "for-each-output",
             "x": 1440,
-            "y": 111,
+            "y": 356,
             "inputs": [
               {
                 "sourceNodeTitle": "Полировка чанка",
@@ -1452,8 +1452,8 @@
       {
         "title": "Сборка драфта",
         "type": "merge",
-        "x": 6100,
-        "y": 405,
+        "x": 6090,
+        "y": 239,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
