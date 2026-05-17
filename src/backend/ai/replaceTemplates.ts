@@ -1,3 +1,4 @@
+import Handlebars from "handlebars"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import type { NodeInputs } from "../plan/nodes/NodeInput.js"
 
@@ -11,21 +12,75 @@ export function nodeInputsToReplacements(inputs: NodeInputs<string>): Record<str
   )
 }
 
+/**
+ * Render a prompt template against a flat map of named string variables.
+ *
+ * Variables come from upstream node contents (keyed by node title) plus
+ * wizard-time fields the template author chose to expose. Identifiers in
+ * Handlebars must be ASCII; our node titles are mostly Russian, so authors
+ * write them in bracket form: `{{[Реестр сетапов и пэйоффов]}}`.
+ *
+ * Helpers available inside expressions:
+ * - `eq` / `ne` — strict equality / inequality.
+ * - `contains` — substring check.
+ * - `startsWith` / `endsWith`.
+ * - `matches` — regex test (pattern as string, optional flags).
+ *
+ * Examples:
+ *   {{[Стиль]}}
+ *   {{#if (eq ageRating "18+")}}...{{/if}}
+ *   {{#if (contains [Чанк] "mode=fragment")}}...{{/if}}
+ *
+ * After rendering, any `{{...}}` that survived (unresolved variable, typo in
+ * a name) is treated as a hard error — we don't ship half-rendered prompts to
+ * the LLM. Handlebars by default renders missing top-level variables as empty
+ * string, so the post-check is the only guard against silently-empty
+ * placeholders.
+ */
+const handlebarsInstance = Handlebars.create()
+handlebarsInstance.registerHelper("eq", (a: unknown, b: unknown) => a === b)
+handlebarsInstance.registerHelper("ne", (a: unknown, b: unknown) => a !== b)
+handlebarsInstance.registerHelper("contains", (haystack: unknown, needle: unknown) => {
+  if (typeof haystack !== "string" || typeof needle !== "string") return false
+  return haystack.includes(needle)
+})
+handlebarsInstance.registerHelper("startsWith", (haystack: unknown, prefix: unknown) => {
+  if (typeof haystack !== "string" || typeof prefix !== "string") return false
+  return haystack.startsWith(prefix)
+})
+handlebarsInstance.registerHelper("endsWith", (haystack: unknown, suffix: unknown) => {
+  if (typeof haystack !== "string" || typeof suffix !== "string") return false
+  return haystack.endsWith(suffix)
+})
+handlebarsInstance.registerHelper("matches", (input: unknown, pattern: unknown, flags?: unknown) => {
+  if (typeof input !== "string" || typeof pattern !== "string") return false
+  try {
+    const re = new RegExp(pattern, typeof flags === "string" ? flags : "")
+    return re.test(input)
+  } catch {
+    return false
+  }
+})
+
 export function replaceTemplates<T extends string | null>(
   content: string | null,
   replacements: Record<string, string>,
 ): T {
   if (!content) return content as T
 
-  let result = (content || "").trim()
-  for (const input of Object.entries(replacements)) {
-    const placeholder = `{{${input[0]}}}`
-    const content = input[1]
-    result = result.split(placeholder).join(content)
+  let rendered: string
+  try {
+    const compiled = handlebarsInstance.compile(content.trim(), {
+      noEscape: true,
+      strict: true,
+      preventIndent: false,
+    })
+    rendered = compiled(replacements)
+  } catch (err) {
+    throw makeErrorWithStatus(`Template render failed: ${(err as Error).message}`, 400)
   }
 
-  // Check that after replacement there are no unresolved patterns left
-  const remainingPlaceholders = result.match(/\{\{[^}]+?\}\}/g)
+  const remainingPlaceholders = rendered.match(/\{\{[^}]+?\}\}/g)
   if (remainingPlaceholders && remainingPlaceholders.length > 0) {
     throw makeErrorWithStatus(
       `Unable to resolve template: ${remainingPlaceholders.join(", ")}. Make sure that specified nodes exist.`,
@@ -33,5 +88,5 @@ export function replaceTemplates<T extends string | null>(
     )
   }
 
-  return result as T
+  return rendered as T
 }

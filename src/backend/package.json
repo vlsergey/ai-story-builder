@@ -27,6 +27,7 @@
     "better-sqlite3": "^12.9.0",
     "electron-trpc": "^0.7.1",
     "expr-eval": "^2.0.2",
+    "handlebars": "^4.7.9",
     "openai": "^6.34.0",
     "zod": "^4.4.1"
   }

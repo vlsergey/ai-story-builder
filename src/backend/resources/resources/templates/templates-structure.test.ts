@@ -28,7 +28,11 @@ const TEMPLATE_FILES = readdirSync(TEMPLATES_DIR)
   .sort()
 
 const INTERNAL_PLAN_NODE_TYPES = new Set<string>(["for-each-input", "for-each-output"])
-const PLACEHOLDER_RE = /\{\{([^}]+?)\}\}/g
+// Handlebars bracket-notation: identifiers with spaces / non-ASCII chars are
+// wrapped as `{{[Name]}}`. Helpers like `{{#if ...}}` start with `#`, `/`, `^`,
+// `>`, `!` and aren't placeholder references, so this regex deliberately
+// matches only the bracket form.
+const PLACEHOLDER_RE = /\{\{\[([^\]]+)\]\}\}/g
 const WIZARD_VAR_RE = /\$\{([^}]+?)\}/g
 
 interface NodeWithCtx {
@@ -184,13 +188,13 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       it.skip("no text-input edges on LLM-call nodes", () => {})
     }
 
-    it.each(cases)("%s references its input {{%s}}", (consumerTitle, sourceTitle) => {
+    it.each(cases)("%s references its input {{[%s]}}", (consumerTitle, sourceTitle) => {
       const consumer = candidates.find((n) => n.node.title === consumerTitle)!.node
       const allPromptText = collectPromptFields(consumer).join("\n")
       expect(
-        allPromptText.includes(`{{${sourceTitle}}}`),
-        `${consumerTitle} has an input edge from "${sourceTitle}" but never references {{${sourceTitle}}} in any prompt field. ` +
-          `The engine does NOT auto-inject input content into prompts; without {{Title}} substitution the LLM never sees the source.`,
+        allPromptText.includes(`{{[${sourceTitle}]}}`),
+        `${consumerTitle} has an input edge from "${sourceTitle}" but never references {{[${sourceTitle}]}} in any prompt field. ` +
+          `The engine does NOT auto-inject input content into prompts; without {{[Title]}} substitution the LLM never sees the source.`,
       ).toBe(true)
     })
   })
@@ -224,10 +228,10 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       // (already covered above)
 
       for (const placeholder of collected) {
-        it(`${node.title}: {{${placeholder}}} has a matching input edge`, () => {
+        it(`${node.title}: {{[${placeholder}]}} has a matching input edge`, () => {
           expect(
             inputs.has(placeholder),
-            `Node "${node.title}" references "{{${placeholder}}}" but has no input with sourceNodeTitle "${placeholder}".`,
+            `Node "${node.title}" references "{{[${placeholder}]}}" but has no input with sourceNodeTitle "${placeholder}".`,
           ).toBe(true)
         })
       }
@@ -280,12 +284,12 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
         counts.set(name, (counts.get(name) ?? 0) + 1)
       }
       const dups = [...counts.entries()].filter(([_, c]) => c > 1)
-      const report = dups.map(([name, c]) => `  - {{${name}}}: ${c}×`).join("\n")
+      const report = dups.map(([name, c]) => `  - {{[${name}]}}: ${c}×`).join("\n")
       expect(
         dups,
-        `${label}: each {{Title}} substitutes the full content of that node into the prompt. ` +
+        `${label}: each {{[Title]}} substitutes the full content of that node into the prompt. ` +
           `Multiple inline mentions duplicate kilobytes of content. Replace duplicate references with plain-text section names ` +
-          `(e.g. «секция \`## Сеттинг\`» instead of «\`{{Сеттинг}}\`»). Offenders:\n${report}`,
+          `(e.g. «секция \`## Сеттинг\`» instead of «\`{{[Сеттинг]}}\`»). Offenders:\n${report}`,
       ).toEqual([])
     })
   })
@@ -348,7 +352,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     }
     it.each(
       fixNodes.map(({ node }) => [node.title]),
-    )("fix-problems %s — foundProblemsTemplate is a bare name (no {{ }}) and {{<name>}} appears in the fix prompt", (title) => {
+    )("fix-problems %s — foundProblemsTemplate is a bare name and {{[<name>]}} appears in the fix prompt", (title) => {
       const node = fixNodes.find((n) => n.node.title === title)!.node
       const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
       const tpl = nts.foundProblemsTemplate as string | undefined
@@ -357,15 +361,16 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
         // doesn't inject the problem list. That's allowed.
         return
       }
-      // Must be a bare placeholder name. The runtime wraps it in `{{...}}`
-      // itself when building replacements; storing it already wrapped
-      // produces `{{{{name}}}}` which never matches anything.
+      // Must be a bare placeholder name (no Handlebars wrapping). The runtime
+      // injects it as `{{[<name>]}}` into the replacements scope; storing it
+      // already wrapped here would mean rendering `{{[{{[name]}}]}}` which
+      // never matches anything.
       expect(
-        tpl.includes("{") || tpl.includes("}"),
-        `${title}: foundProblemsTemplate must be a bare name (e.g. "Найденные проблемы"), without surrounding {{ }}. Got: "${tpl}"`,
+        tpl.includes("{") || tpl.includes("}") || tpl.includes("[") || tpl.includes("]"),
+        `${title}: foundProblemsTemplate must be a bare name (e.g. "Найденные проблемы"), without Handlebars wrapping. Got: "${tpl}"`,
       ).toBe(false)
 
-      const expectedPlaceholder = `{{${tpl}}}`
+      const expectedPlaceholder = `{{[${tpl}]}}`
       const fixPrompt = (nts.aiUserInstructionsToFixProblems as string[] | undefined)?.join("\n") ?? ""
       expect(
         fixPrompt.includes(expectedPlaceholder),
@@ -489,7 +494,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
           const dynName = dyn.find(([, p]) => p === earliestDyn)![0]
           const projName = proj.find(([, p]) => p === latestProj)![0]
           offenders.push(
-            `${node.title}.${field}: dynamic {{${dynName}}} appears before project-wide {{${projName}}} — breaks prompt-cache prefix`,
+            `${node.title}.${field}: dynamic {{[${dynName}]}} appears before project-wide {{[${projName}]}} — breaks prompt-cache prefix`,
           )
         }
       }
@@ -528,7 +533,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
           const growName = growing.find(([, p]) => p === latestGrowing)![0]
           const freshName = fresh.find(([, p]) => p === earliestFresh)![0]
           violations.push(
-            `${node.title}.${field}: growing {{${growName}}} appears after fresh-per-iter {{${freshName}}} — cache prefix breaks at {{${freshName}}} before the growing block contributes`,
+            `${node.title}.${field}: growing {{[${growName}]}} appears after fresh-per-iter {{[${freshName}]}} — cache prefix breaks at {{[${freshName}]}} before the growing block contributes`,
           )
         }
       }
