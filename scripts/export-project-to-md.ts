@@ -117,18 +117,103 @@ interface AggregatedStats {
   wallTimeMs: number | null
 }
 
+interface PlanNodeForCost {
+  id: number
+  parent_id: number | null
+  title: string
+}
+
+interface CallRowForCost {
+  ts: string
+  purpose: string
+  node_title: string | null
+  duration_ms: number
+  cost_usd: number | null
+  iteration_index: number | null
+}
+
+/**
+ * Cost/duration of a single full pipeline run, derived from `ai_call_stats`.
+ *
+ * Why this isn't a plain SUM: during development a node may be regenerated
+ * many times, but only the latest run contributes to the final output. For
+ * each (node_title, purpose, iteration_index) tuple we keep at most N most-
+ * recent successful records, where N is the number of times that node fires
+ * in one pipeline run — 1 for nodes outside any for-each, `chunksCount` for
+ * nodes inside the «Цикл по чанкам» for-each. Records whose `node_title` is
+ * no longer in the project's plan graph (renamed / removed nodes) are
+ * dropped: a fresh run won't pay for them.
+ */
 function aggregateStats(db: Database.Database): AggregatedStats {
-  const callRow = db
-    .prepare(
-      "SELECT COUNT(*) AS n, SUM(duration_ms) AS d, SUM(cost_usd) AS c, COUNT(cost_usd) AS hasCost FROM ai_call_stats",
+  const nodes = db.prepare<[], PlanNodeForCost>("SELECT id, parent_id, title FROM plan_nodes").all()
+  const cycle = nodes.find((n) => n.title === "Цикл по чанкам")
+  let chunksCount = 1
+  if (cycle) {
+    const row = db.prepare("SELECT content FROM plan_nodes WHERE id = ?").get(cycle.id) as
+      | { content: string | null }
+      | undefined
+    try {
+      const parsed = JSON.parse(row?.content || "{}") as { length?: number }
+      if (typeof parsed.length === "number" && parsed.length > 0) chunksCount = parsed.length
+    } catch {
+      // leave at 1
+    }
+  }
+
+  const byId = new Map(nodes.map((n) => [n.id, n] as const))
+  const insideCycle = (id: number): boolean => {
+    let cur = byId.get(id)
+    while (cur && cur.parent_id != null) {
+      if (cur.parent_id === cycle?.id) return true
+      cur = byId.get(cur.parent_id)
+    }
+    return false
+  }
+  const titleInside = new Map<string, boolean>()
+  for (const n of nodes) {
+    const flag = (cycle && n.id === cycle.id) || insideCycle(n.id)
+    const prev = titleInside.get(n.title)
+    titleInside.set(n.title, prev === undefined ? flag : prev || flag)
+  }
+
+  const rows = db
+    .prepare<[], CallRowForCost>(
+      "SELECT ts, purpose, node_title, duration_ms, cost_usd, iteration_index FROM ai_call_stats WHERE success = 1 ORDER BY ts DESC",
     )
-    .get() as { n: number; d: number | null; c: number | null; hasCost: number }
+    .all()
+
+  // Group by (node_title, purpose, iteration_index), keep top N per (node_title).
+  const seenPerTitleKey = new Map<string, number>()
+  let totalCalls = 0
+  let totalDurationMs = 0
+  let totalCostUsd = 0
+  let callsWithCost = 0
+  for (const r of rows) {
+    const title = r.node_title ?? "(no title)"
+    // Records from removed / renamed nodes are skipped — a fresh run wouldn't
+    // pay for them. Allow "(no title)" records (e.g. generate-summary calls
+    // that didn't carry node_title) to pass through.
+    if (!titleInside.has(title) && title !== "(no title)") continue
+    const inside = titleInside.get(title) ?? false
+    const expectedN = inside ? chunksCount : 1
+    const groupKey = `${title}|${r.purpose}|${r.iteration_index ?? "null"}`
+    const so_far = seenPerTitleKey.get(groupKey) ?? 0
+    if (so_far >= expectedN) continue
+    seenPerTitleKey.set(groupKey, so_far + 1)
+    totalCalls += 1
+    totalDurationMs += r.duration_ms
+    if (typeof r.cost_usd === "number" && Number.isFinite(r.cost_usd)) {
+      totalCostUsd += r.cost_usd
+      callsWithCost += 1
+    }
+  }
+
   const wallRow = db.prepare("SELECT SUM(wall_time_ms) AS w FROM ai_run_stats").get() as { w: number | null }
   return {
-    totalCalls: callRow.n,
-    totalDurationMs: callRow.d ?? 0,
-    totalCostUsd: callRow.hasCost > 0 ? callRow.c : null,
-    callsWithCost: callRow.hasCost,
+    totalCalls,
+    totalDurationMs,
+    totalCostUsd: callsWithCost > 0 ? totalCostUsd : null,
+    callsWithCost,
     wallTimeMs: wallRow.w,
   }
 }
