@@ -124,6 +124,10 @@
         "height": { "type": "number" },
         "aiUserInstructions": { "type": "array", "items": { "type": "string" } },
         "nodeTypeSettings": { "type": "object" },
+        "aiSettings": {
+          "type": "object",
+          "description": "Optional per-node override of AI generation settings. Outer key is engine id (`grok`, `yandex`). Stored verbatim in plan_nodes.ai_settings; merged on top of the project-level defaults at LLM-call time. Example: `{ \"grok\": { \"reasoning_effort\": \"none\" } }`."
+        },
         "content": { "type": "array", "items": { "type": "string" } },
         "children": { "type": "array", "items": { "$ref": "#/definitions/TemplateProjectPlanNode" } },
         "inputs": {

@@ -215,7 +215,20 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
   function createPlanNodes(nodes: TemplateProjectPlanNode[], parentNewId: number | null): void {
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i]
-      const { title, type, x, y, width, height, aiUserInstructions, nodeTypeSettings, children, content, inputs } = node
+      const {
+        title,
+        type,
+        x,
+        y,
+        width,
+        height,
+        aiUserInstructions,
+        nodeTypeSettings,
+        aiSettings,
+        children,
+        content,
+        inputs,
+      } = node
 
       // For LLM-calling types (text, split, lore), aiUserInstructions from the
       // template goes into node_type_settings.userPrompt. Other settings from the
@@ -249,6 +262,7 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
         height: height ?? null,
         content: finalContent,
         node_type_settings: initialSettings ? JSON.stringify(initialSettings) : null,
+        ai_settings: aiSettings ? JSON.stringify(aiSettings) : null,
         status,
       })
 

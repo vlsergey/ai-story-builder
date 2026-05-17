@@ -75,6 +75,7 @@ export interface TemplateProjectPlanNode {
   height?: number
   aiUserInstructions?: string[]
   nodeTypeSettings?: Record<string, any>
+  aiSettings?: Record<string, any>
   content?: string[]
   children?: TemplateProjectPlanNode[]
   inputs?: TemplateProjectPlanNodeInput[]

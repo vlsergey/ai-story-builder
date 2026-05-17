@@ -244,7 +244,9 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
     }
     const templateSettings = buildTemplateInstructionSettings(tNode, wizardData)
     const projectSettings = parseProjectSettings(projectNode.node_type_settings)
-    if (instructionsDiffer(tNode.type, templateSettings, projectSettings)) {
+    const templateAiSettingsJson = tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null
+    const aiSettingsDiff = templateAiSettingsJson !== (projectNode.ai_settings ?? null)
+    if (instructionsDiffer(tNode.type, templateSettings, projectSettings) || aiSettingsDiff) {
       updatedNodes.push({ title: tNode.title, type: tNode.type })
     } else {
       unchangedCount += 1
@@ -309,8 +311,10 @@ export async function applyTemplateUpdate(): Promise<TemplateUpdateApplyResult> 
       if (k in fresh) merged[k] = fresh[k]
       else delete merged[k]
     }
+    const aiSettingsForPatch: string | null = tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null
     nodeRepo.patch(pNode.id, {
       node_type_settings: JSON.stringify(merged),
+      ai_settings: aiSettingsForPatch,
     })
     // Demote via the service so each container parent (e.g. for-each) gets
     // a chance to mirror the demotion into its per-iteration snapshots and
@@ -347,6 +351,7 @@ export async function applyTemplateUpdate(): Promise<TemplateUpdateApplyResult> 
       height: tNode.height ?? null,
       content: null,
       node_type_settings: Object.keys(initial).length > 0 ? JSON.stringify(initial) : null,
+      ai_settings: tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null,
       status: "EMPTY",
     })
   }
