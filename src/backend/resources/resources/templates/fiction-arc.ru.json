@@ -1621,11 +1621,6 @@
                 "type": "text"
               }
             ],
-            "aiSettings": {
-              "grok": {
-                "reasoning_effort": "none"
-              }
-            },
             "width": 200,
             "height": 80
           },
