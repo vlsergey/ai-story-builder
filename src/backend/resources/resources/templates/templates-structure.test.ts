@@ -234,6 +234,62 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     }
   })
 
+  // Each {{Title}} substitutes the full content of that node into the prompt.
+  // Multiple inline mentions duplicate that content (often kilobytes) in
+  // hard-to-read places. Author intent is almost always «refer to the section»,
+  // which should use plain text («секция ## Title», «в Title») without
+  // placeholder syntax. Real intentional repeats (e.g. short index values)
+  // are rare; we err on the strict side and let exceptions be explicit.
+  describe("each {{Title}} placeholder appears at most once per prompt field", () => {
+    interface PromptFieldCase {
+      label: string
+      text: string
+    }
+    const cases: PromptFieldCase[] = []
+    for (const { node } of allNodes) {
+      const fields: Array<{ field: string; lines: string[] }> = []
+      if (Array.isArray(node.aiUserInstructions)) {
+        fields.push({ field: "aiUserInstructions", lines: node.aiUserInstructions })
+      }
+      const s = node.nodeTypeSettings as Record<string, unknown> | undefined
+      for (const k of [
+        "aiUserInstructionsToFindProblems",
+        "aiUserInstructionsToFixProblems",
+        "aiSystemInstructionsToFindProblems",
+        "aiSystemInstructionsToFixProblems",
+      ]) {
+        const v = s?.[k]
+        if (Array.isArray(v) && v.every((x): x is string => typeof x === "string")) {
+          fields.push({ field: k, lines: v as string[] })
+        }
+      }
+      for (const { field, lines } of fields) {
+        cases.push({ label: `${node.title} / ${field}`, text: lines.join("\n") })
+      }
+    }
+    if (cases.length === 0) {
+      it.skip("no prompt fields in this template", () => {})
+    }
+
+    it.each(cases.map(({ label }) => [label]))("%s — placeholders appear at most once", (label) => {
+      const text = cases.find((c) => c.label === label)!.text
+      const counts = new Map<string, number>()
+      for (const m of text.matchAll(PLACEHOLDER_RE)) {
+        const name = m[1]
+        if (!allNodeTitles.has(name)) continue // skip virtual vars
+        counts.set(name, (counts.get(name) ?? 0) + 1)
+      }
+      const dups = [...counts.entries()].filter(([_, c]) => c > 1)
+      const report = dups.map(([name, c]) => `  - {{${name}}}: ${c}×`).join("\n")
+      expect(
+        dups,
+        `${label}: each {{Title}} substitutes the full content of that node into the prompt. ` +
+          `Multiple inline mentions duplicate kilobytes of content. Replace duplicate references with plain-text section names ` +
+          `(e.g. «секция \`## Сеттинг\`» instead of «\`{{Сеттинг}}\`»). Offenders:\n${report}`,
+      ).toEqual([])
+    })
+  })
+
   describe("fix-problems has find and fix prompts", () => {
     const fixNodes = allNodes.filter(({ node }) => node.type === "fix-problems")
     if (fixNodes.length === 0) {
