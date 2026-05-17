@@ -22,6 +22,7 @@ export function nodeInputsToReplacements(inputs: NodeInputs<string>): Record<str
  *
  * Helpers available inside expressions:
  * - `eq` / `ne` — strict equality / inequality.
+ * - `or` / `and` / `not` — boolean composition (n-ary; `not` is unary).
  * - `contains` — substring check.
  * - `startsWith` / `endsWith`.
  * - `matches` — regex test (pattern as string, optional flags).
@@ -52,6 +53,16 @@ handlebarsInstance.registerHelper("endsWith", (haystack: unknown, suffix: unknow
   if (typeof haystack !== "string" || typeof suffix !== "string") return false
   return haystack.endsWith(suffix)
 })
+handlebarsInstance.registerHelper("or", (...args: unknown[]) => {
+  // Handlebars passes its `options` object as the last arg; strip it.
+  const operands = args.slice(0, -1)
+  return operands.some((v) => Boolean(v))
+})
+handlebarsInstance.registerHelper("and", (...args: unknown[]) => {
+  const operands = args.slice(0, -1)
+  return operands.every((v) => Boolean(v))
+})
+handlebarsInstance.registerHelper("not", (a: unknown) => !a)
 handlebarsInstance.registerHelper("matches", (input: unknown, pattern: unknown, flags?: unknown) => {
   if (typeof input !== "string" || typeof pattern !== "string") return false
   try {

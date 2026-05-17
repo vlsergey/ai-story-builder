@@ -76,6 +76,25 @@ describe("replaceTemplates — Handlebars bracket-notation substitution", () => 
     it("matches — bad regex returns false", () => {
       expect(replaceTemplates('{{#if (matches [X] "[unclosed")}}M{{else}}X{{/if}}', { X: "anything" })).toBe("X")
     })
+
+    it("or — true if any operand truthy", () => {
+      expect(replaceTemplates('{{#if (or (eq m "a") (eq m "b"))}}Y{{else}}N{{/if}}', { m: "b" })).toBe("Y")
+      expect(replaceTemplates('{{#if (or (eq m "a") (eq m "b"))}}Y{{else}}N{{/if}}', { m: "c" })).toBe("N")
+    })
+
+    it("and — true only if all operands truthy", () => {
+      expect(
+        replaceTemplates('{{#if (and (contains x "fo") (contains x "ba"))}}Y{{else}}N{{/if}}', { x: "foobar" }),
+      ).toBe("Y")
+      expect(
+        replaceTemplates('{{#if (and (contains x "fo") (contains x "qq"))}}Y{{else}}N{{/if}}', { x: "foobar" }),
+      ).toBe("N")
+    })
+
+    it("not — flips truthiness", () => {
+      expect(replaceTemplates('{{#if (not (eq m "a"))}}Y{{else}}N{{/if}}', { m: "b" })).toBe("Y")
+      expect(replaceTemplates('{{#if (not (eq m "a"))}}Y{{else}}N{{/if}}', { m: "a" })).toBe("N")
+    })
   })
 
   it("preserves angle brackets / special chars (no HTML escaping)", () => {
