@@ -8,7 +8,7 @@ Everything runs locally: an Electron app with a SQLite database on your disk and
 
 ## What you can do
 
-- **Turn a one-paragraph synopsis into a ~30 000-word novella** using the bundled `fiction-arc` template. See [What ships in the box](#what-ships-in-the-box) below.
+- **Turn a one-paragraph synopsis into a novella** (~30 000 words at default chunk budget) using the bundled `fiction-arc` template. See [What ships in the box](#what-ships-in-the-box) below.
 - **Author your own templates** as JSON: graphs of `text`, `split`, `merge`, `for-each`, `fix-problems`, `lore` and a couple of for-each-internal nodes. Wizard pages collect inputs from the user when a project is instantiated.
 - **Maintain a Lore tree** alongside the plan graph — characters, world rules, settings — that survives across generations and informs prompts.
 - **Iterate on individual nodes** in the canvas: edit a prompt, re-generate that node only, see the downstream nodes go `OUTDATED` and re-run them when ready.
@@ -42,15 +42,15 @@ You'll need an API key for at least one AI provider — Grok or Yandex GPT — e
 
 ### The `fiction-arc` template
 
-[`src/backend/resources/resources/templates/fiction-arc.ru.json`](src/backend/resources/resources/templates/fiction-arc.ru.json) — a 37-node graph that takes a single Russian-language synopsis and produces a novella of roughly 30 000 words across 20 scenes. The pipeline:
+[`src/backend/resources/resources/templates/fiction-arc.ru.json`](src/backend/resources/resources/templates/fiction-arc.ru.json) — a 32-node graph that takes a single Russian-language synopsis and produces a novella of roughly 30 000 words at default settings. The pipeline:
 
-1. **Bootstrap from synopsis** — theme, genre, world (with explicit canon / AU / what-if handling), style guide, character roster with a genre-aware "anchor" schema (age, gender, plus whatever else the genre needs).
-2. **Plot outline** — 20 beats, Save the Cat stretched, with explicit setup/payoff registry and a fix-problems review pass for orphans and motivation gaps.
-3. **First-draft scenes** — `for-each` over the 20 beats. Each beat gets its own scene plan, director notes (subtext, sensory anchors, opening/closing line), prose generation with all prior scenes visible for continuity, and a polishing fix-problems pass.
-4. **Second-draft scenes** — second `for-each` over the same beats with the full first draft visible. Tightens foreshadowing, echoes motifs, resolves cross-arc inconsistencies.
+1. **Bootstrap from synopsis** — theme, genre, world (with explicit canon / AU / what-if handling), style guide, character anchor schema, character list — all coordinated across the cast (concrete ages, no «unknown» placeholders).
+2. **Cast** — a global voice-plan node designs distinct voices for the whole cast at once, then a `for-each` over each character produces a full profile (anchor sheet + Truby's want/need/flaw/voice/secret) with a fix-problems review pass.
+3. **Plot** — scene plan (number of scenes is LLM-decided from synopsis and genre, typically 4–20), structural review (severity ≥ 80 only — blockers), setup/payoff registry, quality review (severity ≥ 40 — flatness, payoff orphans, foreign-language insertions, etc.).
+4. **Prose** — scenes are decoupled from technical chunks: `chunksCount` (wizard input) is the prose output budget (one chunk ≈ 1500 words). A split distributes scenes across chunks (long scenes can span several chunks; short ones can pack into one), then a `for-each` over chunks produces per-chunk plan, director notes, prose, and a polishing fix-problems pass.
 5. **Final merge** — single document with `## Часть N` headers.
 
-Expected run time: roughly 3–4 hours on a single Grok API key, dominated by the prose-generation calls.
+Expected run time: roughly 1.5–3 hours on a single Grok API key, dominated by the prose-generation calls. Scales with `chunksCount`.
 
 The template authoring quality bar lives in [`TEMPLATE_CHECKS.md`](src/backend/resources/resources/templates/TEMPLATE_CHECKS.md): rules covering output sizing, cache-friendly prompt ordering, structured-list safeguards, fanfic-vs-original handling, classification-node guards, forbidden invented quotes, foreign-language insertion detection in fix-problems, and more — accumulated from real run failures, not from theory.
 
