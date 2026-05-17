@@ -42,13 +42,18 @@ You'll need an API key for at least one AI provider — Grok or Yandex GPT — e
 
 ### The `fiction-arc` template
 
-[`src/backend/resources/resources/templates/fiction-arc.ru.json`](src/backend/resources/resources/templates/fiction-arc.ru.json) — a 32-node graph that takes a single Russian-language synopsis and produces a novella of roughly 30 000 words at default settings. The pipeline:
+Ships in two language variants — same graph, prompts adapted to the output language:
+
+- [`fiction-arc.ru.json`](src/backend/resources/resources/templates/fiction-arc.ru.json) — Russian-language output.
+- [`fiction-arc.en.json`](src/backend/resources/resources/templates/fiction-arc.en.json) — English-language output.
+
+A 32-node graph that takes a single synopsis and produces a novella of roughly 30 000 words at default settings. The pipeline:
 
 1. **Bootstrap from synopsis** — theme, genre, world (with explicit canon / AU / what-if handling), style guide, character anchor schema, character list — all coordinated across the cast (concrete ages, no «unknown» placeholders).
 2. **Cast** — a global voice-plan node designs distinct voices for the whole cast at once, then a `for-each` over each character produces a full profile (anchor sheet + Truby's want/need/flaw/voice/secret) with a fix-problems review pass.
 3. **Plot** — scene plan (number of scenes is LLM-decided from synopsis and genre, typically 4–20), structural review (severity ≥ 80 only — blockers), setup/payoff registry, quality review (severity ≥ 40 — flatness, payoff orphans, foreign-language insertions, etc.).
 4. **Prose** — scenes are decoupled from technical chunks: `chunksCount` (wizard input) is the prose output budget (one chunk ≈ 1500 words). A split distributes scenes across chunks (long scenes can span several chunks; short ones can pack into one), then a `for-each` over chunks produces per-chunk plan, director notes, prose, and a polishing fix-problems pass.
-5. **Final merge** — single document with `## Часть N` headers.
+5. **Final merge** — single document with `## Часть N` / `## Part N` headers.
 
 Expected run time: roughly 1.5–3 hours on a single Grok API key, dominated by the prose-generation calls. Scales with `chunksCount`.
 

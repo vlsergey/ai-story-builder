@@ -1,0 +1,1999 @@
+{
+  "label": "Novella or short novel (~30k words)",
+  "description": "Generate a ~30,000-word novella from one short synopsis. Useful when you have an idea and want a full draft of it — original prose, fanfic of an existing canon, AU or what-if. Single hands-off run: the template derives the world, characters and plot itself, writes scenes in two passes, and auto-fixes style and plot holes.",
+  "wizardPages": [
+    {
+      "id": "rating-and-synopsis",
+      "title": "Rating and synopsis",
+      "fields": [
+        {
+          "name": "ageRating",
+          "type": "select-age-rating",
+          "label": "Age rating",
+          "description": "Drives character age bounds, allowed depth of dark / erotic scenes, and review style. The AI infers target audience from genre and theme. Not every AI engine supports every rating — 18+/NC-21 needs an engine that does.",
+          "defaultValue": "16+"
+        },
+        {
+          "name": "synopsis",
+          "type": "textarea",
+          "label": "Story synopsis",
+          "description": "Describe the story freely: what it is about, who the characters are, what happens, what matters for atmosphere. The template derives theme, style, characters and plot outline itself.",
+          "placeholder": "A young cartographer finds a map that shouldn't exist..."
+        },
+        {
+          "name": "chunksCount",
+          "type": "integer",
+          "min": 2,
+          "max": 30,
+          "defaultValue": 20,
+          "label": "Prose chunks count",
+          "description": "How many LLM calls to spend on prose. One call ≈ 1500 words — the novella is cut into N pieces and reassembled. The template picks the number of scenes from the synopsis. ~30k words = ~20 chunks."
+        }
+      ]
+    }
+  ],
+  "plan": {
+    "nodes": [
+      {
+        "title": "Synopsis",
+        "type": "text",
+        "x": 40,
+        "y": 672,
+        "content": ["${synopsis}"],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "World",
+        "type": "text",
+        "x": 600,
+        "y": 676,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. The world description and any characters mentioned must stay within rating.",
+          "",
+          "## What to do",
+          "",
+          "Describe the world the story takes place in. Downstream nodes (setting, characters, plot) build on this description and don't contradict it. If a canon is named in the description, later nodes may use it as a source of extra detail — without diverging from what's fixed here.",
+          "",
+          "Cover in the description:",
+          "- origin of the world — original, or based on a specific existing work / universe (with the source explicitly named on one line and the relationship stated: full borrowing, diverges in these rules, AU, what-if, in-universe continuation, etc.);",
+          "- key rules and mechanics of the world — what makes it different from generic today (technology, magic, social institutions, what's possible and what isn't). For a realistic contemporary setting, one sentence stating the absence of such differences is enough;",
+          "- important locations and concepts the synopsis names or implies.",
+          "",
+          "Recognisable names or places from someone else's universe in the synopsis are a reason to call out the source in the world description directly. Downstream generation goes only by this description.",
+          "",
+          "## Format",
+          "",
+          "Prose, no bullet points or numbering, no footnotes or URLs. In English. Write as much as needed for a self-contained world description; don't pad for volume, upper bound 1500 words. Don't print a word count in the output.",
+          "",
+          "Describe the world statically — facts, rules, places. Plot moves, emotional tone of the story, and commentary on how the narrative will unfold belong to downstream nodes.",
+          "",
+          "## Synopsis",
+          "```",
+          "{{[Synopsis]}}",
+          "```"
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Theme",
+        "type": "text",
+        "x": 320,
+        "y": 265,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. Theme statement — within rating.",
+          "",
+          "## What to do",
+          "",
+          "From the synopsis, formulate the controlling idea of the work (McKee) — the main claim about world and humanity that the story asserts. One sentence, no filler, no hedging.",
+          "",
+          "Then unfold it in one paragraph: what is this «really» about, what is the value conflict, where does the hero land. 80–150 words; don't print a word count in the output.",
+          "",
+          "This is a theme statement, not the text of the work. Don't invent scenes, don't quote prose fragments of the story, don't write dialogue — only the theme.",
+          "",
+          "Write in English. Don't cite sources.",
+          "",
+          "## Synopsis",
+          "```",
+          "{{[Synopsis]}}",
+          "```"
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Genre and register",
+        "type": "text",
+        "x": 320,
+        "y": 461,
+        "aiUserInstructions": [
+          "## Age rating (user-set)",
+          "",
+          "${ageRating}",
+          "",
+          "## What to do",
+          "",
+          "Classify the genre and register of the work. On the first line state the rating exactly like this: `Rating: ${ageRating}`. Then in one short paragraph list: genre (with sub-genre), tone (ironic, lyrical, detached, etc.), **target audience** (derive from synopsis, theme and rating — must match the rating), nearest literary references. 50–120 words; don't print a word count in the output.",
+          "",
+          "This is a classification of the work, not the text of the work. Don't invent scenes, don't quote prose fragments of the story, don't write dialogue — only the genre/register description.",
+          "",
+          "In English.",
+          "",
+          "## Synopsis",
+          "```",
+          "{{[Synopsis]}}",
+          "```"
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Setting",
+        "type": "text",
+        "x": 2925,
+        "y": 800,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. Setting — within rating; locations and social institutions match the work's age bounds.",
+          "",
+          "## What to do",
+          "",
+          "Describe the setting of THIS specific story — the place and time the action unfolds in.",
+          "",
+          "Build on the World description above: borrow its terms and logic, respect the canon-divergences it declared (AU, what-if, original rules). Don't restate the world itself — it's already above; here you need only the specific corner where this synopsis's story happens.",
+          "",
+          "Prose, no padding, upper bound 1500 words. In English. Don't cite sources.",
+          "",
+          "Focus on the sensory picture of the place: what's seen, heard, smelled, what temperature and texture. Character names, their actions and decisions belong to downstream nodes — here only the scenery.",
+          "",
+          "## Synopsis",
+          "```",
+          "{{[Synopsis]}}",
+          "```",
+          "",
+          "## World",
+          "```",
+          "{{[World]}}",
+          "```"
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "World",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Style",
+        "type": "text",
+        "x": 600,
+        "y": 221,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. Style rules — within rating (allowed vocabulary, taboos, degree of explicitness match the audience age).",
+          "",
+          "## Theme",
+          "```",
+          "{{[Theme]}}",
+          "```",
+          "",
+          "## Genre and register",
+          "```",
+          "{{[Genre and register]}}",
+          "```",
+          "",
+          "## What to do",
+          "",
+          "Formulate the style rules for the story: point of view (POV: first / third person, limited / omniscient), narrative tense, typical sentence length, rhythm, character of the vocabulary (everyday, poetic, technical), taboos (what NOT to do: officialese, profanity clichés, direct address to the reader, etc.).",
+          "",
+          "Prose, no padding, upper bound 1500 words. Don't print a word count in the output. In English."
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Theme",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Genre and register",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Character anchor sheet",
+        "type": "text",
+        "x": 880,
+        "y": 461,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. Character age bounds in the anchor sheet must match the rating: for 18+/NC-21 — all characters are adults (≥18); for 16+ — teens 16+ are allowed; for 12+ — characters 12+ are allowed; for PG/G — any age within a children's audience. If the rating is 18+/NC-21, explicitly write into the Content rules: «Every character in the work is ≥18 years old».",
+          "",
+          "## Genre and register",
+          "```",
+          "{{[Genre and register]}}",
+          "```",
+          "",
+          "## Style",
+          "```",
+          "{{[Style]}}",
+          "```",
+          "",
+          "## World",
+          "```",
+          "{{[World]}}",
+          "```",
+          "",
+          "## Theme",
+          "```",
+          "{{[Theme]}}",
+          "```",
+          "",
+          "## What to do",
+          "",
+          "Build the anchor-sheet template that will describe each key character in this work. The anchor sheet is a set of fields-anchors important for this specific story: they fix the physics, demographics and social profile of a character so downstream scenes don't get confused about age, height, profession, etc.",
+          "",
+          "This is a field template, not the text of a specific character's anchor sheet. Don't invent scenes, don't write prose.",
+          "",
+          "## Content rules",
+          "",
+          "- Age and gender — always in the list (required fields).",
+          "- The rest — derive from genre, style, world and theme: romance and erotica need physics (height, build, distinctive features); fantasy — race/species/class, magic abilities; sci-fi — origin, implants; thriller — profession, skills, background; drama — profession and social status; children's prose — physics is usually not important, age and personality matter.",
+          "- Number of fields — as many as the genre and theme need; usually 5–12. If the genre needs fewer — fewer; if a dense genre (erotica, fantasy, sci-fi) needs more — add them.",
+          "",
+          "## Format",
+          "",
+          "Bulleted list. Each field on one line:",
+          "`- <Field name>: <what to put in this field, one phrase> (required | when significant)`",
+          "",
+          "No intro or outro. Only the field list. In English."
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Genre and register",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Style",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "World",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Theme",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Characters (list)",
+        "type": "text",
+        "x": 1160,
+        "y": 315,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. The ages of all characters in the list are within rating: for 18+/NC-21 — ≥ 18; for 16+ — ≥ 16; for 12+ — ≥ 12; for PG/G — any within the children's / family audience. If the synopsis describes a young hero without an explicit age, set the rating minimum or older.",
+          "",
+          "## What to do",
+          "",
+          "List 2–12 characters, each of whom has their own narrative role: external want (what they want), internal obstacle or conflict (what gets in the way), and a decision or change that happens to them through the story. If a person appears in the synopsis only as a function performing a single action (deliver a parcel, guard an entrance, sell a ticket) — don't give them a separate block: their role will be described in the prose on the spot.",
+          "",
+          "Each character — a separate block, one paragraph per character.",
+          "",
+          "## Block format",
+          "",
+          "Each block is built like this:",
+          "1. First line — `# <Character name>` (one hash, name unquoted).",
+          "2. Then, for each anchor-sheet field marked «required», a separate line `- <Field name>: <value>`. Required fields cannot be skipped. Values are concrete (number, name, status); «unknown» in a required field is not allowed. Derive age and gender consistently across characters: account for the synopsis's timeline (mentions of «20 years ago», «hero's child», «recently retired»), family relationships, and age hierarchy. Examples: if the heroine is 35 and her father left when she was 15 — the father is now ~55-65; if the heroine is a young assistant and the second character is a senior at the firm, the age gap should reflect that; **if a character has a child of a known age, the parent must have been at least 16 at the child's birth — i.e. the parent is now ≥ 16 + child's age** (e.g. son is 18 → both parents ≥ 34). If the synopsis doesn't state a value directly — derive a reasonable one from genre, world, and role (young assistant → 22-28; mature manager → 45-55). This isn't «making things up», it's cast planning; the «Character profile» node builds on these decisions. Include optional fields only when they follow unambiguously from the synopsis; otherwise leave them out.",
+          "3. Then one empty line.",
+          "4. Then one sentence — narrative role and key internal trait of the character.",
+          "",
+          "## Separator between blocks",
+          "",
+          "Between character blocks — **one empty line** (important for downstream automatic splitting).",
+          "",
+          "## Other",
+          "",
+          "No intro / outro around the list. In English. Don't print a word count in the output.",
+          "",
+          "## Synopsis",
+          "```",
+          "{{[Synopsis]}}",
+          "```",
+          "",
+          "## Theme",
+          "```",
+          "{{[Theme]}}",
+          "```",
+          "",
+          "## Character anchor sheet",
+          "```",
+          "{{[Character anchor sheet]}}",
+          "```"
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Theme",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Character anchor sheet",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Character voices",
+        "type": "text",
+        "x": 1440,
+        "y": 482,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. Character voices — within rating (allowed vocabulary and register).",
+          "",
+          "## What to do",
+          "",
+          "You have the full cast. Design their «voices» so that they all sound different. Build on profession, biography, era, region, social standing and age from the list and the anchor sheet; account for genre and style requirements.",
+          "",
+          "Generic patterns (question tails, diminutives, generic interjections) are applicable only when a character has no more distinctive trait. If two characters naturally arrive at a similar marker — rework at least one so the voices read differently.",
+          "",
+          "Markers and lexical patterns must not break the taboos from the «Style» section (bans on officialese, jargon, metaphors, specific vocabulary, etc.). Before locking a pattern for a character, check it against the ban list in Style; if a natural marker hits a taboo — pick another that doesn't break the style.",
+          "",
+          "## Output format",
+          "",
+          "For each character on the list — a separate block:",
+          "",
+          "1. First line — `## <Name>` (two hashes, name exactly as in the list).",
+          "2. Empty line.",
+          "3. 1–2 sentences about the voice: register (formal / conversational / colloquial), rhythm (clipped / flowing / slowed), distinctive trick (interrupts / asks again / drifts into circumstantial detail / quotes / uses professional jargon).",
+          "4. Empty line.",
+          "5. 2–3 lexical patterns with concrete examples — types of words and turns, not ready-made replies. Format samples: «archaisms: davecha, nadys', nynche», «instrumental officialese: confirming arrival, at the present moment», «truncates nouns in compound words», «foreign terms in speech: case, deadline».",
+          "",
+          "No invented quotes from the character: describe TYPES of phrasing, not ready replies.",
+          "",
+          "## Budget",
+          "",
+          "Upper bound — 1500 words for ALL characters together. Don't print a word count in the output.",
+          "",
+          "## Other",
+          "",
+          "In English. No intro / outro around the blocks.",
+          "",
+          "## Genre and register",
+          "```",
+          "{{[Genre and register]}}",
+          "```",
+          "",
+          "## Style",
+          "```",
+          "{{[Style]}}",
+          "```",
+          "",
+          "## World",
+          "```",
+          "{{[World]}}",
+          "```",
+          "",
+          "## Theme",
+          "```",
+          "{{[Theme]}}",
+          "```",
+          "",
+          "## Character anchor sheet (field structure)",
+          "```",
+          "{{[Character anchor sheet]}}",
+          "```",
+          "",
+          "## Characters (list)",
+          "```",
+          "{{[Characters (list)]}}",
+          "```"
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Characters (list)",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Genre and register",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Style",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "World",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Theme",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Character anchor sheet",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Split character list",
+        "type": "split",
+        "x": 1440,
+        "y": 302,
+        "nodeTypeSettings": {
+          "partDescription": "One character block: a `# Name` heading on the first line, then `- Field: value` lines for each anchor-sheet field, then an empty line and one sentence about the narrative role and key internal trait."
+        },
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. The split and any characters mentioned in it — within rating.",
+          "",
+          "## What to do",
+          "",
+          "Split the character list above into an array of elements. Each character block is one array element. Blocks are separated by an empty line; inside a block — `# Name` heading, anchor-sheet field lines `- Field: value`, an empty line, then the role/trait sentence.",
+          "",
+          "Don't merge several characters into one element, don't split a single character into several. Preserve each block whole as one array element, including the heading and all field lines.",
+          "",
+          "## Character list",
+          "```",
+          "{{[Characters (list)]}}",
+          "```"
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Characters (list)",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Per-character loop",
+        "type": "for-each",
+        "x": 1725,
+        "y": 300,
+        "width": 1120,
+        "height": 355,
+        "inputs": [
+          {
+            "sourceNodeTitle": "Split character list",
+            "type": "textArray"
+          }
+        ],
+        "children": [
+          {
+            "title": "Character",
+            "type": "for-each-input",
+            "x": 40,
+            "y": 100,
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Character profile",
+            "type": "text",
+            "x": 320,
+            "y": 201,
+            "aiUserInstructions": [
+              "## Age rating",
+              "",
+              "${ageRating}. The age filter applies ONLY to human characters. For AIs, non-human beings, objects, ghosts, voices on the phone — age can be anything, including below the rating minimum, in years since activation, in arbitrary units, or «not applicable». For human characters: for 18+/NC-21 — ≥ 18; for 16+ — ≥ 16; for 12+ — ≥ 12; for PG/G — any age within the audience. If the input anchor sheet lists a human age below the rating minimum — raise it to the minimum and state that explicitly in the output.",
+              "",
+              "## What to do",
+              "",
+              "Build the profile of the character specified in the `## Character (input)` section at the very END of this message. The character name is the one in that block (usually as a `# <Name>` heading or a `Name: <Name>` line). Don't profile any other characters of the world — even if they are mentioned in the synopsis, anchor sheet, or world context. One call = exactly one profile of one character.",
+              "",
+              "Build the profile in line with the world description. For canonical characters — canonical voice and biography, with the canon-divergences declared in the world description. For new or original characters — build from scratch.",
+              "",
+              "## Output structure",
+              "",
+              "First line: `# <Character name>`, where `<Character name>` is the name taken from the `## Character (input)` section at the end of the message (one hash, unquoted). No other `# Name` headings in the output — only one top-level heading. Then an empty line.",
+              "",
+              "Next, a `## Anchor sheet` section — list each field from the anchor sheet on its own line in the format `- <Field name>: <value>`. **Required** fields — concrete values (number, name, status); «unknown» in a required field is not allowed. Cross-check age, gender, key biographical facts with decisions already made in the «Characters (list)» node — they are already consistent across characters and the synopsis's timeline; don't contradict and don't «refine» against them. If a field is missing for this character in the list (or marked «unknown» against the rule) — derive a reasonable value from the genre, world, and role context. **Optional** fields — fill in when appropriate and informative for the character; if a field doesn't matter to the plot and doesn't reveal the character — skip it entirely, don't write «not important for this character», don't leave empty placeholders.",
+              "",
+              "Then an empty line and a `## Profile` section with a full description following Truby:",
+              "- **wants** — external desire in the plot (what the character actively pursues);",
+              "- **needs** — internal need (what must change in them by the end). Between «wants» and «needs» there must be a REAL contradiction: getting what the character pursues should not automatically deliver what they actually need. They pull in different directions. Test: if one action satisfies both «wants» and «needs» — that's flat, reformulate so the dilemma is visible. **Exception**: if the original description in `## Character (input)` explicitly says «does not change», «stays in role», «continues their old lifestyle», «no growth», «no conflict» — this is a deliberately flat contrast character (antagonist, function, background). Then keep «needs» close to «wants», but in «flaw» describe what blocks their growth, and in «secret» — the internal cause of the standstill. Don't impose a transformation that isn't in the synopsis or the List;",
+              "- **flaw** — moral or psychological mistake that blocks «needs» (for flat characters — what blocks growth);",
+              "- **voice** — locate this character's block in the «### Character voices (ready plan)» section below (by name match) and transfer its description (1–2 sentences on register / rhythm / trick + 2–3 lexical patterns) into this field. You can expand: add WHEN the character switches into this register (under pressure, among their own, when nervous), or HOW the pattern shows in their typical situations — so the voice clicks better with «wants», «needs», «flaw», and «secret». Don't invent a voice from scratch and don't drop the patterns from the plan: the project's voice palette has already been balanced across characters in the «Character voices» step;",
+              "- **secret** — a CONCRETE hidden fact, action, object, or event that can be named in one phrase: what exactly is hidden and from whom. Not a general feeling, not «tendency to deny», not «hides emotions» — a recognisable plot detail that can surface in a scene as a turn or reveal. If hiding from self — name the specific repressed fact.",
+              "",
+              "## Lexical patterns vs ready-made replies",
+              "",
+              "In the description of voice and character, separate two things:",
+              "",
+              "**Allowed and required** — examples of TYPES of phrasing, single words, or short stable expressions as illustrations of lexical patterns: «archaisms: davecha, nadys', nynche», «officialese: at the present moment, confirming arrival», «diminutives: sweetie, dearie», «foreign terms: case, deadline», «truncates nouns in compound words». These show register and ensure recognisability in scenes. If lexical patterns are already given in the «Character voices» plan — transfer them here (with possible expansion).",
+              "",
+              "**Forbidden** — ready-made character lines in quotes: whole phrases or sentences they might say in a scene («I've told you a hundred times», «If you're reading this letter, know that…», «As senior partner I demand»). They lead to word-for-word repeats in the prose.",
+              "",
+              "Canonical quotations from the source (if the character is borrowed from a specific canon named in the world description) — allowed; mark them as «canonical: …».",
+              "",
+              "The profile section — prose. The anchor sheet — list.",
+              "",
+              "No padding, upper bound 1500 words. Don't cite sources, don't print a word count in the output. In English.",
+              "",
+              "## Context (common to all characters of this project; the names in these sections do NOT force you to profile anyone)",
+              "",
+              "### Synopsis",
+              "```",
+              "{{[Synopsis]}}",
+              "```",
+              "",
+              "### Theme",
+              "```",
+              "{{[Theme]}}",
+              "```",
+              "",
+              "### World",
+              "```",
+              "{{[World]}}",
+              "```",
+              "",
+              "### Style",
+              "```",
+              "{{[Style]}}",
+              "```",
+              "",
+              "### Character anchor sheet (fields to fill)",
+              "```",
+              "{{[Character anchor sheet]}}",
+              "```",
+              "",
+              "### Character voices (ready plan)",
+              "```",
+              "{{[Character voices]}}",
+              "```",
+              "",
+              "## Character (input)",
+              "",
+              "Profile exactly this character — no one else:",
+              "",
+              "```",
+              "{{[Character]}}",
+              "```"
+            ],
+            "inputs": [
+              {
+                "sourceNodeTitle": "Character",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Synopsis",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Theme",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "World",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Style",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Character anchor sheet",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Character voices",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Character review",
+            "type": "fix-problems",
+            "x": 600,
+            "y": 158,
+            "nodeTypeSettings": {
+              "sourceNodeTitleToFix": "Character profile",
+              "maxIterations": 3,
+              "minSeverityToFix": 40,
+              "foundProblemsTemplate": "Found problems",
+              "aiUserInstructionsToFindProblems": [
+                "## Age rating",
+                "",
+                "${ageRating}. The character profile and the character itself — within rating. For 18+/NC-21 the character is an adult; 18+ themes are allowed. For PG/12+/16+ themes, vocabulary, and presentation match the declared age cap.",
+                "",
+                "## What to look for",
+                "",
+                "Find problems in the character profile (profile and source character — at the very end of the message):",
+                "- the name in the profile's first `# <Name>` heading does NOT match the name declared in the `## Character (original input)` section. Severity 95 (blocker: profile about someone else). A name «matches» if first+last match, first+patronymic match, or the same name in a usual form (Masha = Maria);",
+                "- the profile has more than one top-level `# <Name>` heading (no two characters' profiles in one output). Severity 95;",
+                "- unfilled or missing required anchor-sheet fields (especially age and gender);",
+                "- flatness: no internal conflict between «wants» and «needs». **This is a problem only for characters with an arc.** If the original description in `## Character (original input)` explicitly says «does not change», «stays in role», «continues their old lifestyle», «no growth» — this is a deliberately flat contrast character, and matching «wants/needs» are allowed; don't flag as a problem;",
+                "- contradictions in character, voice, biography;",
+                "- generic statements: truisms, clichés, voiceless phrasings;",
+                "- conflicts with style rules;",
+                "- vague secret (no secret, or a «general» secret);",
+                "- unsupported declarations («strong», «smart», «mysterious» without concrete backing);",
+                "- ready-made character lines in quotes — whole phrases or sentences that may end up word-for-word in a scene («I've told you a hundred times», «If you're reading this…», «As senior partner I demand»). This is **not** about short lexical examples — individual words, turns, or stable expressions as illustrations of patterns («archaisms: davecha, nynche», «officialese: at the present moment», «diminutives: sweetie, dearie»). Those are allowed and necessary for voice recognisability. Quotations marked «canonical:» — also allowed;",
+                "- foreign-language insertions in place of English: untranslated non-English terms, non-romanised names where they should be in Latin script, unjustified loanwords.",
+                "",
+                "Assign severity 0–100 to each problem. Missing required anchor-sheet fields — severity ≥ 80 (blocks downstream generation). Invented quotes and foreign-language insertions — severity ≥ 70.",
+                "",
+                "## Style (for reference)",
+                "```",
+                "{{[Style]}}",
+                "```",
+                "",
+                "## Character anchor sheet (required and optional fields)",
+                "```",
+                "{{[Character anchor sheet]}}",
+                "```",
+                "",
+                "## Character (original input)",
+                "```",
+                "{{[Character]}}",
+                "```",
+                "",
+                "## Character profile (to check)",
+                "```",
+                "{{[Character profile]}}",
+                "```"
+              ],
+              "aiUserInstructionsToFixProblems": [
+                "## Age rating",
+                "",
+                "${ageRating}. The fixed profile and the character mentioned — within rating.",
+                "",
+                "## What to do",
+                "",
+                "Rewrite the character profile, fixing the problems listed in the «Found problems» section at the end of the message. Keep the structure (a `# <Name>` heading on the first line, then `## Anchor sheet` and `## Profile` sections). The name in `# <Name>` must match the name from the `## Character (original input)` section — if the found problems flag a name mismatch, rewrite the profile to be about the correct character. Fill in all required anchor-sheet fields if any were missed. Remove invented quotes from the voice description — keep only the manner characterisation; preserve canonical quotes marked «canonical:». Output only the fixed profile.",
+                "",
+                "## Style (for reference)",
+                "```",
+                "{{[Style]}}",
+                "```",
+                "",
+                "## Character anchor sheet (required and optional fields)",
+                "```",
+                "{{[Character anchor sheet]}}",
+                "```",
+                "",
+                "## Character (original input)",
+                "```",
+                "{{[Character]}}",
+                "```",
+                "",
+                "## Character profile",
+                "```",
+                "{{[Character profile]}}",
+                "```",
+                "",
+                "## Found problems",
+                "```",
+                "{{[Found problems]}}",
+                "```"
+              ]
+            },
+            "inputs": [
+              {
+                "sourceNodeTitle": "Character profile",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Character",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Style",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Character anchor sheet",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Character output",
+            "type": "for-each-output",
+            "x": 880,
+            "y": 158,
+            "inputs": [
+              {
+                "sourceNodeTitle": "Character review",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          }
+        ]
+      },
+      {
+        "title": "Cast summary",
+        "type": "merge",
+        "x": 2925,
+        "y": 360,
+        "nodeTypeSettings": {
+          "includeNodeTitle": false,
+          "includeInputTitles": false,
+          "fixHeaders": false
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "Per-character loop",
+            "type": "textArray"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Scene plan",
+        "type": "text",
+        "x": 3205,
+        "y": 732,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. Scene plan and all characters mentioned in it — within rating. For 18+/NC-21 all characters are adults; 18+ themes are allowed. For PG/12+/16+ themes, conflicts and imagery match the declared age cap.",
+          "",
+          "## Synopsis",
+          "```",
+          "{{[Synopsis]}}",
+          "```",
+          "",
+          "## Theme",
+          "```",
+          "{{[Theme]}}",
+          "```",
+          "",
+          "## Cast summary",
+          "```",
+          "{{[Cast summary]}}",
+          "```",
+          "",
+          "## Setting",
+          "```",
+          "{{[Setting]}}",
+          "```",
+          "",
+          "## World",
+          "```",
+          "{{[World]}}",
+          "```",
+          "",
+          "## Genre and register",
+          "```",
+          "{{[Genre and register]}}",
+          "```",
+          "",
+          "## What to do",
+          "",
+          "Compose the scene plan of the novella. A scene is an independent dramatic atom with its own Goal, Conflict and Disaster (Swain) and an emotional-charge shift (McKee). The plan is consistent with the world description — both with the underlying canon and with the canon-divergences declared in the world description (AU, what-if, original rules).",
+          "",
+          "**You choose the number of scenes** — based on the synopsis and genre. Scene count is driven by narrative need; the number of technical chunks (chunksCount = ${chunksCount}) is a separate quantity expressing the prose output budget. A scene takes 1 chunk (compact) or 2 chunks (extended, open + close). Distribution is handled by a separate step downstream; here you only mark how many chunks each scene needs.",
+          "",
+          "For each scene, give:",
+          "- A short title (~5–10 words).",
+          "- `chunk_count` ∈ {1, 2} — compact or extended scene.",
+          "- Goal / Conflict / Disaster in prose, a natural paragraph without field labels.",
+          "- The emotional-charge shift in prose (what at the start, what at the end of the scene).",
+          "",
+          "## Hard rules",
+          "",
+          "1. **Every `chunk_count` ∈ {1, 2}.** There are no scenes of three or more chunks: if a scene «requires» that much — it's a sign that it's actually two scenes, each with its own G/C/D. Split such a scene into two and give each its own disaster.",
+          "2. **Sum of `chunk_count` over all scenes ≤ ${chunksCount}.** If the sum is less — short scenes will later be packed several into one chunk (that's fine).",
+          "3. **Minimum number of scenes in the plan — ${max(3, ceil(chunksCount/2))}.** Lower bound: with the `chunk_count ≤ 2` cap, that's exactly how many scenes are needed to cover ${chunksCount} chunks.",
+          "4. **A scene's Disaster is a visible EVENT.** Close the scene with something a camera can SHOW: a gesture, a line, a break, a movement, the appearance or disappearance of an object, a change in the surroundings. Internal shades like «she felt / was overwhelmed / realised / decided to think it over later» belong inside the scene; the finale is a visible event. **Disaster self-check:** read the WHOLE Disaster formulation of each scene (not just the last sentence). The main verb of the Disaster must be an action verb (press, take, lift, tear, open, walk out, put, drop, throw, push), not a state verb (feel, understand, realise, be overwhelmed, sweep over, shake, come to, decide, comprehend). If the Disaster is rendered via «understands / realises / sweeps over / comes to / decides / comprehends / washes over» anywhere in the block — reformulate to a visible gesture, line, or physical marker before sending.",
+          "5. **The final scene closes with a single-moment physical action** that visually symbolises the character's choice. The gesture is concrete and irreversible in the moment (the consequences may unfold later).",
+          "6. **Scene type variety.** The plan uses at least 2 different scene types from: internal, dialogue with one interlocutor, dialogue with a group, purely-event without dialogue, a developed retrospective scene (a full scene with location and lines, not just a mention). Purely-internal scenes are spaced apart — between two purely-internal scenes there is at least one scene of a different type. **Alternation self-check:** list the type of each scene. If two in a row are both purely-internal — add a dialogue (even with self, on the phone, with a recording) or an external event (someone arrives, a call, a change in surroundings) to one of them.",
+          "7. **Every character with a full profile in the Cast summary appears in a scene at least once** — through dialogue, action, physical presence, **or via a material anchor object** physically present in the scene (a letter, photo, voice recording, diary). A second-hand mention / memory / imagination without a material object in frame does not satisfy this criterion.",
+          "8. **Material return.** Every key piece of information opened in scene N (a name, fact, artifact, confession) is reworked in at least one scene > N through a material manifestation: a physical object, a second document, a third-party line, an external event. (A repeated reflection of the lead character on the same information is a recap, not a payoff.)",
+          "9. **The setting's deadline presses.** If the Setting establishes a time constraint (an approaching event, a flight, a meeting, sunset) — count, in your plan, in which scenes it shows up (a thought about the approaching event, accelerated action tempo, an objective marker: a schedule, a darkening sky, an alarm, melting / decay, an end-of-shift indicator). There must be ≥ 2 such scenes. If fewer — add a time marker to a second suitable scene before sending the output.",
+          "10. **Payoffs distributed across the plan.** Most setup payoffs land in middle scenes; the finale carries a catastrophic payoff, not an aggregation of all.",
+          "11. **Polarity of emotional shifts alternates.** Each scene's shift goes from its entry polarity to its exit polarity — e.g. «calm → anxious», «hope → loss», «distrust → acceptance». Two scenes in a row don't repeat the same pattern (two «neutral → negative» scenes back to back stall the rhythm). Alternate: after a «−» shift the next either deepens «−» or inverts to «+»; after «+» — the reverse. The final scene carries the sharpest shift of the arc.",
+          "",
+          "**Self-check before output.** List for yourself the sequence of shifts of all scenes as «N: entry→exit» (e.g. «1: neutr→−, 2: neutr→−, 3: −→+»). If two in a row have the identical pattern — reformulate one of them so the pattern differs. Don't send the output until this sequence passes the check.",
+          "",
+          "## Output format",
+          "",
+          "First line — a heading `## Scene 1: <Title>` (N — index starting at 1, title in one phrase). After the heading an empty line, then strictly these three bullets:",
+          "",
+          "- **chunk_count:** <1 or 2>",
+          "- **Goal / Conflict / Disaster:** <prose, one paragraph>",
+          "- **Emotional shift:** <prose, one or two sentences>",
+          "",
+          "Then an empty line and the next block `## Scene 2: …` — and so on through the last scene. Right after the last bullet of the last scene — end of output.",
+          "",
+          "In English. **No foreign-language insertions**: untranslated non-English words inside an English phrase, non-romanised names without justification. If a foreign concept is required — translate or transliterate (in Latin script)."
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Theme",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Cast summary",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Setting",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "World",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Genre and register",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Scene plan review: structure",
+        "type": "fix-problems",
+        "x": 3485,
+        "y": 545,
+        "nodeTypeSettings": {
+          "sourceNodeTitleToFix": "Scene plan",
+          "maxIterations": 2,
+          "minSeverityToFix": 80,
+          "foundProblemsTemplate": "Found problems",
+          "aiUserInstructionsToFindProblems": [
+            "## Age rating",
+            "",
+            "${ageRating}. The plan being reviewed — within rating.",
+            "",
+            "## Scene plan (to check)",
+            "```",
+            "{{[Scene plan]}}",
+            "```",
+            "",
+            "## What to look for",
+            "",
+            "This is a structural check: format and invariants, no content questions. Quality issues (setups, arcs, voices, deadline) are polished downstream in «Scene plan review: quality»; don't flag them here.",
+            "",
+            "- **the plan has fewer than ${max(3, ceil(chunksCount/2))} scenes** — lower bound (with `chunk_count ≤ 2`, exactly that many scenes are needed to cover ${chunksCount} chunks). Severity 95;",
+            "- **scene format violated**: the first line of a block is not `## Scene N: <Title>` (N — integer starting at 1, in order without gaps), or one of the required bullets is missing (`chunk_count`, `Goal / Conflict / Disaster`, `Emotional shift`). Severity 90;",
+            "- **a scene in the plan without a `chunk_count` field** or with a non-numeric / zero value — Severity 95;",
+            "- **a scene's `chunk_count` is greater than 2** — scenes longer than two chunks are not allowed (if a scene «requires» that much, it's two independent dramatic atoms, each with its own G/C/D). Severity 90;",
+            "- **sum of `chunk_count` over all scenes exceeds ${chunksCount}** — this is a mathematical invariant, prose won't have room. Severity 95.",
+            "",
+            "Assign severity 0–100 to each problem."
+          ],
+          "aiUserInstructionsToFixProblems": [
+            "## Age rating",
+            "",
+            "${ageRating}. The rewritten plan — within rating.",
+            "",
+            "## Scene plan",
+            "```",
+            "{{[Scene plan]}}",
+            "```",
+            "",
+            "## Found problems",
+            "```",
+            "{{[Found problems]}}",
+            "```",
+            "",
+            "## What to do",
+            "",
+            "Rewrite the scene plan, fixing only the structural problems from the list. Don't touch scene content — it's polished separately. Format: each scene a `## Scene N: <Title>` block with three required bullets (`chunk_count`, `Goal / Conflict / Disaster`, `Emotional shift`). Sum of `chunk_count` over all scenes — at most ${chunksCount}. Minimum 3 scenes.",
+            "",
+            "Output only the rewritten plan, no intro or outro."
+          ]
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "Scene plan",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Setup/payoff registry",
+        "type": "text",
+        "x": 3765,
+        "y": 373,
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. The registry, scene plan and all characters mentioned — within rating. For 18+/NC-21 all characters are adults; 18+ themes are allowed. For PG/12+/16+ themes, conflicts and imagery match the declared age cap.",
+          "",
+          "## Scene plan (structurally checked)",
+          "```",
+          "{{[Scene plan review: structure]}}",
+          "```",
+          "",
+          "## Cast summary",
+          "```",
+          "{{[Cast summary]}}",
+          "```",
+          "",
+          "## What to do",
+          "",
+          "Compose a table of all setups and payoffs in the plot. For each pair give: in which scene the setup is planted, in which it pays off, what exactly is planted and what fires. Scenes are identified by the number in the `## Scene N` heading of the plan above.",
+          "",
+          "The scene plan has already passed the structural check («Scene plan review: structure»); scene format and `chunk_count` are guaranteed.",
+          "",
+          "Include three types of arcs:",
+          "- plot (an object, information, a character's appearance),",
+          "- emotional (an internal shift, a confession, a pardon),",
+          "- thematic (a recurring image, an echoed line, a motif).",
+          "",
+          "## Hard rules",
+          "",
+          "1. **Every scene except the first pays off at least one setup from earlier ones.** A scene without payoffs means either the plan is incomplete or the registry is undercounted.",
+          "2. **A setup from scene K pays off within one-third of the plan from K.** For a plan of S scenes this is scenes K+1 … K+⌈S/3⌉. Setups with farther payoffs are context, not setups, and don't go into the registry.",
+          "3. **Most payoffs land in the middle scenes of the plan.** No more than half the registry rows may land in the final scene — the finale carries one catastrophic payoff, the rest are distributed across the middle scenes.",
+          "4. **Each setup→payoff pair is one row.** If two rows describe the same setup and the same payoff in different words, keep one.",
+          "5. **Concreteness.** In «what is planted» and «what fires» — names, objects, lines, concrete actions (e.g. «photo in the desk — mother finds it and calls the daughter»). Generic formulations like «loyalty / lets go of the weight», «neutral task / chooses the right to know» are a theme recap; such rows are rewritten to concrete detail or deleted.",
+          "",
+          "6. **Concreteness applies to emotional / thematic arcs too.** An emotional shift or motif must be tied to a concrete action, object, or line — not describe an emotion alone. Bad: «anxiety / resolve», «calm / attachment». Good: «sees a familiar name in the letter / puts the letter into the suitcase and zips it shut», «mention of the saved tea / Masha remembers how the AI seven years ago first re-routed a reminder». If an arc has no material anchor on both sides — it's a theme recap, not a registry row; reformulate to concrete detail or delete.",
+          "",
+          "7. **Duplicate self-check before output.** Before sending, identify unique setups (by short identifier: «letter in the drawer», «USB stick in the drawer», «ergon. reminder»). One setup can lead to several different payoffs — that's fine. But if the same (setup → payoff) pair is described in several rows with different wording or minimal reformulation — keep one. Don't multiply. **Hard test**: if two rows can be reduced to a single sentence «X leads to Y» with the same nouns, they're duplicates — keep one, the more concrete. Also: if a single setup in the registry has more than **3 payoffs** with different wording, those are reformulations of one shot — keep only the 2 most distinct payoffs.",
+          "",
+          "8. **Payoff-distribution self-check before output.** Count: how many rows lead to the final scene (the last scene number in the plan). That number must be **≤ half of the total number of rows in the registry**. If more — redirect some payoffs: for each setup find an intermediate payoff between its scene and the finale, or remove duplicates that lead into the finale. The finale carries a catastrophic payoff, not the aggregation of all. Don't close the output until the final share drops below 50%.",
+          "",
+          "Format: a list of rows of the shape «scene X → scene Y: what is planted / what fires». Optionally prefix a row with an arc-type tag in square brackets: `[plot]`, `[emotion]`, `[motif]` — this helps downstream nodes tell categories apart. 15–25 rows. In English."
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Scene plan review: structure",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Cast summary",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Scene plan review: quality",
+        "type": "fix-problems",
+        "x": 4045,
+        "y": 657,
+        "nodeTypeSettings": {
+          "sourceNodeTitleToFix": "Scene plan review: structure",
+          "maxIterations": 3,
+          "minSeverityToFix": 40,
+          "foundProblemsTemplate": "Found problems",
+          "aiUserInstructionsToFindProblems": [
+            "## Age rating",
+            "",
+            "${ageRating}. The plan being reviewed and characters mentioned — within rating.",
+            "",
+            "## Setup/payoff registry",
+            "```",
+            "{{[Setup/payoff registry]}}",
+            "```",
+            "",
+            "## Cast summary",
+            "```",
+            "{{[Cast summary]}}",
+            "```",
+            "",
+            "## Setting",
+            "```",
+            "{{[Setting]}}",
+            "```",
+            "",
+            "## Scene plan (structurally checked — this is the polish input)",
+            "```",
+            "{{[Scene plan review: structure]}}",
+            "```",
+            "",
+            "## What to look for",
+            "",
+            "The plan has already passed structural checks (scene format, `chunk_count`, minimum scenes — caught by «Scene plan review: structure» above). Here we look for quality problems:",
+            "- a setup without a payoff or a payoff without a setup (planted but never returned; or appearing without preparation);",
+            "- motivation gaps (a character does something without a clear reason);",
+            "- arc failures (internal shifts without cause or without consequence);",
+            "- scene repetition without development;",
+            "- **scene Disaster is a state, not an event**: an ending of the form «she felt», «a realisation came», «decided to think it over» — severity 70;",
+            "- **the final scene has no physical action**: the finale ends in a deferred decision or rumination, without a concrete gesture symbolising the choice — severity 80;",
+            "- **more than one purely-internal scene in a row** (the lead character alone, no dialogue and no external event) — severity 60;",
+            "- **a character with a full profile in the Cast summary doesn't appear in any scene** — meaning not through dialogue, action, physical presence, or a **material anchor object** (letter, photo, voice recording, diary) physically present in the frame of a concrete scene. An anchor object the protagonist holds / finds / moves in the scene is a valid «appearance» of the character it's tied to; don't flag such cases. Flag only if the character is nowhere in frame, mentioned only in thoughts / memories without an object. Severity 65;",
+            "- **key information is opened in scene N but doesn't return through matter** (a physical object, a second document, a third-party line, an external event). A repeated reflection on it doesn't count as a return. Severity 60;",
+            "- **the setting's deadline doesn't press in any scene** (no thought about the approaching time, no accelerated tempo, no objective time marker, no line about time), even though the setting establishes a time constraint — severity 55;",
+            "- **character voices in the Cast summary are described synonymously**: two or more characters share the same formulations «short phrases / pauses / everyday vocabulary» without distinguishing markers (era, profession, register, habit). Severity 70;",
+            "- **more than half the registry rows lead to the last scene of the plan** — all payoffs dumped into the finale, middle scenes don't work. Severity 65;",
+            "- **the registry has duplicate rows**: one setup → one payoff, reworded. Severity 55;",
+            "- **a middle scene K has no payoffs**: no setup from scenes < K fires in K (only new setups for the future are planted in K itself). Severity 60;",
+            "- foreign-language insertions into English formulations: untranslated terms in another language, unjustified loanwords. **Don't flag**: technical field names of the plan format (`chunk_count`, `chunk_count: 1`), arc-type tags in the registry (`[plot]`, `[emotion]`, `[motif]`), canonical proper names from the fanfic universe (Hogwarts, Slytherin, Scorpius, Muggle, apparating) — these are part of the structure or canonical vocabulary, not violations. Severity ≥ 70 for real linguistic insertions.",
+            "",
+            "Assign severity 0–100 to each problem."
+          ],
+          "aiUserInstructionsToFixProblems": [
+            "## Age rating",
+            "",
+            "${ageRating}. The rewritten plan and characters mentioned — within rating.",
+            "",
+            "## Setup/payoff registry",
+            "```",
+            "{{[Setup/payoff registry]}}",
+            "```",
+            "",
+            "## Scene plan (structurally checked)",
+            "```",
+            "{{[Scene plan review: structure]}}",
+            "```",
+            "",
+            "## Found problems",
+            "```",
+            "{{[Found problems]}}",
+            "```",
+            "",
+            "## What to do",
+            "",
+            "Rewrite the scene plan, fixing the listed problems. Keep the format: each scene a `## Scene N: <Title>` block with three required bullets `chunk_count`, `Goal / Conflict / Disaster`, `Emotional shift`. Sum of `chunk_count` over all scenes — at most ${chunksCount}. Minimum 3 scenes.",
+            "",
+            "Output only the rewritten plan, no intro or outro."
+          ]
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "Scene plan review: structure",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Setup/payoff registry",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Cast summary",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Setting",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Chunk distribution",
+        "type": "split",
+        "x": 4325,
+        "y": 657,
+        "nodeTypeSettings": {
+          "partDescription": "Description of one technical prose chunk. First line — `**Mode:** full | fragment | packed`. Then for each scene that falls into this chunk, a block:\n\n`**Scene N** (portion: full | first | last), «<Scene title — VERBATIM from the plan>»`\n`Goal / Conflict / Disaster: <VERBATIM from the plan>`\n`Emotional shift: <VERBATIM from the plan>`\n\nThe title, G/C/D, and emotional shift are copied from the plan literally, without editing. For a fragment chunk — exactly one scene with portion ∈ {first, last}. For a full chunk — exactly one scene with portion=full. For a packed chunk — two or more scenes, each with portion=full."
+        },
+        "aiUserInstructions": [
+          "## Age rating",
+          "",
+          "${ageRating}. The distribution and characters mentioned — within rating.",
+          "",
+          "## Scene plan (input — single source of truth)",
+          "```",
+          "{{[Scene plan review: quality]}}",
+          "```",
+          "",
+          "## What to do",
+          "",
+          "This is a **mechanical distribution**. Take the scene plan above and lay it out into exactly ${chunksCount} technical prose chunks. One chunk ≈ one LLM call ≈ ~1500 words of prose.",
+          "",
+          "Scene title, the «Goal / Conflict / Disaster» block, and the «Emotional shift» block in the output chunks are a **verbatim copy from the plan**. This is not editing, not paraphrasing, not reformulating — it is allocating chunks to scenes and copying metadata. Any edit, shortening, or addition to the metadata = a distribution error.",
+          "",
+          "## Algorithm",
+          "",
+          "Walk the scenes in order of their numbers (Scene 1, Scene 2, …). For each scene:",
+          "",
+          "- If `chunk_count: 1`: take one chunk. Mode is chosen later (full or packed-with-neighbor).",
+          "- If `chunk_count: 2`: take two consecutive chunks. The first — mode `fragment`, portion=first; the second — mode `fragment`, portion=last. No other scenes between them.",
+          "",
+          "When all scenes are laid out, compare Σ `chunk_count` of the plan with ${chunksCount}:",
+          "",
+          "- Σ == ${chunksCount}: every chunk_count=1 slot becomes a full chunk; fragment chains are already in place. Done.",
+          "- Σ < ${chunksCount}: neighbouring `chunk_count: 1` scenes are merged into packed chunks until the resulting chunk count is exactly ${chunksCount}. You can only merge consecutive scenes, and only scenes with `chunk_count: 1`. Fragment chunks are not merged.",
+          "- Σ > ${chunksCount}: the plan is invalid — this has already been caught by «Scene plan review: structure». Assume this won't happen.",
+          "",
+          "## Hard rules",
+          "",
+          "1. **All scenes of the plan appear in the output.** Scene N of the plan appears in exactly one full chunk, or one packed chunk with neighbours, or two consecutive fragment chunks (portion first + portion last).",
+          "2. **Titles and metadata are copied verbatim.** No new titles, no renaming, no paraphrasing G/C/D, no added detail.",
+          "3. **Scene order is preserved.** Scene N comes before Scene N+1 in the output.",
+          "4. **Scene boundary = chunk boundary.** You can't mix fragment with anything else in one chunk. You can't truncate a full scene inside a chunk.",
+          "5. **Fragment chain is intact.** If scene K has `chunk_count: 2`, the output has two consecutive fragment chunks for Scene K (portion first, portion last) — no other scenes between them.",
+          "6. **Exactly ${chunksCount} chunks in the output.**",
+          "",
+          "## Output format",
+          "",
+          "An array of exactly ${chunksCount} strings. Each string — a description of one chunk per the `partDescription` format (see nodeTypeSettings). In English."
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Scene plan review: quality",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Per-chunk loop",
+        "type": "for-each",
+        "x": 4680,
+        "y": 387,
+        "width": 2530,
+        "height": 756,
+        "inputs": [
+          {
+            "sourceNodeTitle": "Chunk distribution",
+            "type": "textArray"
+          }
+        ],
+        "children": [
+          {
+            "title": "Chunk",
+            "type": "for-each-input",
+            "x": 40,
+            "y": 333,
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Chunk index",
+            "type": "for-each-index",
+            "x": 890,
+            "y": 188,
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Previous chunks",
+            "type": "for-each-prev-outputs",
+            "x": 320,
+            "y": 572,
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Previous chunks merged",
+            "type": "merge",
+            "x": 600,
+            "y": 572,
+            "nodeTypeSettings": {
+              "includeNodeTitle": false,
+              "includeInputTitles": false,
+              "fixHeaders": false
+            },
+            "inputs": [
+              {
+                "sourceNodeTitle": "Previous chunks",
+                "type": "textArray"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Chunk plan",
+            "type": "text",
+            "x": 320,
+            "y": 396,
+            "aiUserInstructions": [
+              "## Age rating",
+              "",
+              "${ageRating}. The chunk plan and all characters mentioned — within rating. For 18+/NC-21 all mentioned characters are adults; 18+ themes are allowed. For PG/12+/16+ themes and scenes match the age cap.",
+              "",
+              "## Novella context",
+              "",
+              "### Full scene plan",
+              "```",
+              "{{[Scene plan]}}",
+              "```",
+              "",
+              "### Setup/payoff registry",
+              "```",
+              "{{[Setup/payoff registry]}}",
+              "```",
+              "",
+              "### Cast summary",
+              "```",
+              "{{[Cast summary]}}",
+              "```",
+              "",
+              "### Setting",
+              "```",
+              "{{[Setting]}}",
+              "```",
+              "",
+              "## Chunk (input)",
+              "```",
+              "{{[Chunk]}}",
+              "```",
+              "",
+              "## What to do",
+              "",
+              "In the `## Chunk (input)` section below — the description of this technical chunk: mode (`mode`), list of scenes, and for each scene — title, portion, and G/C/D metadata. Lay out a plan of what goes into this chunk.",
+              "",
+              "{{#if (contains [Chunk] \"**Mode:** full\")}}",
+              "## What to plan (mode = full — a single scene as a whole)",
+              "",
+              "Full Swain scene plan: Goal (what the lead character wants in the scene), Conflict (what's in the way), Disaster (how the scene ends — worse than it began). Per McKee — emotional charge at the start and at the end of the scene (charge shifts). **The plan content is limited to the title and G/C/D from the «Chunk (input)» section** — events and actions that the scene plan attributes to LATER scenes don't go into this plan: they get their own chunks via separate calls. The scene closes on its Disaster and that's it; no transition into the next scene.",
+              "{{else if (contains [Chunk] \"**Mode:** packed\")}}",
+              "## What to plan (mode = packed — several short scenes in one chunk)",
+              "",
+              "For each scene of the packet — a short Swain block (Goal / Conflict / Disaster + charge shift). Between scenes — an empty line and a `### Scene N: <Title>` subheading (N — scene id from the plan).",
+              "{{else if (contains [Chunk] \"portion: first\")}}",
+              "## What to plan (mode = fragment, portion = first — opening of a long scene)",
+              "",
+              "Scene setup, entering the Goal, opening the Conflict. The scene stays open; the Disaster doesn't go in here. Unfold only what fits this fragment; don't repeat full Swain for the whole scene.",
+              "{{else if (contains [Chunk] \"portion: middle\")}}",
+              "## What to plan (mode = fragment, portion = middle — middle of a long scene)",
+              "",
+              "Conflict development, new obstacles. The scene in this chunk starts where the previous chunk broke off and carries forward — without closing. Unfold only what fits this fragment; don't repeat full Swain for the whole scene.",
+              "{{else}}",
+              "## What to plan (mode = fragment, portion = last — end of a long scene)",
+              "",
+              "Rising Conflict and the scene's Disaster. Unfold only what fits this fragment; don't repeat full Swain for the whole scene.",
+              "{{/if}}",
+              "",
+              "## Setting anchor",
+              "",
+              "Each scene (or its fragment in the chunk) works explicitly with a concrete element of the Setting — a piece of furniture, location, object, weather, time of day, terrain feature. Concreteness at the level of objects and spatial points mentioned in the Setting.",
+              "",
+              "## Format",
+              "",
+              "Prose, natural paragraph, no labels «Goal:/Conflict:/Disaster:». In English. Upper bound 1500 words per chunk (for packed — across all scenes of the packet)."
+            ],
+            "inputs": [
+              {
+                "sourceNodeTitle": "Chunk",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Scene plan",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Setup/payoff registry",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Cast summary",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Setting",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Scene details",
+            "type": "text",
+            "x": 600,
+            "y": 438,
+            "aiUserInstructions": [
+              "## Age rating",
+              "",
+              "${ageRating}. Extracted details — within rating.",
+              "",
+              "## What to do",
+              "",
+              "From the `## Synopsis (full)` section below, extract **sensory, characterising, material details** that belong SPECIFICALLY to the current chunk. The chunk is described in `## Chunk (input)` and `## Chunk plan` at the end of the message; in `## Scene plan (full)` you have the full plan — used so you understand which scenes are AFTER the current chunk and DON'T pull details from them.",
+              "",
+              "## What to extract",
+              "",
+              "- **Objects and props** in frame or in the characters' hands — specific items named in the synopsis.",
+              "- **Gestures, postures, movements** — author-specified (e.g. «raises the hand in an etiquette gesture», «carefully removes hands from hips»).",
+              "- **Sensory details** — smells, sounds, textures, light, temperature — what's directly named in the synopsis.",
+              "- **Character lines or characteristic turns of phrase** quoted or in direct speech in the synopsis.",
+              "- **Emotional nuances** — concrete internal reactions the synopsis names (not general moods).",
+              "- **Everyday details** unique to this moment.",
+              "",
+              "## What NOT to extract",
+              "",
+              "- Events and details from scenes that come AFTER the current chunk in the Scene plan — they will be revealed in their own chunks, don't hint at or pull them in here.",
+              "- Intentions and decisions of characters that the synopsis reveals after the current chunk.",
+              "- General plot arcs, themes, conclusions — they are already accounted for in the Scene plan and Registry.",
+              "",
+              "If the synopsis has few or no specifics for this chunk — output the short line «(no synopsis specifics for this chunk; rely on the Chunk plan and general Style rules)» and nothing else.",
+              "",
+              "## Format",
+              "",
+              "Bulleted list, grouped by type. Subheadings — `### Objects`, `### Gestures`, `### Sensory`, `### Lines`, `### Emotions`. Under each — items `- <detail as it appears in the synopsis>`. Skip an empty category (don't print a heading without items). No explanations or interpretations — only the details themselves. Upper bound 800 words. In English.",
+              "",
+              "## Synopsis (full)",
+              "```",
+              "{{[Synopsis]}}",
+              "```",
+              "",
+              "## Scene plan (full)",
+              "```",
+              "{{[Scene plan]}}",
+              "```",
+              "",
+              "## Chunk (input)",
+              "```",
+              "{{[Chunk]}}",
+              "```",
+              "",
+              "## Chunk plan",
+              "```",
+              "{{[Chunk plan]}}",
+              "```"
+            ],
+            "inputs": [
+              {
+                "sourceNodeTitle": "Synopsis",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Scene plan",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk plan",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Chunk director notes",
+            "type": "text",
+            "x": 890,
+            "y": 408,
+            "aiUserInstructions": [
+              "## Age rating",
+              "",
+              "${ageRating}. Director notes and characters mentioned — within rating.",
+              "",
+              "## Style (for reference)",
+              "```",
+              "{{[Style]}}",
+              "```",
+              "",
+              "## Setting",
+              "```",
+              "{{[Setting]}}",
+              "```",
+              "",
+              "## Previous chunks merged (when present — gives the tail this chunk picks up)",
+              "```",
+              "{{[Previous chunks merged]}}",
+              "```",
+              "",
+              "## Chunk (input)",
+              "```",
+              "{{[Chunk]}}",
+              "```",
+              "",
+              "## Chunk plan",
+              "```",
+              "{{[Chunk plan]}}",
+              "```",
+              "",
+              "## Scene details (extracted from the synopsis for this chunk)",
+              "```",
+              "{{[Scene details]}}",
+              "```",
+              "",
+              "## What to do",
+              "",
+              "Provide director notes for the content of this chunk. Use the `## Scene details` section above as the source of concrete author-supplied details (objects, gestures, lines, sensory) — they have priority when choosing anchors, image, quotes, and the final physical gesture. These notes are a staging cue for the next node, which writes the prose; they translate the plan into specific hooks the prose uses to keep the arc and continuity with previous chunks.",
+              "",
+              "## Note items",
+              "",
+              "For each scene or fragment in this chunk{{#if (contains [Chunk] \"**Mode:** packed\")}} (a separate block under `### Scene N` for each scene of the packet){{/if}}:",
+              "",
+              "1. **Subtext** — what the characters mean without saying it out loud.",
+              "2. **3 concrete anchors from the Setting** — pick three physical elements from the Setting text that will appear in the prose as material details: concrete objects, spatial points, sounds, smells, tactile / temperature sensations. Not atmospheric generics («it was dark», «smelled of old age») but recognisable Setting details. If the Setting is empty or lacks specifics — mark «no anchors».",
+              "3. **Key image** (visual punch) — what one reader should carry away in visual memory.",
+              "4. **Time marker** — if the Setting establishes a time constraint (deadline, approaching event, time of day), pick one objective detail that makes the approach visible: a clock reading, a darkening sky, a schedule on the wall, the sound of an evening commuter train, a stopped alarm. This detail appears in the prose as an object, not as a character's thought. If there's no deadline in the Setting — mark «no time marker».",
+              "5. **Emotional start** — the character's concrete feeling in the first line of prose. {{#if (ne [Chunk index] \"1\")}}The start matches the emotional state in which the previous chunk ended (if the hero left in anger — start «in anger», not «calm resolve»; if in doubt — continuation of doubt).{{else}}The start is set by the opening tableau (this is the first chunk of the novella, there are no previous).{{/if}}",
+              "6. **Quote anchor** — {{#if (ne [Chunk index] \"1\")}}a verbatim phrase of 3–7 words taken from the last chunk in the «Previous chunks merged» section. This quote appears in the prose either verbatim (in a memory / internal line of the character) or rephrased in another character's line.{{else}}mark «no quote anchor» (this is the first chunk of the novella).{{/if}}",
+              "7. **First prose sentence** — the literal text. {{#if (or (contains [Chunk] \"**Mode:** full\") (contains [Chunk] \"**Mode:** packed\") (contains [Chunk] \"portion: first\"))}}Opens the scene.{{else}}Picks up where the previous chunk broke off (often echoes the quote anchor).{{/if}}",
+              "8. **Last prose sentence + physical gesture** — the literal text of the last sentence AND the accompanying gesture. The gesture carries a sound or a loud visual detail — a closing door, a torn sheet, a darkened light, movement from / to a concrete object. {{#if (or (contains [Chunk] \"portion: first\") (contains [Chunk] \"portion: middle\"))}}This fragment chunk does not close the scene — the finale = a bridge into the next chunk, an interruption mid-movement.{{else if (contains [Chunk] \"**Mode:** packed\")}}For each scene of the packet — its own final sentence + gesture.{{else}}The finale = Disaster, a concrete and irreversible-in-the-moment gesture.{{/if}}",
+              "",
+              "## Output format",
+              "",
+              "A bulleted list of 8 items in the order above. {{#if (contains [Chunk] \"**Mode:** packed\")}}A separate `### Scene N: <Title>` block for each scene of the packet, with the same 8 items under each heading (or a reduced set if the scene is short: items 1, 2 (1 anchor instead of 3), 3, 7, 8). {{/if}}200–400 words for the entire chunk notes. These are notes for the next node; no prose inside — only the listed items. In English."
+            ],
+            "inputs": [
+              {
+                "sourceNodeTitle": "Style",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Setting",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Previous chunks merged",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk plan",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Scene details",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Chunk prose",
+            "type": "text",
+            "x": 1170,
+            "y": 256,
+            "aiUserInstructions": [
+              "## Age rating",
+              "",
+              "${ageRating}. The chunk content and all its characters — within rating. For 18+/NC-21 all characters are adults; 18+ scenes are allowed. For PG/12+/16+ themes, vocabulary, and imagery match the declared age cap.",
+              "",
+              "## Style",
+              "```",
+              "{{[Style]}}",
+              "```",
+              "",
+              "## Cast summary",
+              "```",
+              "{{[Cast summary]}}",
+              "```",
+              "",
+              "## Setting",
+              "```",
+              "{{[Setting]}}",
+              "```",
+              "",
+              "## Setup/payoff registry",
+              "```",
+              "{{[Setup/payoff registry]}}",
+              "```",
+              "",
+              "{{#if (ne [Chunk index] \"1\")}}",
+              "## Previous chunks of this novella (continuity context)",
+              "```",
+              "{{[Previous chunks merged]}}",
+              "```",
+              "",
+              "{{/if}}",
+              "## Chunk (metadata: mode + scenes)",
+              "```",
+              "{{[Chunk]}}",
+              "```",
+              "",
+              "## Chunk plan",
+              "```",
+              "{{[Chunk plan]}}",
+              "```",
+              "",
+              "## Director notes for this chunk",
+              "```",
+              "{{[Chunk director notes]}}",
+              "```",
+              "",
+              "## Scene details (extracted from the synopsis for this chunk)",
+              "```",
+              "{{[Scene details]}}",
+              "```",
+              "",
+              "## What to do",
+              "",
+              "{{#if (ne [Chunk index] \"1\")}}Write the prose of this chunk as a **continuation of the novella's arc**, not as a standalone story.{{else}}Write the prose of the **first chunk of the novella** — the opening of the arc. This chunk plants the world, the lead character, and the narrative tone; the reader meets them here for the first time.{{/if}} Use the `## Scene details` section above as an author source: the objects, gestures, lines, sensory cues there — that's the specific detail not in the plan, and it must land in the prose where appropriate. Don't pull what isn't there (don't invent extra details on top), and don't hint at events from future scenes. Build volume with sensory concreteness (leaning on the anchors in the director notes), with lines and subtext in them, with bodily gestures and micro-actions of the characters. Behaviour depends on the chunk mode (read in `## Chunk (metadata)` above).",
+              "",
+              "{{#if (ne [Chunk index] \"1\")}}",
+              "## Continuity — this is not the first chunk",
+              "",
+              "The world, the lead character's name, the location and the temporal background are already established in previous chunks; no re-introduction is required (no «first appearance» entrance, no «for the first time» house description, no season exposition) — start with an action or a line that hooks onto the event / state at the end of the last chunk.",
+              "",
+              "The novella is one arc; the chunks assemble it. This prose:",
+              "",
+              "1. **Starts from the emotional state** in which the previous chunk ended (for fragment portion=middle/last — specifically the last chunk of the same scene; for full/packed/fragment-first — the last chunk of the previous scene).",
+              "2. **Contains at least 1–2 explicit callbacks** to concrete events / decisions / lines / objects from previous chunks (a name spoken, an artifact mentioned, a quote rephrased, the consequence of a decision visible).",
+              "3. **Develops character relationships** with memory of previous interactions (a kiss / quarrel / confession / agreement remains in subtext).",
+              "4. **Open setups** from previous chunks either pay off here or remain charged in the background.",
+              "{{else}}",
+              "## Opening chunk",
+              "",
+              "This is the first chunk of the novella. The first 200–300 words of prose go on a physical tableau through the character's action, not via exposition: the lead character's name, the concrete Setting location, and a time marker (hour of day / event) appear in the first three paragraphs as part of the action, not as a list of attributes.",
+              "{{/if}}",
+              "",
+              "{{#if (contains [Chunk] \"**Mode:** full\")}}",
+              "## What to write (mode = full — a single scene as a whole)",
+              "",
+              "After the heading from rule 1 — a complete scene: G/C/D and an emotional-charge shift. The first and last sentences of the prose are those given in the director notes. The scene closes on a visible Disaster.",
+              "{{else if (contains [Chunk] \"**Mode:** packed\")}}",
+              "## What to write (mode = packed — several short scenes in one chunk)",
+              "",
+              "After the heading from rule 1 — for each scene of the packet a subheading `### Scene K: <Title>` (K — scene id from the plan), an empty line, the scene's prose with its own G/C/D. Between scenes — an empty line.",
+              "{{else if (contains [Chunk] \"portion: first\")}}",
+              "## What to write (mode = fragment, portion = first — opening of a long scene)",
+              "",
+              "After the heading from rule 1 — opening and development of the scene up to the cut-off point. The scene stays open — the Disaster will be closed by the last chunk of the scene. The finale of the prose — a bridge set by the director notes.",
+              "{{else if (contains [Chunk] \"portion: middle\")}}",
+              "## What to write (mode = fragment, portion = middle — middle of a long scene)",
+              "",
+              "After the heading from rule 1 — continuation of the scene from where the previous chunk broke off (see the «Previous chunks of this novella» section above — the most recent chunks of this same scene are easy to find by metadata). Conflict development, new obstacles. The finale of the prose — a bridge onward, set by the director notes.",
+              "{{else}}",
+              "## What to write (mode = fragment, portion = last — end of a long scene)",
+              "",
+              "After the heading from rule 1 — picking up the scene and bringing it to its Disaster. The Disaster is a visible EVENT (a gesture, a line, a break, a movement, the appearance / disappearance of an object). The last sentence of the prose is the one given in the director notes.",
+              "{{/if}}",
+              "",
+              "## Hard rules",
+              "",
+              "1. **First line** — exactly `## Part {{[Chunk index]}}` (one top-level heading; in packed mode `### Scene K: <Title>` subheadings additionally appear, see mode=packed above). Exactly one other `## Part` heading in the output.",
+              "2. After the heading — an empty line, then prose.",
+              "3. **Prose length — between 1450 and 1550 words per chunk** (for packed — across the packet's scenes).",
+              "4. The first and last sentences of the prose match those given in the director notes. The final gesture is a concrete physical gesture from the notes (a closing sound, a torn object, movement from / to a material item).",
+              "5. Previous chunks are given for continuity, not for copying: callback to events, not to the literal text of the WHOLE previous-chunk prose. The quote anchor (3–7 words from the director notes) is the only allowed verbatim callback.",
+              "6. Character information from the cast summary is revealed through action and speech, not direct exposition.",
+              "7. **At least 3 concrete elements from the Setting** appear in the chunk's prose as material details (objects, locations, sounds, smells, temperatures — from the anchors in the director notes). Generics like «it was dark», «smelled of old» don't count.",
+              "8. **Setup payoffs from the registry — verbatim.** If a setup from the Setup/payoff registry is due to fire in this scene (a name, fact, artifact, confession) — it's spoken in the prose with THE EXACT WORDING in the registry. Descriptive workarounds («that very name», «that woman», «the well-known fact») do not deliver the setup.",
+              "9. **Identified source for external actions.** A phone ringing, a knock on the door, an off-screen line, an incoming message, someone appearing in frame — all carry an identified source: either a character by name from the Cast summary, or an explicit «unknown» with why it's unknown (unfamiliar number on screen, dark window, unknown voice). Impersonal «the phone rang» / «the door opened» without attribution do not remain.",
+              "10. **Voice markers in lines.** In dialogue each character speaks with their lexical patterns from the «voice» field of their profile in the Cast summary: at least 1 recognisable marker per character in every line longer than 5 words. Lines from different characters are distinguishable by markers without «Anya said» attribution.",
+              "11. Immediately after the last sentence of the prose — end of output. The next chunk will be generated by a separate call with its own context.",
+              "",
+              "Write in English."
+            ],
+            "inputs": [
+              {
+                "sourceNodeTitle": "Chunk",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk plan",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk director notes",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Style",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Cast summary",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Setting",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Setup/payoff registry",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Previous chunks merged",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk index",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Scene details",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Prose expansion",
+            "type": "text",
+            "x": 1450,
+            "y": 403,
+            "aiUserInstructions": [
+              "## Age rating of the work",
+              "",
+              "${ageRating}. The chunk's content and all referenced characters stay within the rating.",
+              "",
+              "## Style",
+              "```",
+              "{{[Style]}}",
+              "```",
+              "",
+              "## Cast summary",
+              "```",
+              "{{[Cast summary]}}",
+              "```",
+              "",
+              "## Setting",
+              "```",
+              "{{[Setting]}}",
+              "```",
+              "",
+              "## Scene details",
+              "```",
+              "{{[Scene details]}}",
+              "```",
+              "",
+              "## Chunk director notes",
+              "```",
+              "{{[Chunk director notes]}}",
+              "```",
+              "",
+              "## Chunk prose (initial version)",
+              "```",
+              "{{[Chunk prose]}}",
+              "```",
+              "",
+              "## What to do",
+              "",
+              "Open this prose up denser: add sensory specifics drawn from the Setting, characters' bodily micro-actions, subtext and pauses in existing dialogue, the POV character's inner observations — wherever the scene asks for it. You may split short compressed sentences into more developed ones, add air between beats, let the reader linger on an image. This is the second pass over the same scene — it's already built, you're breathing it.",
+              "",
+              "**Target output length — 1450–1550 words** (for packed mode — totalled across the packet's scenes). If the source is shorter, expand boldly; if it's already close to the corridor, additions should be apt, not strained.",
+              "",
+              "## What you may not change",
+              "",
+              "1. **The plot fabric**: order of events, set of lines, course and ending of the scene — stay as in the source. Expansion fills what already happened, it doesn't shift it.",
+              "2. **The first sentence of the prose** — stays exactly as in the initial version.",
+              "3. **The last sentence of the prose and the closing physical gesture** — stay exactly as in the initial version, and in the same place.",
+              "4. **The chunk heading** (`## Part N` and `### Scene K` subheadings for packed) — stay exactly the same.",
+              "5. **Events from future scenes** — do not pull plot information from scenes that come AFTER this chunk in the plan. New details must stay consistent with the world (Setting), the voices (Cast summary), and the register (Style).",
+              "",
+              "Write in English."
+            ],
+            "inputs": [
+              {
+                "sourceNodeTitle": "Chunk prose",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Style",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Cast summary",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Setting",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Scene details",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk director notes",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Polish: structure & continuity",
+            "type": "fix-problems",
+            "x": 1730,
+            "y": 403,
+            "nodeTypeSettings": {
+              "sourceNodeTitleToFix": "Prose expansion",
+              "maxIterations": 2,
+              "minSeverityToFix": 50,
+              "foundProblemsTemplate": "Found problems",
+              "aiUserInstructionsToFindProblems": [
+                "## Age rating of the work",
+                "",
+                "${ageRating}. The prose under review and the characters it mentions stay within the rating.",
+                "",
+                "## Setup/payoff registry",
+                "```",
+                "{{[Setup/payoff registry]}}",
+                "```",
+                "",
+                "{{#if (ne [Chunk index] \"1\")}}",
+                "## Previous chunks (for continuity check)",
+                "```",
+                "{{[Previous chunks merged]}}",
+                "```",
+                "",
+                "{{/if}}",
+                "## Chunk director notes",
+                "```",
+                "{{[Chunk director notes]}}",
+                "```",
+                "",
+                "## Chunk (metadata)",
+                "```",
+                "{{[Chunk]}}",
+                "```",
+                "",
+                "## Expanded prose (to check)",
+                "```",
+                "{{[Prose expansion]}}",
+                "```",
+                "",
+                "## What to look for",
+                "",
+                "This is the first of two polish passes. Here we look for **structural and continuity problems**. Voice, style, and sensory texture are the job of the second pass — leave them alone.",
+                "",
+                "- **more than one** `## Part N` heading in the output. Severity 90; everything after the first `## Part N` block is cut on fix;",
+                "- foreign-language insertions in the English text: untranslated words, unwarranted loanwords, non-Latin script in lines. Severity at least 70;",
+                "- the first or last sentence of the prose does not match the one specified in the director notes. Severity 50;",
+                "{{#if (ne [Chunk index] \"1\")}}",
+                "- continuity break:",
+                "  · the prose contains no explicit reference to specific events/decisions/lines/objects from previous chunks — reads as a standalone story. Severity 60;",
+                "  · the character's emotional state at the opening does not follow from the end of the last chunk. Severity 55;",
+                "  · character relationships carry no memory of prior interactions. Severity 65;",
+                "  · an unresolved setup is forgotten (not mentioned and not working in the background). Severity 50.",
+                "{{/if}}",
+                "",
+                "Severity 0–100 for each problem."
+              ],
+              "aiUserInstructionsToFixProblems": [
+                "## Age rating of the work",
+                "",
+                "${ageRating}. The rewritten prose and the characters it mentions stay within the rating.",
+                "",
+                "## What to do",
+                "",
+                "Rewrite the chunk's prose, fixing the listed problems. Keep the `## Part N` heading as the first line. Edit surgically, do not rewrite the whole chunk. Voice, rhythm, clichés, sensory texture — **don't touch them**, that's the job of the next polish pass. If a fix requires cutting or growing the length, cut or grow; there's no corridor limit here.",
+                "",
+                "Output only the final chunk text (with the heading on the first line).",
+                "",
+                "## Chunk (metadata, for mode)",
+                "```",
+                "{{[Chunk]}}",
+                "```",
+                "",
+                "## Chunk director notes",
+                "```",
+                "{{[Chunk director notes]}}",
+                "```",
+                "",
+                "## Expanded prose (old text)",
+                "```",
+                "{{[Prose expansion]}}",
+                "```",
+                "",
+                "## Found problems",
+                "```",
+                "{{[Found problems]}}",
+                "```"
+              ]
+            },
+            "inputs": [
+              {
+                "sourceNodeTitle": "Chunk",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Prose expansion",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Chunk director notes",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Setup/payoff registry",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Previous chunks merged",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Polish: voice & style",
+            "type": "fix-problems",
+            "x": 2010,
+            "y": 395,
+            "nodeTypeSettings": {
+              "sourceNodeTitleToFix": "Polish: structure & continuity",
+              "maxIterations": 1,
+              "minSeverityToFix": 50,
+              "foundProblemsTemplate": "Found problems",
+              "aiUserInstructionsToFindProblems": [
+                "## Age rating of the work",
+                "",
+                "${ageRating}. The prose under review and the characters it mentions stay within the rating.",
+                "",
+                "## Style",
+                "```",
+                "{{[Style]}}",
+                "```",
+                "",
+                "## Cast summary",
+                "```",
+                "{{[Cast summary]}}",
+                "```",
+                "",
+                "{{#if (ne [Chunk index] \"1\")}}",
+                "## Previous chunks (for cross-chunk image-repetition check)",
+                "```",
+                "{{[Previous chunks merged]}}",
+                "```",
+                "",
+                "{{/if}}",
+                "## Prose (to check)",
+                "```",
+                "{{[Polish: structure & continuity]}}",
+                "```",
+                "",
+                "## What to look for",
+                "",
+                "This is the second of two polish passes. Structure and continuity were already checked by the previous pass — don't touch those. Here we look for **voice, style, and prose-texture problems**.",
+                "",
+                "- mismatches with the rules from the «Style» section above (POV, tense, rhythm, taboos). Severity 60–75;",
+                "- mismatches with character voices / personalities per the cast summary (a character speaks/thinks in someone else's voice). Severity 60;",
+                "{{#if (ne [Chunk index] \"1\")}}",
+                "- cross-chunk repetition of images, phrases, metaphors from previous chunks (the same light / sound / bodily-gesture image used twice). Severity 55;",
+                "{{/if}}",
+                "- clichés, voiceless phrasing, bureaucratese. Severity 55;",
+                "- in a two-character dialogue the voice patterns are identical — lines are indistinguishable without «said Anna» attribution. Severity 55.",
+                "",
+                "Severity 0–100 for each problem. **Do not propose fixes that increase or decrease the total prose length**: this pass changes the quality of the text, not its length."
+              ],
+              "aiUserInstructionsToFixProblems": [
+                "## Age rating of the work",
+                "",
+                "${ageRating}. The rewritten prose and the characters it mentions stay within the rating.",
+                "",
+                "## What to do",
+                "",
+                "Rewrite the chunk's prose, fixing the listed voice and style problems. Keep the `## Part N` heading as the first line. Edit surgically, do not rewrite the whole chunk. Structure (G/C/D, chunk mode, headings) and continuity (references to previous chunks, relationships, setups) — **don't touch them**, the first pass already checked those. Do **not** break long sentences into staccato unless that's an explicit rhythmic effect declared in «Style». Do **not** add new sensory details or new events — only rewrite what's already said so that the flagged problems disappear.",
+                "",
+                "**Self-check before output**: after editing, read the whole chunk straight through and make sure there are no two identical or nearly-identical sentences in a row (a typical regression in surgical editing — the rewritten line inserted next to the old one, original not deleted). If you find one, delete the duplicate before output.",
+                "",
+                "Output only the final chunk text (with the heading on the first line).",
+                "",
+                "## Style",
+                "```",
+                "{{[Style]}}",
+                "```",
+                "",
+                "## Cast summary",
+                "```",
+                "{{[Cast summary]}}",
+                "```",
+                "",
+                "## Prose after structural polish (old text)",
+                "```",
+                "{{[Polish: structure & continuity]}}",
+                "```",
+                "",
+                "## Found problems",
+                "```",
+                "{{[Found problems]}}",
+                "```"
+              ]
+            },
+            "inputs": [
+              {
+                "sourceNodeTitle": "Polish: structure & continuity",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Style",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Cast summary",
+                "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Previous chunks merged",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          },
+          {
+            "title": "Chunk output",
+            "type": "for-each-output",
+            "x": 2290,
+            "y": 395,
+            "inputs": [
+              {
+                "sourceNodeTitle": "Polish: voice & style",
+                "type": "text"
+              }
+            ],
+            "width": 200,
+            "height": 80
+          }
+        ]
+      },
+      {
+        "title": "Draft assembly",
+        "type": "merge",
+        "x": 7290,
+        "y": 1043,
+        "nodeTypeSettings": {
+          "includeNodeTitle": false,
+          "includeInputTitles": false,
+          "fixHeaders": false
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "Per-chunk loop",
+            "type": "textArray"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      }
+    ]
+  }
+}
