@@ -1,30 +1,33 @@
 #!/usr/bin/env tsx
 /**
- * Run regeneration for a single plan node inside a project sqlite.
+ * Run regeneration for a single plan node, or for an entire project.
  *
- * Wraps `regenerateTreeNodesContents(nodeId)` — the same path the UI's
- * "regenerate this node" button uses. Works for any node type the engine
- * knows how to regenerate (text/split/merge/fix-problems/for-each/lore);
- * not strictly LLM-only.
+ * Wraps `regenerateTreeNodesContents()` — the same path the UI uses. Works
+ * for any node type the engine knows how to regenerate (text/split/merge/
+ * fix-problems/for-each/lore); not strictly LLM-only.
  *
+ *   # single node by id:
  *   npx tsx scripts/regenerate-node.ts \
  *     --project "Письмо" \
  *     --node-id 28
  *
- *   # or by title:
+ *   # single node by title:
  *   npx tsx scripts/regenerate-node.ts \
  *     --project "Письмо" \
  *     --node-title "Проза чанка"
  *
- *   # optional: refuse to start if any incoming-edge source isn't ready
- *   #   (status not in {MANUAL, EMPTY, GENERATED}). Useful when you don't
- *   #   want to trigger a cascade — exit early instead.
+ *   # entire project (every node in topological order; OUTDATED gets re-run,
+ *   # GENERATED is skipped unless --regenerate-generated is set):
+ *   npx tsx scripts/regenerate-node.ts --project "Письмо" --all
+ *
+ *   # optional (single-node mode only): refuse to start if any incoming-edge
+ *   # source isn't ready (status not in {MANUAL, EMPTY, GENERATED}).
  *   npx tsx scripts/regenerate-node.ts ... --check-prereqs
  *
- * NOTE: regenerateTreeNodesContents propagates stale status across the
- * graph before running, so transitively-stale upstream nodes get DB-flagged
- * OUTDATED (no LLM calls — just a status write). The actual regeneration
- * runs only for the requested node.
+ * NOTE: in single-node mode, regenerateTreeNodesContents propagates stale
+ * status across the graph before running, so transitively-stale upstream
+ * nodes get DB-flagged OUTDATED (no LLM calls — just a status write). The
+ * actual regeneration runs only for the requested node.
  */
 import process from "node:process"
 import { Command, InvalidArgumentError } from "commander"
@@ -39,6 +42,7 @@ interface CliArgs {
   project: string
   nodeId?: number
   nodeTitle?: string
+  all: boolean
   checkPrereqs: boolean
   printContent: boolean
 }
@@ -52,30 +56,43 @@ function parsePositiveInt(value: string, name: string): number {
 function parseCli(): CliArgs {
   const program = new Command()
     .name("regenerate-node")
-    .description("Run regeneration for a single plan node inside a project sqlite.")
+    .description("Run regeneration for a single plan node, or for an entire project.")
     .requiredOption("--project <name-or-path>", "Project name (looked up in projects folder) or full path to .sqlite")
     .option("--node-id <id>", "Node ID (positive integer)", (v) => parsePositiveInt(v, "--node-id"))
     .option("--node-title <title>", "Node title (must be unique; use --node-id to disambiguate)")
     .option(
-      "--check-prereqs",
-      "Refuse to start if any incoming-edge source is not in {MANUAL, EMPTY, GENERATED}",
+      "--all",
+      "Regenerate every node in the project (topological order). Excludes --node-id/--node-title.",
       false,
     )
-    .option("--print-content", "Print the regenerated node content to stdout when done", false)
+    .option(
+      "--check-prereqs",
+      "Single-node mode only: refuse to start if any incoming-edge source is not in {MANUAL, EMPTY, GENERATED}",
+      false,
+    )
+    .option("--print-content", "Single-node mode only: print the regenerated node content to stdout when done", false)
     .parse()
   const opts = program.opts<{
     project: string
     nodeId?: number
     nodeTitle?: string
+    all: boolean
     checkPrereqs: boolean
     printContent: boolean
   }>()
-  if (!opts.nodeId && !opts.nodeTitle) program.error("Pass --node-id or --node-title")
-  if (opts.nodeId && opts.nodeTitle) program.error("Pass either --node-id or --node-title, not both.")
+  if (opts.all) {
+    if (opts.nodeId || opts.nodeTitle) program.error("--all cannot be combined with --node-id or --node-title.")
+    if (opts.checkPrereqs) program.error("--check-prereqs only applies in single-node mode.")
+    if (opts.printContent) program.error("--print-content only applies in single-node mode.")
+  } else {
+    if (!opts.nodeId && !opts.nodeTitle) program.error("Pass --node-id, --node-title, or --all.")
+    if (opts.nodeId && opts.nodeTitle) program.error("Pass either --node-id or --node-title, not both.")
+  }
   return {
     project: opts.project,
     nodeId: opts.nodeId,
     nodeTitle: opts.nodeTitle,
+    all: opts.all,
     checkPrereqs: opts.checkPrereqs,
     printContent: opts.printContent,
   }
@@ -123,6 +140,27 @@ async function main(): Promise<void> {
   const dbPath = resolveProjectPath(args.project)
   console.info(`Opening project: ${dbPath}`)
   setCurrentDbPath(dbPath)
+
+  if (args.all) {
+    const allBefore = new PlanNodeRepository().findAll()
+    const byStatus: Record<string, number> = {}
+    for (const n of allBefore) byStatus[n.status] = (byStatus[n.status] ?? 0) + 1
+    console.info(
+      `Whole-project regeneration: ${allBefore.length} nodes total — ${Object.entries(byStatus)
+        .map(([s, n]) => `${s}=${n}`)
+        .join(", ")}`,
+    )
+    await regenerateTreeNodesContents()
+    const allAfter = new PlanNodeRepository().findAll()
+    const byStatusAfter: Record<string, number> = {}
+    for (const n of allAfter) byStatusAfter[n.status] = (byStatusAfter[n.status] ?? 0) + 1
+    console.info(
+      `Done. Final status counts: ${Object.entries(byStatusAfter)
+        .map(([s, n]) => `${s}=${n}`)
+        .join(", ")}`,
+    )
+    return
+  }
 
   const service = new PlanNodeService()
   const nodeId = resolveNodeId(service, args)
