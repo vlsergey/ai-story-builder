@@ -14,7 +14,7 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     req: GenerateResponseRequest<GrokAiGenerationSettings>,
     onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
   ): Promise<string> {
-    const engineConfig = SettingsRepository.getAllAiEnginesConfig().grok ?? {}
+    const engineConfig = req.engineConfig ?? SettingsRepository.getAllAiEnginesConfig().grok ?? {}
 
     const apiKey = engineConfig.api_key?.trim()
     if (!apiKey) throw new Error("Grok api_key is required")
@@ -38,7 +38,10 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
     //   // userContent.push({ type: 'input_text', text: req.userPrompt })
     // }
 
-    const uuidV4PromptCacheKey = generateDeterministicV4(`${getCurrentDbPath()}/${req.promptCacheKeys.join("/")}`)
+    // No project sqlite during wizard-time advice calls; seed with a stable
+    // marker instead so xAI's cache key remains valid (UUID v4 shape).
+    const dbPathSeed = getCurrentDbPath() ?? "no-project"
+    const uuidV4PromptCacheKey = generateDeterministicV4(`${dbPathSeed}/${req.promptCacheKeys.join("/")}`)
 
     const requestParams: Omit<ResponseCreateParamsStreaming, "stream"> = {
       model: actualAiSettings.model,

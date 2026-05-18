@@ -11,7 +11,7 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
     req: GenerateResponseRequest<YandexAiGenerationSettings>,
     onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
   ): Promise<string> {
-    const engineConfig = SettingsRepository.getAllAiEnginesConfig().yandex ?? {}
+    const engineConfig = req.engineConfig ?? SettingsRepository.getAllAiEnginesConfig().yandex ?? {}
 
     const apiKey = engineConfig?.api_key?.trim()
     const folderId = engineConfig?.folder_id?.trim()

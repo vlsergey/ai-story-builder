@@ -50,6 +50,10 @@ export function generateAdvice(input: GenerateAdviceInput) {
           userPrompt,
           systemPrompt,
           aiGenerationSettings,
+          // Adapters normally pull api_key + defaults from SettingsRepository,
+          // which needs an open project sqlite. At wizard time the project
+          // doesn't exist yet — pass the config explicitly instead.
+          engineConfig: aiEngineConfig,
           promptCacheKeys: ["wizard-advice"],
           includeExistingLore: false,
           engineFileIds: [],

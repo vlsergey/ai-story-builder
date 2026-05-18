@@ -23,6 +23,13 @@ export interface GenerateResponseRequest<S extends AiGenerationSettings = AiGene
   engineFileIds: string[]
   /** AI settings specific to the engine (model, webSearch, maxTokens, etc.), including settings from current node or UI */
   aiGenerationSettings?: S
+  /**
+   * Per-call engine config override. When set, the adapter reads `api_key`,
+   * `defaultAiGenerationSettings`, `folder_id`, etc. from this object instead
+   * of calling `SettingsRepository`. Required for any call site that runs
+   * without an open project sqlite (wizard-time advice, etc.).
+   */
+  engineConfig?: AiEngineConfig<S>
   /** Routing keys (to increase cache hit) */
   promptCacheKeys: string[]
   /** When provided, adapters request structured JSON output; route emits partial_json SSE events. */
