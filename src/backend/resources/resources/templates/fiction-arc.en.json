@@ -75,7 +75,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. The world description and any characters mentioned must stay within rating.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## What to do",
           "",
@@ -116,7 +116,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. Theme statement — within rating.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## What to do",
           "",
@@ -150,7 +150,7 @@
         "aiUserInstructions": [
           "## Age rating (user-set)",
           "",
-          "${ageRating}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## What to do",
           "",
@@ -182,7 +182,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. Setting — within rating; locations and social institutions match the work's age bounds.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## What to do",
           "",
@@ -225,7 +225,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. Style rules — within rating (allowed vocabulary, taboos, degree of explicitness match the audience age).",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## Theme",
           "```",
@@ -264,7 +264,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. Character age bounds in the anchor sheet must match the rating: for 18+/NC-21 — all characters are adults (≥18); for 16+ — teens 16+ are allowed; for 12+ — characters 12+ are allowed; for PG/G — any age within a children's audience. If the rating is 18+/NC-21, explicitly write into the Content rules: «Every character in the work is ≥18 years old».",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## Genre and register",
           "```",
@@ -334,7 +334,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. The ages of all characters in the list are within rating: for 18+/NC-21 — ≥ 18; for 16+ — ≥ 16; for 12+ — ≥ 12; for PG/G — any within the children's / family audience. If the synopsis describes a young hero without an explicit age, set the rating minimum or older.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## What to do",
           "",
@@ -398,7 +398,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. Character voices — within rating (allowed vocabulary and register).",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## What to do",
           "",
@@ -498,7 +498,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. The split and any characters mentioned in it — within rating.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## What to do",
           "",
@@ -550,7 +550,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}. The age filter applies ONLY to human characters. For AIs, non-human beings, objects, ghosts, voices on the phone — age can be anything, including below the rating minimum, in years since activation, in arbitrary units, or «not applicable». For human characters: for 18+/NC-21 — ≥ 18; for 16+ — ≥ 16; for 12+ — ≥ 12; for PG/G — any age within the audience. If the input anchor sheet lists a human age below the rating minimum — raise it to the minimum and state that explicitly in the output.",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
               "",
               "## What to do",
               "",
@@ -671,7 +671,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Age rating",
                 "",
-                "${ageRating}. The character profile and the character itself — within rating. For 18+/NC-21 the character is an adult; 18+ themes are allowed. For PG/12+/16+ themes, vocabulary, and presentation match the declared age cap.",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
                 "",
                 "## What to look for",
                 "",
@@ -713,7 +713,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Age rating",
                 "",
-                "${ageRating}. The fixed profile and the character mentioned — within rating.",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
                 "",
                 "## What to do",
                 "",
@@ -809,7 +809,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. Scene plan and all characters mentioned in it — within rating. For 18+/NC-21 all characters are adults; 18+ themes are allowed. For PG/12+/16+ themes, conflicts and imagery match the declared age cap.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## Synopsis",
           "```",
@@ -923,7 +923,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating",
             "",
-            "${ageRating}. The plan being reviewed — within rating.",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
             "",
             "## Scene plan (to check)",
             "```",
@@ -945,7 +945,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating",
             "",
-            "${ageRating}. The rewritten plan — within rating.",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
             "",
             "## Scene plan",
             "```",
@@ -981,7 +981,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. The registry, scene plan and all characters mentioned — within rating. For 18+/NC-21 all characters are adults; 18+ themes are allowed. For PG/12+/16+ themes, conflicts and imagery match the declared age cap.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## Scene plan (structurally checked)",
           "```",
@@ -1046,7 +1046,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating",
             "",
-            "${ageRating}. The plan being reviewed and characters mentioned — within rating.",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
             "",
             "## Setup/payoff registry",
             "```",
@@ -1092,7 +1092,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating",
             "",
-            "${ageRating}. The rewritten plan and characters mentioned — within rating.",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
             "",
             "## Setup/payoff registry",
             "```",
@@ -1148,7 +1148,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}. The distribution and characters mentioned — within rating.",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
           "",
           "## Scene plan (input — single source of truth)",
           "```",
@@ -1276,7 +1276,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}. The chunk plan and all characters mentioned — within rating. For 18+/NC-21 all mentioned characters are adults; 18+ themes are allowed. For PG/12+/16+ themes and scenes match the age cap.",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
               "",
               "## Novella context",
               "",
@@ -1372,7 +1372,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}. Extracted details — within rating.",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
               "",
               "## What to do",
               "",
@@ -1449,7 +1449,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}. Director notes and characters mentioned — within rating.",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
               "",
               "## Style (for reference)",
               "```",
@@ -1539,7 +1539,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}. The chunk content and all its characters — within rating. For 18+/NC-21 all characters are adults; 18+ scenes are allowed. For PG/12+/16+ themes, vocabulary, and imagery match the declared age cap.",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
               "",
               "## Style",
               "```",
@@ -1700,7 +1700,7 @@
             "aiUserInstructions": [
               "## Age rating of the work",
               "",
-              "${ageRating}. The chunk's content and all referenced characters stay within the rating.",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
               "",
               "## Style",
               "```",
@@ -1790,7 +1790,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}. The prose under review and the characters it mentions stay within the rating.",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
                 "",
                 "## Setup/payoff registry",
                 "```",
@@ -1839,7 +1839,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}. The rewritten prose and the characters it mentions stay within the rating.",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
                 "",
                 "## What to do",
                 "",
@@ -1906,7 +1906,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}. The prose under review and the characters it mentions stay within the rating.",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
                 "",
                 "## Style",
                 "```",
@@ -1947,7 +1947,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}. The rewritten prose and the characters it mentions stay within the rating.",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
                 "",
                 "## What to do",
                 "",
