@@ -21,16 +21,22 @@ function systemTemplatesDir(): string {
   } catch {
     // No Electron context — fall through to dev location.
   }
-  // dev under tsup-bundled `dist/backend/`: templates at `./resources/templates`.
-  // dev under raw tsx (scripts/, tests): templates at the source-tree location
-  // `src/backend/resources/resources/templates/`, which is two levels up from
-  // this file's directory.
+  // Two dev layouts to support, both anchored at this file's compiled location:
+  // - tsup-bundled `dist/backend/projects/project-templates.js`: json files at
+  //   `dist/backend/resources/templates/` (one level up, then `resources/templates`).
+  // - raw tsx from `src/backend/projects/project-templates.ts`: json files at
+  //   `src/backend/resources/resources/templates/` (one level up, then
+  //   `resources/resources/templates`).
+  // Each candidate must contain at least one .json file — `fs.existsSync` alone
+  // can match a same-named empty folder (e.g. tsup may emit a leftover
+  // `resources/resources/templates/` with only compiled tests).
   const candidates = [
-    path.join(__dirname, "resources", "templates"),
+    path.join(__dirname, "..", "resources", "templates"),
     path.join(__dirname, "..", "resources", "resources", "templates"),
   ]
   for (const c of candidates) {
-    if (fs.existsSync(c)) return c
+    if (!fs.existsSync(c)) continue
+    if (fs.readdirSync(c).some((f) => f.endsWith(".json"))) return c
   }
   return candidates[0]
 }
