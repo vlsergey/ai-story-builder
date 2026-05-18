@@ -22,7 +22,7 @@
  * Iteration index is zero-based: pass 0 for the first iteration.
  */
 import process from "node:process"
-import { parseArgs } from "node:util"
+import { Command, InvalidArgumentError } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { PlanNodeRepository } from "../src/backend/plan/nodes/plan-node-repository.js"
 import { PlanNodeService } from "../src/backend/plan/nodes/plan-node-service.js"
@@ -36,46 +36,37 @@ interface CliArgs {
   iteration: number
 }
 
+function parseNonNegativeInt(value: string, name: string): number {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 0) throw new InvalidArgumentError(`${name} must be a non-negative integer`)
+  return n
+}
+
+function parsePositiveInt(value: string, name: string): number {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n <= 0) throw new InvalidArgumentError(`${name} must be a positive integer`)
+  return n
+}
+
 function parseCli(): CliArgs {
-  const { values } = parseArgs({
-    options: {
-      project: { type: "string" },
-      "node-id": { type: "string" },
-      "node-title": { type: "string" },
-      iteration: { type: "string" },
-    },
-  })
-  if (!values.project || (!values["node-id"] && !values["node-title"]) || values.iteration == null) {
-    process.stderr.write(
-      "usage: tsx scripts/switch-foreach-iteration.ts " +
-        "--project <name-or-path> " +
-        "(--node-id <n> | --node-title <title>) " +
-        "--iteration <0-based-index>\n",
+  const program = new Command()
+    .name("switch-foreach-iteration")
+    .description("Switch which iteration is currently mounted on a for-each container.")
+    .requiredOption("--project <name-or-path>", "Project name (looked up in projects folder) or full path to .sqlite")
+    .option("--node-id <id>", "For-each node ID (positive integer)", (v) => parsePositiveInt(v, "--node-id"))
+    .option("--node-title <title>", "For-each node title (must be unique; use --node-id to disambiguate)")
+    .requiredOption("--iteration <index>", "Zero-based iteration index to mount", (v) =>
+      parseNonNegativeInt(v, "--iteration"),
     )
-    process.exit(2)
-  }
-  if (values["node-id"] && values["node-title"]) {
-    process.stderr.write("Pass either --node-id or --node-title, not both.\n")
-    process.exit(2)
-  }
-  const iteration = Number(values.iteration)
-  if (!Number.isInteger(iteration) || iteration < 0) {
-    process.stderr.write("--iteration must be a non-negative integer\n")
-    process.exit(2)
-  }
-  let nodeId: number | undefined
-  if (values["node-id"]) {
-    nodeId = Number(values["node-id"])
-    if (!Number.isInteger(nodeId) || nodeId <= 0) {
-      process.stderr.write("--node-id must be a positive integer\n")
-      process.exit(2)
-    }
-  }
+    .parse()
+  const opts = program.opts<{ project: string; nodeId?: number; nodeTitle?: string; iteration: number }>()
+  if (!opts.nodeId && !opts.nodeTitle) program.error("Pass --node-id or --node-title")
+  if (opts.nodeId && opts.nodeTitle) program.error("Pass either --node-id or --node-title, not both.")
   return {
-    project: values.project as string,
-    nodeId,
-    nodeTitle: values["node-title"],
-    iteration,
+    project: opts.project,
+    nodeId: opts.nodeId,
+    nodeTitle: opts.nodeTitle,
+    iteration: opts.iteration,
   }
 }
 

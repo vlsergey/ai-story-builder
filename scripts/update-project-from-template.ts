@@ -21,8 +21,7 @@
  * 'deleted old + added new' to this tool — the old project node stays as an
  * orphan, the new one gets inserted. Handle that case manually.
  */
-import process from "node:process"
-import { parseArgs } from "node:util"
+import { Command } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { analyzeTemplateUpdate, applyTemplateUpdate } from "../src/backend/projects/template-update.js"
 import { resolveProjectPath } from "./lib/project-paths.js"
@@ -33,20 +32,13 @@ interface CliArgs {
 }
 
 function parseCli(): CliArgs {
-  const { values } = parseArgs({
-    options: {
-      project: { type: "string" },
-      "dry-run": { type: "boolean", default: false },
-    },
-  })
-  if (!values.project) {
-    process.stderr.write("usage: tsx scripts/update-project-from-template.ts --project <name-or-path> [--dry-run]\n")
-    process.exit(2)
-  }
-  return {
-    project: values.project,
-    dryRun: !!values["dry-run"],
-  }
+  const program = new Command()
+    .name("update-project-from-template")
+    .description("Update a project's plan graph from the template it was created from.")
+    .requiredOption("--project <name-or-path>", "Project name (looked up in projects folder) or full path to .sqlite")
+    .option("--dry-run", "Show what would change without modifying anything", false)
+    .parse()
+  return program.opts<CliArgs>()
 }
 
 function printAnalysis(analysis: ReturnType<typeof analyzeTemplateUpdate>): void {

@@ -2,7 +2,6 @@
 import fs from "node:fs"
 import path from "node:path"
 import process from "node:process"
-import { parseArgs } from "node:util"
 /**
  * Export a generated project's final result to a Markdown file inside the
  * project's folder (next to the .sqlite).
@@ -37,6 +36,7 @@ import { parseArgs } from "node:util"
  * caller.
  */
 import Database from "better-sqlite3"
+import { Command } from "commander"
 import { getProjectsFolder, resolveProjectPath } from "./lib/project-paths.js"
 
 interface CliArgs {
@@ -49,32 +49,17 @@ interface CliArgs {
 }
 
 function parseCli(): CliArgs {
-  const { values } = parseArgs({
-    options: {
-      project: { type: "string" },
-      template: { type: "string" },
-      genre: { type: "string" },
-      "final-node": { type: "string" },
-      language: { type: "string" },
-      output: { type: "string" },
-    },
-  })
-  if (!values.project || !values.template || !values.genre || !values["final-node"]) {
-    process.stderr.write(
-      "usage: tsx scripts/export-project-to-md.ts " +
-        '--project <name-or-path> --template <fiction-arc.ru.json> --genre <genre> --final-node "<plan-node title>" ' +
-        "[--language <code>] [--output <path>]\n",
-    )
-    process.exit(2)
-  }
-  return {
-    project: values.project,
-    template: values.template,
-    genre: values.genre,
-    finalNode: values["final-node"],
-    language: values.language,
-    output: values.output,
-  }
+  return new Command()
+    .name("export-project-to-md")
+    .description("Export a generated project's final result to a Markdown file inside the project's folder.")
+    .requiredOption("--project <name-or-path>", "Project name (looked up in projects folder) or full path to .sqlite")
+    .requiredOption("--template <filename>", "Template file used to generate the project (e.g. fiction-arc.ru.json)")
+    .requiredOption("--genre <genre>", "Genre tag to include in the output filename")
+    .requiredOption("--final-node <title>", "Title of the plan node that holds the finished assembled prose")
+    .option("--language <code>", "Language code (auto-detected from template filename when omitted)")
+    .option("--output <path>", "Override output path (defaults to next to the project .sqlite)")
+    .parse()
+    .opts<CliArgs>()
 }
 
 function readSettingJson(db: Database.Database, key: string): unknown {

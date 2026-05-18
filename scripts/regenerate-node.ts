@@ -27,7 +27,7 @@
  * runs only for the requested node.
  */
 import process from "node:process"
-import { parseArgs } from "node:util"
+import { Command, InvalidArgumentError } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { PlanEdgeRepository } from "../src/backend/plan/edges/plan-edge-repository.js"
 import { regenerateTreeNodesContents } from "../src/backend/plan/nodes/generate/regenerateTreeNodesContents.js"
@@ -43,43 +43,41 @@ interface CliArgs {
   printContent: boolean
 }
 
+function parsePositiveInt(value: string, name: string): number {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n <= 0) throw new InvalidArgumentError(`${name} must be a positive integer`)
+  return n
+}
+
 function parseCli(): CliArgs {
-  const { values } = parseArgs({
-    options: {
-      project: { type: "string" },
-      "node-id": { type: "string" },
-      "node-title": { type: "string" },
-      "check-prereqs": { type: "boolean", default: false },
-      "print-content": { type: "boolean", default: false },
-    },
-  })
-  if (!values.project || (!values["node-id"] && !values["node-title"])) {
-    process.stderr.write(
-      "usage: tsx scripts/regenerate-node.ts " +
-        "--project <name-or-path> " +
-        "(--node-id <n> | --node-title <title>) " +
-        "[--check-prereqs] [--print-content]\n",
+  const program = new Command()
+    .name("regenerate-node")
+    .description("Run regeneration for a single plan node inside a project sqlite.")
+    .requiredOption("--project <name-or-path>", "Project name (looked up in projects folder) or full path to .sqlite")
+    .option("--node-id <id>", "Node ID (positive integer)", (v) => parsePositiveInt(v, "--node-id"))
+    .option("--node-title <title>", "Node title (must be unique; use --node-id to disambiguate)")
+    .option(
+      "--check-prereqs",
+      "Refuse to start if any incoming-edge source is not in {MANUAL, EMPTY, GENERATED}",
+      false,
     )
-    process.exit(2)
-  }
-  if (values["node-id"] && values["node-title"]) {
-    process.stderr.write("Pass either --node-id or --node-title, not both.\n")
-    process.exit(2)
-  }
-  let nodeId: number | undefined
-  if (values["node-id"]) {
-    nodeId = Number(values["node-id"])
-    if (!Number.isInteger(nodeId) || nodeId <= 0) {
-      process.stderr.write("--node-id must be a positive integer\n")
-      process.exit(2)
-    }
-  }
+    .option("--print-content", "Print the regenerated node content to stdout when done", false)
+    .parse()
+  const opts = program.opts<{
+    project: string
+    nodeId?: number
+    nodeTitle?: string
+    checkPrereqs: boolean
+    printContent: boolean
+  }>()
+  if (!opts.nodeId && !opts.nodeTitle) program.error("Pass --node-id or --node-title")
+  if (opts.nodeId && opts.nodeTitle) program.error("Pass either --node-id or --node-title, not both.")
   return {
-    project: values.project as string,
-    nodeId,
-    nodeTitle: values["node-title"],
-    checkPrereqs: !!values["check-prereqs"],
-    printContent: !!values["print-content"],
+    project: opts.project,
+    nodeId: opts.nodeId,
+    nodeTitle: opts.nodeTitle,
+    checkPrereqs: opts.checkPrereqs,
+    printContent: opts.printContent,
   }
 }
 

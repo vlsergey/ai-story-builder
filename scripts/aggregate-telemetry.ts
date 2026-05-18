@@ -29,6 +29,7 @@ import { readFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import process from "node:process"
+import { Command, InvalidArgumentError } from "commander"
 
 interface CallRecord {
   ts: string
@@ -122,40 +123,52 @@ interface BucketStats {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
-function parseArgs(argv: string[]): {
+function parseDate(value: string): Date {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) throw new InvalidArgumentError(`bad date: ${value}`)
+  return d
+}
+
+function parseBucketKeys(value: string): BucketKey[] {
+  const parts = value.split(",").map((s) => s.trim()) as BucketKey[]
+  for (const p of parts) {
+    if (!ALLOWED_KEYS.includes(p)) {
+      throw new InvalidArgumentError(`unknown key: ${p} (allowed: ${ALLOWED_KEYS.join(",")})`)
+    }
+  }
+  return parts
+}
+
+function parseCli(): {
   engine?: string
   model?: string
   since?: Date
   by: BucketKey[]
-  asJson: boolean
+  json: boolean
   telemetry?: string
 } {
-  let engine: string | undefined
-  let model: string | undefined
-  let since: Date | undefined
-  let by: BucketKey[] = ["engine", "model", "purpose"]
-  let asJson = false
-  let telemetry: string | undefined
-
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]
-    if (a === "--engine") engine = argv[++i]
-    else if (a === "--model") model = argv[++i]
-    else if (a === "--since") {
-      const d = new Date(argv[++i])
-      if (Number.isNaN(d.getTime())) throw new Error(`bad --since date`)
-      since = d
-    } else if (a === "--by") {
-      const parts = argv[++i].split(",").map((s) => s.trim()) as BucketKey[]
-      for (const p of parts) {
-        if (!ALLOWED_KEYS.includes(p)) throw new Error(`unknown --by key: ${p} (allowed: ${ALLOWED_KEYS.join(",")})`)
-      }
-      by = parts
-    } else if (a === "--json") asJson = true
-    else if (a === "--telemetry") telemetry = argv[++i]
-    else throw new Error(`unknown option: ${a}`)
-  }
-  return { engine, model, since, by, asJson, telemetry }
+  return new Command()
+    .name("aggregate-telemetry")
+    .description("Aggregate local LLM-call telemetry into per-bucket medians (p50 / p90).")
+    .option("--engine <id>", "Filter to this engine (default: include all)")
+    .option("--model <name>", "Filter to this model (default: include all)")
+    .option("--since <iso>", "Only include records with ts >= this ISO date", parseDate)
+    .option("--by <keys>", `Aggregation keys, comma-separated. Allowed: ${ALLOWED_KEYS.join(", ")}`, parseBucketKeys, [
+      "engine",
+      "model",
+      "purpose",
+    ] as BucketKey[])
+    .option("--json", "Emit the aggregated buckets as JSON instead of a table", false)
+    .option("--telemetry <path>", "Override telemetry JSONL path")
+    .parse()
+    .opts<{
+      engine?: string
+      model?: string
+      since?: Date
+      by: BucketKey[]
+      json: boolean
+      telemetry?: string
+    }>()
 }
 
 function defaultTelemetryPath(): string {
@@ -442,7 +455,7 @@ function printTable(by: BucketKey[], buckets: BucketStats[]): void {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 function main(): void {
-  const opts = parseArgs(process.argv.slice(2))
+  const opts = parseCli()
   const telemetryPath = opts.telemetry ?? defaultTelemetryPath()
 
   let records: CallRecord[]
@@ -469,7 +482,7 @@ function main(): void {
 
   const buckets = aggregate(records, opts.by)
 
-  if (opts.asJson) {
+  if (opts.json) {
     console.log(JSON.stringify({ source: telemetryPath, records: records.length, by: opts.by, buckets }, null, 2))
     return
   }

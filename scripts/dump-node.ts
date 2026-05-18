@@ -36,7 +36,7 @@
  * when piping `> file.md`).
  */
 import process from "node:process"
-import { parseArgs } from "node:util"
+import { Command, InvalidArgumentError } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { PlanNodeRepository } from "../src/backend/plan/nodes/plan-node-repository.js"
 import type { PlanNodeRow } from "../src/shared/plan-graph.js"
@@ -79,74 +79,72 @@ interface FixContent {
   iterations?: FixIteration[]
 }
 
+function parsePositiveInt(value: string, name: string): number {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n <= 0) throw new InvalidArgumentError(`${name} must be a positive integer`)
+  return n
+}
+
+function parseNonNegativeInt(value: string, name: string): number {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 0) throw new InvalidArgumentError(`${name} must be a non-negative integer`)
+  return n
+}
+
+function parseFormat(value: string): Format {
+  if (value !== "raw" && value !== "fix-problems") {
+    throw new InvalidArgumentError("must be 'raw' or 'fix-problems'")
+  }
+  return value
+}
+
 function parseCli(): CliArgs {
-  const { values } = parseArgs({
-    options: {
-      project: { type: "string", multiple: true },
-      projects: { type: "string" },
-      "node-id": { type: "string" },
-      "node-title": { type: "string" },
-      iteration: { type: "string" },
-      "all-iterations": { type: "boolean", default: false },
-      format: { type: "string", default: "raw" },
-      summary: { type: "boolean", default: false },
-      quiet: { type: "boolean", default: false },
-    },
-  })
+  const program = new Command()
+    .name("dump-node")
+    .description("Print a plan node's stored content from one or more project sqlites to stdout.")
+    .option("--project <name-or-path...>", "Project name or path; pass flag multiple times for multiple projects")
+    .option("--projects <a,b,c>", "Comma-separated list of project names (alternative to repeating --project)")
+    .option("--node-id <id>", "Node ID (positive integer)", (v) => parsePositiveInt(v, "--node-id"))
+    .option("--node-title <title>", "Node title (must be unique; use --node-id to disambiguate)")
+    .option("--iteration <index>", "Zero-based iteration index of a for-each-internal node", (v) =>
+      parseNonNegativeInt(v, "--iteration"),
+    )
+    .option("--all-iterations", "Walk every iteration of a for-each-internal node", false)
+    .option("--format <kind>", "Output rendering: raw | fix-problems", parseFormat, "raw" as Format)
+    .option("--summary", "Print a one-line size + status summary instead of the full content", false)
+    .option("--quiet", "Suppress the project/node header (useful when piping to a file)", false)
+    .parse()
+  const opts = program.opts<{
+    project?: string[]
+    projects?: string
+    nodeId?: number
+    nodeTitle?: string
+    iteration?: number
+    allIterations: boolean
+    format: Format
+    summary: boolean
+    quiet: boolean
+  }>()
   const projects: string[] = []
-  for (const p of (values.project as string[] | undefined) ?? []) projects.push(p)
-  if (values.projects) {
-    for (const p of values.projects.split(",")) {
+  for (const p of opts.project ?? []) projects.push(p)
+  if (opts.projects) {
+    for (const p of opts.projects.split(",")) {
       const t = p.trim()
       if (t) projects.push(t)
     }
   }
-  if (projects.length === 0 || (!values["node-id"] && !values["node-title"])) {
-    process.stderr.write(
-      "usage: tsx scripts/dump-node.ts " +
-        "(--project <name>… | --projects <a,b,c>) " +
-        "(--node-id <n> | --node-title <title>) " +
-        "[--iteration <i> | --all-iterations] " +
-        "[--format raw|fix-problems] " +
-        "[--summary] " +
-        "[--quiet]\n",
-    )
-    process.exit(2)
-  }
-  if (values["node-id"] && values["node-title"]) {
-    process.stderr.write("Pass either --node-id or --node-title, not both.\n")
-    process.exit(2)
-  }
-  let nodeId: number | undefined
-  if (values["node-id"]) {
-    nodeId = Number(values["node-id"])
-    if (!Number.isInteger(nodeId) || nodeId <= 0) {
-      process.stderr.write("--node-id must be a positive integer\n")
-      process.exit(2)
-    }
-  }
-  let iteration: number | undefined
-  if (values.iteration != null) {
-    iteration = Number(values.iteration)
-    if (!Number.isInteger(iteration) || iteration < 0) {
-      process.stderr.write("--iteration must be a non-negative integer\n")
-      process.exit(2)
-    }
-  }
-  const format = values.format as Format
-  if (format !== "raw" && format !== "fix-problems") {
-    process.stderr.write(`--format must be 'raw' or 'fix-problems' (got ${JSON.stringify(values.format)})\n`)
-    process.exit(2)
-  }
+  if (projects.length === 0) program.error("Pass --project (one or more) or --projects <a,b,c>")
+  if (!opts.nodeId && !opts.nodeTitle) program.error("Pass --node-id or --node-title")
+  if (opts.nodeId && opts.nodeTitle) program.error("Pass either --node-id or --node-title, not both.")
   return {
     projects,
-    nodeId,
-    nodeTitle: values["node-title"],
-    iteration,
-    allIterations: !!values["all-iterations"],
-    format,
-    summary: !!values.summary,
-    quiet: !!values.quiet,
+    nodeId: opts.nodeId,
+    nodeTitle: opts.nodeTitle,
+    iteration: opts.iteration,
+    allIterations: opts.allIterations,
+    format: opts.format,
+    summary: opts.summary,
+    quiet: opts.quiet,
   }
 }
 

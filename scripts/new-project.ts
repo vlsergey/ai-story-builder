@@ -22,7 +22,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import process from "node:process"
-import { parseArgs } from "node:util"
+import { Command, InvalidArgumentError } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { createProject } from "../src/backend/projects/create-project.js"
 import { applyProjectSettings, getProjectSettings } from "../src/backend/projects/project-settings.js"
@@ -39,42 +39,40 @@ interface CliArgs {
   wizardKv: Record<string, string>
 }
 
+function collectWizardKv(value: string, previous: Record<string, string>): Record<string, string> {
+  const eq = value.indexOf("=")
+  if (eq <= 0) throw new InvalidArgumentError(`--wizard must be key=value, got: ${value}`)
+  return { ...previous, [value.slice(0, eq)]: value.slice(eq + 1) }
+}
+
 function parseCli(): CliArgs {
-  const { values } = parseArgs({
-    options: {
-      name: { type: "string" },
-      template: { type: "string" },
-      "copy-settings-from": { type: "string" },
-      "wizard-file": { type: "string" },
-      wizard: { type: "string", multiple: true },
-    },
-  })
-  if (!values.name || !values.template) {
-    process.stderr.write(
-      "usage: tsx scripts/new-project.ts " +
-        "--name <project-name> " +
-        "--template <template-file> " +
-        "[--copy-settings-from <project-name-or-path>] " +
-        "[--wizard-file <kv.json>] " +
-        "[--wizard key=value]…\n",
+  const program = new Command()
+    .name("new-project")
+    .description("Create a new project file from a template, with AI settings copied from an existing project.")
+    .requiredOption("--name <project-name>", "New project name (becomes <name>.sqlite in the projects folder)")
+    .requiredOption("--template <filename>", "Template filename (e.g. fiction-arc.ru.json) or full path")
+    .option("--copy-settings-from <name-or-path>", "Copy AI settings (engine, model, params) from this project")
+    .option("--wizard-file <kv.json>", "JSON object of wizard field → value")
+    .option(
+      "--wizard <key=value>",
+      "Single wizard field override; pass flag multiple times. CLI overrides win over --wizard-file.",
+      collectWizardKv,
+      {} as Record<string, string>,
     )
-    process.exit(2)
-  }
-  const wizardKv: Record<string, string> = {}
-  for (const item of values.wizard ?? []) {
-    const eq = item.indexOf("=")
-    if (eq <= 0) {
-      process.stderr.write(`--wizard must be key=value, got: ${item}\n`)
-      process.exit(2)
-    }
-    wizardKv[item.slice(0, eq)] = item.slice(eq + 1)
-  }
+    .parse()
+  const opts = program.opts<{
+    name: string
+    template: string
+    copySettingsFrom?: string
+    wizardFile?: string
+    wizard: Record<string, string>
+  }>()
   return {
-    name: values.name,
-    template: values.template,
-    copySettingsFrom: values["copy-settings-from"],
-    wizardFile: values["wizard-file"],
-    wizardKv,
+    name: opts.name,
+    template: opts.template,
+    copySettingsFrom: opts.copySettingsFrom,
+    wizardFile: opts.wizardFile,
+    wizardKv: opts.wizard,
   }
 }
 
