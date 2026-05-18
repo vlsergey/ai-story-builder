@@ -1,4 +1,5 @@
 {
+  "advice.engine-not-configured": "Configure an AI engine on the earlier wizard step to enable advice.",
   "ai-select.page-title": "Select AI",
   "ai-settings.page-title": "AI Settings",
   "confirm.page-title": "Confirm",

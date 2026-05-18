@@ -50,7 +50,20 @@ export interface WizardIntegerField extends BaseWizardField {
   defaultValue?: number
 }
 
-export type WizardField = WizardInputField | WizardTextAreaField | WizardSelectAgeRatingField | WizardIntegerField
+export interface WizardAdviceField extends BaseWizardField {
+  type: "advice"
+  buttonLabel: string
+  placeholder?: string
+  prompt: string[]
+  systemPrompt?: string[]
+}
+
+export type WizardField =
+  | WizardInputField
+  | WizardTextAreaField
+  | WizardSelectAgeRatingField
+  | WizardIntegerField
+  | WizardAdviceField
 
 export interface TemplateProjectLore {
   nodes: TemplateProjectLoreNode[]

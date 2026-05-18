@@ -1,4 +1,5 @@
 {
+  "advice.engine-not-configured": "Чтобы получить совет, настройте ИИ-движок на предыдущей странице мастера.",
   "ai-select.page-title": "Выбор ИИ",
   "ai-settings.page-title": "Настройки ИИ",
   "confirm.page-title": "Подтверждение",

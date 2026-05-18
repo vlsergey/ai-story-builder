@@ -27,6 +27,12 @@ export function buildFormSchema(wizardFields: WizardField[]): ZodObject<Record<s
         case "integer":
           result = z.coerce.number().int().min(field.min).max(field.max)
           break
+        case "advice":
+          // Read-only LLM advice display. Doesn't carry user input the rest of
+          // the wizard needs, but we keep it in the form so the value survives
+          // round-trips through react-hook-form's controlled state.
+          result = z.string().optional()
+          break
       }
       return [field.name, result]
     }),

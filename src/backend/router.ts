@@ -32,6 +32,7 @@ import { buildProjectRoutes } from "./projects/projects-routes.js"
 import { getAiBilling } from "./routes/ai-billing.js"
 import { testEngineConnection } from "./routes/ai-config.js"
 import { syncLore } from "./routes/ai-sync.js"
+import { type GenerateAdviceInput, generateAdvice } from "./routes/generate-advice.js"
 import { settingsRoutes } from "./settings/settings-routes.js"
 
 const t = initTRPC.create({
@@ -65,6 +66,12 @@ export const appRouter = t.router({
       .input((val: unknown) => val as { engineId: AiEngineKey; aiEngineConfig: AiEngineConfig })
       .mutation(({ input }) => testEngineConnection(input.engineId, input.aiEngineConfig)),
     syncLore: t.procedure.mutation(() => syncLore()),
+    // Wizard-time advice call: no project sqlite is open yet, so engine,
+    // config, prompt template and current wizard field values all come over
+    // the wire from the frontend in one shot.
+    generateAdvice: t.procedure
+      .input((val: unknown) => val as GenerateAdviceInput)
+      .subscription(({ input }) => generateAdvice(input)),
   }),
 
   project: buildProjectRoutes(t),

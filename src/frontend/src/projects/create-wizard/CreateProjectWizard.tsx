@@ -148,6 +148,7 @@ function CreateProjectWizardImpl<FieldNames extends string>({
           onNext={stepper.navigation.next}
           values={templateData}
           onChange={setTemplateData}
+          settings={settings}
         />
       )
     }

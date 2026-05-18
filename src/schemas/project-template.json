@@ -78,12 +78,34 @@
       "required": ["type", "min", "max"],
       "unevaluatedProperties": false
     },
+    "WizardAdviceField": {
+      "description": "Read-only field that asks the configured LLM for a recommendation based on prior wizard values. The user clicks `buttonLabel`; the prompt (Handlebars over wizard field values) is sent to whichever engine the user picked on the AI-select page. Streams reasoning + answer back live. Only visible when an engine is configured.",
+      "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
+      "properties": {
+        "type": { "const": "advice" },
+        "buttonLabel": { "type": "string" },
+        "placeholder": { "type": "string" },
+        "prompt": {
+          "description": "User-prompt template lines. Joined with newlines and rendered as Handlebars against the current wizard field values (use `{{fieldName}}`, no brackets needed since field names are plain identifiers).",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "systemPrompt": {
+          "description": "Optional system-prompt template lines. Same Handlebars context as `prompt`.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["type", "buttonLabel", "prompt"],
+      "unevaluatedProperties": false
+    },
     "WizardField": {
       "oneOf": [
         { "$ref": "#/definitions/WizardInputField" },
         { "$ref": "#/definitions/WizardTextAreaField" },
         { "$ref": "#/definitions/WizardSelectAgeRatingField" },
-        { "$ref": "#/definitions/WizardIntegerField" }
+        { "$ref": "#/definitions/WizardIntegerField" },
+        { "$ref": "#/definitions/WizardAdviceField" }
       ]
     },
     "TemplateProjectLore": {

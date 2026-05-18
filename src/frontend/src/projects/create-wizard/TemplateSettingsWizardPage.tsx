@@ -14,16 +14,19 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { AGE_RATING_INFO, AGE_RATING_ORDER } from "@shared/ai-engines"
 import type { WizardField, WizardPage } from "@shared/project-template"
 import { buildFormSchema } from "@shared/project-template-form"
-import { useCallback, useId, type ReactElement, type SetStateAction } from "react"
+import type { SettingsTypes } from "@shared/settings"
+import { useCallback, useId, useMemo, type ReactElement, type SetStateAction } from "react"
 import { useTranslation } from "react-i18next"
 import {
   Controller,
   useForm,
+  useWatch,
   type ControllerFieldState,
   type ControllerRenderProps,
   type FieldPath,
   type FieldValues,
 } from "react-hook-form"
+import AdviceField from "./AdviceField"
 
 interface TemplateSettingsWizardPageProps<T extends string, R extends Record<T, any>> {
   formId: string
@@ -35,6 +38,9 @@ interface TemplateSettingsWizardPageProps<T extends string, R extends Record<T, 
       name: T
     })[]
   }
+  /** AI engine + config the user picked on earlier wizard pages. Forwarded to
+   *  any `advice`-type fields so they can call the LLM without a project DB. */
+  settings: Partial<SettingsTypes> | undefined
 }
 
 export default function TemplateSettingsWizardPage<T extends string, R extends Record<T, any>>({
@@ -43,6 +49,7 @@ export default function TemplateSettingsWizardPage<T extends string, R extends R
   onNext,
   values,
   wizardPage,
+  settings,
 }: TemplateSettingsWizardPageProps<T, R>) {
   const formSchema = buildFormSchema(wizardPage.fields)
 
@@ -69,6 +76,21 @@ export default function TemplateSettingsWizardPage<T extends string, R extends R
     [onChange, onNext],
   )
 
+  // Combine the values from previous pages (`values`) with this page's current
+  // form state so advice prompts can reference fields filled earlier (e.g.
+  // synopsis on page 1, chunksCount + advice on page 2).
+  const liveFields = useWatch({ control: form.control })
+  const adviceContext = useMemo(() => {
+    const merged: Record<string, string> = {}
+    for (const [k, v] of Object.entries(values as Record<string, unknown>)) {
+      if (v != null) merged[k] = String(v)
+    }
+    for (const [k, v] of Object.entries(liveFields)) {
+      if (v != null) merged[k] = String(v)
+    }
+    return merged
+  }, [values, liveFields])
+
   return (
     <form id={formId} onSubmit={form.handleSubmit(afterSubmit)}>
       <FieldGroup>
@@ -79,7 +101,13 @@ export default function TemplateSettingsWizardPage<T extends string, R extends R
               name={wizardField.name as any}
               control={form.control}
               render={({ field, fieldState }) => (
-                <ControllableWizardFieldRenderer<R> wizardField={wizardField} field={field} fieldState={fieldState} />
+                <ControllableWizardFieldRenderer<R>
+                  wizardField={wizardField}
+                  field={field}
+                  fieldState={fieldState}
+                  settings={settings}
+                  adviceContext={adviceContext}
+                />
               )}
             />
           ))}
@@ -96,12 +124,16 @@ interface ControllableWizardFieldRendererProps<
   field: ControllerRenderProps<TFieldValues, TName>
   fieldState: ControllerFieldState
   wizardField: WizardField
+  settings: Partial<SettingsTypes> | undefined
+  adviceContext: Record<string, string>
 }
 
 function ControllableWizardFieldRenderer<T extends FieldValues>({
   field,
   fieldState,
   wizardField,
+  settings,
+  adviceContext,
 }: ControllableWizardFieldRendererProps<T>): ReactElement {
   const htmlId = useId()
   const { t } = useTranslation("ai-engines")
@@ -146,6 +178,17 @@ function ControllableWizardFieldRenderer<T extends FieldValues>({
           value={field.value ?? wizardField.defaultValue ?? wizardField.min}
           onChange={(e) => field.onChange(Number(e.target.value))}
           onBlur={field.onBlur}
+        />
+      )}
+      {wizardField.type === "advice" && (
+        <AdviceField
+          wizardField={wizardField}
+          htmlId={htmlId}
+          engineId={settings?.currentBackend ?? null}
+          aiEngineConfig={
+            settings?.currentBackend ? settings?.allAiEnginesConfig?.[settings.currentBackend] : undefined
+          }
+          wizardData={adviceContext}
         />
       )}
       {wizardField.type === "select-age-rating" && (

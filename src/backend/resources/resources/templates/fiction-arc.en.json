@@ -34,6 +34,24 @@
           "defaultValue": 20,
           "label": "Prose chunks count",
           "description": "How many LLM calls to spend on prose. One call ≈ 1500 words — the novella is cut into N pieces and reassembled. The template picks the number of scenes from the synopsis. ~30k words = ~20 chunks."
+        },
+        {
+          "name": "chunksCountAdvice",
+          "type": "advice",
+          "label": "LLM advice on length",
+          "description": "If the synopsis is already filled in, ask the configured engine what number of chunks fits the story best.",
+          "buttonLabel": "Ask for advice",
+          "placeholder": "The LLM's chunk-count recommendation will appear here.",
+          "prompt": [
+            "Age rating: {{ageRating}}.",
+            "",
+            "Synopsis of the upcoming work:",
+            "```",
+            "{{synopsis}}",
+            "```",
+            "",
+            "Based on the synopsis, suggest the best number of chunks for this work, given that each chunk is 1000–1500 words. Give 3 options (minimal, optimal, extended) with a concrete chunk count for each, and explain why. List the options briefly first (one line each), then the reasoning. In English."
+          ]
         }
       ]
     }
