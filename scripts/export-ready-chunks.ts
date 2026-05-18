@@ -59,18 +59,48 @@ interface ForEachContent {
   overrides?: Array<Record<string, OverrideSlot>>
 }
 
+interface FixProblemsIteration {
+  fixProblemsResult?: string
+}
+interface FixProblemsContent {
+  iterations?: FixProblemsIteration[]
+}
+
+/**
+ * fix-problems nodes store a JSON `{iterations:[{input, findProblemsResult,
+ * fixProblemsResult}, …]}` in their content column. The final polished prose
+ * is the last iteration's `fixProblemsResult`. Plain `text` nodes store the
+ * prose directly. Try fix-problems shape first; fall back to raw content.
+ */
+function extractProse(raw: string): string {
+  if (!raw.trim().startsWith("{")) return raw
+  try {
+    const parsed = JSON.parse(raw) as FixProblemsContent
+    const iters = parsed.iterations
+    if (Array.isArray(iters) && iters.length > 0) {
+      for (let i = iters.length - 1; i >= 0; i--) {
+        const r = iters[i]?.fixProblemsResult
+        if (typeof r === "string" && r.trim().length > 0) return r
+      }
+    }
+  } catch {
+    // not JSON — fall through and return as-is
+  }
+  return raw
+}
+
 function main(): void {
   const args = parseCli()
   const dbPath = resolveProjectPath(args.project)
   const db = new Database(dbPath, { readonly: true })
   try {
-    const containerRow = db
-      .prepare("SELECT id, content FROM plan_nodes WHERE title = ?")
-      .get(args.forEach) as { id: number; content: string | null } | undefined
+    const containerRow = db.prepare("SELECT id, content FROM plan_nodes WHERE title = ?").get(args.forEach) as
+      | { id: number; content: string | null }
+      | undefined
     if (!containerRow) throw new Error(`for-each container '${args.forEach}' not found`)
-    const polishRow = db
-      .prepare("SELECT id, status, content FROM plan_nodes WHERE title = ?")
-      .get(args.polishNode) as { id: number; status: string; content: string | null } | undefined
+    const polishRow = db.prepare("SELECT id, status, content FROM plan_nodes WHERE title = ?").get(args.polishNode) as
+      | { id: number; status: string; content: string | null }
+      | undefined
     if (!polishRow) throw new Error(`polish node '${args.polishNode}' not found`)
 
     const parsed = JSON.parse(containerRow.content || "{}") as ForEachContent
@@ -92,7 +122,7 @@ function main(): void {
         content = slot?.content ?? ""
       }
       if (status === "GENERATED" && content.trim().length > 0) {
-        parts.push(content.trim())
+        parts.push(extractProse(content).trim())
         readyCount++
       } else {
         parts.push(`## Часть ${i + 1} — ${status}`)
