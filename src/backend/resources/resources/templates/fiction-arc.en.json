@@ -19,7 +19,13 @@
           "label": "Story synopsis",
           "description": "Describe the story freely: what it is about, who the characters are, what happens, what matters for atmosphere. The template derives theme, style, characters and plot outline itself.",
           "placeholder": "A young cartographer finds a map that shouldn't exist..."
-        },
+        }
+      ]
+    },
+    {
+      "id": "chunks-count",
+      "title": "Prose budget",
+      "fields": [
         {
           "name": "chunksCount",
           "type": "integer",
