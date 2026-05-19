@@ -1,9 +1,12 @@
 import type { AiEngineConfig } from "@shared/ai-engine-config.js"
 import type OpenAI from "openai"
+import type { ResponseCreateParamsStreaming, Tool } from "openai/resources/responses/responses.js"
 import type { YandexAiGenerationSettings } from "../../shared/yandex-ai-generation-settings.js"
 import type { AiEngineAdapter, GenerateResponseRequest } from "../ai/ai-engine-adapter.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
+import { isVerboseLogging } from "./ai-logging.js"
+import lastAiGenerationEventManager from "./last-ai-generation-event-manager.js"
 import { createYandexClient } from "./yandex-client.js"
 
 export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings> {
@@ -25,53 +28,85 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
     const model = actualAiSettings.model || `gpt://${folderId}/yandexgpt/latest`
     const client = createYandexClient(apiKey, folderId)
 
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []
-    if (req.systemPrompt) {
-      messages.push({ role: "system", content: req.systemPrompt })
-    }
-    if (req.userPrompt) {
-      messages.push({ role: "user", content: req.userPrompt })
-    }
-
-    const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+    // Use Yandex's Responses API (POST /v1/responses) — same shape as
+    // OpenAI/Grok. Their chat.completions endpoint accepts only
+    // `type: "function"` tools (no web_search / file_search there), so we
+    // route through Responses where the native built-in tools work.
+    // Docs: https://aistudio.yandex.ru/docs/ru/ai-studio/responses/createResponse.html
+    const requestParams: Omit<ResponseCreateParamsStreaming, "stream"> = {
       model,
-      messages,
-      ...(actualAiSettings.maxTokens != null ? { max_tokens: actualAiSettings.maxTokens } : {}),
+      instructions: req.systemPrompt ?? "",
+      input: req.userPrompt || "",
       ...(actualAiSettings.maxCompletionTokens != null
-        ? { max_completion_tokens: actualAiSettings.maxCompletionTokens }
+        ? { max_output_tokens: actualAiSettings.maxCompletionTokens }
         : {}),
     }
 
+    const tools: Array<Tool> = []
+    if (actualAiSettings.webSearch && actualAiSettings.webSearch !== "none") {
+      tools.push({
+        type: "web_search",
+        search_context_size: actualAiSettings.webSearch,
+      } as unknown as Tool)
+    }
+    if (req.includeExistingLore) {
+      const searchIndexId = engineConfig?.search_index_id
+      if (searchIndexId) {
+        tools.push({
+          type: "file_search",
+          vector_store_ids: [searchIndexId],
+        } as unknown as Tool)
+      }
+    }
+    if (tools.length > 0) {
+      requestParams.tools = tools
+    }
+
     if (req.responseSchema && req.stringFormat !== false) {
-      ;(requestParams as unknown as Record<string, unknown>).response_format = {
-        type: "json_schema",
-        json_schema: {
+      requestParams.text = {
+        format: {
+          type: "json_schema",
           name: req.responseSchema.name,
-          schema: req.responseSchema.schema,
+          ...(req.responseSchema.description ? { description: req.responseSchema.description } : {}),
           strict: true,
+          schema: req.responseSchema.schema,
         },
       }
     }
 
-    // Yandex's OpenAI-compatible chat.completions endpoint accepts only
-    // `type: "function"` in the tools array — its API errors with
-    // `unknown variant 'web_search', expected 'function'` on the OpenAI
-    // Assistant-API tool shapes. Web search and search-index live on Yandex's
-    // native endpoints (Generative Search Tool, Search Index Tool), not as
-    // chat-completions tools. So we silently drop those tool requests with a
-    // warning; users keep the engine setting but it's a no-op until we wire
-    // up the native paths.
-    if (req.includeExistingLore) {
-      console.warn(
-        "[yandex] file_search / lore attachment is not supported via the OpenAI-compatible chat endpoint — skipping",
-      )
-    }
-    if (actualAiSettings.webSearch && actualAiSettings.webSearch !== "none") {
-      console.warn("[yandex] web_search is not supported via the OpenAI-compatible chat endpoint — skipping")
+    const stream = await client.responses.create(
+      { ...requestParams, stream: true } satisfies ResponseCreateParamsStreaming,
+      { signal: req.abortSignal },
+    )
+
+    let text = ""
+    for await (const event of stream) {
+      if (isVerboseLogging()) {
+        const { type, ...rest } = event as any
+        console.log(`[Yandex] SSE ${type} ${JSON.stringify(rest)}`)
+      }
+      onEvent?.(event)
+
+      switch (event.type) {
+        case "response.output_text.delta":
+          text += event.delta
+          break
+        case "response.completed":
+          lastAiGenerationEventManager.onAiGenerationEvent({ ...event.response?.usage })
+          break
+        case "response.failed":
+          throw new Error(
+            `Yandex response failed: ${JSON.stringify((event.response as { error?: unknown }).error ?? {})}`,
+          )
+        case "response.incomplete":
+          throw new Error(
+            "[Yandex] response incomplete: " +
+              JSON.stringify((event.response as { incomplete_details?: unknown }).incomplete_details ?? {}),
+          )
+      }
     }
 
-    const completion = await client.chat.completions.create(requestParams)
-    return completion.choices[0]?.message?.content ?? ""
+    return text
   }
 
   async testConnectivity(
