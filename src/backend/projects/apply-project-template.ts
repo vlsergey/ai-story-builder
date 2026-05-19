@@ -1,4 +1,3 @@
-import { Parser } from "expr-eval"
 import type {
   ProjectTemplate,
   TemplateProjectLoreNode,
@@ -9,35 +8,34 @@ import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 
 const PLAIN_IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/
-const EXPR_PARSER = new Parser()
 
 /**
- * Join all template lines into single line with line breaks (concatenate with \n)
- * and replace `${...}` templates with values from wizard data.
+ * Join all template lines into a single string and replace each `${ident}`
+ * with the corresponding wizard-data value. Apply-time substitution.
  *
- * Two flavors of `${...}`:
- * - Bare identifier (`${ageRating}`) — looked up directly in templateData.
- *   Falsy values substitute as empty string (existing convention; keeps backward
- *   compatibility for `defaultValue ?? ""` semantics in old templates).
- * - Expression (anything else — has operators, parens, function calls, digits):
- *   evaluated by expr-eval with templateData as the variable scope. Functions
- *   available: round / floor / ceil / min / max / abs / pow. Result is coerced
- *   to string. Use this for formulas keyed off slider values, e.g.
- *   `${round(1400/partsCount)}`.
+ * Only bare identifiers are supported — arithmetic and function calls live
+ * on the LLM-call side via Handlebars math helpers (`{{max ...}}`,
+ * `{{ceil ...}}`, `{{divide ...}}`, …), so templates can compose formulas
+ * over already-substituted literals, e.g.
+ *
+ *   `{{max 3 (ceil (divide ${chunksCount} 2))}}`
+ *
+ * ⟶ after this pass: `{{max 3 (ceil (divide 20 2))}}`
+ * ⟶ after Handlebars at LLM-call time: `10`
+ *
+ * A missing or falsy lookup substitutes as empty string (legacy convention
+ * for older templates that used `${optionalVar}` as an optional slot).
  */
 export function normalizeAndReplaceContent(templateValue: string[], templateData: Record<string, any>) {
   return templateValue.join("\n").replace(/\${([^}]+)}/g, (_match, expr: string) => {
     const trimmed = expr.trim()
-    if (PLAIN_IDENT_RE.test(trimmed)) {
-      return templateData[trimmed] || ""
-    }
-    try {
-      const result = EXPR_PARSER.parse(trimmed).evaluate(templateData)
-      return String(result)
-    } catch (err) {
-      console.warn(`[template] failed to evaluate \${${trimmed}}: ${(err as Error).message}`)
+    if (!PLAIN_IDENT_RE.test(trimmed)) {
+      console.warn(
+        `[template] $\{${trimmed}} is not a bare identifier — arithmetic must use Handlebars helpers (e.g. {{max 3 (ceil (divide \${chunksCount} 2))}}) — substituting empty string`,
+      )
       return ""
     }
+    return templateData[trimmed] || ""
   })
 }
 

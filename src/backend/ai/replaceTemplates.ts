@@ -73,6 +73,27 @@ handlebarsInstance.registerHelper("matches", (input: unknown, pattern: unknown, 
   }
 })
 
+// Math helpers — minimal set, expand as templates need more. After
+// apply-time `${var}` substitution leaves literal numbers in the prompt,
+// these helpers do the actual arithmetic at LLM-call time.
+// Subexpression form (Handlebars-native prefix):
+//   {{max 3 (ceil (divide 20 2))}}  ⟹  10
+function toNum(v: unknown): number {
+  const n = typeof v === "number" ? v : Number(v)
+  if (!Number.isFinite(n)) throw new Error(`expected number, got: ${JSON.stringify(v)}`)
+  return n
+}
+handlebarsInstance.registerHelper("add", (a: unknown, b: unknown) => toNum(a) + toNum(b))
+handlebarsInstance.registerHelper("subtract", (a: unknown, b: unknown) => toNum(a) - toNum(b))
+handlebarsInstance.registerHelper("multiply", (a: unknown, b: unknown) => toNum(a) * toNum(b))
+handlebarsInstance.registerHelper("divide", (a: unknown, b: unknown) => toNum(a) / toNum(b))
+handlebarsInstance.registerHelper("ceil", (a: unknown) => Math.ceil(toNum(a)))
+handlebarsInstance.registerHelper("floor", (a: unknown) => Math.floor(toNum(a)))
+handlebarsInstance.registerHelper("round", (a: unknown) => Math.round(toNum(a)))
+handlebarsInstance.registerHelper("abs", (a: unknown) => Math.abs(toNum(a)))
+handlebarsInstance.registerHelper("min", (...args: unknown[]) => Math.min(...args.slice(0, -1).map(toNum)))
+handlebarsInstance.registerHelper("max", (...args: unknown[]) => Math.max(...args.slice(0, -1).map(toNum)))
+
 export function replaceTemplates<T extends string | null>(
   content: string | null,
   replacements: Record<string, string>,

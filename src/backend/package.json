@@ -28,7 +28,6 @@
     "@trpc/server": "^10.45.4",
     "best-effort-json-parser": "^1.4.0",
     "electron-trpc": "^0.7.1",
-    "expr-eval": "^2.0.2",
     "handlebars": "^4.7.9"
   }
 }

@@ -95,6 +95,41 @@ describe("replaceTemplates — Handlebars bracket-notation substitution", () => 
       expect(replaceTemplates('{{#if (not (eq m "a"))}}Y{{else}}N{{/if}}', { m: "b" })).toBe("Y")
       expect(replaceTemplates('{{#if (not (eq m "a"))}}Y{{else}}N{{/if}}', { m: "a" })).toBe("N")
     })
+
+    it("math helpers — single-step", () => {
+      expect(replaceTemplates("{{ceil n}}", { n: "3.2" })).toBe("4")
+      expect(replaceTemplates("{{floor n}}", { n: "3.8" })).toBe("3")
+      expect(replaceTemplates("{{round n}}", { n: "3.5" })).toBe("4")
+      expect(replaceTemplates("{{abs n}}", { n: "-7" })).toBe("7")
+      expect(replaceTemplates("{{add a b}}", { a: "2", b: "3" })).toBe("5")
+      expect(replaceTemplates("{{subtract a b}}", { a: "10", b: "4" })).toBe("6")
+      expect(replaceTemplates("{{multiply a b}}", { a: "3", b: "4" })).toBe("12")
+      expect(replaceTemplates("{{divide a b}}", { a: "20", b: "2" })).toBe("10")
+      expect(replaceTemplates("{{min 3 7 2 5}}", {})).toBe("2")
+      expect(replaceTemplates("{{max 3 7 2 5}}", {})).toBe("7")
+    })
+
+    it("math — nested subexpressions reproduce expr-eval formula", () => {
+      // The fiction-arc minimum-scenes formula:
+      //   ${max(3, ceil(chunksCount/2))} with chunksCount=20 ⟹ 10
+      // After apply-time substitutes ${chunksCount} → "20", the prompt holds
+      // literal numbers and Handlebars composes the math.
+      expect(replaceTemplates("{{max 3 (ceil (divide 20 2))}}", {})).toBe("10")
+      expect(replaceTemplates("{{max 3 (ceil (divide 2 2))}}", {})).toBe("3")
+      expect(replaceTemplates("{{max 3 (ceil (divide 5 2))}}", {})).toBe("3")
+      expect(replaceTemplates("{{max 3 (ceil (divide 30 2))}}", {})).toBe("15")
+    })
+
+    it("math — string operands are coerced to numbers", () => {
+      // Apply-time substitution writes ${chunksCount} into the Handlebars
+      // template as a string literal — math helpers must coerce.
+      expect(replaceTemplates('{{ceil "3.2"}}', {})).toBe("4")
+      expect(replaceTemplates('{{divide "20" 2}}', {})).toBe("10")
+    })
+
+    it("math — non-numeric input throws (render fails loudly)", () => {
+      expect(() => replaceTemplates('{{ceil "not-a-number"}}', {})).toThrow(/expected number/)
+    })
   })
 
   it("preserves angle brackets / special chars (no HTML escaping)", () => {
