@@ -53,16 +53,21 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
       }
     }
 
-    const tools: unknown[] = []
+    // Yandex's OpenAI-compatible chat.completions endpoint accepts only
+    // `type: "function"` in the tools array — its API errors with
+    // `unknown variant 'web_search', expected 'function'` on the OpenAI
+    // Assistant-API tool shapes. Web search and search-index live on Yandex's
+    // native endpoints (Generative Search Tool, Search Index Tool), not as
+    // chat-completions tools. So we silently drop those tool requests with a
+    // warning; users keep the engine setting but it's a no-op until we wire
+    // up the native paths.
     if (req.includeExistingLore) {
-      const searchIndexId = engineConfig?.search_index_id
-      tools.push({ type: "file_search", file_search: { vector_store_ids: [searchIndexId] } })
+      console.warn(
+        "[yandex] file_search / lore attachment is not supported via the OpenAI-compatible chat endpoint — skipping",
+      )
     }
     if (actualAiSettings.webSearch && actualAiSettings.webSearch !== "none") {
-      tools.push({ type: "web_search", web_search: { search_context_size: actualAiSettings.webSearch } })
-    }
-    if (tools.length > 0) {
-      ;(requestParams as unknown as Record<string, unknown>).tools = tools
+      console.warn("[yandex] web_search is not supported via the OpenAI-compatible chat endpoint — skipping")
     }
 
     const completion = await client.chat.completions.create(requestParams)
