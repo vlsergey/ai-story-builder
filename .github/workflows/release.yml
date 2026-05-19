@@ -1,10 +1,7 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - master
-      - trunk
+  workflow_dispatch: {}
 
 permissions:
   contents: write
