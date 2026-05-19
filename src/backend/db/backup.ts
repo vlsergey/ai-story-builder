@@ -20,7 +20,7 @@ export function createBackup(dbPath: string): void {
   fs.mkdirSync(backupDir, { recursive: true })
 
   const basename = path.basename(dbPath, path.extname(dbPath))
-  const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "T").slice(0, 15) // "YYYYMMDDTHHmmss"
+  const timestamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) // "YYYYMMDDTHHmmss"
   const backupName = `${basename}.${timestamp}.bak`
   const backupPath = path.join(backupDir, backupName)
 
