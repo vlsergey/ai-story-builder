@@ -162,7 +162,21 @@ export const YANDEX_ENGINE_DEF = {
   ],
   aiSettingsFields: [
     { key: "max_completion_tokens", defaultValue: "0", type: "integer", schema: z.coerce.number().int().min(0) },
-    { key: "webSearch", type: "select", options: ["none", "low", "medium", "high"], defaultValue: "none" },
+    {
+      key: "webSearch",
+      type: "select",
+      options: ["default", "none", "low", "medium", "high"],
+      defaultValue: "default",
+      // "default" — UI-only sentinel, the field is not sent to the API and
+      // Yandex picks its own default. "none" / "low" / "medium" / "high" map
+      // to the `search_context_size` parameter of the Responses-API
+      // web_search tool. The adapter only attaches the tool when value is
+      // "low"|"medium"|"high".
+      schema: z
+        .enum(["default", "none", "low", "medium", "high"])
+        .optional()
+        .transform((v) => (v === undefined || v === "default" ? undefined : v)),
+    },
   ],
   maxFilesPerRequest: null,
 } as const satisfies AiEngineDefinition
