@@ -236,7 +236,14 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
       if (type === "fix-problems") {
         initialSettings = {}
       } else if (nodeTypeSettings || aiUserInstructions) {
-        initialSettings = { ...(nodeTypeSettings ?? {}) }
+        // Substitute `${var}` inside string values of nodeTypeSettings so
+        // template authors can reference wizard fields from settings (e.g.
+        // SplitSettings.expectedPartsCount = "${chunksCount}"). Plain object
+        // copies leave non-string values untouched.
+        initialSettings = {}
+        for (const [k, v] of Object.entries(nodeTypeSettings ?? {})) {
+          initialSettings[k] = typeof v === "string" ? normalizeAndReplaceContent([v], templateData) : v
+        }
         if (aiUserInstructions) {
           initialSettings.userPrompt = normalizeAndReplaceContent(aiUserInstructions, templateData)
         }

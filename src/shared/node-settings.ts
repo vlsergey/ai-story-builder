@@ -19,6 +19,19 @@ export interface SplitSettings extends LlmCallPrompts {
    * needing it duplicated in the user prompt.
    */
   partDescription?: string
+  /**
+   * Optional fixed cardinality of the resulting array. Stored as a string in
+   * the template so it can carry `${chunksCount}`-style wizard substitutions;
+   * apply-time substitution replaces it with a literal numeric string. When
+   * set and parseable as a positive integer, the split call:
+   *  - prepends a system-prompt line "Output EXACTLY N parts as N array elements"
+   *  - adds `minItems: N` / `maxItems: N` to the JSON schema (bonus enforcement
+   *    on engines that honour it; harmless on those that don't).
+   *
+   * Leave undefined when the count is genuinely model-decided (e.g. the
+   * character-list split where the cast size is part of the model's output).
+   */
+  expectedPartsCount?: string
 }
 
 export interface MergeSettings {

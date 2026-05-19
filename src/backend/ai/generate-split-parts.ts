@@ -11,31 +11,48 @@ import { getEngineAdapter } from "./ai-engine-adapter.js"
 import { generateWithTelemetry } from "./generate-with-telemetry.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
-export function buildSplitResponseSchema(partDescription: string | null): Record<string, unknown> {
+export function buildSplitResponseSchema(
+  partDescription: string | null,
+  expectedPartsCount: number | null,
+): Record<string, unknown> {
   const items: Record<string, unknown> = { type: "string" }
   if (partDescription && partDescription.trim().length > 0) {
     items.description = partDescription.trim()
   }
+  const partsField: Record<string, unknown> = {
+    type: "array",
+    items,
+  }
+  if (expectedPartsCount != null && expectedPartsCount > 0) {
+    partsField.minItems = expectedPartsCount
+    partsField.maxItems = expectedPartsCount
+  }
   return {
     type: "object",
     properties: {
-      parts: {
-        type: "array",
-        items,
-      },
+      parts: partsField,
     },
     required: ["parts"],
     additionalProperties: false,
   }
 }
 
-function readPartDescription(nodeTypeSettings: string | null): string | null {
-  if (!nodeTypeSettings) return null
+function readSplitSettings(nodeTypeSettings: string | null): {
+  partDescription: string | null
+  expectedPartsCount: number | null
+} {
+  if (!nodeTypeSettings) return { partDescription: null, expectedPartsCount: null }
   try {
     const parsed = JSON.parse(nodeTypeSettings) as Partial<SplitSettings>
-    return typeof parsed.partDescription === "string" ? parsed.partDescription : null
+    const partDescription = typeof parsed.partDescription === "string" ? parsed.partDescription : null
+    let expectedPartsCount: number | null = null
+    if (typeof parsed.expectedPartsCount === "string" && parsed.expectedPartsCount.trim().length > 0) {
+      const n = Number(parsed.expectedPartsCount.trim())
+      if (Number.isInteger(n) && n > 0) expectedPartsCount = n
+    }
+    return { partDescription, expectedPartsCount }
   } catch {
-    return null
+    return { partDescription: null, expectedPartsCount: null }
   }
 }
 
@@ -60,8 +77,13 @@ export async function generateSplitParts(
 
   const replacements = nodeInputsToReplacements(inputs)
   const finalUserPrompt = replaceTemplates(aiUserPrompt, replacements)
-  const finalSystemPrompt = aiSystemPrompt ? replaceTemplates(aiSystemPrompt, replacements) : SYSTEM_PROMPT_FALLBACK
-  const responseSchema = buildSplitResponseSchema(readPartDescription(node.node_type_settings))
+  const { partDescription, expectedPartsCount } = readSplitSettings(node.node_type_settings)
+  const baseSystemPrompt = aiSystemPrompt ? replaceTemplates(aiSystemPrompt, replacements) : SYSTEM_PROMPT_FALLBACK
+  const finalSystemPrompt =
+    expectedPartsCount != null
+      ? `Output EXACTLY ${expectedPartsCount} parts as ${expectedPartsCount} separate elements in the JSON \`parts\` array. The array length must be exactly ${expectedPartsCount} — not fewer, not more, and never a single concatenated string with in-text separators.\n\n${baseSystemPrompt}`
+      : baseSystemPrompt
+  const responseSchema = buildSplitResponseSchema(partDescription, expectedPartsCount)
 
   const engineId = SettingsRepository.getCurrentBackend()
   if (!engineId) throw makeErrorWithStatus("no AI engine configured", 400)

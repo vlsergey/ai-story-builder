@@ -48,7 +48,12 @@ export interface TemplateUpdateAnalysis {
   newEdges: NewEdge[]
 }
 
-const INSTRUCTION_KEYS_TEXTLIKE = ["userPrompt", "systemPrompt"] as const
+// Keys in node_type_settings that count as "instruction-shaped" for the
+// template-update diff. The diff treats these as authored content that
+// can drift between the project DB and a freshly-edited template; other
+// keys (runtime-resolved ids, etc.) are ignored. `expectedPartsCount` and
+// `partDescription` belong here for split nodes — they steer the LLM call.
+const INSTRUCTION_KEYS_TEXTLIKE = ["userPrompt", "systemPrompt", "partDescription", "expectedPartsCount"] as const
 const INSTRUCTION_KEYS_FIXPROBLEMS = [
   "aiUserInstructionsToFindProblems",
   "aiUserInstructionsToFixProblems",
@@ -104,7 +109,13 @@ function buildTemplateInstructionSettings(
   node: TemplateProjectPlanNode,
   wizardData: Record<string, string>,
 ): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...(node.nodeTypeSettings ?? {}) }
+  // Substitute `${var}` inside string values of nodeTypeSettings so template
+  // authors can wire wizard fields straight into settings (e.g. SplitSettings
+  // `expectedPartsCount: "${chunksCount}"`). Mirrors apply-project-template.
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(node.nodeTypeSettings ?? {})) {
+    out[k] = typeof v === "string" ? normalizeAndReplaceContent([v], wizardData) : v
+  }
 
   if (node.type === "fix-problems") {
     for (const k of [
