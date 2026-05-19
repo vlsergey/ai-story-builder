@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
+    "@electron/rebuild": "^4.0.4",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^10.0.7",
@@ -54,7 +55,6 @@
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "electron-builder": "^26.8.1",
-    "electron-rebuild": "^3.2.9",
     "eslint": "^10.2.1",
     "globals": "^17.5.0",
     "mustache": "^4.2.0",
