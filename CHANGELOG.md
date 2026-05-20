@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/vlsergey/ai-story-builder/compare/v1.0.1...v1.0.2) (2026-05-20)
+
+
+### Bug Fixes
+
+* **ci:** tell electron-builder to publish to existing release, not draft ([ff1ad91](https://github.com/vlsergey/ai-story-builder/commit/ff1ad91b419f87641def7f53e9f88321a7e414cd))
+
 ## [1.0.1](https://github.com/vlsergey/ai-story-builder/compare/v1.0.0...v1.0.1) (2026-05-20)
 
 
