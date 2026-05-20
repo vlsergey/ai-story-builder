@@ -78,7 +78,8 @@
     "publish": {
       "provider": "github",
       "owner": "vlsergey",
-      "repo": "ai-story-builder"
+      "repo": "ai-story-builder",
+      "releaseType": "release"
     },
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**",
