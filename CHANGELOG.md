@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/vlsergey/ai-story-builder/compare/v1.0.0...v1.0.1) (2026-05-20)
+
+
+### Bug Fixes
+
+* **ci:** publish binaries to GitHub Release via electron-builder ([fc0172e](https://github.com/vlsergey/ai-story-builder/commit/fc0172ed95ffc2fef32a09572d9b1a6bc15090c7))
+
 # 1.0.0 (2026-05-20)
 
 
