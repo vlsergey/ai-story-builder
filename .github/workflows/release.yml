@@ -10,6 +10,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.semantic.outputs.new_release_published }}
+      version: ${{ steps.semantic.outputs.new_release_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,21 +37,26 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Release
+      - name: Semantic Release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
 
   build:
     needs: release
-    if: always()
+    if: needs.release.outputs.published == 'true'
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -62,11 +70,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Package
-        run: npm run package
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ matrix.os }}
-          path: release/
+      - name: Package and publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --publish always

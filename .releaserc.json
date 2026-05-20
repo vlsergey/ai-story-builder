@@ -10,29 +10,7 @@
         "pkgRoot": "."
       }
     ],
-    [
-      "@semantic-release/github",
-      {
-        "assets": [
-          {
-            "path": "release/**/*.exe",
-            "label": "Windows Installer"
-          },
-          {
-            "path": "release/**/*.AppImage",
-            "label": "Linux AppImage"
-          },
-          {
-            "path": "release/**/*.dmg",
-            "label": "macOS DMG"
-          },
-          {
-            "path": "release/**/*.zip",
-            "label": "Portable Archive"
-          }
-        ]
-      }
-    ],
+    "@semantic-release/github",
     [
       "@semantic-release/git",
       {

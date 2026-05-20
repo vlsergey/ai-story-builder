@@ -5,6 +5,10 @@
   "author": "Sergey Vladimirov",
   "license": "Apache-2.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vlsergey/ai-story-builder.git"
+  },
   "type": "module",
   "main": "dist/backend/main.js",
   "workspaces": [
@@ -71,6 +75,11 @@
       "output": "release"
     },
     "asar": true,
+    "publish": {
+      "provider": "github",
+      "owner": "vlsergey",
+      "repo": "ai-story-builder"
+    },
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**",
       "**/*.node"
