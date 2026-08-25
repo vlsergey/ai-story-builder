@@ -57,10 +57,16 @@ Measured on the same prompt, same settings, Russian prose out:
 | Model | Time | Result |
 |---|---|---|
 | `huihui_ai/qwen3.5-abliterated:9b` | ~13 s | a Chinese token mid-sentence (`сердце猛地 подпрыгнуть`) |
-| `huihui_ai/qwen3.8-abliterated:27b-q3_K` | ~5 s | clean, no CJK, visibly better prose |
+| `huihui_ai/qwen3.8-abliterated:27b-q3_K` | ~5 s | clean, no CJK |
 
 The 27B is both faster here and clean, so prefer it. Do not read the 9B result as
 "local models leak scripts into Russian" — it is that build, not the class.
+
+Prose *quality* was not measured and is not claimed. In the same probe the 27B
+opened with "she felt it not by hearing but with her back" — against a prompt that
+said she hears the lock click. Fluent, and contradicting the brief in its first
+clause. That failure mode is invisible to a reading eye and is what the template's
+checks exist for; do not substitute an impression of the output for them.
 
 `/api/tags` reports `details.context_length` per model; use it to set `num_ctx`.
 
