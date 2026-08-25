@@ -81,3 +81,32 @@ lines dropped, empty buffer safe).
 
 Live check against a running daemon is not in the suite — it needs the model
 pulled. Reproduce with a short script importing `streamOllamaChat` directly.
+
+## Always cap `max_output_tokens` on local models
+
+First full-template run (40 nodes, 3 chunks, 27B) reached node 37 of 40 in ~2 h and
+died in a `fix-problems` node with:
+
+```
+Unterminated string in JSON at position 144085
+```
+
+The node had been running for 69 minutes. Cause: `max_output_tokens: 0` in the
+engine settings, i.e. no `num_predict` sent, i.e. no stop.
+
+**A JSON schema in `format` buys shape, not termination.** Grammar-constrained
+decoding guarantees the output parses — but the grammar happily allows an
+arbitrarily long string and an arbitrarily large array, so a model that starts
+enumerating findings can run until it exhausts the context, at which point the
+JSON is truncated and unparseable. Hosted models stop on their own; a local one
+has no such instinct.
+
+Set `max_output_tokens` to something the node's purpose justifies (a findings list
+needs far less than prose). Zero means "no limit" and on a local model that is a
+trap, not a convenience.
+
+Everything upstream of that node completed and stayed proportionate: reviews edited
+their documents rather than inflating them (world 13 545 → 14 625 chars across two
+gates, setting 13 420 → 14 671), the `split` produced exactly the requested three
+parts as valid JSON, and the tension-score node came out at 873 chars — one line per
+scene, as designed.
