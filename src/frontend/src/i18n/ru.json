@@ -102,6 +102,7 @@
   "planGraph.addNode.for-each-index": "Номер итерации for-each",
   "planGraph.addNode.lore": "Лор",
   "planGraph.addNode.merge": "Объединение",
+  "planGraph.addNode.script": "Скрипт",
   "planGraph.addNode.split": "Разделение",
   "planGraph.addNode.text": "Текст",
 

@@ -103,6 +103,7 @@
   "planGraph.addNode.text": "Text",
   "planGraph.addNode.lore": "Lore",
   "planGraph.addNode.merge": "Merge",
+  "planGraph.addNode.script": "Script",
   "planGraph.addNode.split": "Split",
 
   "planGraph.toolbar.autoLayout": "Auto layout",

@@ -43,6 +43,19 @@ export interface MergeSettings {
   fixHeaders: boolean
 }
 
+export interface ScriptSettings {
+  /**
+   * JS source, run as a function body in an isolated context. `return` produces
+   * the node output. Inputs arrive as `inputs: {title, text}[]`, and `text` is a
+   * shortcut for the first input. No file system, no network, no timers —
+   * a script node is a pure text-to-text function. See
+   * `src/backend/script/run-script.ts`.
+   */
+  source?: string
+  /** Wall-clock budget in milliseconds for synchronous execution. */
+  timeoutMs?: number
+}
+
 export interface TextSettings extends LlmCallPrompts {}
 export interface LoreSettings extends LlmCallPrompts {}
 
@@ -53,6 +66,7 @@ export type ForEachOutputSettings = unknown
 export type NodeTypeSettingsMap = {
   split: SplitSettings
   merge: MergeSettings
+  script: ScriptSettings
   text: TextSettings
   lore: LoreSettings
   "for-each": ForEachSettings
@@ -65,6 +79,7 @@ export type NodeTypeSettings<T extends keyof NodeTypeSettingsMap = keyof NodeTyp
 /** Partial (optional) versions for API input/output */
 export type SplitSettingsPartial = Partial<SplitSettings>
 export type MergeSettingsPartial = Partial<MergeSettings>
+export type ScriptSettingsPartial = Partial<ScriptSettings>
 export type TextSettingsPartial = Partial<TextSettings>
 export type LoreSettingsPartial = Partial<LoreSettings>
 export type ForEachSettingsPartial = Partial<ForEachSettings>
@@ -74,6 +89,7 @@ export type ForEachOutputSettingsPartial = Partial<ForEachOutputSettings>
 export type NodeTypeSettingsPartialMap = {
   split: SplitSettingsPartial
   merge: MergeSettingsPartial
+  script: ScriptSettingsPartial
   text: TextSettingsPartial
   lore: LoreSettingsPartial
   "for-each": ForEachSettingsPartial
@@ -96,6 +112,8 @@ export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(
         fixHeaders: false,
         autoUpdate: false,
       } as NodeTypeSettingsMap[T]
+    case "script":
+      return { source: "", timeoutMs: 5000 } as NodeTypeSettingsMap[T]
     case "text":
     case "lore":
       return {} as NodeTypeSettingsMap[T]

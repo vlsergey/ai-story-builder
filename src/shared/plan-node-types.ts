@@ -12,6 +12,7 @@ export const PLAN_NON_CONTAINER_NODE_TYPE_VALUES = [
   "merge",
   "split",
   "fix-problems",
+  "script",
   "for-each-input",
   "for-each-output",
   "for-each-prev-outputs",

@@ -82,6 +82,15 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canRegenerate: true,
   },
   {
+    id: "script",
+    allowedOutgoingEdgeTypes: ["text"],
+    allowedIncomingEdgeTypes: ["text", "textArray"],
+    canCreate: true,
+    canDelete: true,
+    isGroup: false,
+    canRegenerate: true,
+  },
+  {
     id: "for-each",
     allowedOutgoingEdgeTypes: ["textArray"],
     allowedIncomingEdgeTypes: ["textArray"],
