@@ -50,13 +50,19 @@ Age rating is `NC21` — not a claim about permissiveness but an admission that 
 provider policy applies: what a locally pulled model will write is decided by that
 model.
 
-## Known quality caveat for non-English prose
+## Model choice matters more than the adapter
 
-Measured on `huihui_ai/qwen3.5-abliterated:9b` generating Russian: a Chinese token
-appeared mid-sentence (`сердце猛地 подпрыгнуть`). Local abliterated builds are
-weaker on language purity than the hosted engines. If a template is used for
-non-English prose, either pick a larger local model or expect a language-purity
-pass to be necessary — `fiction-arc` already has one in the quality reviews.
+Measured on the same prompt, same settings, Russian prose out:
+
+| Model | Time | Result |
+|---|---|---|
+| `huihui_ai/qwen3.5-abliterated:9b` | ~13 s | a Chinese token mid-sentence (`сердце猛地 подпрыгнуть`) |
+| `huihui_ai/qwen3.8-abliterated:27b-q3_K` | ~5 s | clean, no CJK, visibly better prose |
+
+The 27B is both faster here and clean, so prefer it. Do not read the 9B result as
+"local models leak scripts into Russian" — it is that build, not the class.
+
+`/api/tags` reports `details.context_length` per model; use it to set `num_ctx`.
 
 ## Tests
 
