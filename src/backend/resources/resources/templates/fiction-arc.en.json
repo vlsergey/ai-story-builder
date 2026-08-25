@@ -70,7 +70,7 @@
         "height": 80
       },
       {
-        "title": "World",
+        "title": "World draft",
         "type": "text",
         "x": 340,
         "y": 1042,
@@ -116,7 +116,7 @@
         "x": 620,
         "y": 1042,
         "nodeTypeSettings": {
-          "sourceNodeTitleToFix": "World",
+          "sourceNodeTitleToFix": "World draft",
           "maxIterations": 2,
           "minSeverityToFix": 65,
           "foundProblemsTemplate": "Found problems",
@@ -150,7 +150,7 @@
             "",
             "Scale: 80–100 — a plot move or a scene collapses on it; 65–79 — a reader who knows the subject stumbles. Do not report findings weaker than 65.",
             "",
-            "{{[World]}}",
+            "{{[World draft]}}",
             "```"
           ],
           "aiUserInstructionsToFixProblems": [
@@ -172,7 +172,7 @@
             "",
             "Output only the rewritten world description, no intro or outro.",
             "",
-            "{{[World]}}",
+            "{{[World draft]}}",
             "```",
             "",
             "## Found problems",
@@ -183,7 +183,7 @@
         },
         "inputs": [
           {
-            "sourceNodeTitle": "World",
+            "sourceNodeTitle": "World draft",
             "type": "text"
           }
         ],
@@ -191,7 +191,7 @@
         "height": 80
       },
       {
-        "title": "World review: readability",
+        "title": "World",
         "type": "fix-problems",
         "x": 900,
         "y": 1042,
@@ -341,7 +341,7 @@
         "height": 80
       },
       {
-        "title": "Setting",
+        "title": "Setting draft",
         "type": "text",
         "x": 1180,
         "y": 1184,
@@ -367,7 +367,7 @@
           "",
           "## World",
           "```",
-          "{{[World review: readability]}}",
+          "{{[World]}}",
           "```"
         ],
         "inputs": [
@@ -376,7 +376,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World review: readability",
+            "sourceNodeTitle": "World",
             "type": "text"
           }
         ],
@@ -384,12 +384,12 @@
         "height": 80
       },
       {
-        "title": "Setting review: consistency",
+        "title": "Setting",
         "type": "fix-problems",
         "x": 3225,
         "y": 1184,
         "nodeTypeSettings": {
-          "sourceNodeTitleToFix": "Setting",
+          "sourceNodeTitleToFix": "Setting draft",
           "maxIterations": 3,
           "minSeverityToFix": 70,
           "foundProblemsTemplate": "Found problems",
@@ -438,13 +438,13 @@
             "## World",
             "",
             "```",
-            "{{[World review: readability]}}",
+            "{{[World]}}",
             "```",
             "",
             "## Setting (the file under check)",
             "",
             "```",
-            "{{[Setting]}}",
+            "{{[Setting draft]}}",
             "```"
           ],
           "aiUserInstructionsToFixProblems": [
@@ -475,7 +475,7 @@
             "## World",
             "",
             "```",
-            "{{[World review: readability]}}",
+            "{{[World]}}",
             "```",
             "",
             "## Found problems",
@@ -487,13 +487,13 @@
             "## Setting (to rewrite)",
             "",
             "```",
-            "{{[Setting]}}",
+            "{{[Setting draft]}}",
             "```"
           ]
         },
         "inputs": [
           {
-            "sourceNodeTitle": "Setting",
+            "sourceNodeTitle": "Setting draft",
             "type": "text"
           },
           {
@@ -501,7 +501,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World review: readability",
+            "sourceNodeTitle": "World",
             "type": "text"
           }
         ],
@@ -569,7 +569,7 @@
           "",
           "## World",
           "```",
-          "{{[World review: readability]}}",
+          "{{[World]}}",
           "```",
           "",
           "## Theme",
@@ -606,7 +606,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World review: readability",
+            "sourceNodeTitle": "World",
             "type": "text"
           },
           {
@@ -731,7 +731,7 @@
           "",
           "## World",
           "```",
-          "{{[World review: readability]}}",
+          "{{[World]}}",
           "```",
           "",
           "## Theme",
@@ -763,7 +763,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World review: readability",
+            "sourceNodeTitle": "World",
             "type": "text"
           },
           {
@@ -890,7 +890,7 @@
               "",
               "### World",
               "```",
-              "{{[World review: readability]}}",
+              "{{[World]}}",
               "```",
               "",
               "### Style",
@@ -930,7 +930,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "World review: readability",
+                "sourceNodeTitle": "World",
                 "type": "text"
               },
               {
@@ -1119,12 +1119,12 @@
           "",
           "## Setting",
           "```",
-          "{{[Setting review: consistency]}}",
+          "{{[Setting]}}",
           "```",
           "",
           "## World",
           "```",
-          "{{[World review: readability]}}",
+          "{{[World]}}",
           "```",
           "",
           "## Genre and register",
@@ -1186,11 +1186,11 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "Setting review: consistency",
+            "sourceNodeTitle": "Setting",
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World review: readability",
+            "sourceNodeTitle": "World",
             "type": "text"
           },
           {
@@ -1429,7 +1429,7 @@
             "",
             "## Setting",
             "```",
-            "{{[Setting review: consistency]}}",
+            "{{[Setting]}}",
             "```",
             "",
             "## Scene plan (structurally checked — this is the polish input)",
@@ -1501,7 +1501,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "Setting review: consistency",
+            "sourceNodeTitle": "Setting",
             "type": "text"
           },
           {
@@ -1559,7 +1559,7 @@
             "",
             "## World",
             "```",
-            "{{[World review: readability]}}",
+            "{{[World]}}",
             "```",
             "",
             "## Cast summary",
@@ -1605,7 +1605,7 @@
             "",
             "## World",
             "```",
-            "{{[World review: readability]}}",
+            "{{[World]}}",
             "```",
             "",
             "## Cast summary",
@@ -1638,7 +1638,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World review: readability",
+            "sourceNodeTitle": "World",
             "type": "text"
           }
         ],
@@ -1806,7 +1806,7 @@
               "",
               "### Setting",
               "```",
-              "{{[Setting review: consistency]}}",
+              "{{[Setting]}}",
               "```",
               "### Tension score",
               "```",
@@ -1873,7 +1873,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting review: consistency",
+                "sourceNodeTitle": "Setting",
                 "type": "text"
               },
               {
@@ -1978,7 +1978,7 @@
               "",
               "## Setting",
               "```",
-              "{{[Setting review: consistency]}}",
+              "{{[Setting]}}",
               "```",
               "",
               "## Previous chunks merged (when present — gives the tail this chunk picks up)",
@@ -2028,7 +2028,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting review: consistency",
+                "sourceNodeTitle": "Setting",
                 "type": "text"
               },
               {
@@ -2073,7 +2073,7 @@
               "",
               "## Setting",
               "```",
-              "{{[Setting review: consistency]}}",
+              "{{[Setting]}}",
               "```",
               "",
               "## Setup/payoff registry",
@@ -2189,7 +2189,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting review: consistency",
+                "sourceNodeTitle": "Setting",
                 "type": "text"
               },
               {
@@ -2234,7 +2234,7 @@
               "",
               "## Setting",
               "```",
-              "{{[Setting review: consistency]}}",
+              "{{[Setting]}}",
               "```",
               "",
               "## Scene details",
@@ -2282,7 +2282,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting review: consistency",
+                "sourceNodeTitle": "Setting",
                 "type": "text"
               },
               {
