@@ -2,11 +2,13 @@ import * as z from "zod"
 import type { AiEngineDefinition } from "./ai-engines.js"
 import { type AiGenerationSettings, getAiGenerationSettingsSchema } from "./ai-generation-settings.js"
 import type { GrokAiGenerationSettings } from "./grok-ai-generation-settings.js"
+import type { OllamaAiGenerationSettings } from "./ollama-ai-generation-settings.js"
 import type { YandexAiGenerationSettings } from "./yandex-ai-generation-settings.js"
 
 export interface AllAiEnginesConfig {
   grok?: GrokEngineConfig
   yandex?: YandexEngineConfig
+  ollama?: OllamaEngineConfig
 }
 
 export interface AiEngineConfig<EngineAiGenerationSettings extends AiGenerationSettings = AiGenerationSettings> {
@@ -40,4 +42,9 @@ export interface GrokEngineConfig extends AiEngineConfig<GrokAiGenerationSetting
 export interface YandexEngineConfig extends AiEngineConfig<YandexAiGenerationSettings> {
   folder_id?: string
   search_index_id?: string
+}
+
+export interface OllamaEngineConfig extends AiEngineConfig<OllamaAiGenerationSettings> {
+  /** Where the Ollama daemon listens. Defaults to http://localhost:11434. */
+  base_url?: string
 }

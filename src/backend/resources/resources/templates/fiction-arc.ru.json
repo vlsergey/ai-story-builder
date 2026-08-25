@@ -63,9 +63,7 @@
         "type": "text",
         "x": 40,
         "y": 100,
-        "content": [
-          "${synopsis}"
-        ],
+        "content": ["${synopsis}"],
         "width": 200,
         "height": 80
       },

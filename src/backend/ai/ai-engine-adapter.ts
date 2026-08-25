@@ -3,6 +3,7 @@ import type OpenAI from "openai"
 import type { AiEngineKey } from "../../shared/ai-engines.js"
 import type { AiGenerationSettings } from "../../shared/ai-generation-settings.js"
 import { GrokAdapter } from "./grok-adapter.js"
+import { OllamaAdapter } from "./ollama-adapter.js"
 import { YandexAdapter } from "./yandex-adapter.js"
 
 export interface JsonSchemaSpec {
@@ -66,6 +67,7 @@ export interface AiEngineAdapter<T extends AiGenerationSettings = AiGenerationSe
 const adapters = {
   grok: new GrokAdapter(),
   yandex: new YandexAdapter(),
+  ollama: new OllamaAdapter(),
 } as const
 
 export function getEngineAdapter(engineId: AiEngineKey): AiEngineAdapter<AiGenerationSettings> {

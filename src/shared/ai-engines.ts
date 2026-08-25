@@ -40,7 +40,7 @@ export const AGE_RATING_INFO: Record<AgeRating, AgeRatingInfo> = {
   NC21: { label: "NC-21", minAge: 21, bg: "#6b21a8", fg: "#fff" }, // purple-800
 }
 
-export const AI_ENGINES_KEYS = ["grok", "yandex"] as const
+export const AI_ENGINES_KEYS = ["grok", "yandex", "ollama"] as const
 export type AiEngineKey = (typeof AI_ENGINES_KEYS)[number]
 
 export interface AiEngineCapabilities {
@@ -187,7 +187,43 @@ export type YandexFieldKeys =
   | (typeof YANDEX_ENGINE_DEF.aiSettingsFields)[number]["key"]
 
 /** Built-in AI engine definitions. */
-export const BUILTIN_ENGINES = [GROK_ENGINE_DEF, YANDEX_ENGINE_DEF] as const satisfies AiEngineDefinition[]
+
+export const OLLAMA_ENGINE_DEF = {
+  id: "ollama",
+  provider: "Ollama",
+  // Local models carry no provider policy: what the model will write is
+  // decided by the model you pulled, not by an operator.
+  ageRating: "NC21",
+  capabilities: {
+    fileUpload: false,
+    fileDeletion: false,
+    fileAttachment: false,
+    knowledgeBase: false,
+    knowledgeBaseAttachment: false,
+  },
+  configFields: [{ key: "base_url", type: "input" }],
+  aiSettingsFields: [
+    { key: "max_output_tokens", defaultValue: "0", type: "integer", schema: z.coerce.number().int().min(0) },
+    { key: "temperature", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(2) },
+    { key: "top_p", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(1) },
+    // Ollama truncates to the model's default window (often 4096) without
+    // warning, so a long prompt silently loses its head. Set the real window.
+    { key: "num_ctx", defaultValue: "32768", type: "integer", schema: z.coerce.number().int().min(0) },
+    { key: "think", type: "checkbox", schema: z.coerce.boolean() },
+  ],
+  maxFilesPerRequest: 0,
+} as const satisfies AiEngineDefinition
+
+// for i18n checks
+export type OllamaFieldKeys =
+  | (typeof OLLAMA_ENGINE_DEF.configFields)[number]["key"]
+  | (typeof OLLAMA_ENGINE_DEF.aiSettingsFields)[number]["key"]
+
+export const BUILTIN_ENGINES = [
+  GROK_ENGINE_DEF,
+  YANDEX_ENGINE_DEF,
+  OLLAMA_ENGINE_DEF,
+] as const satisfies AiEngineDefinition[]
 
 /** Returns the capabilities of the given engine, or null if unknown. */
 export function getEngineCapabilities(engineId: string | null | undefined): AiEngineCapabilities | null {

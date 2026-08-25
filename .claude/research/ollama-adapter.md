@@ -1,0 +1,71 @@
+# Ollama adapter — local models
+
+*Added 2026-08-25.*
+
+## What it is
+
+Third engine next to Grok and Yandex: models running on the user's own machine
+via the Ollama daemon. No API key, no per-token billing, no text leaving the box.
+
+- `src/backend/ai/ollama-client.ts` — native `/api/chat` over `fetch`, NDJSON stream.
+- `src/backend/ai/ollama-adapter.ts` — `AiEngineAdapter` implementation.
+- `src/shared/ollama-ai-generation-settings.ts`, `OLLAMA_ENGINE_DEF` in
+  `src/shared/ai-engines.ts`, `OllamaEngineConfig` in `src/shared/ai-engine-config.ts`.
+- Registered in `adapters` (`ai-engine-adapter.ts`); i18n in `ai-engines-i18n.{ru,en}.json`.
+
+## Native `/api/chat`, not the OpenAI-compatible `/v1`
+
+Ollama exposes both. The native endpoint was chosen because:
+
+- `format` takes a **JSON Schema object** directly, which is what
+  `GenerateResponseRequest.responseSchema` already carries. The `/v1` route
+  needs the OpenAI `response_format` wrapper and honours it less reliably.
+- `options.num_ctx` is reachable. Through `/v1` it is not — see the trap below.
+- `think: false` turns off the reasoning channel on models that have one.
+
+Cost: the app's `onEvent` contract speaks `OpenAI.Responses.ResponseStreamEvent`,
+so the adapter synthesises the two events anything downstream actually consumes:
+`response.output_text.delta` per chunk and one `response.completed` carrying usage.
+Yandex gets these free from the OpenAI SDK; here they are hand-built.
+
+## The `num_ctx` trap
+
+**Ollama silently truncates the prompt to the model's default context window**
+(commonly 4096 tokens) no matter what the model can hold. There is no error and
+no warning — the head of the prompt is simply gone, and the model answers from
+whatever survived. A 38 KB template prompt loses most of itself this way.
+
+`num_ctx` is therefore a first-class engine setting with a default of 32768 and a
+hint that says so. Set it to the model's real window; `/api/tags` reports
+`details.context_length` per model.
+
+## What local models don't have
+
+`web_search`, file upload, knowledge bases and provider-reported cost are absent
+from `OLLAMA_ENGINE_DEF.capabilities` rather than stubbed. Usage **counts** are
+reported (`prompt_eval_count` / `eval_count` → `input_tokens` / `output_tokens`)
+so the telemetry pane still shows volume; cost stays absent rather than invented.
+
+Age rating is `NC21` — not a claim about permissiveness but an admission that no
+provider policy applies: what a locally pulled model will write is decided by that
+model.
+
+## Known quality caveat for non-English prose
+
+Measured on `huihui_ai/qwen3.5-abliterated:9b` generating Russian: a Chinese token
+appeared mid-sentence (`сердце猛地 подпрыгнуть`). Local abliterated builds are
+weaker on language purity than the hosted engines. If a template is used for
+non-English prose, either pick a larger local model or expect a language-purity
+pass to be necessary — `fiction-arc` already has one in the quality reviews.
+
+## Tests
+
+`src/backend/ai/ollama-client.test.ts` — 22 cases over the two pure functions:
+message assembly (blank system prompt omitted, empty user prompt allowed),
+`options` mapping including `max_output_tokens → num_predict` and rejection of
+zero / negative / NaN / string values, schema passthrough and `enforceSchema:false`,
+`think` handling, and NDJSON framing in `takeLines` (partial tail retained, blank
+lines dropped, empty buffer safe).
+
+Live check against a running daemon is not in the suite — it needs the model
+pulled. Reproduce with a short script importing `streamOllamaChat` directly.
