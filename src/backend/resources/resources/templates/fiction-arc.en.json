@@ -62,7 +62,7 @@
         "title": "Synopsis",
         "type": "text",
         "x": 40,
-        "y": 672,
+        "y": 956,
         "content": ["${synopsis}"],
         "width": 200,
         "height": 80
@@ -71,7 +71,7 @@
         "title": "World",
         "type": "text",
         "x": 600,
-        "y": 676,
+        "y": 890,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -112,7 +112,7 @@
         "title": "Theme",
         "type": "text",
         "x": 320,
-        "y": 265,
+        "y": 707,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -146,7 +146,7 @@
         "title": "Genre and register",
         "type": "text",
         "x": 320,
-        "y": 461,
+        "y": 808,
         "aiUserInstructions": [
           "## Age rating (user-set)",
           "",
@@ -177,8 +177,8 @@
       {
         "title": "Setting",
         "type": "text",
-        "x": 2925,
-        "y": 800,
+        "x": 2935,
+        "y": 926,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -221,7 +221,7 @@
         "title": "Style",
         "type": "text",
         "x": 600,
-        "y": 221,
+        "y": 637,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -259,8 +259,8 @@
       {
         "title": "Character anchor sheet",
         "type": "text",
-        "x": 880,
-        "y": 461,
+        "x": 890,
+        "y": 676,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -329,8 +329,8 @@
       {
         "title": "Characters (list)",
         "type": "text",
-        "x": 1160,
-        "y": 315,
+        "x": 1170,
+        "y": 467,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -393,8 +393,8 @@
       {
         "title": "Character voices",
         "type": "text",
-        "x": 1440,
-        "y": 482,
+        "x": 1450,
+        "y": 634,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -490,8 +490,8 @@
       {
         "title": "Split character list",
         "type": "split",
-        "x": 1440,
-        "y": 302,
+        "x": 1450,
+        "y": 454,
         "nodeTypeSettings": {
           "partDescription": "One character block: a `# Name` heading on the first line, then `- Field: value` lines for each anchor-sheet field, then an empty line and one sentence about the narrative role and key internal trait."
         },
@@ -523,10 +523,10 @@
       {
         "title": "Per-character loop",
         "type": "for-each",
-        "x": 1725,
-        "y": 300,
+        "x": 1735,
+        "y": 221,
         "width": 1120,
-        "height": 355,
+        "height": 385,
         "inputs": [
           {
             "sourceNodeTitle": "Split character list",
@@ -538,7 +538,7 @@
             "title": "Character",
             "type": "for-each-input",
             "x": 40,
-            "y": 100,
+            "y": 111,
             "width": 200,
             "height": 80
           },
@@ -546,7 +546,7 @@
             "title": "Character profile",
             "type": "text",
             "x": 320,
-            "y": 201,
+            "y": 223,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -662,7 +662,7 @@
             "title": "Character review",
             "type": "fix-problems",
             "x": 600,
-            "y": 158,
+            "y": 180,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Character profile",
               "maxIterations": 3,
@@ -770,7 +770,7 @@
             "title": "Character output",
             "type": "for-each-output",
             "x": 880,
-            "y": 158,
+            "y": 180,
             "inputs": [
               {
                 "sourceNodeTitle": "Character review",
@@ -785,8 +785,8 @@
       {
         "title": "Cast summary",
         "type": "merge",
-        "x": 2925,
-        "y": 360,
+        "x": 2935,
+        "y": 281,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -804,8 +804,8 @@
       {
         "title": "Scene plan",
         "type": "text",
-        "x": 3205,
-        "y": 732,
+        "x": 3215,
+        "y": 859,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -913,8 +913,8 @@
       {
         "title": "Scene plan review: structure",
         "type": "fix-problems",
-        "x": 3485,
-        "y": 545,
+        "x": 3495,
+        "y": 809,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan",
           "maxIterations": 2,
@@ -976,8 +976,8 @@
       {
         "title": "Setup/payoff registry",
         "type": "text",
-        "x": 3765,
-        "y": 373,
+        "x": 3775,
+        "y": 546,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -1034,10 +1034,83 @@
         "height": 80
       },
       {
+        "title": "Tension score",
+        "type": "text",
+        "x": 3775,
+        "y": 726,
+        "aiUserInstructions": [
+          "## Age rating of the work",
+          "",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+          "",
+          "## Scene plan (structurally reviewed)",
+          "```",
+          "{{[Scene plan review: structure]}}",
+          "```",
+          "",
+          "## Cast summary",
+          "```",
+          "{{[Cast summary]}}",
+          "```",
+          "",
+          "## Theme",
+          "```",
+          "{{[Theme]}}",
+          "```",
+          "",
+          "## What to do",
+          "",
+          "Write the tension score: one line per scene of the plan. The score answers **how hard and through what** a scene hits — the plan only answers what happens in it.",
+          "",
+          "The plan has already passed the structural check; take scene numbers `## Scene N` from it.",
+          "",
+          "For each scene:",
+          "",
+          "- **weight 1–5** — force of the blow to the protagonist. 1 is everyday awkwardness, 3 a tangible loss, 5 an irreversible turn;",
+          "- **source of pressure** — what it strikes through: someone else's gaze, time and deadline, the closeness of the witness, the irreversibility of what was done, the protagonist's own choice, growing used to the situation;",
+          "- **resistance** — what the protagonist attempts against the pressure and how it ends: succeeded, partly succeeded, failed, did not try;",
+          "- **withhold** — what the reader is not yet meant to know in this scene. Or `none`.",
+          "",
+          "## Hard rules",
+          "",
+          "1. **Weight is not length.** A long scene may weigh 1, a short one 5. If weight matches `chunk_count` across the whole plan, you are measuring length rather than force; redo it.",
+          "2. **Never two fives in a row.** A scene of weight 5 is followed by one of weight ≤ 3: the reader needs level ground, otherwise the next blow is not felt.",
+          "3. **After weight ≥ 4 the next scene is ≤ 3.** The same rule, softer, for fours.",
+          "4. **The source of pressure never repeats twice in a row.** Two consecutive scenes through one source read as a single scene: a blow registers by the novelty of the pressure, not by its force.",
+          "5. **At least one genuine \"succeeded\".** If resistance fails in every scene there is no hope, and without hope there is no tension — only a record of decline.",
+          "6. **The curve rises with dips, not in a straight line.** The final scene carries the highest weight in the plan; between the opening and the finale there is at least one drop of 2 or more.",
+          "7. **What is withheld stays withheld.** If something is marked \"withhold\" in scene K, it appears in no score line before K.",
+          "",
+          "**Self-check before output.** Write out the sequence of weights separated by commas and check rules 2, 3 and 6 against it. Then write out the sequence of pressure sources and check rule 4. Do not send the output until both sequences pass.",
+          "",
+          "Format: one line per scene, of the form",
+          "",
+          "`Scene N · weight W · source: … · resistance: … → … · withhold: …`",
+          "",
+          "Exactly as many lines as there are scenes in the plan. Each line is a single line of text, no wrapping. After the last line, output ends — no summary, no commentary. Do not state the word count in the output. In English."
+        ],
+        "inputs": [
+          {
+            "sourceNodeTitle": "Scene plan review: structure",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Cast summary",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Theme",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
         "title": "Scene plan review: quality",
         "type": "fix-problems",
-        "x": 4045,
-        "y": 657,
+        "x": 4055,
+        "y": 689,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan review: structure",
           "maxIterations": 3,
@@ -1052,6 +1125,11 @@
             "```",
             "{{[Setup/payoff registry]}}",
             "```",
+            "## Tension score",
+            "```",
+            "{{[Tension score]}}",
+            "```",
+            "",
             "",
             "## Cast summary",
             "```",
@@ -1087,7 +1165,9 @@
             "- **a middle scene K has no payoffs**: no setup from scenes < K fires in K (only new setups for the future are planted in K itself). Severity 60;",
             "- foreign-language insertions into English formulations: untranslated terms in another language, unjustified loanwords. **Don't flag**: technical field names of the plan format (`chunk_count`, `chunk_count: 1`), arc-type tags in the registry (`[plot]`, `[emotion]`, `[motif]`), canonical proper names from the fanfic universe (Hogwarts, Slytherin, Scorpius, Muggle, apparating) — these are part of the structure or canonical vocabulary, not violations. Severity ≥ 70 for real linguistic insertions.",
             "",
-            "Assign severity 0–100 to each problem."
+            "Assign severity 0–100 to each problem.",
+            "",
+            "**Tension score: curve shape.** severity 65 — two consecutive scenes of weight 5, or a scene of weight >= 4 followed by another of weight >= 4. severity 60 — the same source of pressure in two adjacent scenes. severity 70 — resistance fails in every scene with no single \"succeeded\". severity 55 — the finale does not carry the highest weight in the plan. severity 75 — something marked \"withhold\" in scene K is named in the plan before scene K."
           ],
           "aiUserInstructionsToFixProblems": [
             "## Age rating",
@@ -1132,6 +1212,10 @@
           {
             "sourceNodeTitle": "Setting",
             "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Tension score",
+            "type": "text"
           }
         ],
         "width": 200,
@@ -1140,8 +1224,8 @@
       {
         "title": "Chunk distribution",
         "type": "split",
-        "x": 4325,
-        "y": 657,
+        "x": 4335,
+        "y": 689,
         "nodeTypeSettings": {
           "partDescription": "Description of one technical prose chunk. First line — `**Mode:** full | fragment | packed`. Then for each scene that falls into this chunk, a block.\n\nFor **full** (one whole scene):\n`**Scene N** (portion: full), «<Title VERBATIM from the plan>»`\n`Goal / Conflict / Disaster: <VERBATIM from the plan>`\n`Emotional shift: <VERBATIM from the plan>`\n\nFor **packed** — several such full-blocks in a row, each scene with portion=full.\n\nFor **fragment** one scene is split across two chunks. Block contents are **asymmetric**: first has no Disaster, last has no Goal — this structurally forbids downstream LLM-generation nodes from pulling material from the other half. At the boundary stands a «Closing beat / Resume after» marker — its text is identical character-by-character in both chunks.\n\nfragment first:\n`**Scene N** (portion: first), «<Title VERBATIM from the plan>»`\n`Goal: <VERBATIM from the plan's «Goal»>`\n`Conflict (up to the cut point): <part of the Conflict from the plan that gets played out in this half>`\n`Closing beat (chunk ENDS on this event): <one phrase, a concrete physical gesture / line / sound / object movement>`\n`Emotional shift of this chunk: <from the state at the scene's start — to the state at the Closing beat>`\n\nfragment last:\n`**Scene N** (portion: last), «<Title VERBATIM from the plan>»`\n`Resume after (the previous chunk ended on this event — it is ALREADY PLAYED OUT, do not rewrite it as a scene): <IDENTICAL to the previous chunk's Closing beat, character-by-character>`\n`Conflict (after the cut point): <part of the Conflict from the plan that remains after the Closing beat>`\n`Disaster: <VERBATIM from the plan's «Disaster»>`\n`Emotional shift of this chunk: <from the state at Resume after — to the scene's final state>`",
           "expectedPartsCount": "${chunksCount}"
@@ -1215,10 +1299,10 @@
       {
         "title": "Per-chunk loop",
         "type": "for-each",
-        "x": 4680,
-        "y": 387,
-        "width": 2530,
-        "height": 756,
+        "x": 4640,
+        "y": 384,
+        "width": 2520,
+        "height": 740,
         "inputs": [
           {
             "sourceNodeTitle": "Chunk distribution",
@@ -1230,15 +1314,15 @@
             "title": "Chunk",
             "type": "for-each-input",
             "x": 40,
-            "y": 333,
+            "y": 403,
             "width": 200,
             "height": 80
           },
           {
             "title": "Chunk index",
             "type": "for-each-index",
-            "x": 890,
-            "y": 188,
+            "x": 880,
+            "y": 210,
             "width": 200,
             "height": 80
           },
@@ -1246,7 +1330,7 @@
             "title": "Previous chunks",
             "type": "for-each-prev-outputs",
             "x": 320,
-            "y": 572,
+            "y": 578,
             "width": 200,
             "height": 80
           },
@@ -1254,7 +1338,7 @@
             "title": "Previous chunks merged",
             "type": "merge",
             "x": 600,
-            "y": 572,
+            "y": 578,
             "nodeTypeSettings": {
               "includeNodeTitle": false,
               "includeInputTitles": false,
@@ -1273,7 +1357,7 @@
             "title": "Chunk plan",
             "type": "text",
             "x": 320,
-            "y": 396,
+            "y": 280,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1300,6 +1384,11 @@
               "```",
               "{{[Setting]}}",
               "```",
+              "### Tension score",
+              "```",
+              "{{[Tension score]}}",
+              "```",
+              "",
               "",
               "## Chunk (input)",
               "```",
@@ -1338,7 +1427,9 @@
               "",
               "## Format",
               "",
-              "Prose, natural paragraph, no labels «Goal:/Conflict:/Disaster:». In English. Upper bound 1500 words per chunk (for packed — across all scenes of the packet)."
+              "Prose, natural paragraph, no labels «Goal:/Conflict:/Disaster:». In English. Upper bound 1500 words per chunk (for packed — across all scenes of the packet).",
+              "",
+              "The score line for this scene sets the force of the blow, the source of pressure, and what the scene withholds. Weight is not length: plan force, not volume. What is withheld must not reach the chunk plan in any words."
             ],
             "inputs": [
               {
@@ -1360,6 +1451,10 @@
               {
                 "sourceNodeTitle": "Setting",
                 "type": "text"
+              },
+              {
+                "sourceNodeTitle": "Tension score",
+                "type": "text"
               }
             ],
             "width": 200,
@@ -1369,7 +1464,7 @@
             "title": "Scene details",
             "type": "text",
             "x": 600,
-            "y": 438,
+            "y": 455,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1445,8 +1540,8 @@
           {
             "title": "Chunk director notes",
             "type": "text",
-            "x": 890,
-            "y": 408,
+            "x": 880,
+            "y": 441,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1535,8 +1630,8 @@
           {
             "title": "Chunk prose",
             "type": "text",
-            "x": 1170,
-            "y": 256,
+            "x": 1160,
+            "y": 264,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1696,8 +1791,8 @@
           {
             "title": "Prose expansion",
             "type": "text",
-            "x": 1450,
-            "y": 403,
+            "x": 1440,
+            "y": 269,
             "aiUserInstructions": [
               "## Age rating of the work",
               "",
@@ -1781,8 +1876,8 @@
           {
             "title": "Polish: structure & continuity",
             "type": "fix-problems",
-            "x": 1730,
-            "y": 403,
+            "x": 1720,
+            "y": 461,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Prose expansion",
               "maxIterations": 2,
@@ -1897,8 +1992,8 @@
           {
             "title": "Polish: voice & style",
             "type": "fix-problems",
-            "x": 2010,
-            "y": 395,
+            "x": 2000,
+            "y": 112,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Polish: structure & continuity",
               "maxIterations": 1,
@@ -2003,8 +2098,8 @@
           {
             "title": "Chunk output",
             "type": "for-each-output",
-            "x": 2290,
-            "y": 395,
+            "x": 2280,
+            "y": 112,
             "inputs": [
               {
                 "sourceNodeTitle": "Polish: voice & style",
@@ -2019,8 +2114,8 @@
       {
         "title": "Draft assembly",
         "type": "merge",
-        "x": 7290,
-        "y": 1043,
+        "x": 7240,
+        "y": 444,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
