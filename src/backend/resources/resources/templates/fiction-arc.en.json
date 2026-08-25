@@ -62,16 +62,18 @@
         "title": "Synopsis",
         "type": "text",
         "x": 40,
-        "y": 956,
-        "content": ["${synopsis}"],
+        "y": 100,
+        "content": [
+          "${synopsis}"
+        ],
         "width": 200,
         "height": 80
       },
       {
         "title": "World",
         "type": "text",
-        "x": 600,
-        "y": 890,
+        "x": 340,
+        "y": 1042,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -109,10 +111,174 @@
         "height": 80
       },
       {
+        "title": "World review: physics",
+        "type": "fix-problems",
+        "x": 620,
+        "y": 1042,
+        "nodeTypeSettings": {
+          "sourceNodeTitleToFix": "World",
+          "maxIterations": 2,
+          "minSeverityToFix": 65,
+          "foundProblemsTemplate": "Found problems",
+          "aiUserInstructionsToFindProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to do",
+            "",
+            "Check the world description for one thing: does what it describes work the way it is described. Consistency with the synopsis, fidelity to the intent, style and completeness are not for this node — other nodes handle them.",
+            "",
+            "One test for every finding: picture the description filmed as a single unbroken take. It is visible that it wouldn't work — that's a finding. Doubt with nothing behind it is not a finding.",
+            "",
+            "The world's own declared rules (magic, technology, social institutions) are a given. Everything else is under check: whatever works in this world the way it works in ours.",
+            "",
+            "This is analysis, not the story: write no prose, compose no scenes, give no dialogue.",
+            "",
+            "## What to look for",
+            "",
+            "- **a device is described the way it does not work**: who physically changes an entry-phone code and with what; what falls inside a camera's field of view and what it records; where the call panel is, where the handset is, who buzzes whom in; what a door closer does; what the lock latches with and from which side, what happens when the door slams shut; where the power comes from. Severity 80;",
+            "- **a building is described the way they are not built**: where an external stair is put and where it leads, what height its lowest flight starts at; what belongs on a facade and what on a blank end wall; where windows face and which way doors open; where the attic, cellar, service floor sit. Severity 75;",
+            "- **sizes, heights, distances and durations are impossible or don't add up against each other**: a figure implausible on its own, or two figures in the file contradicting each other — that distance isn't covered in that time, a storey isn't that tall, that object doesn't fit a room of those dimensions. Severity 80;",
+            "- **weather and materials do what they don't do**: wind of the stated force, snow, rain, ice, frost, heat; what carries a load and what tears, bends, slips, burns; how long something dries, cools, holds a mark. Severity 70;",
+            "- **the central object is eyeballed**: the thing the plot is built around is described without a single quantity — no mass, no size, no speed, no height, no duration, nothing to estimate from. Severity 70;",
+            "- **a physical claim about the central object doesn't add up**: run the numbers — mass, sail area, wind speed, height, time — and compare them against the claim. Numbers against the claim — Severity 90.",
+            "",
+            "## Output format",
+            "",
+            "A list of findings, one item each: a quote from the world description (one sentence), then what does not work about it, with a figure or an estimate wherever the finding is about quantities, then severity 0–100. Up to 60 words per finding. Do not print a word count in the output.",
+            "",
+            "Scale: 80–100 — a plot move or a scene collapses on it; 65–79 — a reader who knows the subject stumbles. Do not report findings weaker than 65.",
+            "",
+            "{{[World]}}",
+            "```"
+          ],
+          "aiUserInstructionsToFixProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to do",
+            "",
+            "Rewrite the world description, removing the findings listed below. Change only what they name; carry the rest of the text over sentence by sentence.",
+            "",
+            "A fix is a replacement with something that works: a different device, a different building arrangement, a different figure, a different way of doing the same thing. After the fix the figures add up against each other and against the rest of the text.",
+            "",
+            "The world's declared rules stay as they are — the description around them is what gets repaired.",
+            "",
+            "Leave no marks of editing: no disclaimers, no commentary on the findings, no highlighting of what changed.",
+            "",
+            "Format unchanged: prose, no bullet points or numbering, no footnotes or URLs, in English. Upper bound 1500 words. Do not print a word count in the output.",
+            "",
+            "Output only the rewritten world description, no intro or outro.",
+            "",
+            "{{[World]}}",
+            "```",
+            "",
+            "## Found problems",
+            "```",
+            "{{[Found problems]}}",
+            "```"
+          ]
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "World",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "World review: readability",
+        "type": "fix-problems",
+        "x": 900,
+        "y": 1042,
+        "nodeTypeSettings": {
+          "sourceNodeTitleToFix": "World review: physics",
+          "maxIterations": 2,
+          "minSeverityToFix": 60,
+          "foundProblemsTemplate": "Found problems",
+          "aiUserInstructionsToFindProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to look for",
+            "",
+            "The «World» and «Setting» files below are read by the scene planner, and the planner's plan is read by the prose writer. One check: whatever is named here must stay recognisable after both hand-offs. This is analysis, not the work itself: don't write prose, don't compose scenes, don't offer corrected wordings — only the list of findings.",
+            "",
+            "Finding classes:",
+            "",
+            "- **a thing named by a feature instead of by its name** — referred to through its material, shape, a part of it, or the action it performs, while people have a word for the thing itself. Failure: «a voice answered from the grille», where the grille is the intercom speaker. Severity 75.",
+            "- **an element introduced as already known, never declared** — «the alcove», «the riser», «the apron», «the annexe» and the like used as if the reader already knows what they refer to, while nowhere in the two files is that thing named and described. Severity 80.",
+            "- **key geometry packed into one phrase** — the spatial relation the action depends on is compressed into a single clause and leans on landmarks the reader has not been given yet. Severity 75.",
+            "- **inventory instead of picture** — objects run one after another through commas, with no action, no weight, no vantage point; such an enumeration begs to be rewritten as a list. Severity 65.",
+            "- **a list of what is absent** — a place described through what it lacks: «there was no rag, no bag, no mat». Severity 60.",
+            "- **the story's central movement given without dimensions** — the passage, opening, distance or obstacle the action turns on is left to the eye, while secondary things in the same files are measured. Severity 70.",
+            "- **a person acts but is missing from the roster of people** — someone watches, lets others in, keeps watch, calls out, phones, yet is not declared among the residents, neighbours, staff. Severity 80.",
+            "- **foreign-language insertions into the English text** — untranslated terms, non-English fragments in the prose, non-localised proper nouns. Not a violation: names and titles from a canon that the «World» file names. Severity 85.",
+            "",
+            "Severity scale: 80–100 — blocking, the thing travels down the pipeline unrecognised; 60–79 — noticeable, the reader stumbles. Don't surface anything below 60. The number next to a class is for a clear-cut case; a weak instance of the same class scores lower, within the scale.",
+            "",
+            "For each finding assign severity 0–100, name the file — «World» or «Setting» — and quote the spot briefly. One spot — one item.",
+            "",
+            "{{[World review: physics]}}",
+            "```"
+          ],
+          "aiUserInstructionsToFixProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to do",
+            "",
+            "Rewrite the «World» file, clearing the problems found. Only «World» is edited; «Setting» is attached for cross-checking and stays as it is. A finding attributed to «Setting» is still cleared in «World»: a thing «Setting» mentions as known gets declared and named here.",
+            "",
+            "By finding class:",
+            "",
+            "- a thing named by a feature or a part gets back the word people call it by, and in the same place that word is tied to the feature the thing was already mentioned under;",
+            "- an element introduced as known gets a declaration before its first use: what it is, where it is, what it is for;",
+            "- key geometry is unpacked into separate sentences, and landmarks are introduced before anything refers to them;",
+            "- an inventory is worked into a picture: keep what takes part in the action, give the objects weight and an order of perception, drop the rest;",
+            "- a list of what is absent is replaced by a statement of what is present;",
+            "- the story's central movement gets dimensions in the same units the secondary things beside it are measured in;",
+            "- an acting person is entered into the roster of people: who they are, what they do, when they are on the spot;",
+            "- foreign-language insertions are rendered in English, keeping the canonical names from the source the file names.",
+            "",
+            "Constraints:",
+            "",
+            "- the world's facts, rules, canon and geography are preserved — what changes is how they are named and introduced. Add no new entities; the only additions are declarations of entities already mentioned;",
+            "- the format stays as before: continuous prose, no bullet points or numbering, no footnotes or URLs, in English. An unpacked inventory stays prose — don't set it as a list;",
+            "- the world is described statically — facts, rules, places. No plot moves, no scenes, no dialogue or lines of speech here;",
+            "- upper bound 1500 words; don't print a word count in the output. Everything the findings don't touch is preserved in full: the volume must not shrink after the edit.",
+            "",
+            "Output only the rewritten «World» file, no intro or outro.",
+            "",
+            "{{[World review: physics]}}",
+            "```",
+            "",
+            "## Found problems",
+            "```",
+            "{{[Found problems]}}",
+            "```"
+          ]
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "World review: physics",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
         "title": "Theme",
         "type": "text",
-        "x": 320,
-        "y": 707,
+        "x": 620,
+        "y": 129,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -145,8 +311,8 @@
       {
         "title": "Genre and register",
         "type": "text",
-        "x": 320,
-        "y": 808,
+        "x": 620,
+        "y": 862,
         "aiUserInstructions": [
           "## Age rating (user-set)",
           "",
@@ -177,8 +343,8 @@
       {
         "title": "Setting",
         "type": "text",
-        "x": 2935,
-        "y": 926,
+        "x": 1180,
+        "y": 1184,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -201,7 +367,7 @@
           "",
           "## World",
           "```",
-          "{{[World]}}",
+          "{{[World review: readability]}}",
           "```"
         ],
         "inputs": [
@@ -210,7 +376,132 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World",
+            "sourceNodeTitle": "World review: readability",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
+        "title": "Setting review: consistency",
+        "type": "fix-problems",
+        "x": 3225,
+        "y": 1184,
+        "nodeTypeSettings": {
+          "sourceNodeTitleToFix": "Setting",
+          "maxIterations": 3,
+          "minSeverityToFix": 70,
+          "foundProblemsTemplate": "Found problems",
+          "aiUserInstructionsToFindProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to do",
+            "",
+            "Cross-check the three files below — synopsis, world description and setting — and list the discrepancies between them and inside them. Only the setting will be rewritten: phrase every finding so that editing the setting alone removes it.",
+            "",
+            "This is analysis, not the work itself: don't compose scenes, don't write dialogue, don't produce prose fragments. Output only the list of findings.",
+            "",
+            "## What to look for",
+            "",
+            "- **the same thing described twice and differently** — a place, an object or a person named in two files with descriptions that don't match. Severity 85;",
+            "- **numbers don't add up** — floors, distances, time of day and durations, ages, apartment numbers, counts of rooms, windows, doors, people. Check every number that appears more than once. Severity 85;",
+            "- **a paragraph contradicts itself** — the paragraph says an object is absent and a line below it is there; the list of what's missing doesn't match the list of what's present. Look inside a single paragraph; don't compare across files in this class. Severity 90;",
+            "- **a property changes between files** — glass transparent in one and mirrored in the other, a door of iron that is also wooden, winter that is also heat, a lift that works and also doesn't. Severity 80;",
+            "- **a key prop lives in one file only** — the synopsis or the world rests on an object, place or device the setting never has; or the reverse: the setting introduces a thing the action leans on and nothing else mentions. Severity 75;",
+            "- **a load-bearing prop with no provenance** — walk a solid list, not the eye-catching items: write out everything the action rests on per the synopsis (key, code, lock, door, clothes, phone, money, document, transport, medicine, weapon, food, water, light, connection), and for each give four answers: where it is declared, where it came from, who holds it, where it ends up. Walk the whole list; report only the items where at least one answer isn't there. Severity 75;",
+            "- **a condition of the synopsis is unachievable in this world** — the action needs access, a device, a place or an ability the world and the setting don't provide. Severity 90;",
+            "- **the world grants what the synopsis forbade** — the synopsis rests on something being impossible, and the world or the setting makes it possible. Severity 85;",
+            "- **foreign-language insertions** — words and phrases not in English, untranslated terms and non-English fragments inside the English text. Severity 75.",
+            "",
+            "## Severity bands",
+            "",
+            "- 80–100: blocker, the text can't go downstream as is;",
+            "- 60–79: significant, the reader will stumble;",
+            "- 40–59: polish;",
+            "- below 40: don't report.",
+            "",
+            "Assign severity 0–100 to each finding.",
+            "",
+            "## Output format",
+            "",
+            "A numbered list. Each item: severity as a number 0–100, then the substance of the discrepancy, then both of its sides with the file each is stated in. No intro or outro. Nothing found — output a single line: `No discrepancies found`.",
+            "",
+            "## Synopsis",
+            "",
+            "```",
+            "{{[Synopsis]}}",
+            "```",
+            "",
+            "## World",
+            "",
+            "```",
+            "{{[World review: readability]}}",
+            "```",
+            "",
+            "## Setting (the file under check)",
+            "",
+            "```",
+            "{{[Setting]}}",
+            "```"
+          ],
+          "aiUserInstructionsToFixProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to do",
+            "",
+            "Rewrite the setting, clearing the found problems listed below. Only the setting is edited. The synopsis and the world description are the source of truth: on a discrepancy, change the setting to match them, not the other way round.",
+            "",
+            "Bring numbers, properties, materials and names into line with what the synopsis and the world say. An object the action rests on that the setting lacks — put it into the surroundings: where it is, whose it is, what it looks like, how to reach it, what becomes of it. Inside a paragraph, reconcile the list of what's missing with the list of what's present. Supply an unachievable condition of the synopsis: add the place, access or device without which the action doesn't run. Remove from the setting the ability the synopsis forbade. Replace foreign-language insertions with English words.",
+            "",
+            "Keep the rest of the text verbatim — rewrite only the places the findings touch.",
+            "",
+            "The setting stays a setting: a sensory picture of the place — what is seen, heard, smelled, the temperature and the texture. Write props in as part of the surroundings, without whoever uses them. Don't introduce character names, their actions or decisions, don't compose scenes, don't write dialogue.",
+            "",
+            "Prose, no bullets or numbering, no footnotes or URLs. In English, no foreign-language insertions. Upper bound 1500 words, don't inflate the volume for completeness. Do not include the word count in the output.",
+            "",
+            "Output only the rewritten setting, no intro or outro.",
+            "",
+            "## Synopsis",
+            "",
+            "```",
+            "{{[Synopsis]}}",
+            "```",
+            "",
+            "## World",
+            "",
+            "```",
+            "{{[World review: readability]}}",
+            "```",
+            "",
+            "## Found problems",
+            "",
+            "```",
+            "{{[Found problems]}}",
+            "```",
+            "",
+            "## Setting (to rewrite)",
+            "",
+            "```",
+            "{{[Setting]}}",
+            "```"
+          ]
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "Setting",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "World review: readability",
             "type": "text"
           }
         ],
@@ -220,8 +511,8 @@
       {
         "title": "Style",
         "type": "text",
-        "x": 600,
-        "y": 637,
+        "x": 900,
+        "y": 194,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -259,8 +550,8 @@
       {
         "title": "Character anchor sheet",
         "type": "text",
-        "x": 890,
-        "y": 676,
+        "x": 1180,
+        "y": 750,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -278,7 +569,7 @@
           "",
           "## World",
           "```",
-          "{{[World]}}",
+          "{{[World review: readability]}}",
           "```",
           "",
           "## Theme",
@@ -315,7 +606,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World",
+            "sourceNodeTitle": "World review: readability",
             "type": "text"
           },
           {
@@ -329,8 +620,8 @@
       {
         "title": "Characters (list)",
         "type": "text",
-        "x": 1170,
-        "y": 467,
+        "x": 1460,
+        "y": 482,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -393,8 +684,8 @@
       {
         "title": "Character voices",
         "type": "text",
-        "x": 1450,
-        "y": 634,
+        "x": 1740,
+        "y": 649,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -440,7 +731,7 @@
           "",
           "## World",
           "```",
-          "{{[World]}}",
+          "{{[World review: readability]}}",
           "```",
           "",
           "## Theme",
@@ -472,7 +763,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World",
+            "sourceNodeTitle": "World review: readability",
             "type": "text"
           },
           {
@@ -490,8 +781,8 @@
       {
         "title": "Split character list",
         "type": "split",
-        "x": 1450,
-        "y": 454,
+        "x": 1740,
+        "y": 469,
         "nodeTypeSettings": {
           "partDescription": "One character block: a `# Name` heading on the first line, then `- Field: value` lines for each anchor-sheet field, then an empty line and one sentence about the narrative role and key internal trait."
         },
@@ -523,8 +814,8 @@
       {
         "title": "Per-character loop",
         "type": "for-each",
-        "x": 1735,
-        "y": 221,
+        "x": 2025,
+        "y": 236,
         "width": 1120,
         "height": 385,
         "inputs": [
@@ -599,7 +890,7 @@
               "",
               "### World",
               "```",
-              "{{[World]}}",
+              "{{[World review: readability]}}",
               "```",
               "",
               "### Style",
@@ -639,7 +930,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "World",
+                "sourceNodeTitle": "World review: readability",
                 "type": "text"
               },
               {
@@ -785,8 +1076,8 @@
       {
         "title": "Cast summary",
         "type": "merge",
-        "x": 2935,
-        "y": 281,
+        "x": 3225,
+        "y": 296,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -804,8 +1095,8 @@
       {
         "title": "Scene plan",
         "type": "text",
-        "x": 3215,
-        "y": 859,
+        "x": 3525,
+        "y": 1115,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -828,12 +1119,12 @@
           "",
           "## Setting",
           "```",
-          "{{[Setting]}}",
+          "{{[Setting review: consistency]}}",
           "```",
           "",
           "## World",
           "```",
-          "{{[World]}}",
+          "{{[World review: readability]}}",
           "```",
           "",
           "## Genre and register",
@@ -895,11 +1186,11 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "Setting",
+            "sourceNodeTitle": "Setting review: consistency",
             "type": "text"
           },
           {
-            "sourceNodeTitle": "World",
+            "sourceNodeTitle": "World review: readability",
             "type": "text"
           },
           {
@@ -913,8 +1204,8 @@
       {
         "title": "Scene plan review: structure",
         "type": "fix-problems",
-        "x": 3495,
-        "y": 809,
+        "x": 3805,
+        "y": 1095,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan",
           "maxIterations": 2,
@@ -976,8 +1267,8 @@
       {
         "title": "Setup/payoff registry",
         "type": "text",
-        "x": 3775,
-        "y": 546,
+        "x": 4085,
+        "y": 460,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -1036,8 +1327,8 @@
       {
         "title": "Tension score",
         "type": "text",
-        "x": 3775,
-        "y": 726,
+        "x": 4085,
+        "y": 348,
         "aiUserInstructions": [
           "## Age rating of the work",
           "",
@@ -1109,8 +1400,8 @@
       {
         "title": "Scene plan review: quality",
         "type": "fix-problems",
-        "x": 4055,
-        "y": 689,
+        "x": 4365,
+        "y": 519,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan review: structure",
           "maxIterations": 3,
@@ -1138,7 +1429,7 @@
             "",
             "## Setting",
             "```",
-            "{{[Setting]}}",
+            "{{[Setting review: consistency]}}",
             "```",
             "",
             "## Scene plan (structurally checked — this is the polish input)",
@@ -1210,7 +1501,7 @@
             "type": "text"
           },
           {
-            "sourceNodeTitle": "Setting",
+            "sourceNodeTitle": "Setting review: consistency",
             "type": "text"
           },
           {
@@ -1222,10 +1513,143 @@
         "height": 80
       },
       {
+        "title": "Scene plan review: motive and perception",
+        "type": "fix-problems",
+        "x": 4645,
+        "y": 386,
+        "nodeTypeSettings": {
+          "sourceNodeTitleToFix": "Scene plan review: quality",
+          "maxIterations": 3,
+          "minSeverityToFix": 65,
+          "foundProblemsTemplate": "Found problems",
+          "aiUserInstructionsToFindProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to look for",
+            "",
+            "A motive-and-perception check: what each scene rests on from the side of whoever drives it. Scene format, `chunk_count` values, scene count and factual cross-checks are not checked here — other nodes catch those.",
+            "",
+            "For every scene identify the driving character — the one whose decision moves the scene — and test them against the classes below. What to lean on: the synopsis sets the plot's obligations, the world description sets what is available in this world and what is absent from it, the cast summary sets what the driver values, what they can do, what they fear and who they are attached to.",
+            "",
+            "Problem classes:",
+            "",
+            "- **interest not named** — the character enters a bargain, an alliance or a conflict, and the plan doesn't show what they gain from it and what they stand to lose. Severity 75;",
+            "- **knowledge from nowhere** — the character acts on information they cannot see, hear or know from here: they were not present at the conversation, received no message, the object is out of their reach, the event happened elsewhere and nobody reported it. Severity 80;",
+            "- **the way out is still open** — the synopsis requires the driver to have no choice, and the world offers a way around: wait it out, go around, ask for help, sit tight, make a call. The plan doesn't close that route. Severity 75;",
+            "- **absent witness** — the pressure on the character rests on someone else's gaze, judgement, exposure or reaction, and the one who watches and judges is not in this scene and never learns of it. Severity 70;",
+            "- **cheap price** — what the driver pays with is not dear to them by their profile: the loss touches neither an attachment, nor a standing, nor whatever holds them together. Severity 65;",
+            "- **foreign-language insertions** — untranslated non-English words inside an English phrase, non-romanised names without justification. Don't flag the plan's technical field names (`chunk_count`) or canonical proper names of the world. Severity 75.",
+            "",
+            "**Severity bands.** 80–100 — blocker: the plan can't go on with it. 60–79 — significant: the reader will notice and hold it against the work. 40–59 — polish. Below 40 — don't surface at all.",
+            "",
+            "Assign severity 0–100 to each problem.",
+            "",
+            "## Output format",
+            "",
+            "A bulleted list, one finding per item. Each item: the scene's number and title, the problem class, the driving character, what exactly fails, and the severity. 25–60 words per item, at most 12 items, heaviest first. Do not include the word count in the output.",
+            "",
+            "This is analysis, not the work itself: do not write prose, do not compose scenes, do not invent dialogue, and do not output a rewritten plan here. In English.",
+            "",
+            "## Synopsis",
+            "```",
+            "{{[Synopsis]}}",
+            "```",
+            "",
+            "## World",
+            "```",
+            "{{[World review: readability]}}",
+            "```",
+            "",
+            "## Cast summary",
+            "```",
+            "{{[Cast summary]}}",
+            "```",
+            "",
+            "## Scene plan (to check)",
+            "```",
+            "{{[Scene plan review: quality]}}",
+            "```"
+          ],
+          "aiUserInstructionsToFixProblems": [
+            "## Age rating of the work",
+            "",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "",
+            "## What to do",
+            "",
+            "Rewrite the scene plan, closing the findings listed below. Only motive and perception get fixed: why the driving character walks into the scene, what they have to work with there, what holds them, and what they pay with.",
+            "",
+            "Leave unchanged: the number of scenes, their order, numbering and `## Scene N: <Title>` headings; the `chunk_count` values and their sum; the three required bullets of each scene (`chunk_count`, `Goal / Conflict / Disaster`, `Emotional shift`); the events and disasters of scenes that carry no findings.",
+            "",
+            "Close each finding inside the scene where it was found:",
+            "",
+            "- interest — name what the driver gains and what they lose, in the terms the cast summary uses for them;",
+            "- knowledge — give a physical source of the information in this scene or an earlier one: an object in hand, an overheard conversation, a delivered message, a witness. Remove any action that rests on the inaccessible;",
+            "- open way out — close the detour with means already established by the world description and the synopsis, not with a new prohibition out of nowhere;",
+            "- absent witness — bring the observer into the scene, or move the pressure onto what is physically present in it;",
+            "- cheap price — replace what is paid with something dear to the character by their profile;",
+            "- foreign-language insertion — translate it or transliterate it in Latin script.",
+            "",
+            "Fix by replacing wording, not by adding to it: `Goal / Conflict / Disaster` — one prose paragraph, up to ~120 words per scene; `Emotional shift` — one or two sentences. The plan's overall size does not grow. Do not include the word count in the output.",
+            "",
+            "This is a plan, not the novella itself: describe scenes, don't play them out; write no dialogue and no passages of fiction. In English, with no foreign-language insertions.",
+            "",
+            "Output only the rewritten plan, no intro or outro.",
+            "",
+            "## Synopsis",
+            "```",
+            "{{[Synopsis]}}",
+            "```",
+            "",
+            "## World",
+            "```",
+            "{{[World review: readability]}}",
+            "```",
+            "",
+            "## Cast summary",
+            "```",
+            "{{[Cast summary]}}",
+            "```",
+            "",
+            "## Scene plan",
+            "```",
+            "{{[Scene plan review: quality]}}",
+            "```",
+            "",
+            "## Found problems",
+            "```",
+            "{{[Found problems]}}",
+            "```"
+          ]
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "Scene plan review: quality",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Cast summary",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "World review: readability",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
         "title": "Chunk distribution",
         "type": "split",
-        "x": 4335,
-        "y": 689,
+        "x": 4925,
+        "y": 386,
         "nodeTypeSettings": {
           "partDescription": "Description of one technical prose chunk. First line — `**Mode:** full | fragment | packed`. Then for each scene that falls into this chunk, a block.\n\nFor **full** (one whole scene):\n`**Scene N** (portion: full), «<Title VERBATIM from the plan>»`\n`Goal / Conflict / Disaster: <VERBATIM from the plan>`\n`Emotional shift: <VERBATIM from the plan>`\n\nFor **packed** — several such full-blocks in a row, each scene with portion=full.\n\nFor **fragment** one scene is split across two chunks. Block contents are **asymmetric**: first has no Disaster, last has no Goal — this structurally forbids downstream LLM-generation nodes from pulling material from the other half. At the boundary stands a «Closing beat / Resume after» marker — its text is identical character-by-character in both chunks.\n\nfragment first:\n`**Scene N** (portion: first), «<Title VERBATIM from the plan>»`\n`Goal: <VERBATIM from the plan's «Goal»>`\n`Conflict (up to the cut point): <part of the Conflict from the plan that gets played out in this half>`\n`Closing beat (chunk ENDS on this event): <one phrase, a concrete physical gesture / line / sound / object movement>`\n`Emotional shift of this chunk: <from the state at the scene's start — to the state at the Closing beat>`\n\nfragment last:\n`**Scene N** (portion: last), «<Title VERBATIM from the plan>»`\n`Resume after (the previous chunk ended on this event — it is ALREADY PLAYED OUT, do not rewrite it as a scene): <IDENTICAL to the previous chunk's Closing beat, character-by-character>`\n`Conflict (after the cut point): <part of the Conflict from the plan that remains after the Closing beat>`\n`Disaster: <VERBATIM from the plan's «Disaster»>`\n`Emotional shift of this chunk: <from the state at Resume after — to the scene's final state>`",
           "expectedPartsCount": "${chunksCount}"
@@ -1237,7 +1661,7 @@
           "",
           "## Scene plan (input — single source of truth)",
           "```",
-          "{{[Scene plan review: quality]}}",
+          "{{[Scene plan review: motive and perception]}}",
           "```",
           "",
           "## What to do",
@@ -1289,7 +1713,7 @@
         ],
         "inputs": [
           {
-            "sourceNodeTitle": "Scene plan review: quality",
+            "sourceNodeTitle": "Scene plan review: motive and perception",
             "type": "text"
           }
         ],
@@ -1299,10 +1723,10 @@
       {
         "title": "Per-chunk loop",
         "type": "for-each",
-        "x": 4640,
-        "y": 384,
-        "width": 2520,
-        "height": 740,
+        "x": 5230,
+        "y": 257,
+        "width": 2530,
+        "height": 726,
         "inputs": [
           {
             "sourceNodeTitle": "Chunk distribution",
@@ -1314,7 +1738,7 @@
             "title": "Chunk",
             "type": "for-each-input",
             "x": 40,
-            "y": 403,
+            "y": 443,
             "width": 200,
             "height": 80
           },
@@ -1322,7 +1746,7 @@
             "title": "Chunk index",
             "type": "for-each-index",
             "x": 880,
-            "y": 210,
+            "y": 246,
             "width": 200,
             "height": 80
           },
@@ -1330,7 +1754,7 @@
             "title": "Previous chunks",
             "type": "for-each-prev-outputs",
             "x": 320,
-            "y": 578,
+            "y": 564,
             "width": 200,
             "height": 80
           },
@@ -1338,7 +1762,7 @@
             "title": "Previous chunks merged",
             "type": "merge",
             "x": 600,
-            "y": 578,
+            "y": 564,
             "nodeTypeSettings": {
               "includeNodeTitle": false,
               "includeInputTitles": false,
@@ -1357,7 +1781,7 @@
             "title": "Chunk plan",
             "type": "text",
             "x": 320,
-            "y": 280,
+            "y": 307,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1382,7 +1806,7 @@
               "",
               "### Setting",
               "```",
-              "{{[Setting]}}",
+              "{{[Setting review: consistency]}}",
               "```",
               "### Tension score",
               "```",
@@ -1449,7 +1873,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting",
+                "sourceNodeTitle": "Setting review: consistency",
                 "type": "text"
               },
               {
@@ -1464,7 +1888,7 @@
             "title": "Scene details",
             "type": "text",
             "x": 600,
-            "y": 455,
+            "y": 435,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1554,7 +1978,7 @@
               "",
               "## Setting",
               "```",
-              "{{[Setting]}}",
+              "{{[Setting review: consistency]}}",
               "```",
               "",
               "## Previous chunks merged (when present — gives the tail this chunk picks up)",
@@ -1604,7 +2028,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting",
+                "sourceNodeTitle": "Setting review: consistency",
                 "type": "text"
               },
               {
@@ -1630,8 +2054,8 @@
           {
             "title": "Chunk prose",
             "type": "text",
-            "x": 1160,
-            "y": 264,
+            "x": 1170,
+            "y": 213,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1649,7 +2073,7 @@
               "",
               "## Setting",
               "```",
-              "{{[Setting]}}",
+              "{{[Setting review: consistency]}}",
               "```",
               "",
               "## Setup/payoff registry",
@@ -1765,7 +2189,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting",
+                "sourceNodeTitle": "Setting review: consistency",
                 "type": "text"
               },
               {
@@ -1791,8 +2215,8 @@
           {
             "title": "Prose expansion",
             "type": "text",
-            "x": 1440,
-            "y": 269,
+            "x": 1450,
+            "y": 219,
             "aiUserInstructions": [
               "## Age rating of the work",
               "",
@@ -1810,7 +2234,7 @@
               "",
               "## Setting",
               "```",
-              "{{[Setting]}}",
+              "{{[Setting review: consistency]}}",
               "```",
               "",
               "## Scene details",
@@ -1858,7 +2282,7 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Setting",
+                "sourceNodeTitle": "Setting review: consistency",
                 "type": "text"
               },
               {
@@ -1876,8 +2300,8 @@
           {
             "title": "Polish: structure & continuity",
             "type": "fix-problems",
-            "x": 1720,
-            "y": 461,
+            "x": 1730,
+            "y": 189,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Prose expansion",
               "maxIterations": 2,
@@ -1992,8 +2416,8 @@
           {
             "title": "Polish: voice & style",
             "type": "fix-problems",
-            "x": 2000,
-            "y": 112,
+            "x": 2010,
+            "y": 100,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Polish: structure & continuity",
               "maxIterations": 1,
@@ -2098,8 +2522,8 @@
           {
             "title": "Chunk output",
             "type": "for-each-output",
-            "x": 2280,
-            "y": 112,
+            "x": 2290,
+            "y": 100,
             "inputs": [
               {
                 "sourceNodeTitle": "Polish: voice & style",
@@ -2114,8 +2538,8 @@
       {
         "title": "Draft assembly",
         "type": "merge",
-        "x": 7240,
-        "y": 444,
+        "x": 7840,
+        "y": 317,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
