@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer"
 import type { JsonSchemaSpec } from "./ai-engine-adapter.js"
 
 /** Native Ollama chat message. */
@@ -81,48 +82,71 @@ export async function* streamOllamaChat(
   request: OllamaChatRequest,
   abortSignal: AbortSignal,
 ): AsyncGenerator<OllamaChatChunk> {
-  const url = `${baseUrl.replace(/\/+$/, "")}/api/chat`
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-    signal: abortSignal,
+  for await (const line of streamLines(baseUrl, request, abortSignal)) {
+    let chunk: OllamaChatChunk
+    try {
+      chunk = JSON.parse(line) as OllamaChatChunk
+    } catch {
+      continue
+    }
+    if (chunk.error) throw new Error(`Ollama: ${chunk.error}`)
+    yield chunk
+  }
+}
+
+/**
+ * Raw NDJSON lines over node:http.
+ *
+ * Deliberately NOT global `fetch`: undici imposes a five-minute
+ * `headersTimeout`, and Ollama withholds response headers while the model
+ * evaluates the prompt. A long prompt on a local model routinely exceeds that,
+ * and the call dies as `TypeError: fetch failed` / `UND_ERR_HEADERS_TIMEOUT`
+ * before the first byte of output exists. `http.request` imposes no such
+ * deadline, so the only limit is the caller's abort signal.
+ */
+async function* streamLines(
+  baseUrl: string,
+  request: OllamaChatRequest,
+  abortSignal: AbortSignal,
+): AsyncGenerator<string> {
+  const url = new URL(`${baseUrl.replace(/\/+$/, "")}/api/chat`)
+  const transport = url.protocol === "https:" ? await import("node:https") : await import("node:http")
+  const body = JSON.stringify(request)
+
+  const res = await new Promise<import("node:http").IncomingMessage>((resolve, reject) => {
+    const req = transport.request(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+      },
+      resolve,
+    )
+    req.on("error", reject)
+    abortSignal.addEventListener("abort", () => req.destroy(new Error("aborted")), { once: true })
+    req.end(body)
   })
 
-  if (!response.ok || !response.body) {
-    const detail = await response.text().catch(() => "")
-    throw new Error(`Ollama ${response.status} ${response.statusText}${detail ? `: ${detail.slice(0, 500)}` : ""}`)
+  if (!res.statusCode || res.statusCode >= 400) {
+    const detail = await readAll(res)
+    throw new Error(`Ollama ${res.statusCode} ${res.statusMessage ?? ""}${detail ? `: ${detail.slice(0, 500)}` : ""}`)
   }
 
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
+  res.setEncoding("utf8")
   let buffer = ""
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const { lines, rest } = takeLines(buffer)
-      buffer = rest
-      for (const line of lines) {
-        let chunk: OllamaChatChunk
-        try {
-          chunk = JSON.parse(line) as OllamaChatChunk
-        } catch {
-          continue
-        }
-        if (chunk.error) throw new Error(`Ollama: ${chunk.error}`)
-        yield chunk
-      }
-    }
-    if (buffer.trim().length > 0) {
-      try {
-        yield JSON.parse(buffer) as OllamaChatChunk
-      } catch {
-        /* trailing garbage — ignore */
-      }
-    }
-  } finally {
-    reader.releaseLock()
+  for await (const piece of res) {
+    if (abortSignal.aborted) throw new Error("aborted")
+    buffer += piece as string
+    const { lines, rest } = takeLines(buffer)
+    buffer = rest
+    for (const line of lines) yield line
   }
+  if (buffer.trim().length > 0) yield buffer
+}
+
+async function readAll(res: import("node:http").IncomingMessage): Promise<string> {
+  let out = ""
+  res.setEncoding("utf8")
+  for await (const piece of res) out += piece as string
+  return out
 }
