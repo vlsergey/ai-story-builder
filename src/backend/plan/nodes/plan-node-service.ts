@@ -28,6 +28,7 @@ import { ForEachProcessor } from "./graph/for-each-processor.js"
 import { LoreProcessor } from "./graph/lore-processor.js"
 import { MergeProcessor } from "./graph/merge-processor.js"
 import type { NodeProcessor } from "./graph/node-processor.js"
+import { FormatProcessor } from "./graph/format-processor.js"
 import { ScriptProcessor } from "./graph/script-processor.js"
 import { mergeNodeSettings } from "./graph/settings-helper.js"
 import { SplitProcessor } from "./graph/split-processor.js"
@@ -53,6 +54,7 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   split: new SplitProcessor(),
   merge: new MergeProcessor(),
   script: new ScriptProcessor(),
+  format: new FormatProcessor(),
 }
 
 const DO_NOT_NOTIFY_DOWNSTREAMS_ON_CHANGES_IN: (keyof PlanNodeRow)[] = [

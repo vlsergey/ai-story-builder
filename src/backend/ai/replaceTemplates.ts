@@ -122,3 +122,28 @@ export function replaceTemplates<T extends string | null>(
 
   return rendered as T
 }
+
+/** Count whitespace-separated tokens — for word counts in formatting templates. */
+handlebarsInstance.registerHelper("words", (v: unknown) =>
+  typeof v === "string" ? v.split(/\s+/u).filter(Boolean).length : 0,
+)
+
+/**
+ * Render a formatting template (not a prompt).
+ *
+ * Differs from `replaceTemplates` in two ways that matter:
+ *  - HTML escaping is ON, so `{{x}}` is safe by default and `{{{x}}}` is the
+ *    deliberate opt-out. Prompts want the opposite and get `noEscape: true`.
+ *  - the context carries arbitrary values, not just strings, so a `textArray`
+ *    input arrives as an array and `{{#each}}` works on it.
+ *
+ * The same helpers are available, plus `words`.
+ */
+export function renderFormatTemplate(template: string, context: Record<string, unknown>): string {
+  try {
+    const compiled = handlebarsInstance.compile(template, { strict: true, preventIndent: false })
+    return compiled(context)
+  } catch (err) {
+    throw makeErrorWithStatus(`Format template render failed: ${(err as Error).message}`, 400)
+  }
+}

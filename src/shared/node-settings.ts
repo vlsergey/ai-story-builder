@@ -56,6 +56,16 @@ export interface ScriptSettings {
   timeoutMs?: number
 }
 
+export interface FormatSettings {
+  /**
+   * Handlebars template rendering this node's inputs. Inputs are addressed by
+   * source node title, as in prompts: `{{[Draft assembly]}}`. A `textArray`
+   * input arrives as an array, so `{{#each [Per-chunk loop]}}` iterates parts.
+   * HTML escaping is on; `{{{x}}}` opts out.
+   */
+  template?: string
+}
+
 export interface TextSettings extends LlmCallPrompts {}
 export interface LoreSettings extends LlmCallPrompts {}
 
@@ -67,6 +77,7 @@ export type NodeTypeSettingsMap = {
   split: SplitSettings
   merge: MergeSettings
   script: ScriptSettings
+  format: FormatSettings
   text: TextSettings
   lore: LoreSettings
   "for-each": ForEachSettings
@@ -80,6 +91,7 @@ export type NodeTypeSettings<T extends keyof NodeTypeSettingsMap = keyof NodeTyp
 export type SplitSettingsPartial = Partial<SplitSettings>
 export type MergeSettingsPartial = Partial<MergeSettings>
 export type ScriptSettingsPartial = Partial<ScriptSettings>
+export type FormatSettingsPartial = Partial<FormatSettings>
 export type TextSettingsPartial = Partial<TextSettings>
 export type LoreSettingsPartial = Partial<LoreSettings>
 export type ForEachSettingsPartial = Partial<ForEachSettings>
@@ -90,6 +102,7 @@ export type NodeTypeSettingsPartialMap = {
   split: SplitSettingsPartial
   merge: MergeSettingsPartial
   script: ScriptSettingsPartial
+  format: FormatSettingsPartial
   text: TextSettingsPartial
   lore: LoreSettingsPartial
   "for-each": ForEachSettingsPartial
@@ -114,6 +127,8 @@ export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(
       } as NodeTypeSettingsMap[T]
     case "script":
       return { source: "", timeoutMs: 5000 } as NodeTypeSettingsMap[T]
+    case "format":
+      return { template: "" } as NodeTypeSettingsMap[T]
     case "text":
     case "lore":
       return {} as NodeTypeSettingsMap[T]

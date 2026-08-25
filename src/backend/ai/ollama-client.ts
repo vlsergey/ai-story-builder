@@ -34,6 +34,16 @@ export interface OllamaChatChunk {
 
 export const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
+/**
+ * How long the socket may stay silent before we call it dead.
+ *
+ * NOT a deadline on the whole call and NOT a deadline on the first header —
+ * a local model legitimately spends many minutes evaluating a long prompt
+ * before it emits anything. This only catches a connection that has stopped
+ * delivering bytes altogether.
+ */
+export const OLLAMA_IDLE_TIMEOUT_MS = 30 * 60 * 1000
+
 export function buildChatRequest(args: {
   model: string
   systemPrompt: string | null
@@ -123,6 +133,11 @@ async function* streamLines(
       resolve,
     )
     req.on("error", reject)
+    req.setTimeout(OLLAMA_IDLE_TIMEOUT_MS, () => {
+      req.destroy(
+        new Error(`Ollama: no data for ${Math.round(OLLAMA_IDLE_TIMEOUT_MS / 60000)} min — connection is dead`),
+      )
+    })
     abortSignal.addEventListener("abort", () => req.destroy(new Error("aborted")), { once: true })
     req.end(body)
   })

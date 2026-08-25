@@ -16,6 +16,7 @@
         "split",
         "fix-problems",
         "script",
+        "format",
         "for-each-input",
         "for-each-output",
         "for-each-prev-outputs",
