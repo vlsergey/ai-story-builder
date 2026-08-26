@@ -3,6 +3,71 @@ import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
 
 /**
+ * Node types whose content is a pure function of their inputs — no model call,
+ * no randomness. Re-running one over unchanged inputs reproduces its content
+ * exactly, emptiness included.
+ */
+const DETERMINISTIC_TYPES = new Set<PlanNodeRow["type"]>([
+  "merge",
+  "script",
+  "format",
+  "for-each-input",
+  "for-each-output",
+  "for-each-index",
+  "for-each-prev-outputs",
+])
+
+/**
+ * Which EMPTY nodes actually mean "work is pending".
+ *
+ * EMPTY says "has no content" — on its own it does not say whether that is a
+ * finished answer or an unfinished one. For a deterministic node fed by
+ * settled inputs it is finished: re-running yields the same nothing, so every
+ * reader downstream is still fresh. For a generative node it is unfinished —
+ * an empty answer today may be a full one tomorrow — so it stays contagious.
+ *
+ * Conflating the two is what dragged a whole for-each loop back through the
+ * model: one merge node aggregating previous iterations is legitimately EMPTY
+ * on iteration 0, it fed six siblings, they were pre-marked OUTDATED, that
+ * promoted the container bottom-up, and an hour of prose regenerated for
+ * nothing. Bottom-up propagation already carved out this case; forward
+ * propagation did not.
+ */
+function computeContagiousEmpty(
+  allNodes: PlanNodeRow[],
+  incoming: Map<number, number[]>,
+  byId: Map<number, PlanNodeRow>,
+  forwardStale: Set<PlanNodeRow["status"]>,
+): Set<number> {
+  const contagious = new Set<number>()
+  for (const n of allNodes) {
+    if (n.status === "EMPTY" && !DETERMINISTIC_TYPES.has(n.type)) contagious.add(n.id)
+  }
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const n of allNodes) {
+      if (n.status !== "EMPTY" || contagious.has(n.id)) continue
+      const pendingSource = (incoming.get(n.id) ?? []).some((srcId) => {
+        const src = byId.get(srcId)
+        if (!src) return false
+        return src.status === "EMPTY" ? contagious.has(src.id) : forwardStale.has(src.status)
+      })
+      if (pendingSource) {
+        contagious.add(n.id)
+        grew = true
+      }
+    }
+  }
+  return contagious
+}
+
+export interface PropagateOptions {
+  regenerateManual: boolean
+  regenerateGenerated: boolean
+}
+
+/**
  * Before a regeneration sweep starts, propagate "stale" status through the
  * graph so the topological scheduler doesn't accidentally consider a
  * GENERATED downstream node ready to run while one of its (transitively)
@@ -22,8 +87,9 @@ import { PlanNodeRepository } from "../plan-node-repository.js"
  *      and summary, blocks summary regen, and confuses the UI.
  *
  * Stale-source set per rule:
- *   - forward: ERROR, OUTDATED, EMPTY  (EMPTY upstream means downstream got
- *     no real input — must refresh)
+ *   - forward: ERROR, OUTDATED, and EMPTY — but only a *contagious* EMPTY,
+ *     see computeContagiousEmpty. A deterministic node fed by settled inputs
+ *     re-runs to the same emptiness, so its EMPTY is an answer, not a debt.
  *   - bottom-up: ERROR, OUTDATED only  (EMPTY descendants do NOT propagate
  *     to their container — for-each-internal merge nodes like «Сборка
  *     предыдущих сцен» are legitimately EMPTY on iter 0, and that is not a
@@ -37,11 +103,6 @@ import { PlanNodeRepository } from "../plan-node-repository.js"
  * (user-authoritative) nor disturb in-flight (GENERATING) / already-stale
  * statuses.
  */
-export interface PropagateOptions {
-  regenerateManual: boolean
-  regenerateGenerated: boolean
-}
-
 export function propagateStaleStatus(
   options: PropagateOptions = { regenerateManual: false, regenerateGenerated: false },
 ): {
@@ -69,11 +130,11 @@ export function propagateStaleStatus(
   const allNodes = nodeRepo.findAll()
   const byId = new Map<number, PlanNodeRow>(allNodes.map((n) => [n.id, n]))
 
-  const downstream = new Map<number, number[]>()
+  const incoming = new Map<number, number[]>()
   for (const e of edgeRepo.findAll()) {
-    const list = downstream.get(e.from_node_id) ?? []
-    list.push(e.to_node_id)
-    downstream.set(e.from_node_id, list)
+    const list = incoming.get(e.to_node_id) ?? []
+    list.push(e.from_node_id)
+    incoming.set(e.to_node_id, list)
   }
 
   const childrenByParent = new Map<number, PlanNodeRow[]>()
@@ -89,18 +150,15 @@ export function propagateStaleStatus(
   let changed = true
   while (changed) {
     changed = false
+    const contagiousEmpty = computeContagiousEmpty(allNodes, incoming, byId, forwardStale)
     for (const node of allNodes) {
       if (node.status !== "GENERATED") continue
 
-      const upstreamStale = (() => {
-        for (const [fromId, outs] of downstream) {
-          if (outs.includes(node.id)) {
-            const src = byId.get(fromId)
-            if (src && forwardStale.has(src.status)) return true
-          }
-        }
-        return false
-      })()
+      const upstreamStale = (incoming.get(node.id) ?? []).some((fromId) => {
+        const src = byId.get(fromId)
+        if (!src) return false
+        return src.status === "EMPTY" ? contagiousEmpty.has(src.id) : forwardStale.has(src.status)
+      })
 
       const childStale = (childrenByParent.get(node.id) ?? []).some((c) => bottomUpStale.has(c.status))
 

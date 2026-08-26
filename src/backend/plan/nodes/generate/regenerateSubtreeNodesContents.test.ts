@@ -156,4 +156,55 @@ describe("regenerateSubtreeNodesContents — re-checks live status after cascade
     expect(mergeRuns, "merge re-queued multiple times — infinite-loop bug").toBe(1)
     expect(consumerRuns, "consumer never ran — deferred forever by demoted-source check").toBe(1)
   })
+
+  it("still reaches a consumer when a settled-EMPTY source stops being empty", async () => {
+    // The other half of the forward-EMPTY exemption in propagateStaleStatus.
+    // Nothing is pre-marked from a deterministic node that is merely empty —
+    // so the run-time cascade has to carry the work instead. Here the merge
+    // stops being empty because its own source finally produced something,
+    // and the consumer must still be dragged back through regeneration.
+    const nodeRepo = new PlanNodeRepository()
+    const edgeRepo = new PlanEdgeRepository()
+
+    const src = nodeRepo.insert({ title: "Src", type: "text", parent_id: null, status: "OUTDATED" })
+    const merge = nodeRepo.insert({ title: "Agg", type: "merge", parent_id: null, status: "EMPTY", content: "" })
+    const consumer = nodeRepo.insert({
+      title: "Consumer",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      content: "stale",
+    })
+    edgeRepo.insert({ from_node_id: src, to_node_id: merge, type: "text" })
+    edgeRepo.insert({ from_node_id: merge, to_node_id: consumer, type: "text" })
+    const stubSettings = JSON.stringify({ userPrompt: "stub" })
+    nodeRepo.patch(src, { node_type_settings: stubSettings })
+    nodeRepo.patch(consumer, { node_type_settings: stubSettings })
+
+    vi.spyOn(PlanNodeService.prototype, "regenerate").mockImplementation(async function (this: PlanNodeService, ctx) {
+      regenerateOrder.push(ctx.nodeId)
+      return await this.patch(ctx.nodeId, false, { status: "GENERATED", content: `gen-${ctx.nodeId}` })
+    })
+
+    const abortController = new AbortController()
+    const containerContext: any = {
+      abortSignal: abortController.signal,
+      options: { regenerateManual: false, regenerateGenerated: false },
+      onNodeSkip: () => {},
+      onNodeStart: async <T>(_node: any, block: (ctx: any) => Promise<{ result: T; status: string }>) => {
+        await block({
+          nodeId: _node.id,
+          abortSignal: abortController.signal,
+          options: { regenerateManual: false, regenerateGenerated: false },
+          onResponseStreamEvent: () => {},
+        })
+      },
+    }
+
+    await regenerateSubtreeNodesContents(containerContext, null)
+
+    expect(regenerateOrder, "merge must re-run — it was EMPTY").toContain(merge)
+    expect(regenerateOrder, "consumer must re-run — its source stopped being empty").toContain(consumer)
+    expect(regenerateOrder.indexOf(merge)).toBeLessThan(regenerateOrder.indexOf(consumer))
+  })
 })

@@ -176,4 +176,97 @@ describe("propagateStaleStatus", () => {
 
     expect(nodes.findById(downstream)!.status).toBe("OUTDATED")
   })
+
+  it("does NOT propagate forward from an EMPTY deterministic node whose inputs are settled", () => {
+    // The «Сборка предыдущих чанков» trap, forward edition. A merge node inside
+    // a for-each aggregates previous iterations; on iteration 0 there are none,
+    // so it is EMPTY — and that is its final, correct answer. Re-running it
+    // produces the same emptiness, so everything reading from it is still fresh.
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const prev = nodes.insert({ title: "Prev", type: "for-each-prev-outputs", parent_id: null, status: "GENERATED" })
+    const agg = nodes.insert({ title: "PrevAgg", type: "merge", parent_id: null, status: "EMPTY" })
+    const reader = nodes.insert({ title: "Notes", type: "text", parent_id: null, status: "GENERATED" })
+    edges.insert({ from_node_id: prev, to_node_id: agg, type: "textArray" })
+    edges.insert({ from_node_id: agg, to_node_id: reader, type: "text" })
+
+    const result = propagateStaleStatus()
+
+    expect(result.markedNodeIds).toEqual([])
+    expect(nodes.findById(reader)!.status).toBe("GENERATED")
+  })
+
+  it("DOES propagate forward from an EMPTY deterministic node when its own input is stale", () => {
+    // Emptiness is only settled while nothing upstream is pending. An OUTDATED
+    // source means the merge is about to change, so downstream must be demoted.
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const src = nodes.insert({ title: "Src", type: "text", parent_id: null, status: "OUTDATED" })
+    const agg = nodes.insert({ title: "PrevAgg", type: "merge", parent_id: null, status: "EMPTY" })
+    const reader = nodes.insert({ title: "Notes", type: "text", parent_id: null, status: "GENERATED" })
+    edges.insert({ from_node_id: src, to_node_id: agg, type: "text" })
+    edges.insert({ from_node_id: agg, to_node_id: reader, type: "text" })
+
+    propagateStaleStatus()
+
+    expect(nodes.findById(reader)!.status).toBe("OUTDATED")
+  })
+
+  it("carries the exemption through a chain of EMPTY deterministic nodes", () => {
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const prev = nodes.insert({ title: "Prev", type: "for-each-prev-outputs", parent_id: null, status: "GENERATED" })
+    const agg = nodes.insert({ title: "Agg", type: "merge", parent_id: null, status: "EMPTY" })
+    const page = nodes.insert({ title: "Page", type: "format", parent_id: null, status: "EMPTY" })
+    const reader = nodes.insert({ title: "Reader", type: "text", parent_id: null, status: "GENERATED" })
+    edges.insert({ from_node_id: prev, to_node_id: agg, type: "textArray" })
+    edges.insert({ from_node_id: agg, to_node_id: page, type: "text" })
+    edges.insert({ from_node_id: page, to_node_id: reader, type: "text" })
+
+    expect(propagateStaleStatus().markedNodeIds).toEqual([])
+  })
+
+  it("still propagates forward from an EMPTY LLM node — its emptiness is not an answer", () => {
+    // A text node that came back empty may well come back non-empty next time,
+    // so the exemption must not reach generative types.
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    for (const type of ["text", "split", "lore", "fix-problems"] as const) {
+      const empty = nodes.insert({ title: `E-${type}`, type, parent_id: null, status: "EMPTY" })
+      const reader = nodes.insert({ title: `R-${type}`, type: "text", parent_id: null, status: "GENERATED" })
+      edges.insert({ from_node_id: empty, to_node_id: reader, type: "text" })
+    }
+
+    propagateStaleStatus()
+
+    for (const n of nodes.findAll()) {
+      if (n.title.startsWith("R-")) expect(n.status, n.title).toBe("OUTDATED")
+    }
+  })
+
+  it("leaves a whole for-each loop alone when only its prev-outputs aggregate is EMPTY", () => {
+    // End-to-end shape of the real graph: one legitimately-EMPTY merge fed six
+    // siblings, which pre-marked them OUTDATED, which bottom-up promoted the
+    // container, which re-ran an hour of prose. Nothing here should move.
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const loop = nodes.insert({ title: "Loop", type: "for-each", parent_id: null, status: "GENERATED" })
+    const prev = nodes.insert({ title: "Prev", type: "for-each-prev-outputs", parent_id: loop, status: "GENERATED" })
+    const agg = nodes.insert({ title: "Agg", type: "merge", parent_id: loop, status: "EMPTY" })
+    edges.insert({ from_node_id: prev, to_node_id: agg, type: "textArray" })
+    const readers = ["Notes", "Prose", "Expand", "Polish A", "Polish B", "Out"].map((title) => {
+      const id = nodes.insert({ title, type: "text", parent_id: loop, status: "GENERATED" })
+      edges.insert({ from_node_id: agg, to_node_id: id, type: "text" })
+      return id
+    })
+    const downstream = nodes.insert({ title: "Draft", type: "merge", parent_id: null, status: "GENERATED" })
+    edges.insert({ from_node_id: loop, to_node_id: downstream, type: "textArray" })
+
+    const result = propagateStaleStatus()
+
+    expect(result.markedNodeIds).toEqual([])
+    expect(nodes.findById(loop)!.status, "container").toBe("GENERATED")
+    expect(nodes.findById(downstream)!.status, "downstream of container").toBe("GENERATED")
+    for (const id of readers) expect(nodes.findById(id)!.status, nodes.findById(id)!.title).toBe("GENERATED")
+  })
 })
