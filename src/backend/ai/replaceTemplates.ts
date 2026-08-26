@@ -129,6 +129,17 @@ handlebarsInstance.registerHelper("words", (v: unknown) =>
 )
 
 /**
+ * Drop a leading markdown heading.
+ *
+ * Chunks of prose open with `## Часть N` so the merged markdown draft can be
+ * navigated by header. A layout template draws its own heading and would
+ * otherwise print that line again as literal text, once per part.
+ */
+handlebarsInstance.registerHelper("stripHeading", (v: unknown) =>
+  typeof v === "string" ? v.replace(/^\s*#{1,6}[ \t]+[^\n]*(?:\r?\n)+/, "") : "",
+)
+
+/**
  * Render a formatting template (not a prompt).
  *
  * Differs from `replaceTemplates` in two ways that matter:
@@ -137,7 +148,7 @@ handlebarsInstance.registerHelper("words", (v: unknown) =>
  *  - the context carries arbitrary values, not just strings, so a `textArray`
  *    input arrives as an array and `{{#each}}` works on it.
  *
- * The same helpers are available, plus `words`.
+ * The same helpers are available, plus `words` and `stripHeading`.
  */
 export function renderFormatTemplate(template: string, context: Record<string, unknown>): string {
   try {

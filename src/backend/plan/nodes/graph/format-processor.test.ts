@@ -99,3 +99,34 @@ describe("buildFormatContext — the project name", () => {
     expect(buildFormatContext([input("Draft", "x")] as never)).toEqual({ Draft: "x", projectName: "" })
   })
 })
+
+describe("stripHeading helper", () => {
+  it("drops a leading markdown heading — the layout draws its own", () => {
+    const out = renderFormatTemplate("{{stripHeading x}}", { x: "## Часть 1\n\nБелая ткань." })
+    expect(out).toBe("Белая ткань.")
+  })
+
+  it("drops it at any heading level", () => {
+    for (const hashes of ["#", "##", "###", "######"]) {
+      expect(renderFormatTemplate("{{stripHeading x}}", { x: `${hashes} T\n\nтело` })).toBe("тело")
+    }
+  })
+
+  it("leaves text alone when it does not open with a heading", () => {
+    expect(renderFormatTemplate("{{stripHeading x}}", { x: "Просто текст." })).toBe("Просто текст.")
+  })
+
+  it("does not touch a heading further down — only the opening one goes", () => {
+    expect(renderFormatTemplate("{{stripHeading x}}", { x: "## Первая\n\nтело\n\n## Вторая" })).toBe(
+      "тело\n\n## Вторая",
+    )
+  })
+
+  it("still escapes what is left", () => {
+    expect(renderFormatTemplate("{{stripHeading x}}", { x: "# T\n<b>" })).toBe("&lt;b&gt;")
+  })
+
+  it("survives a non-string", () => {
+    expect(renderFormatTemplate("{{stripHeading x}}", { x: null })).toBe("")
+  })
+})
