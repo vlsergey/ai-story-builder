@@ -26,6 +26,30 @@ Apply now uses sibling-first then a flat global-title map to resolve `sourceNode
 
 User-placed leaf node inside a for-each that emits the current 1-based iteration position as text via `getOutput`. No override storage, no regeneration — pure function of the parent for-each's `currentIndex`. Used in fiction-arc so each scene's prose starts with `## Часть {{Номер сцены}}` — the second-draft pass then re-locates each scene in the merged first draft by header without re-splitting.
 
+### Forward propagation of EMPTY (commit `accfede`)
+
+`EMPTY` says "has no content" and nothing more, but `propagateStaleStatus` read
+it forward as "work pending". One `merge` aggregating previous iterations is
+legitimately EMPTY on iteration 0; it fed six siblings, they were pre-marked
+OUTDATED, that promoted the for-each container bottom-up, and re-rendering a
+single downstream `format` node re-ran ~55 min of prose. Bottom-up propagation
+had already carved out this exact node; the forward rule had not.
+
+Fix in [`propagateStaleStatus.ts`](../../src/backend/plan/nodes/generate/propagateStaleStatus.ts):
+`computeContagiousEmpty` splits the two meanings. A deterministic node (`merge`,
+`script`, `format`, the `for-each-*` internals) fed by settled inputs re-runs to
+the same emptiness, so its EMPTY is an answer and readers stay fresh. A
+generative node's emptiness stays contagious, as does a deterministic node's
+while anything upstream of it is still pending. Measured on the graph that
+caused it: 11 nodes pre-marked → 0, 55 min → 0.4 s.
+
+Note for future digging: per-iteration state is **not** the gap here.
+`NodeOverride` already carries `status` per iteration, saved and restored by
+`collectForEachNodeIterationContentFromChildren` /
+`applyForEachNodeIterationToChildren`. The row status of a for-each child is
+simply the mounted iteration's, which is correct — the bug was entirely in what
+got inferred from it.
+
 ## Open — deferred but planned
 
 ### `llm-boundary-split` — for splitting large existing inputs
@@ -49,23 +73,6 @@ Status: nice-to-have, doesn't block anything functionally — fiction-arc works 
 Currently `text` nodes with `responseSchema` that return invalid JSON throw and the node lands in `ERROR`. The new `llm-split` has retry baked in. Other places that want structured output (e.g. a future JSON-reformat stage) would benefit from the same.
 
 Status: small, isolated change. Not blocking fiction-arc (it doesn't use `responseSchema` on text nodes — the `llm-split` with `partDescription` absorbs that need). Implementation if needed: extract the retry loop from `generateSplitParts` into a helper, reuse from `generatePlanNodeTextContent` when `responseSchema` is set.
-
-### Per-iteration invalidation in `for-each` (observed 2026-08-26)
-
-One unfinished iteration re-runs every iteration. A `for-each-prev-outputs`
-node is legitimately EMPTY on iteration 0 — there are no previous outputs yet —
-but that EMPTY is stored as the node's current status, so anything that treats
-EMPTY as "needs work" drags the whole loop back through the model.
-
-Cost is real: re-rendering one downstream `format` node re-generated a whole
-3-chunk prose loop, ~55 min of local inference, and would have produced
-different prose than the page already shipped. Workaround while it stands —
-call the processor directly for the one node you want rebuilt instead of going
-through `regenerateTreeNodesContents`.
-
-The fix is to invalidate per iteration rather than per node, which means
-iteration-scoped status alongside the iteration-scoped content already in
-`overrides`.
 
 ## Open — speculative
 
