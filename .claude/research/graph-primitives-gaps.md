@@ -50,6 +50,23 @@ Currently `text` nodes with `responseSchema` that return invalid JSON throw and 
 
 Status: small, isolated change. Not blocking fiction-arc (it doesn't use `responseSchema` on text nodes — the `llm-split` with `partDescription` absorbs that need). Implementation if needed: extract the retry loop from `generateSplitParts` into a helper, reuse from `generatePlanNodeTextContent` when `responseSchema` is set.
 
+### Per-iteration invalidation in `for-each` (observed 2026-08-26)
+
+One unfinished iteration re-runs every iteration. A `for-each-prev-outputs`
+node is legitimately EMPTY on iteration 0 — there are no previous outputs yet —
+but that EMPTY is stored as the node's current status, so anything that treats
+EMPTY as "needs work" drags the whole loop back through the model.
+
+Cost is real: re-rendering one downstream `format` node re-generated a whole
+3-chunk prose loop, ~55 min of local inference, and would have produced
+different prose than the page already shipped. Workaround while it stands —
+call the processor directly for the one node you want rebuilt instead of going
+through `regenerateTreeNodesContents`.
+
+The fix is to invalidate per iteration rather than per node, which means
+iteration-scoped status alongside the iteration-scoped content already in
+`overrides`.
+
 ## Open — speculative
 
 ### File input node
