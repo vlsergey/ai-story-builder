@@ -90,3 +90,31 @@ These came up while writing the template prompts and are non-obvious:
 - **`## Часть N` as first-line header on every scene** is the navigation primitive for the second pass. The polish node prompt must explicitly forbid removing/modifying this header.
 - **`Мир` as a separate top-level node** so synopses across the spectrum (pure original, faithful fanfic, AU, what-if speculative — e.g. "Гарри и Драко находят…", or "мир похож на HP, но магия закончилась 10 лет назад") get a deliberate world-description step. Three axes — anchor canon / borrowed / deviations — instead of a binary canon-vs-original branch.
 - **Multi-line `{{X}}` substitutions get fenced or heading-bracketed** in all prompts (see memory `feedback_template_prompt_style`). Inline single-token references like `{{Номер сцены}}` stay bare.
+
+## First full run on a local model (2026-08-26)
+
+40 nodes, 3 chunks, `qwen3.8-abliterated:27b-q3_K`, ~56 min. It completed, and
+the structural machinery held: the tension score came out one line per scene with
+its curve rules honoured, `split` produced exactly the requested three parts as
+valid JSON, and the bible gates edited rather than inflated (world 13 545 →
+14 625 chars, setting 13 420 → 14 671). What the gates did **not** catch is the
+useful part:
+
+- **The chunks decay.** 5676 → 4279 → **1236** chars. The finale came out at 22 %
+  of the opening and collapsed into one-clause paragraphs. The tension score
+  demands the finale carry the highest weight, and both polish gates passed it
+  anyway — they check continuity, voice and style, and **nothing checks length
+  against intent**. A per-chunk floor, or a review class comparing delivered
+  length to the score's weight, is the missing gate.
+- **POV slips survive.** In chunk 2 the viewpoint character is called «сестра»
+  inside a passage otherwise tight on her. `Полировка: структура и continuity`
+  did not flag it.
+- **`Ревью плана сцен: структура` changed nothing** — 4974 chars in, 4974 out.
+  One data point, but worth watching: a gate that never edits is either
+  redundant or mis-prompted.
+
+Read none of this as "local models can't write". The failures above are
+instruction-following and long-context coherence, not register — and the model
+was running at 3 bits per weight (`q3_K`). Test quantisation before blaming the
+model, and see [`ollama-adapter.md`](ollama-adapter.md) for the window sizing
+that made the run possible at all.
