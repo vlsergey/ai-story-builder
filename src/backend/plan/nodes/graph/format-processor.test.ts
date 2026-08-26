@@ -10,7 +10,7 @@ const input = (title: string, value: unknown, type: "text" | "textArray" = "text
 
 describe("buildFormatContext", () => {
   it("keys a text input by its source node title", () => {
-    expect(buildFormatContext([input("Draft", "hello")] as never)).toEqual({ Draft: "hello" })
+    expect(buildFormatContext([input("Draft", "hello")] as never)).toEqual({ Draft: "hello", projectName: "" })
   })
 
   it("keeps a textArray input as an array so each can iterate it", () => {
@@ -19,7 +19,7 @@ describe("buildFormatContext", () => {
   })
 
   it("survives a null input", () => {
-    expect(buildFormatContext([input("Draft", null)] as never)).toEqual({ Draft: "" })
+    expect(buildFormatContext([input("Draft", null)] as never)).toEqual({ Draft: "", projectName: "" })
   })
 
   it("keeps Russian titles usable as bracket identifiers", () => {
@@ -72,5 +72,30 @@ describe("renderFormatTemplate — failures", () => {
 
   it("throws on a malformed template", () => {
     expect(() => renderFormatTemplate("{{#each}}", {})).toThrow(/render failed/i)
+  })
+})
+
+describe("buildFormatContext — the project name", () => {
+  it("exposes it as projectName, so a page can title itself", () => {
+    const ctx = buildFormatContext([] as never, "Полотенце")
+    expect(renderFormatTemplate("<h1>{{projectName}}</h1>", ctx)).toBe("<h1>Полотенце</h1>")
+  })
+
+  it("renders as empty rather than undefined when the project has no name", () => {
+    expect(buildFormatContext([] as never, null).projectName).toBe("")
+  })
+
+  it("escapes it like any other value", () => {
+    const ctx = buildFormatContext([] as never, "Bell & Co <b>")
+    expect(renderFormatTemplate("{{projectName}}", ctx)).toBe("Bell &amp; Co &lt;b&gt;")
+  })
+
+  it("lets an explicit input of the same name win — the graph beats ambient data", () => {
+    const ctx = buildFormatContext([input("projectName", "из графа")] as never, "из настроек")
+    expect(ctx.projectName).toBe("из графа")
+  })
+
+  it("stays absent-safe when no name is passed at all", () => {
+    expect(buildFormatContext([input("Draft", "x")] as never)).toEqual({ Draft: "x", projectName: "" })
   })
 })

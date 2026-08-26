@@ -1,6 +1,7 @@
 import type { FormatSettings } from "../../../../shared/node-settings.js"
 import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
 import { renderFormatTemplate } from "../../../ai/replaceTemplates.js"
+import { SettingsRepository } from "../../../settings/settings-repository.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { NodeInputs } from "../NodeInput.js"
 import type { PlanNodeService } from "../plan-node-service.js"
@@ -32,7 +33,7 @@ export class FormatProcessor implements NodeProcessor<FormatSettings> {
     const template = settings.template ?? ""
     if (template.trim().length === 0) return { content: "", status: "EMPTY" }
 
-    const context = buildFormatContext(service.findNodeInputs(node.id))
+    const context = buildFormatContext(service.findNodeInputs(node.id), SettingsRepository.getProjectTitle())
     context.title = node.title
 
     try {
@@ -50,8 +51,13 @@ export class FormatProcessor implements NodeProcessor<FormatSettings> {
  * A `textArray` edge arrives as an array so `{{#each [Title]}}` works;
  * a `text` edge arrives as a string.
  */
-export function buildFormatContext(nodeInputs: NodeInputs<unknown>): Record<string, unknown> {
-  const context: Record<string, unknown> = {}
+export function buildFormatContext(
+  nodeInputs: NodeInputs<unknown>,
+  projectName?: string | null,
+): Record<string, unknown> {
+  // Seeded before the inputs so a node actually titled "projectName" wins:
+  // what the graph states explicitly beats what the environment supplies.
+  const context: Record<string, unknown> = { projectName: projectName ?? "" }
   for (const nodeInput of nodeInputs) {
     const title = nodeInput.sourceNode.title
     if (nodeInput.edge.type === "textArray") {
