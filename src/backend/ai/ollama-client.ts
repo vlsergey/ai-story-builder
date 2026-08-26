@@ -165,3 +165,62 @@ async function readAll(res: import("node:http").IncomingMessage): Promise<string
   for await (const piece of res) out += piece as string
   return out
 }
+
+/** One entry of `GET /api/ps` — a model currently resident in the daemon. */
+export interface OllamaLoadedModel {
+  model: string
+  /** Window the model was actually loaded with. Absent on older daemons. */
+  context_length?: number
+}
+
+/**
+ * Guard against the `num_ctx` trap.
+ *
+ * Ollama honours `num_ctx` only at the moment it LOADS a model. If the model
+ * is already resident — pulled in by an earlier request, or by another
+ * consumer sharing the daemon — the window it was loaded with silently wins.
+ * Nothing in the chat response says so. A prompt that outgrows that window
+ * does not fail either: the daemon simply stops answering, and the call dies
+ * much later on the idle timeout.
+ *
+ * So we ask `/api/ps` what the window really is and refuse to pretend.
+ *
+ * Returns a human-readable complaint, or null when there is nothing to report:
+ * the model is not loaded yet (it will load with our window), the daemon does
+ * not report a window, or the resident window is at least as large as asked.
+ */
+export function describeContextWindowMismatch(
+  loaded: readonly OllamaLoadedModel[],
+  model: string,
+  requestedNumCtx: number | undefined,
+): string | null {
+  if (!isPositive(requestedNumCtx)) return null
+  const entry = loaded.find((m) => m.model === model)
+  if (!entry || !isPositive(entry.context_length)) return null
+  if (entry.context_length >= requestedNumCtx) return null
+  return (
+    `Ollama: model "${model}" is already loaded with a context window of ${entry.context_length}, ` +
+    `but ${requestedNumCtx} was requested — Ollama applies num_ctx only when it loads a model, ` +
+    `so the smaller window silently wins and a long prompt will stall instead of failing. ` +
+    `Unload the model (ollama stop ${model}) or lower num_ctx to ${entry.context_length}.`
+  )
+}
+
+/** Ask the daemon which models are resident and with which window. */
+export async function fetchLoadedModels(baseUrl: string): Promise<OllamaLoadedModel[]> {
+  const url = new URL(`${baseUrl.replace(/\/+$/, "")}/api/ps`)
+  const transport = url.protocol === "https:" ? await import("node:https") : await import("node:http")
+  const raw = await new Promise<string>((resolve, reject) => {
+    const req = transport.request(url, { method: "GET" }, (res) => {
+      readAll(res).then(resolve, reject)
+    })
+    req.on("error", reject)
+    req.setTimeout(OLLAMA_PS_TIMEOUT_MS, () => req.destroy(new Error("Ollama: /api/ps did not answer")))
+    req.end()
+  })
+  const parsed = JSON.parse(raw) as { models?: OllamaLoadedModel[] }
+  return parsed.models ?? []
+}
+
+/** `/api/ps` is a local bookkeeping call; if it hangs, something is very wrong. */
+export const OLLAMA_PS_TIMEOUT_MS = 10_000

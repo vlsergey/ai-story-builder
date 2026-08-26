@@ -3,7 +3,13 @@ import type { OllamaAiGenerationSettings } from "../../shared/ollama-ai-generati
 import { SettingsRepository } from "../settings/settings-repository.js"
 import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapter.js"
 import lastAiGenerationEventManager from "./last-ai-generation-event-manager.js"
-import { buildChatRequest, DEFAULT_OLLAMA_BASE_URL, streamOllamaChat } from "./ollama-client.js"
+import {
+  buildChatRequest,
+  DEFAULT_OLLAMA_BASE_URL,
+  describeContextWindowMismatch,
+  fetchLoadedModels,
+  streamOllamaChat,
+} from "./ollama-client.js"
 
 /**
  * Local models via Ollama. No API key, no per-token cost, no network egress —
@@ -35,6 +41,15 @@ export class OllamaAdapter implements AiEngineAdapter<OllamaAiGenerationSettings
       responseSchema: req.responseSchema,
       enforceSchema: req.stringFormat !== false,
     })
+
+    // Ollama applies num_ctx only when it loads a model. A model that is
+    // already resident keeps the window it came up with, and a prompt that
+    // outgrows it stalls the daemon instead of failing outright. Ask first.
+    // A daemon that will not answer /api/ps is no reason to refuse work, so
+    // the guard degrades to silence rather than blocking generation.
+    const loaded = await fetchLoadedModels(baseUrl).catch(() => [])
+    const mismatch = describeContextWindowMismatch(loaded, model, request.options?.num_ctx)
+    if (mismatch) throw new Error(mismatch)
 
     let text = ""
     let promptTokens: number | undefined

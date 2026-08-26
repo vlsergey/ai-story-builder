@@ -1,7 +1,7 @@
 import http from "node:http"
 import type { AddressInfo } from "node:net"
 import { afterEach, describe, expect, it } from "vitest"
-import { streamOllamaChat } from "./ollama-client.js"
+import { fetchLoadedModels, streamOllamaChat } from "./ollama-client.js"
 
 /**
  * Regression: a local model can spend minutes evaluating a long prompt before
@@ -90,4 +90,34 @@ describe("streamOllamaChat — transport", () => {
     })()
     await expect(run).rejects.toThrow()
   }, 20_000)
+})
+
+describe("fetchLoadedModels — /api/ps", () => {
+  it("reads the window each resident model was actually loaded with", async () => {
+    const url = await startServer((req, res) => {
+      expect(req.url).toBe("/api/ps")
+      expect(req.method).toBe("GET")
+      res.setHeader("content-type", "application/json")
+      res.end(JSON.stringify({ models: [{ model: "qwen", context_length: 8192 }] }))
+    })
+    expect(await fetchLoadedModels(url)).toEqual([{ model: "qwen", context_length: 8192 }])
+  })
+
+  it("reports an empty list when nothing is loaded", async () => {
+    const url = await startServer((_req, res) => res.end(JSON.stringify({ models: [] })))
+    expect(await fetchLoadedModels(url)).toEqual([])
+  })
+
+  it("tolerates a response with no models key at all", async () => {
+    const url = await startServer((_req, res) => res.end("{}"))
+    expect(await fetchLoadedModels(url)).toEqual([])
+  })
+
+  it("does not choke on a trailing slash in the base url", async () => {
+    const url = await startServer((req, res) => {
+      expect(req.url).toBe("/api/ps")
+      res.end(JSON.stringify({ models: [] }))
+    })
+    expect(await fetchLoadedModels(url + "/")).toEqual([])
+  })
 })

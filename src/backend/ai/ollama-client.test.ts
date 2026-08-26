@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildChatRequest, takeLines } from "./ollama-client.js"
+import { buildChatRequest, describeContextWindowMismatch, takeLines } from "./ollama-client.js"
 
 const base = {
   model: "qwen",
@@ -102,5 +102,48 @@ describe("takeLines — NDJSON framing", () => {
 
   it("survives an empty buffer", () => {
     expect(takeLines("")).toEqual({ lines: [], rest: "" })
+  })
+})
+
+describe("describeContextWindowMismatch — the num_ctx trap", () => {
+  const loaded = (model: string, context_length?: number) => [{ model, context_length }]
+
+  it("says nothing when no window was requested", () => {
+    expect(describeContextWindowMismatch(loaded("qwen", 8192), "qwen", undefined)).toBeNull()
+  })
+
+  it("says nothing when the model is not resident — it will load with our window", () => {
+    expect(describeContextWindowMismatch([], "qwen", 65536)).toBeNull()
+  })
+
+  it("says nothing when another model is resident", () => {
+    expect(describeContextWindowMismatch(loaded("llama", 8192), "qwen", 65536)).toBeNull()
+  })
+
+  it("says nothing when the resident window matches", () => {
+    expect(describeContextWindowMismatch(loaded("qwen", 65536), "qwen", 65536)).toBeNull()
+  })
+
+  it("says nothing when the resident window is larger than asked", () => {
+    expect(describeContextWindowMismatch(loaded("qwen", 131072), "qwen", 65536)).toBeNull()
+  })
+
+  it("says nothing when the daemon does not report a window", () => {
+    expect(describeContextWindowMismatch(loaded("qwen"), "qwen", 65536)).toBeNull()
+  })
+
+  it("complains when the resident window is smaller than asked", () => {
+    const msg = describeContextWindowMismatch(loaded("qwen", 8192), "qwen", 65536)
+    expect(msg).toContain("8192")
+    expect(msg).toContain("65536")
+    expect(msg).toContain("qwen")
+  })
+
+  it("finds the model among several resident ones", () => {
+    const models = [
+      { model: "llama", context_length: 131072 },
+      { model: "qwen", context_length: 4096 },
+    ]
+    expect(describeContextWindowMismatch(models, "qwen", 32768)).toContain("4096")
   })
 })
