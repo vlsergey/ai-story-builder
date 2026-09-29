@@ -1,6 +1,6 @@
 # Iteration state — data model
 
-*2026-09-29. Part of the architecture proposal for review; see [README.md](README.md).*
+*2026-09-29, revised after review. Part of the architecture proposal; see [README.md](README.md).*
 
 ## Two tables
 
@@ -23,14 +23,17 @@ CREATE TABLE plan_node_states (
   in_review              INTEGER NOT NULL DEFAULT 0,
   review_base_content    TEXT,
   ai_improve_instruction TEXT,
+  rev                    TEXT    NOT NULL DEFAULT (lower(hex(randomblob(8)))),
   PRIMARY KEY (node_id, path)
 );
 CREATE INDEX idx_plan_node_states_path ON plan_node_states (path);
 ```
 
-`ai_sync_info` does not move: on plan nodes it is only ever written as null.
-Counts are recomputed on **every** content write (today only `create` computes
-them, so the UI shows stale numbers).
+`ai_sync_info` does not move: nothing reads it for plan nodes. `rev` changes on
+every write — see "Write ordering" in [engine.md](engine.md). Counts are
+recomputed on **every** write, from the processor's output rather than the raw
+content: fix-problems, split and container content is JSON. Today only `create`
+computes them, from raw content.
 
 ## The path
 
@@ -43,7 +46,8 @@ iterationKey:= index     -- for-each: decimal, no leading zeros
 ```
 
 - `''` is the root; `'27:2'` is a child of loop #27 in iteration 2;
-  `'27:2/40:0'` is one level deeper. Depth = number of container ancestors.
+  `'27:2/40:0'` is one level deeper. Depth = number of container ancestors; a
+  non-container parent adds no segment.
 - "At or below `A`" in SQL: `path = :a OR (path >= :a || '/' AND path < :a || '0')`
   — `'0'` is the character after `'/'`, so it uses the index and needs no LIKE.
   `A = ''` means no filter.
@@ -52,10 +56,17 @@ iterationKey:= index     -- for-each: decimal, no leading zeros
 ## A missing row is not EMPTY
 
 - **No row** = never produced. For processing it is *pending*: it makes
-  consumers stale and promotes its container, like an OUTDATED row.
-- **An EMPTY row** = produced, and the answer is empty. Whether it is contagious
-  follows the existing rule: a generative node's EMPTY is (a retry may produce
-  content), a deterministic node's EMPTY fed by settled inputs is not.
+  consumers stale and makes its container need a visit, like an OUTDATED row.
+- **An EMPTY row** = produced, and the answer is empty. A generative node's EMPTY
+  is contagious (a retry may produce content); a deterministic node's EMPTY fed by
+  settled inputs is not, and neither is the EMPTY of a node with nothing to
+  generate from.
+- **Every node type resolves pending.** A node the scheduler skips because it has
+  nothing to generate from — a text node without a prompt, lore — writes a
+  settled row: its content if it has one at that path, otherwise EMPTY. Today
+  that skip writes nothing (`regenerateTreeNodesContents.ts:419-433`), which under
+  this model would leave consumers stale forever. After a successful run no child
+  of a visited container is missing or OUTDATED at a current key.
 - The UI may *display* a missing row as empty; processing never treats it so.
 
 This separates by data the two meanings EMPTY has carried until now — "not yet"
@@ -74,9 +85,10 @@ node type instead.
   random answers to one question. Its result fills every position the element
   occupies. So a parallel iteration may have several positions.
 - **Growth renames rows.** When the key length grows, every row under the old
-  segment — nested ones included — is renamed in one transaction. To know which
-  current element an old key belonged to once two share it, the container keeps
-  each iteration's full hash.
+  segment — nested ones included — is renamed in one transaction, during the
+  container's expansion, when none of its branches runs. To know which current
+  element an old key belonged to once two share it, the container keeps each
+  iteration's full hash.
 
 ## A container's own state
 
@@ -88,17 +100,19 @@ A container stores **no state of its children**. Its own row, at its own path:
 | `parallel-for-each` | `{"keyLength": 6, "iterations": {"a3f9c1": "<full sha-256>", …}}` |
 
 Its output is computed from its output child's rows across its iterations and is
-never stored. `for-each-input` rows are written by the container when it expands
-its input — one per iteration.
+never stored. The container writes its `for-each-input` rows itself, one per
+iteration, when it expands its input at the start of its run
+([engine.md](engine.md)).
 
 ## Lifecycle
 
 - Node deleted → its rows go by `ON DELETE CASCADE`.
-- A container's input shrinks → it deletes the rows of vanished iterations (and
-  everything nested under them) when it next runs.
+- A container's input shrinks → its next run deletes the rows of vanished
+  iterations and everything nested under them.
 - A node moves to another container → its rows and its subtree's rows are
   deleted in the same transaction as the move; its paths no longer mean anything.
-- Definition edits (prompt, settings) demote **every** row of the node.
+- Definition edits demote the node's rows at every path, MANUAL ones excepted
+  ([cascade.md](cascade.md)).
 
 ## What counts as state
 

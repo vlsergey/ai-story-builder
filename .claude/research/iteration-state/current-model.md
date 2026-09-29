@@ -1,7 +1,7 @@
 # Iteration state — the current model
 
-*2026-09-29. How `for-each` keeps its children's state today, and what that costs.
-The proposal that replaces it: [README.md](README.md).*
+*2026-09-29, revised after review. How `for-each` keeps its children's state today,
+and what that costs. The proposal that replaces it: [README.md](README.md).*
 
 ## Mounting an iteration into the definition rows
 
@@ -10,8 +10,9 @@ definition (`parent_id`, `title`, `type`, `position`, `x`/`y`/`width`/`height`,
 `node_type_settings`, `ai_settings`) with its state (`content`, `summary`,
 `status`, counts, `in_review`, `review_base_content`, `ai_improve_instruction`).
 
-A `for-each` keeps per-iteration snapshots of its children in its own content as
-`overrides[i][childId]` ([for-each-plan-node.ts](../../../src/shared/for-each-plan-node.ts)).
+A `for-each` keeps per-iteration snapshots of its **direct** children in its own
+content as `overrides[i][childId]`
+([for-each-plan-node.ts](../../../src/shared/for-each-plan-node.ts)).
 `NodeOverride` covers content, summary, counts and status — **not** the review
 fields. Running iteration `i` means *mounting* it: `changeForEachNodePage`
 ([plan-node-service.ts:596](../../../src/backend/plan/nodes/plan-node-service.ts))
@@ -29,24 +30,38 @@ In local projects these blobs run from 8 KB to 3.7 MB.
   container is GENERATING — switching would clobber the running iteration.
 - **Single-node actions don't lock the pager.** Regenerate or improve a child,
   switch pages, and the result lands in the newly mounted iteration.
-- **The editor writes the wrong iteration.** It never re-syncs from the server
-  (`useState(initialValue)`, `PlanNodeEditor.tsx:72-75`), so after a page switch its
-  next save writes the old iteration's text onto the new one.
+- **The editor keeps the iteration it loaded.** It re-syncs only after its own
+  generate or improve (`PlanNodeEditor.tsx:72-75,113-116`). After a page switch it
+  still shows the previous iteration, and a content edit saves that iteration's
+  text, edited, onto the newly mounted one; a prompt-only edit writes just the
+  prompt, since it saves a diff (`:83`).
 - **Review state ignores iterations.** A review started on page 2 is still open on
   page 3, against page 2's base content.
+- **Only the mounted iteration hears about changes from outside the loop.** An
+  upstream edit reaches a loop child through the cascade
+  (`plan-node-service.ts:201-232`), a prompt edit demotes it directly (`:416-418`),
+  and both touch the mounted row only. Other iterations keep GENERATED snapshots,
+  which the scheduler skips. Only template updates mirror a demotion into every
+  snapshot, through `demoteToOutdated` → `onChildDemoted`
+  (`template-update.ts:374,442`). Each fiction-arc template has 25 edges entering
+  a loop from outside (Style → Chunk prose, World → Character profile, …); in the
+  chunk loop later iterations still re-run through the prev-outputs chain,
+  earlier ones never do.
 - **Staleness is seen for the mounted iteration only.** `propagateStaleStatus`
   checks child rows ([propagateStaleStatus.ts:163](../../../src/backend/plan/nodes/generate/propagateStaleStatus.ts));
   an ERROR in `overrides[2]` with page 0 mounted never promotes the container.
-- **Compensating hooks.** `onChildDemoted` exists to mirror a demotion into every
-  snapshot, because the rows hold only one.
 - **The mounted snapshot is stale by design.** `overrides[currentIndex]` is written
   on page change, so the live state of the current page is in the rows. In local
   projects 7 of 18 containers disagree, in both directions.
 - **Output length is the snapshot count, not `length`.** `getOutput` maps over
   `overrides`; one local project has 25 snapshots against `length` 24, and the
-  extra output reaches a downstream merge.
-- **Nested loops don't work.** Mounting touches direct children only, so an inner
-  loop's children are shared by every outer iteration. No template nests loops.
+  extra output reaches a downstream merge. It also compares strictly with
+  `currentIndex`, so while that is unset it reads every iteration from snapshots;
+  every other reader treats unset as 0.
+- **Nested loops don't work.** Only direct children are snapshotted: an inner
+  container's own content, snapshots included, is swapped per outer iteration,
+  but the inner loop's mounted child rows are shared by every outer iteration. No
+  template nests loops.
 
 ## Who touches it
 
@@ -58,3 +73,4 @@ the rest), the `for-each-prev-outputs` and `for-each-index` processors,
 `switch-foreach-iteration`, `dump-node`, `export-ready-chunks`,
 `export-project-to-md`. Migration 032 and `export-project-as-template` do not:
 032's "overrides" are per-node AI settings, and export reads definitions only.
+The full list of what goes: [removals.md](removals.md).

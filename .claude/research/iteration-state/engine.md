@@ -1,6 +1,6 @@
 # Iteration state — engine
 
-*2026-09-29. Part of the architecture proposal for review; see [README.md](README.md).
+*2026-09-29, revised after review. Part of the architecture proposal; see [README.md](README.md).
 Interfaces are shapes to agree on, not final code.*
 
 ## Paths and state access
@@ -19,7 +19,7 @@ export function isAtOrBelow(p: NodePath, ancestor: NodePath): boolean
 export class PlanNodeStateRepository {
   find(nodeId: number, path: NodePath): PlanNodeStateRow | undefined
   findAtOrBelow(nodeIds: number[] | null, ancestor: NodePath): PlanNodeStateRow[]
-  upsert(nodeId: number, path: NodePath, f: PlanNodeStateUpdate): PlanNodeStateRow  // whitelisted columns
+  upsert(nodeId: number, path: NodePath, f: PlanNodeStateUpdate, expectedRev?: string): PlanNodeStateRow | null
   setStatus(nodeIds: number[], ancestor: NodePath, from: PlanNodeStatus[], to: PlanNodeStatus): PlanNodeStateRow[]
   deleteAtOrBelow(nodeIds: number[] | null, ancestor: NodePath): number
   renameKey(parent: NodePath, containerId: number, from: string, to: string): number  // nested rows too
@@ -28,7 +28,26 @@ export class PlanNodeStateRepository {
 
 `PlanNodeRow` survives as the **composed view** — definition + state at a path +
 the path — so most consumers keep their shape. Multi-row operations run in a real
-`db.transaction`; today `withDbWrite` is a pass-through and nothing is transactional.
+`db.transaction`; no plan-node write does today (`withDbWrite` is a pass-through;
+only migration steps and lore reordering use transactions).
+
+## Write ordering
+
+A generation takes minutes, and its row may change meanwhile: a prompt edit
+demotes it, an upstream edit drops its iteration, the user deletes the node.
+Today the result lands regardless (phase 0 #16); with parallel branches and
+editing during runs it would land on demoted rows, on vanished paths, over MANUAL
+text.
+
+- Every state row carries `rev`, replaced by a fresh random value on every write,
+  demotion and rename. It is never reused, so a deleted and re-created row cannot
+  match an old one.
+- Regenerate, improve and editor saves send the `rev` they started from, and the
+  write is compare-and-set. A generation or improve that loses is dropped and
+  counted in the run's progress; the row keeps the newer write. An editor that
+  loses gets a conflict and reloads.
+- `upsert` refuses a path whose segments are not the containers' current keys,
+  so nothing is written under a vanished or renamed iteration.
 
 ## Processors
 
@@ -50,6 +69,12 @@ export interface RegenerationIteration { key: string; positions: number[] }  // 
   for-each-output return whole rows, so the patch carries `x`/`y`/`id`/`type` and
   never cascades; returning state only makes a finished container cascade — a
   deliberate behaviour change, covered by tests.
+- **A container expands its input at the start of its own run**, when none of its
+  branches runs: it resolves its inputs at its path, writes the `for-each-input`
+  rows of new or changed elements, deletes vanished iterations and grows keys —
+  idempotently. Its `onInputContentChange` only demotes it. Today expansion lives
+  in `onInputContentChange`; kept there, an inner loop fed from outside the outer
+  loop would never be expanded for a new outer iteration.
 - `onUpdate` (for-each-output) and `onChildDemoted` (for-each) go away;
   `onChildStateChanged` replaces both.
 - `for-each-prev-outputs` reads the output node at `P/C:0 … P/C:(i−1)`, `i` from
@@ -58,13 +83,13 @@ export interface RegenerationIteration { key: string; positions: number[] }  // 
 ## Generation functions take resolved inputs
 
 `generatePlanNodeTextContent`, `generateSplitParts`, `findProblems`,
-`fixProblems` stop creating `new PlanNodeService()` and take `NodeInputs<string>`
-resolved by their processor at its path (plus `inputToFix` for find/fix). They
-then need no path at all, so no call site can silently resolve at `''` and read
-another iteration. fix-problems stops re-resolving its inputs up to
-`1 + 2 × maxIterations` times per visit and sees one snapshot. `NodeInput` gains
-`sourcePath`; its `sourceNode` is the source's state at that path (split and
-fix-problems copy its `summary`).
+`fixProblems` and `improvePlanNodeContent` stop reading rows by id and take
+`NodeInputs<string>` resolved by their caller at its path (plus `inputToFix` for
+find/fix, the content and instruction for improve). No call site can then resolve
+at `''` and read another iteration. fix-problems stops re-resolving its inputs up
+to `1 + 2 × maxIterations` times per visit. `NodeInput` gains `sourcePath`; its
+`sourceNode` is the source's state at that path (split, merge, fix-problems and
+for-each-output copy its `summary`).
 
 ## Input resolution and edge shapes
 
@@ -75,65 +100,16 @@ A consumer at path `P` reads source `X` at `truncatePath(P, depth(X))`.
 | siblings | `P` |
 | outside → inside | a shorter prefix of `P` (a root node reads `''`) |
 | container → outside | `P`; the container aggregates its children at `P/C:k` |
-| into a container (textArray) | a prefix of `P`; the container writes its input rows |
+| into a container (textArray) | a prefix of `P`; the container expands it |
 | inside → outside, skipping the container | **rejected** |
 | across two sibling loops | **rejected** |
 
 Today all six are accepted — `canCreateEdge` checks types only — and the last two
 read whichever page is mounted. The fiction-arc templates use none of them.
-Rejection is enforced on the server (edge routes, template apply and update), as
-is `allowedContainers`, which the backend does not check today; the parallel
+Rejection is enforced on the server — edge routes, template apply and update, and
+reparenting, which can turn an existing edge into a rejected shape — as is
+`allowedContainers`, which the backend does not check today; the parallel
 container's ban on `for-each-prev-outputs` and `for-each-index` depends on it.
 
-## Writes and the cascade
-
-`patch` splits in two:
-
-- `patchState(id, path, manual, data)` — today's status rules per `(node, path)`,
-  counts recomputed, then the cascade from `(X, P)`.
-- `patchDefinition(id, data)` — a settings change demotes every row of the node;
-  a parent change deletes the moved subtree's rows.
-
-Cascade from `(X, P)`: consumers in X's scope at `P`; consumers inside a loop fed
-from outside at every row at or below `P`; if X's parent is a container,
-`onChildStateChanged` — the output child cascades from the container at
-`parentPath(P)`, and a sequential loop demotes prev-outputs at later iterations.
-It never crosses into a sibling iteration. Which state keys cascade is decided
-explicitly, instead of today's "every key outside `DO_NOT_NOTIFY`", where one
-excluded key cancels the cascade for a whole patch.
-
-## Staleness propagation
-
-`propagateStaleStatus` iterates over state rows: forward resolves each source at
-the consumer's path (a source outside a loop feeds every iteration); bottom-up
-promotes `(C, P)` if any child row at `P/C:k` is stale **for C's current keys
-only**, missing rows counting as pending; top-down into `(for-each-input, P/C:k)`
-for all k; and prev-outputs at `P/C:j` depends on the output at `P/C:k`, `k < j`.
-It writes processing state only, in batches, emitting events with paths.
-
-## Scheduler and concurrency
-
-- The path lives **in the regeneration context**; only the cycle context's
-  `asContainers(iterations, concurrency, block)` builds child paths, so the
-  scheduler and the path cannot disagree. It waits for every started iteration to
-  settle, then rethrows the first error — otherwise the run's `finally` would
-  clear `inProcess` while branches still write.
-- Concurrency: a per-node cap on `parallel-for-each` (default 4) **and** a
-  run-wide cap on concurrent LLM calls, engine-aware — nested caps multiply, and
-  Ollama is a shared daemon (cap 1 there).
-- The progress stack becomes a **tree of frames**, one per context — no LIFO for
-  parallel branches to corrupt. Events carry `{id, title, type}` refs and paths,
-  not full rows, and are copied when emitted (today they reference the live array).
-- `regenerateTreeNodesContents(target?: {nodeId, path})`.
-- `computeLevelDependencies` runs once per container per run, not per iteration.
-- Dead code goes: `nodeContext.asContainer`, `onNodeUpdated`, `getNodeOutput`,
-  `NodeUpdateEvent`, `PlanNodeSubscriptionEvent`.
-
-## Telemetry
-
-`ai_call_stats` gains nullable `node_id` and `path`, set through an
-AsyncLocalStorage value owned by the node context. `iteration_index` stays what it
-is — the fix-problems loop counter. `promptCacheKeys` stays `[purpose, nodeId]`:
-it is a prefix-cache hint, and iterations share the prefix. Parallel runs break
-the `wall_time ≥ sum(durations)` invariant and the visit split in
-`scripts/aggregate-telemetry.ts`; both key on the path from then on.
+The rest of the engine — writes, the cascade, staleness propagation, the
+scheduler and telemetry — is in [cascade.md](cascade.md).
