@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ProjectTemplate, TemplateProjectPlanNode, WizardField } from "../../../../shared/project-template.js"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
 import { computeTemplateLayoutWithEntries } from "../../../lib/elk-template-layout.js"
+import { templateVariables } from "../../../plan/nodes/input-relevance.js"
 import { applyProjectTemplate } from "../../../projects/apply-project-template.js"
 
 vi.mock("../../../settings/settings-repository.js", () => ({
@@ -188,31 +189,46 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       it.skip("no text-input edges on LLM-call nodes", () => {})
     }
 
-    it.each(cases)("%s references its input {{[%s]}}", (consumerTitle, sourceTitle) => {
+    it.each(cases)("%s names its input %s in a prompt", (consumerTitle, sourceTitle) => {
       const consumer = candidates.find((n) => n.node.title === consumerTitle)!.node
-      const allPromptText = collectPromptFields(consumer).join("\n")
+      // Any reference counts — `{{[Title]}}`, or a helper argument such as `(ne [Title] "1")`.
+      const allPromptText = collectPromptFields(consumer).join("\n").replace(WIZARD_VAR_RE, "0")
       expect(
-        allPromptText.includes(`{{[${sourceTitle}]}}`),
-        `${consumerTitle} has an input edge from "${sourceTitle}" but never references {{[${sourceTitle}]}} in any prompt field. ` +
-          `The engine does NOT auto-inject input content into prompts; without {{[Title]}} substitution the LLM never sees the source.`,
+        templateVariables(allPromptText)?.has(sourceTitle),
+        `${consumerTitle} has an input edge from "${sourceTitle}" but no prompt field names it. ` +
+          `The engine does NOT auto-inject input content into prompts; unreferenced, the LLM never sees the source.`,
       ).toBe(true)
     })
   })
 
-  describe("every {{Title}} placeholder has a matching input edge", () => {
+  describe("every node a prompt names has a matching input edge", () => {
+    // Every form counts, not only a bare `{{[Title]}}`: a name inside a helper
+    // call such as `(ne [Номер чанка] "1")` renders as undefined without its
+    // edge — strict mode does not check helper arguments — and the prompt
+    // silently takes the wrong branch.
+    const titles = new Set(allNodes.map(({ node }) => node.title))
+    const namedNodes = (lines: string[] | undefined, owner: string): Set<string> => {
+      if (!lines) return new Set()
+      // Wizard values are substituted at apply time, before Handlebars ever
+      // sees the prompt (`(divide ${chunksCount} 2)` parses only once it is a number).
+      const variables = templateVariables(lines.join("\n").replace(WIZARD_VAR_RE, "0"))
+      if (variables === null) throw new Error(`a prompt of "${owner}" does not parse`)
+      return new Set([...variables].filter((name) => titles.has(name) && name !== owner))
+    }
+
     for (const { node } of allNodes) {
       const collected = new Set<string>()
       const inputs = new Set((node.inputs ?? []).map((i) => i.sourceNodeTitle))
 
       // text-style nodes: aiUserInstructions
-      for (const p of extractPlaceholders(node.aiUserInstructions)) collected.add(p)
+      for (const p of namedNodes(node.aiUserInstructions, node.title)) collected.add(p)
 
       // fix-problems: find/fix prompts, plus foundProblemsTemplate as known-internal
       const nts = (node.nodeTypeSettings ?? {}) as Record<string, unknown>
       if (node.type === "fix-problems") {
-        for (const p of extractPlaceholders(nts.aiUserInstructionsToFindProblems as string[] | undefined))
+        for (const p of namedNodes(nts.aiUserInstructionsToFindProblems as string[] | undefined, node.title))
           collected.add(p)
-        for (const p of extractPlaceholders(nts.aiUserInstructionsToFixProblems as string[] | undefined))
+        for (const p of namedNodes(nts.aiUserInstructionsToFixProblems as string[] | undefined, node.title))
           collected.add(p)
         // foundProblemsTemplate is the bare name of a self-supplied placeholder
         // (the engine wraps it in {{...}} when injecting). Tolerate both bare
