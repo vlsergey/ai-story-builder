@@ -485,11 +485,13 @@ describe("template-update — the parameters an update may change", () => {
   it("offers the fields the template marks editable, with the values the project holds", () => {
     createProject({ synopsis: "S", minAge: "21" })
 
-    const offered = mod.analyzeTemplateUpdate().parameters.map(({ field, value }) => [field.name, value])
+    const offered = mod
+      .analyzeTemplateUpdate()
+      .parameters.map(({ page, field, value }) => [page.title, field.name, value])
 
     expect(offered, "the default where the project holds none").toEqual([
-      ["minAge", "21"],
-      ["chunks", "4"],
+      ["p", "minAge", "21"],
+      ["p", "chunks", "4"],
     ])
   })
 

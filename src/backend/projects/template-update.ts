@@ -82,6 +82,8 @@ export interface TemplateUpdateAnalysis {
 }
 
 export interface TemplateParameter {
+  /** The wizard page the field is on: the dialog groups the parameters by it. */
+  page: { id: string; title: string }
   field: WizardField
   value: string
 }
@@ -92,10 +94,12 @@ export interface TemplateParameter {
  */
 export type TemplateParameterChanges = Record<string, string | number>
 
-function editableFields(template: ProjectTemplate): WizardField[] {
-  return (template.wizardPages ?? [])
-    .flatMap((page) => page.fields)
-    .filter((field) => field.editableOnUpdate && field.type !== "advice")
+function editableFields(template: ProjectTemplate): { page: TemplateParameter["page"]; field: WizardField }[] {
+  return (template.wizardPages ?? []).flatMap((page) =>
+    page.fields
+      .filter((field) => field.editableOnUpdate && field.type !== "advice")
+      .map((field) => ({ page: { id: page.id, title: page.title }, field })),
+  )
 }
 
 /** The value a field has in the project, or the template's default where it has none. */
@@ -154,7 +158,7 @@ function loadAppliedContext(changes: TemplateParameterChanges = {}): AppliedCont
 
   const editable = editableFields(template)
   for (const [name, value] of Object.entries(changes)) {
-    const field = editable.find((f) => f.name === name)
+    const field = editable.find((e) => e.field.name === name)?.field
     if (!field) throw makeErrorWithStatus(`«${name}» is not a parameter an update may change`, 400)
     const checked = buildFormSchema([field]).safeParse({ [name]: value })
     if (!checked.success) throw makeErrorWithStatus(`«${field.label}» cannot be ${JSON.stringify(value)}`, 400)
@@ -392,7 +396,11 @@ export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): T
     removedEdges,
     retypedNodes,
     retypeBlocked,
-    parameters: editableFields(template).map((field) => ({ field, value: heldValue(field, wizardData) })),
+    parameters: editableFields(template).map(({ page, field }) => ({
+      page,
+      field,
+      value: heldValue(field, wizardData),
+    })),
   }
 }
 
