@@ -67,3 +67,45 @@ describe("grokGenerate — onEvent callbacks", () => {
     expect(onEvent).toHaveBeenCalledWith(event)
   })
 })
+
+describe("grokGenerate — which output item the answer comes from", () => {
+  beforeEach(() => mockCreate.mockReset())
+
+  const delta = (output_index: number, d: string) => ({ type: "response.output_text.delta", output_index, delta: d })
+
+  it("joins deltas of a single output item", async () => {
+    mockCreate.mockResolvedValue(makeStream([delta(0, '{"a":'), delta(0, "1}")]))
+    expect(await grokGenerate(null, "k", { model: "grok-3" })).toBe('{"a":1}')
+  })
+
+  it("returns the last item, not every item glued together", async () => {
+    // Observed on grok-4.7 under a json_schema: an empty object in the first
+    // output item, the real findings in the second. Concatenating them produced
+    // `{"foundProblems": []}{"foundProblems":[…]}` — valid JSON followed by
+    // junk, which JSON.parse rejects at the position where the second begins.
+    mockCreate.mockResolvedValue(
+      makeStream([delta(0, '{"foundProblems": []}'), delta(1, '{"foundProblems":['), delta(1, "{}]}")]),
+    )
+    expect(await grokGenerate(null, "k", { model: "grok-3" })).toBe('{"foundProblems":[{}]}')
+  })
+
+  it("ignores a trailing empty item", async () => {
+    mockCreate.mockResolvedValue(makeStream([delta(0, '{"real":1}'), delta(1, "")]))
+    expect(await grokGenerate(null, "k", { model: "grok-3" })).toBe('{"real":1}')
+  })
+
+  it("falls back to joining when the stream carries no output_index", async () => {
+    mockCreate.mockResolvedValue(
+      makeStream([
+        { type: "response.output_text.delta", delta: "ab" },
+        { type: "response.output_text.delta", delta: "cd" },
+      ]),
+    )
+    expect(await grokGenerate(null, "k", { model: "grok-3" })).toBe("abcd")
+  })
+
+  it("returns an empty string when nothing was emitted", async () => {
+    mockCreate.mockResolvedValue(makeStream([{ type: "response.created" }]))
+    expect(await grokGenerate(null, "k", { model: "grok-3" })).toBe("")
+  })
+})

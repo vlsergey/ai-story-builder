@@ -39,7 +39,15 @@ export async function grokGenerate(
     },
   )
 
-  let text = ""
+  // Text deltas carry the index of the output item they belong to, and a
+  // response may hold more than one text item. Seen on grok-4.7 under a
+  // json_schema: an empty object in item 0, the real findings in item 1.
+  // Gluing every delta into one string then yields valid JSON followed by
+  // junk, which JSON.parse rejects at the character where the second object
+  // starts. So keep the items apart and answer with the last one that said
+  // anything — one call asks one question and wants one answer.
+  const itemText = new Map<number, string>()
+  const itemOrder: number[] = []
 
   for await (const event of stream) {
     if (isVerboseLogging()) {
@@ -50,9 +58,13 @@ export async function grokGenerate(
     onEvent?.(event)
 
     switch (event.type) {
-      case "response.output_text.delta":
-        text += event.delta
+      case "response.output_text.delta": {
+        const rawIndex = (event as { output_index?: unknown }).output_index
+        const index = typeof rawIndex === "number" ? rawIndex : 0
+        if (!itemText.has(index)) itemOrder.push(index)
+        itemText.set(index, (itemText.get(index) ?? "") + event.delta)
         break
+      }
 
       case "response.completed":
         lastAiGenerationEventManager.onAiGenerationEvent({ ...event.response?.usage })
@@ -73,5 +85,9 @@ export async function grokGenerate(
     }
   }
 
-  return text
+  for (let i = itemOrder.length - 1; i >= 0; i--) {
+    const candidate = itemText.get(itemOrder[i]) ?? ""
+    if (candidate.length > 0) return candidate
+  }
+  return ""
 }
