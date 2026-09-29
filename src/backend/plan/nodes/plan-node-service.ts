@@ -442,6 +442,9 @@ export class PlanNodeService {
       ...update,
       ...(await this.mayBeInvokeOnUpdate(nodeId, oldNode, { ...oldNode, ...update })),
     }
+    if (update.content !== undefined) {
+      update = { ...update, ...this.countsOf({ ...oldNode, ...update }) }
+    }
 
     const updated = Object.keys(update).length !== 0 ? this.repo.patch(nodeId, update) : oldNode
     if (!updated) throw makeErrorWithStatus("node not found", 404)
@@ -660,6 +663,22 @@ export class PlanNodeService {
     })
 
     return result
+  }
+
+  /**
+   * Counts of what a node outputs. For split, fix-problems and loops the
+   * content is JSON, and counting it would measure the envelope.
+   */
+  private countsOf(node: PlanNodeRow): Pick<PlanNodeRow, "word_count" | "char_count" | "byte_count"> {
+    let text = node.content ?? ""
+    try {
+      const output = this.getProcessor(node.type).getOutput(this, node)
+      if (typeof output === "string") text = output
+      else if (Array.isArray(output)) text = output.filter((part) => typeof part === "string").join("\n\n")
+    } catch {
+      // No output yet (a loop before its children exist): count the raw content.
+    }
+    return { word_count: this.countWords(text), char_count: this.countChars(text), byte_count: this.countBytes(text) }
   }
 
   private countWords(text: string): number {
