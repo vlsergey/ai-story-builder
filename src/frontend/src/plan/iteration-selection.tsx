@@ -157,7 +157,7 @@ export function useIterationSelection(): IterationSelection {
  */
 export function useNodeDisplayState(nodeId: number): { path: NodePath; state: PlanNodeStateBrief | undefined } {
   const path = useIterationSelection().displayPath(nodeId)
-  const states = trpc.plan.nodes.findStatesAtPath.useQuery(path, { refetchOnWindowFocus: false }).data
+  const states = trpc.plan.nodes.findStatesAtPath.useQuery({ path }, { refetchOnWindowFocus: false }).data
   const state = useMemo(() => states?.find((s) => s.node_id === nodeId), [states, nodeId])
   return { path, state }
 }

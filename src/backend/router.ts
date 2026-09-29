@@ -128,9 +128,11 @@ export const appRouter = t.router({
       findInputs: t.procedure
         .input(nodeAtPath)
         .query(({ input }) => new PlanNodeService().findInputRows(input.id, input.path)),
+      // The path travels inside an object: electron-trpc drops a falsy input,
+      // and the top level's path is ''.
       findStatesAtPath: t.procedure
-        .input(z.string())
-        .query(({ input }) => new PlanNodeService().findStatesAtPath(input)),
+        .input(z.object({ path: z.string() }))
+        .query(({ input }) => new PlanNodeService().findStatesAtPath(input.path)),
       getById: t.procedure.input(nodeAtPath).query(({ input }): PlanNodeInIteration => {
         const service = new PlanNodeService()
         const current = service.isCurrentPath(input.id, input.path)
