@@ -33,6 +33,7 @@ import { ScriptProcessor } from "./graph/script-processor.js"
 import { mergeNodeSettings } from "./graph/settings-helper.js"
 import { SplitProcessor } from "./graph/split-processor.js"
 import { TextProcessor } from "./graph/text-processor.js"
+import { usesInput } from "./input-relevance.js"
 import type { NodeInputs } from "./NodeInput.js"
 import { planNodeEventManager } from "./plan-node-event-manager.js"
 import { PlanNodeRepository } from "./plan-node-repository.js"
@@ -57,19 +58,20 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   format: new FormatProcessor(),
 }
 
-const DO_NOT_NOTIFY_DOWNSTREAMS_ON_CHANGES_IN: (keyof PlanNodeRow)[] = [
-  "x",
-  "y",
-  "width",
-  "height",
-  "word_count",
-  "char_count",
-  "byte_count",
-  "in_review",
-  "review_base_content",
-  "ai_improve_instruction",
-  "created_at",
-] as const
+/**
+ * A patch reaches downstream nodes only when one of these actually changes:
+ * consumers read content and summary, and a move changes which iteration of a
+ * loop a node belongs to. Rewriting a value unchanged — a deterministic node
+ * re-run, a node starting to generate — must not demote anything.
+ */
+const CASCADING_KEYS = ["content", "summary", "parent_id"] as const
+
+/**
+ * Statuses a changed input demotes. MANUAL is the user's own text; OUTDATED
+ * and ERROR will re-run anyway. A GENERATING node is demoted so that the result
+ * it is computing from the old input does not land.
+ */
+const DEMOTABLE_BY_INPUT_CHANGE: ReadonlySet<PlanNodeStatus> = new Set(["GENERATED", "GENERATING", "EMPTY"])
 
 /**
  * Service for plan node operations.
@@ -199,12 +201,18 @@ export class PlanNodeService {
    * and downstream notifications will propagate further.
    */
   async markAsOutdatedAndNotifyDownstreamNodes(changedNodeId: number): Promise<void> {
+    const changedNode = this.repo.findById(changedNodeId)
+    if (!changedNode) return
     const outgoingEdges = new PlanEdgeRepository().findByFromNodeId(changedNodeId)
     for (const edge of outgoingEdges) {
-      const downstreamNode = this.getById(edge.to_node_id)
+      const downstreamNode = this.repo.findById(edge.to_node_id)
       if (!downstreamNode) continue
+      // A consumer that does not read this input cannot go stale from it.
+      if (!usesInput(downstreamNode, changedNode)) continue
 
-      let downstreamUpdate: PlanNodeUpdate = { status: "OUTDATED" }
+      let downstreamUpdate: PlanNodeUpdate = DEMOTABLE_BY_INPUT_CHANGE.has(downstreamNode.status)
+        ? { status: "OUTDATED" }
+        : {}
       let toBeAfterUpdate: PlanNodeRow = { ...downstreamNode, ...downstreamUpdate }
 
       const processor = this.getProcessor(downstreamNode.type)
@@ -429,11 +437,7 @@ export class PlanNodeService {
     // Emit event to frontend
     planNodeEventManager.emitUpdate(nodeId, `patched keys: ${Object.keys(data).join(", ")}`)
 
-    // If important field is changed, notify downstream nodes
-    const needToNotify = (Object.keys(update) as (keyof PlanNodeUpdate)[]).every(
-      (key) => !DO_NOT_NOTIFY_DOWNSTREAMS_ON_CHANGES_IN.includes(key),
-    )
-    if (needToNotify) {
+    if (CASCADING_KEYS.some((key) => updated[key] !== oldNode[key])) {
       await this.markAsOutdatedAndNotifyDownstreamNodes(nodeId)
     }
 

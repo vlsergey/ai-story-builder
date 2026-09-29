@@ -46,11 +46,11 @@ describe("regenerateSubtreeNodesContents — re-checks live status after cascade
     edgeRepo.insert({ from_node_id: a, to_node_id: b, type: "text" })
     edgeRepo.insert({ from_node_id: b, to_node_id: c, type: "text" })
     // hasRegenerationCriteria requires text/split/lore nodes to have a
-    // non-blank userPrompt; stub one on each.
-    const stubSettings = JSON.stringify({ userPrompt: "stub" })
-    nodeRepo.patch(a, { node_type_settings: stubSettings })
-    nodeRepo.patch(b, { node_type_settings: stubSettings })
-    nodeRepo.patch(c, { node_type_settings: stubSettings })
+    // non-blank userPrompt, and a consumer is demoted only by inputs its
+    // prompt reads.
+    nodeRepo.patch(a, { node_type_settings: JSON.stringify({ userPrompt: "stub" }) })
+    nodeRepo.patch(b, { node_type_settings: JSON.stringify({ userPrompt: "{{[A]}}" }) })
+    nodeRepo.patch(c, { node_type_settings: JSON.stringify({ userPrompt: "{{[B]}}" }) })
 
     // Stub PlanNodeService.regenerate so each call patches the node to
     // GENERATED and records its id.
@@ -177,9 +177,9 @@ describe("regenerateSubtreeNodesContents — re-checks live status after cascade
     })
     edgeRepo.insert({ from_node_id: src, to_node_id: merge, type: "text" })
     edgeRepo.insert({ from_node_id: merge, to_node_id: consumer, type: "text" })
-    const stubSettings = JSON.stringify({ userPrompt: "stub" })
-    nodeRepo.patch(src, { node_type_settings: stubSettings })
-    nodeRepo.patch(consumer, { node_type_settings: stubSettings })
+    nodeRepo.patch(src, { node_type_settings: JSON.stringify({ userPrompt: "stub" }) })
+    // The consumer's prompt reads the aggregate, so the aggregate's change demotes it.
+    nodeRepo.patch(consumer, { node_type_settings: JSON.stringify({ userPrompt: "{{[Agg]}}" }) })
 
     vi.spyOn(PlanNodeService.prototype, "regenerate").mockImplementation(async function (this: PlanNodeService, ctx) {
       regenerateOrder.push(ctx.nodeId)

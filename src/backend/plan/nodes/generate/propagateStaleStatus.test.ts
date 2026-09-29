@@ -4,6 +4,9 @@ import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
 import { propagateStaleStatus } from "./propagateStaleStatus.js"
 
+/** Settings for a text node whose prompt reads the named inputs. */
+const reads = (...titles: string[]) => JSON.stringify({ userPrompt: titles.map((t) => `{{[${t}]}}`).join("\n") })
+
 describe("propagateStaleStatus", () => {
   beforeEach(() => setUpTestDb())
   afterEach(() => tearDownTestDb())
@@ -12,8 +15,20 @@ describe("propagateStaleStatus", () => {
     const nodes = new PlanNodeRepository()
     const edges = new PlanEdgeRepository()
     const a = nodes.insert({ title: "A", type: "text", parent_id: null, status: "OUTDATED" })
-    const b = nodes.insert({ title: "B", type: "text", parent_id: null, status: "GENERATED" })
-    const c = nodes.insert({ title: "C", type: "text", parent_id: null, status: "GENERATED" })
+    const b = nodes.insert({
+      title: "B",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("A"),
+    })
+    const c = nodes.insert({
+      title: "C",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("B"),
+    })
     edges.insert({ from_node_id: a, to_node_id: b, type: "text" })
     edges.insert({ from_node_id: b, to_node_id: c, type: "text" })
 
@@ -43,8 +58,20 @@ describe("propagateStaleStatus", () => {
     const edges = new PlanEdgeRepository()
     const err = nodes.insert({ title: "Err", type: "text", parent_id: null, status: "ERROR" })
     const emp = nodes.insert({ title: "Empty", type: "text", parent_id: null, status: "EMPTY" })
-    const t1 = nodes.insert({ title: "T1", type: "text", parent_id: null, status: "GENERATED" })
-    const t2 = nodes.insert({ title: "T2", type: "text", parent_id: null, status: "GENERATED" })
+    const t1 = nodes.insert({
+      title: "T1",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("Err"),
+    })
+    const t2 = nodes.insert({
+      title: "T2",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("Empty"),
+    })
     edges.insert({ from_node_id: err, to_node_id: t1, type: "text" })
     edges.insert({ from_node_id: emp, to_node_id: t2, type: "text" })
 
@@ -52,6 +79,44 @@ describe("propagateStaleStatus", () => {
 
     expect(nodes.findById(t1)!.status).toBe("OUTDATED")
     expect(nodes.findById(t2)!.status).toBe("OUTDATED")
+  })
+
+  it("does not demote a consumer whose prompt does not read the stale source", () => {
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const stale = nodes.insert({ title: "Мир", type: "text", parent_id: null, status: "OUTDATED" })
+    const other = nodes.insert({ title: "Стиль", type: "text", parent_id: null, status: "GENERATED" })
+    const reader = nodes.insert({
+      title: "Проза",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("Стиль"),
+    })
+    edges.insert({ from_node_id: stale, to_node_id: reader, type: "text" })
+    edges.insert({ from_node_id: other, to_node_id: reader, type: "text" })
+
+    propagateStaleStatus()
+
+    expect(nodes.findById(reader)!.status).toBe("GENERATED")
+  })
+
+  it("counts a source named inside a helper call as read", () => {
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const stale = nodes.insert({ title: "Чанк", type: "text", parent_id: null, status: "OUTDATED" })
+    const reader = nodes.insert({
+      title: "Проза",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: JSON.stringify({ userPrompt: '{{#if (contains [Чанк] "mode=fragment")}}фрагмент{{/if}}' }),
+    })
+    edges.insert({ from_node_id: stale, to_node_id: reader, type: "text" })
+
+    propagateStaleStatus()
+
+    expect(nodes.findById(reader)!.status).toBe("OUTDATED")
   })
 
   it("never touches MANUAL — user-authoritative", () => {
@@ -84,7 +149,13 @@ describe("propagateStaleStatus", () => {
     const nodes = new PlanNodeRepository()
     const edges = new PlanEdgeRepository()
     const manual = nodes.insert({ title: "M", type: "text", parent_id: null, status: "MANUAL" })
-    const downstream = nodes.insert({ title: "D", type: "text", parent_id: null, status: "GENERATED" })
+    const downstream = nodes.insert({
+      title: "D",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("M"),
+    })
     edges.insert({ from_node_id: manual, to_node_id: downstream, type: "text" })
 
     propagateStaleStatus({ regenerateManual: true, regenerateGenerated: false })
@@ -98,7 +169,13 @@ describe("propagateStaleStatus", () => {
     const nodes = new PlanNodeRepository()
     const edges = new PlanEdgeRepository()
     const root = nodes.insert({ title: "R", type: "text", parent_id: null, status: "GENERATED" })
-    const downstream = nodes.insert({ title: "D", type: "text", parent_id: null, status: "GENERATED" })
+    const downstream = nodes.insert({
+      title: "D",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("R"),
+    })
     edges.insert({ from_node_id: root, to_node_id: downstream, type: "text" })
 
     propagateStaleStatus({ regenerateManual: false, regenerateGenerated: true })
@@ -169,7 +246,13 @@ describe("propagateStaleStatus", () => {
     const nodes = new PlanNodeRepository()
     const edges = new PlanEdgeRepository()
     const empty = nodes.insert({ title: "Empty", type: "text", parent_id: null, status: "EMPTY" })
-    const downstream = nodes.insert({ title: "D", type: "text", parent_id: null, status: "GENERATED" })
+    const downstream = nodes.insert({
+      title: "D",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("Empty"),
+    })
     edges.insert({ from_node_id: empty, to_node_id: downstream, type: "text" })
 
     propagateStaleStatus()
@@ -203,7 +286,13 @@ describe("propagateStaleStatus", () => {
     const edges = new PlanEdgeRepository()
     const src = nodes.insert({ title: "Src", type: "text", parent_id: null, status: "OUTDATED" })
     const agg = nodes.insert({ title: "PrevAgg", type: "merge", parent_id: null, status: "EMPTY" })
-    const reader = nodes.insert({ title: "Notes", type: "text", parent_id: null, status: "GENERATED" })
+    const reader = nodes.insert({
+      title: "Notes",
+      type: "text",
+      parent_id: null,
+      status: "GENERATED",
+      node_type_settings: reads("PrevAgg"),
+    })
     edges.insert({ from_node_id: src, to_node_id: agg, type: "text" })
     edges.insert({ from_node_id: agg, to_node_id: reader, type: "text" })
 
@@ -233,7 +322,13 @@ describe("propagateStaleStatus", () => {
     const edges = new PlanEdgeRepository()
     for (const type of ["text", "split", "lore", "fix-problems"] as const) {
       const empty = nodes.insert({ title: `E-${type}`, type, parent_id: null, status: "EMPTY" })
-      const reader = nodes.insert({ title: `R-${type}`, type: "text", parent_id: null, status: "GENERATED" })
+      const reader = nodes.insert({
+        title: `R-${type}`,
+        type: "text",
+        parent_id: null,
+        status: "GENERATED",
+        node_type_settings: reads(`E-${type}`),
+      })
       edges.insert({ from_node_id: empty, to_node_id: reader, type: "text" })
     }
 

@@ -1,5 +1,6 @@
 import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
+import { usesInput } from "../input-relevance.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
 
 /**
@@ -74,8 +75,8 @@ export interface PropagateOptions {
  * upstream inputs still needs to regenerate.
  *
  * Three rules, applied repeatedly to fixpoint:
- *   1. Forward via input edges — if any upstream node has a stale status,
- *      mark this GENERATED node OUTDATED.
+ *   1. Forward via input edges — if any upstream node this node actually
+ *      reads (`usesInput`) has a stale status, mark this GENERATED node OUTDATED.
  *   2. Bottom-up via parent_id — if any descendant of a container is stale,
  *      mark the GENERATED container OUTDATED (so the scheduler enters it
  *      and its regenerate method handles the inner sub-tree).
@@ -146,6 +147,19 @@ export function propagateStaleStatus(
     }
   }
 
+  // The same relevance rule as the cascade: a stale input the prompt never
+  // reads cannot make the node stale. Settings do not change here, so memoize.
+  const relevance = new Map<string, boolean>()
+  const reads = (consumer: PlanNodeRow, source: PlanNodeRow): boolean => {
+    const key = `${consumer.id}:${source.id}`
+    let result = relevance.get(key)
+    if (result === undefined) {
+      result = usesInput(consumer, source)
+      relevance.set(key, result)
+    }
+    return result
+  }
+
   const marked: number[] = []
   let changed = true
   while (changed) {
@@ -156,7 +170,7 @@ export function propagateStaleStatus(
 
       const upstreamStale = (incoming.get(node.id) ?? []).some((fromId) => {
         const src = byId.get(fromId)
-        if (!src) return false
+        if (!src || !reads(node, src)) return false
         return src.status === "EMPTY" ? contagiousEmpty.has(src.id) : forwardStale.has(src.status)
       })
 
