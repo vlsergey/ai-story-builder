@@ -459,6 +459,18 @@ export class PlanNodeService {
     return updated
   }
 
+  /**
+   * Patches several nodes, one after another, as a drag of several nodes in
+   * the graph does. Each patch is awaited, so the call returns once all are
+   * stored and a failure reaches the caller instead of becoming an unhandled
+   * rejection.
+   */
+  async batchPatch(items: { id: number; data: PlanNodeUpdate }[]): Promise<void> {
+    for (const { id, data } of items) {
+      await this.patch(id, false, data)
+    }
+  }
+
   private async mayBeInvokeOnUpdate<
     N extends PlanNodeRow | null = PlanNodeRow,
     T extends Record<string, any> = Record<string, any>,
