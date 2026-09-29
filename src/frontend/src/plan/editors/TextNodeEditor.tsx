@@ -88,10 +88,10 @@ export default function TextNodeEditor({
 
   const handleAcceptChanges = useCallback(async () => {
     await save(value)
-    const newValue = await acceptChangesMutation({ id: nodeId, path })
-    onChange(newValue)
+    // The server wrote this row: the editor takes it as it is, it is not an edit to save.
+    onExternalUpdate(await acceptChangesMutation({ id: nodeId, path }))
     setEditorMode((prevMode) => (prevMode === "review_after_generate" ? "generate" : "improve"))
-  }, [onChange, nodeId, path, save, value])
+  }, [onExternalUpdate, nodeId, path, save, value])
 
   const aiThinkinPanelRef = useRef<AiThinkingPanelHandle>(null)
   /** The text as the model streams it: shown in place of the content, never saved as it. */
