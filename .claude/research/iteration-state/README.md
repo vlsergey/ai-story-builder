@@ -1,8 +1,9 @@
 # Iteration state — rework proposal
 
 *2026-09-29. Status: phase 0 done on `master`; **phases 1–3 landed** on branch
-`iteration-state` ([plan.md](plan.md)); phase 1 reviewed and fixed, the review
-of the parallel loop under way. Re-verify pointers before relying on them.*
+`iteration-state` ([plan.md](plan.md)), each implementation reviewed and fixed;
+a check of the UI on the running app remains. Re-verify pointers before relying
+on them.*
 
 ## In short
 

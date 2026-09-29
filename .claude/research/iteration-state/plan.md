@@ -131,8 +131,9 @@ worker pool that lets running branches finish after a failure; the progress
 waits for a slot of its engine (`engine-slots.ts`, setting
 `max_concurrent_calls`: Ollama 1, Yandex and Grok 10); a loop's own
 `concurrency` caps its branches, the engine's limit by default. Deferred: the
-container display aggregate (`iterationStatuses`); the pager does not mark
-running iterations. Implementation review under way.
+container display aggregate (`iterationStatuses`). Reviewed: 1 high, 2 medium,
+10 low, all fixed test-first in `669154c` — among them a run-wide stop after a
+failure, and the key growth written in one transaction with its renames.
 
 ## Phase 3 — the character loop goes parallel (done, `7270652`)
 
