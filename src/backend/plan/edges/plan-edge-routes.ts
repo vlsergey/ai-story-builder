@@ -5,7 +5,9 @@ import {
   isValidEdgeType,
 } from "../../../shared/node-edge-dictionary.js"
 import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
+import { usesInput } from "../nodes/input-relevance.js"
 import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
+import { PlanNodeService } from "../nodes/plan-node-service.js"
 import { planEdgeEventManager } from "./plan-edge-event-manager.js"
 import { PlanEdgeRepository } from "./plan-edge-repository.js"
 
@@ -33,6 +35,17 @@ function makeEdgeCompatibilityError(sourceType: string, targetType: string, edge
     )
   }
   return makeError(`Edge type "${edgeType}" not allowed between node types "${sourceType}" and "${targetType}".`, 400)
+}
+
+/**
+ * A node that gains or loses an input it reads has produced its results from
+ * a different set of sources: every iteration of it is stale.
+ */
+function inputsChanged(sourceId: number, targetId: number): void {
+  const nodeRepo = new PlanNodeRepository()
+  const source = nodeRepo.findById(sourceId)
+  const target = nodeRepo.findById(targetId)
+  if (source && target && usesInput(target, source)) new PlanNodeService().demoteEverywhere(target.id)
 }
 
 // ── Edge functions ─────────────────────────────────────────────────────────────
@@ -66,6 +79,7 @@ export function createGraphEdge(data: {
   if (!canCreateEdge(sourceNode.type as any, targetNode.type as any, type as any)) {
     throw makeEdgeCompatibilityError(sourceNode.type, targetNode.type, type)
   }
+  new PlanNodeService().checkEdge(from_node_id, to_node_id)
 
   const edgeRepo = new PlanEdgeRepository()
   const edgeType: PlanEdgeType = type as PlanEdgeType
@@ -78,6 +92,7 @@ export function createGraphEdge(data: {
     template: template ?? null,
   })
   planEdgeEventManager.emitUpdate(Number(id))
+  inputsChanged(from_node_id, to_node_id)
   return { id }
 }
 
@@ -120,6 +135,7 @@ export function patchGraphEdge(
 
   edgeRepo.update(id, updateFields)
   planEdgeEventManager.emitUpdate(id)
+  if (type !== undefined && type !== currentEdge.type) inputsChanged(currentEdge.from_node_id, currentEdge.to_node_id)
   return { ok: true }
 }
 
@@ -131,5 +147,6 @@ export function deleteGraphEdge(id: number): { ok: boolean } {
   }
   edgeRepo.delete(id)
   planEdgeEventManager.emitUpdate(id)
+  inputsChanged(edge.from_node_id, edge.to_node_id)
   return { ok: true }
 }

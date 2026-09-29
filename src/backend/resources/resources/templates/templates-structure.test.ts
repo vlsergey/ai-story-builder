@@ -3,10 +3,15 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ProjectTemplate, TemplateProjectPlanNode, WizardField } from "../../../../shared/project-template.js"
+import { replaceTemplates } from "../../../ai/replaceTemplates.js"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
 import { computeTemplateLayoutWithEntries } from "../../../lib/elk-template-layout.js"
 import { templateVariables } from "../../../plan/nodes/input-relevance.js"
-import { applyProjectTemplate } from "../../../projects/apply-project-template.js"
+import {
+  applyProjectTemplate,
+  normalizeAndReplaceContent,
+  wizardSubstitutions,
+} from "../../../projects/apply-project-template.js"
 
 vi.mock("../../../settings/settings-repository.js", () => ({
   SettingsRepository: {
@@ -73,7 +78,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   const allNodes = walkPlanNodes(template.plan?.nodes)
 
   // ── Shared classifiers used by the prompt-cache discipline tests below ───
-  // A node is "dynamic" iff it lives anywhere inside a for-each — its content
+  // A node is "dynamic" iff it lives anywhere inside a loop — its content
   // varies per iteration. "Growing" is a refinement: a merge node whose
   // direct input is a for-each-prev-outputs sibling — its content is the
   // prefix of the next iteration's content (append-only).
@@ -82,7 +87,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   function insideForEach(n: TemplateProjectPlanNode): boolean {
     let cur: TemplateProjectPlanNode | null = parentOf.get(n) ?? null
     while (cur != null) {
-      if (cur.type === "for-each") return true
+      if (cur.type === "for-each" || cur.type === "parallel") return true
       cur = parentOf.get(cur) ?? null
     }
     return false
@@ -333,8 +338,8 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     })
   })
 
-  describe("every for-each has a for-each-input child", () => {
-    const forEachNodes = allNodes.filter(({ node }) => node.type === "for-each")
+  describe("every loop has a for-each-input child", () => {
+    const forEachNodes = allNodes.filter(({ node }) => node.type === "for-each" || node.type === "parallel")
     if (forEachNodes.length === 0) {
       it.skip("no for-each nodes in this template", () => {})
     }
@@ -608,6 +613,56 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     })
   })
 
+  // ─── Minimum character age ───────────────────────────────────────────────
+  // Grok refuses adult content unless every character is 21 or older, and
+  // other engines likely follow. A template lets the user say how old the
+  // characters are with a `minCharacterAge` select, and every LLM call
+  // carries the choice in the option's own words.
+  describe("every LLM call carries the minimum character age", () => {
+    const minAge = (template.wizardPages ?? []).flatMap((page) => page.fields).find((f) => f.name === "minCharacterAge")
+    if (!minAge) {
+      it.skip("template has no minCharacterAge wizard field — rule N/A", () => {})
+      return
+    }
+    const llmCallTypes = new Set(["text", "split", "lore", "fix-problems"])
+
+    it("in every prompt, as the chosen option says it", () => {
+      expect(minAge.type).toBe("select")
+      if (minAge.type !== "select") return
+      const failures: string[] = []
+      for (const { node } of allNodes.filter(({ node }) => llmCallTypes.has(node.type))) {
+        for (const { field, lines } of gatherPromptFields(node)) {
+          const ageLines = lines.filter((line) => line.includes("${minCharacterAge}"))
+          if (ageLines.length === 0) failures.push(`${node.title}.${field} does not mention it`)
+          for (const option of minAge.options) {
+            const values = wizardSubstitutions(template, { minCharacterAge: option.value })
+            const rendered = replaceTemplates<string>(normalizeAndReplaceContent(ageLines, values), {})
+            if (option.text && !rendered.includes(option.text))
+              failures.push(`${node.title}.${field} under ${option.label}`)
+          }
+        }
+      }
+      expect(failures).toEqual([])
+    })
+  })
+
+  // ─── No branching on a wizard value at call time ─────────────────────────
+  // A wizard value is known once the template applies. A prompt that branches
+  // on it when the model is called leaves in the text the user reads a
+  // condition settled long ago — `(eq "18+" "18+")`. The choice belongs in a
+  // select option's text, which the apply substitutes.
+  describe("no prompt branches on a wizard value at call time", () => {
+    it("has no {{#if}} or {{#unless}} over a ${…} substitution", () => {
+      const failures: string[] = []
+      for (const { node } of allNodes) {
+        for (const { field, lines } of gatherPromptFields(node)) {
+          if (lines.some((line) => /\{\{#(?:if|unless)\b[^}]*\$\{/.test(line))) failures.push(`${node.title}.${field}`)
+        }
+      }
+      expect(failures).toEqual([])
+    })
+  })
+
   // ─── Apply-time check — the whole template applies into a fresh DB ───────
   // Catches things the pure-JSON checks above can't: cross-parent references
   // that don't resolve, fix-problems sourceNodeTitleToFix pointing nowhere,
@@ -670,13 +725,18 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       applyProjectTemplate(template, wizardData)
 
       const { PlanNodeRepository } = await import("../../../plan/nodes/plan-node-repository.js")
-      const nodes = new PlanNodeRepository().findAll()
+      const { PlanNodeStateRepository } = await import("../../../plan/nodes/plan-node-state-repository.js")
+      const idByTitle = new Map(new PlanNodeRepository().findAll().map((n) => [n.title, n.id]))
+      const states = new PlanNodeStateRepository()
       const failures: string[] = []
-      for (const node of nodes) {
-        const hasNonBlankContent = node.content != null && node.content.trim().length > 0
-        if (hasNonBlankContent && node.status === "EMPTY") {
-          failures.push(`${node.title} (id=${node.id}): non-blank content but status=EMPTY`)
-        }
+      // Every node the template gives content must hold it, as the user's text.
+      for (const { node } of walkPlanNodes(template.plan?.nodes)) {
+        if (!node.content || node.content.length === 0) continue
+        const id = idByTitle.get(node.title)
+        const state = id === undefined ? undefined : states.find(id, "")
+        if (!state?.content?.trim()) failures.push(`${node.title}: its content did not land`)
+        else if (state.status !== "MANUAL")
+          failures.push(`${node.title} (id=${id}): content but status=${state.status}`)
       }
       expect(failures).toEqual([])
     })

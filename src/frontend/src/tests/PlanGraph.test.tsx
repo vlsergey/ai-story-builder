@@ -58,6 +58,10 @@ vi.mock("../ipcClient", () => ({
   },
 }))
 
+vi.mock("../plan/iteration-selection", () => ({
+  useIterationSelection: () => ({ displayPath: () => "", selected: () => 0, select: vi.fn() }),
+}))
+
 vi.mock("../plan/plan-graph/PlanTextNode", () => ({ default: () => null }))
 vi.mock("../plan/plan-graph/PlanLoreNode", () => ({ default: () => null }))
 vi.mock("../plan/plan-graph/PlanEdge", () => ({ default: () => null }))
@@ -79,7 +83,11 @@ vi.mock("@dagrejs/dagre", () => ({
   },
 }))
 
-describe("PlanGraph", () => {
+describe("PlanGraph", async () => {
+  // The graph's module tree takes seconds to load on a slow CI runner. That
+  // belongs to collecting the tests, not to the time one of them may take.
+  const { default: PlanGraph } = await import("../plan/plan-graph/PlanGraph")
+
   beforeEach(() => {
     // Ensure localStorage.getItem returns default
     vi.spyOn(Storage.prototype, "getItem").mockImplementation((key) => (key === "planGraph.autoLayout" ? "true" : null))
@@ -90,16 +98,14 @@ describe("PlanGraph", () => {
     vi.restoreAllMocks()
   })
 
-  it("renders without crashing", async () => {
-    const PlanGraph = (await import("../plan/plan-graph/PlanGraph")).default
+  it("renders without crashing", () => {
     const { unmount } = render(<PlanGraph />)
     // Component should render without errors
     // No need to wait for anything because queries are mocked
     unmount()
   })
 
-  it("renders the ReactFlow component", async () => {
-    const PlanGraph = (await import("../plan/plan-graph/PlanGraph")).default
+  it("renders the ReactFlow component", () => {
     const { getByTestId } = render(<PlanGraph />)
     // ReactFlow is mocked and should be present immediately
     expect(getByTestId("react-flow")).toBeInTheDocument()

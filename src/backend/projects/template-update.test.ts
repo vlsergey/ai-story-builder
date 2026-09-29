@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ProjectTemplate } from "../../shared/project-template.js"
 import { setUpTestDb, tearDownTestDb } from "../db/test-db-utils.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
+import { propagateStaleStatus } from "../plan/nodes/generate/propagateStaleStatus.js"
+import { seedState, stateAt } from "../plan/nodes/plan-node-fixtures.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { applyProjectTemplate } from "./apply-project-template.js"
@@ -105,7 +107,7 @@ describe("template-update", () => {
     // Mark project's root node as GENERATED — the apply must demote to OUTDATED.
     const planRepo = new PlanNodeRepository()
     const root = planRepo.findAll().find((n) => n.title === "Root")!
-    planRepo.patch(root.id, { status: "GENERATED", content: "user's generated text" })
+    seedState(root.id, "", { status: "GENERATED", content: "user's generated text" })
 
     // Write a NEW version of the template — root instructions changed.
     const updated = baseTemplate()
@@ -120,8 +122,8 @@ describe("template-update", () => {
     expect(result.updatedNodeCount).toBe(1)
 
     const after = new PlanNodeRepository().findAll().find((n) => n.title === "Root")!
-    expect(after.status).toBe("OUTDATED")
-    expect(after.content, "content must NOT be touched on update").toBe("user's generated text")
+    expect(stateAt(after.id)?.status).toBe("OUTDATED")
+    expect(stateAt(after.id)?.content, "content must NOT be touched on update").toBe("user's generated text")
     const settings = JSON.parse(after.node_type_settings || "{}")
     expect(settings.userPrompt).toBe("BRAND NEW root instructions")
   })
@@ -142,10 +144,9 @@ describe("template-update", () => {
       y: 0,
       width: null,
       height: null,
-      content: "kept",
       node_type_settings: null,
-      status: "MANUAL",
     })
+    seedState(orphanId, "", { status: "MANUAL", content: "kept" })
     const rootId = planRepo.findAll().find((n) => n.title === "Root")!.id
     const edgeRepo = new PlanEdgeRepository()
     edgeRepo.insert({ from_node_id: rootId, to_node_id: orphanId, type: "text" })
@@ -171,15 +172,15 @@ describe("template-update", () => {
     const after = new PlanNodeRepository().findAll()
     const sibling = after.find((n) => n.title === "Sibling")
     expect(sibling).toBeTruthy()
-    expect(sibling?.status).toBe("EMPTY")
+    expect(stateAt(sibling!.id)?.status).toBe("EMPTY")
 
     // Project-only survives, edge to it survives.
-    expect(after.find((n) => n.title === "Project-only")?.content).toBe("kept")
+    expect(stateAt(orphanId)?.content).toBe("kept")
     const edges = new PlanEdgeRepository().findAll()
     expect(edges.some((e) => e.from_node_id === rootId && e.to_node_id === orphanId)).toBe(true)
   })
 
-  it("demotes a for-each child across ALL iterations and demotes the for-each itself", async () => {
+  it("demotes a for-each child in ALL iterations, and the loop runs again", async () => {
     // Template: for-each "Loop" with one user-defined child "Loop child".
     const initial: ProjectTemplate = {
       label: "loop",
@@ -214,24 +215,9 @@ describe("template-update", () => {
     const loop = all.find((n) => n.title === "Loop")!
     const child = all.find((n) => n.title === "Loop child")!
 
-    // Seed the for-each with 3 iterations. Iter 0 and iter 2 snapshots
-    // both have Child as GENERATED. Current iter is 1, also GENERATED.
-    const mkOverride = (s: string) => ({
-      [`${child.id}`]: {
-        status: "GENERATED",
-        content: s,
-        summary: null,
-        word_count: null,
-        char_count: null,
-        byte_count: null,
-      },
-    })
-    const overrides = [mkOverride("iter0"), mkOverride("iter1"), mkOverride("iter2")]
-    planRepo.patch(loop.id, {
-      content: JSON.stringify({ length: 3, currentIndex: 1, overrides }),
-      status: "GENERATED",
-    })
-    planRepo.patch(child.id, { status: "GENERATED", content: "iter1" })
+    // The loop ran 3 iterations; Child is GENERATED in each.
+    seedState(loop.id, "", { status: "GENERATED", content: JSON.stringify({ length: 3 }) })
+    for (let i = 0; i < 3; i++) seedState(child.id, `${loop.id}:${i}`, { status: "GENERATED", content: `iter${i}` })
 
     // Template changes Child's instructions.
     const updated = JSON.parse(JSON.stringify(initial)) as ProjectTemplate
@@ -243,18 +229,14 @@ describe("template-update", () => {
 
     await applyTemplateUpdate()
 
-    const afterAll = new PlanNodeRepository().findAll()
-    const afterChild = afterAll.find((n) => n.id === child.id)!
-    const afterLoop = afterAll.find((n) => n.id === loop.id)!
-
-    expect(afterChild.status, "child row OUTDATED").toBe("OUTDATED")
-    expect(afterLoop.status, "for-each itself OUTDATED").toBe("OUTDATED")
-    const loopContent = JSON.parse(afterLoop.content || "{}")
-    expect(loopContent.overrides).toHaveLength(3)
-    loopContent.overrides.forEach((ov: any, i: number) => {
-      const entry = ov[`${child.id}`]
-      expect(entry?.status, `iter ${i} override status`).toBe("OUTDATED")
-    })
+    for (let i = 0; i < 3; i++) {
+      const state = stateAt(child.id, `${loop.id}:${i}`)
+      expect(state?.status, `iteration ${i}`).toBe("OUTDATED")
+      expect(state?.content, `iteration ${i} keeps its text`).toBe(`iter${i}`)
+    }
+    // The next run enters the loop to redo them.
+    propagateStaleStatus()
+    expect(stateAt(loop.id)?.status).toBe("OUTDATED")
   })
 
   it("re-substitutes wizard variables when comparing", () => {
@@ -340,6 +322,94 @@ describe("template-update", () => {
     expect(left, "hand-wired edge must survive").toEqual(["Root → Project-only"])
   })
 
+  /** A project whose character loop ran sequentially, over Аня, Боря and Аня again. */
+  function sequentialCast(): { template: ProjectTemplate; loop: number; input: number; profile: number } {
+    const template = {
+      label: "cast",
+      description: "cast",
+      wizardPages: [],
+      plan: {
+        nodes: [
+          { title: "Cast", type: "split", aiUserInstructions: ["List the cast."], inputs: [] },
+          {
+            title: "Loop",
+            type: "for-each",
+            inputs: [{ sourceNodeTitle: "Cast", type: "textArray" }],
+            children: [
+              { title: "Character", type: "for-each-input" },
+              {
+                title: "Profile",
+                type: "text",
+                aiUserInstructions: ["Profile of {{[Character]}}"],
+                inputs: [{ sourceNodeTitle: "Character", type: "text" }],
+              },
+              { title: "Result", type: "for-each-output", inputs: [{ sourceNodeTitle: "Profile", type: "text" }] },
+            ],
+          },
+        ],
+      },
+    } as unknown as ProjectTemplate
+    applyProjectTemplate(template, {})
+    SettingsRepository.setAppliedTemplateFile("cast.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+    const all = new PlanNodeRepository().findAll()
+    const id = (title: string) => all.find((n) => n.title === title)!.id
+    const [loop, input, profile, result] = ["Loop", "Character", "Profile", "Result"].map(id)
+    seedState(id("Cast"), "", { status: "GENERATED", content: JSON.stringify(["Аня", "Боря", "Аня"]) })
+    seedState(loop, "", { status: "GENERATED", content: JSON.stringify({ length: 3 }) })
+    ;["Аня", "Боря", "Аня"].forEach((name, i) => {
+      seedState(input, `${loop}:${i}`, { status: "GENERATED", content: name })
+      seedState(profile, `${loop}:${i}`, {
+        status: i === 1 ? "MANUAL" : "GENERATED",
+        content: `profile of ${name} #${i}`,
+      })
+      seedState(result, `${loop}:${i}`, { status: "GENERATED", content: `profile of ${name} #${i}` })
+    })
+    return { template, loop, input, profile }
+  }
+
+  it("turns a loop the template made parallel into one, keeping what each element produced", async () => {
+    const { template, loop, profile } = sequentialCast()
+    const parallel = JSON.parse(JSON.stringify(template)) as ProjectTemplate
+    ;(parallel.plan as any).nodes[1].type = "parallel"
+    writeTemplate("cast.json", parallel)
+
+    expect(analyzeTemplateUpdate().retypedNodes).toEqual([{ title: "Loop", from: "for-each", to: "parallel" }])
+    await applyTemplateUpdate()
+
+    expect(new PlanNodeRepository().findById(loop)?.type).toBe("parallel")
+    const { createHash } = await import("node:crypto")
+    const key = (name: string) => createHash("sha256").update(name, "utf8").digest("hex").slice(0, 6)
+    expect(stateAt(profile, `${loop}:${key("Аня")}`)?.content, "the first of identical elements").toBe(
+      "profile of Аня #0",
+    )
+    expect(stateAt(profile, `${loop}:${key("Боря")}`)).toMatchObject({
+      content: "profile of Боря #1",
+      status: "MANUAL",
+    })
+    expect(stateAt(profile, `${loop}:0`), "no row stays under an index").toBeUndefined()
+    expect(stateAt(profile, `${loop}:2`)).toBeUndefined()
+    const content = JSON.parse(stateAt(loop)?.content ?? "{}")
+    expect(content.order).toEqual([key("Аня"), key("Боря"), key("Аня")])
+    // Nothing is stale: the next run has nothing to redo.
+    expect(propagateStaleStatus().marked).toEqual([])
+  })
+
+  it("leaves a sequential loop alone when it holds what a parallel loop cannot", async () => {
+    const { template, loop } = sequentialCast()
+    new PlanNodeRepository().insert({ title: "Earlier", type: "for-each-prev-outputs", parent_id: loop })
+    const parallel = JSON.parse(JSON.stringify(template)) as ProjectTemplate
+    ;(parallel.plan as any).nodes[1].type = "parallel"
+    writeTemplate("cast.json", parallel)
+
+    const analysis = analyzeTemplateUpdate()
+    expect(analysis.retypedNodes).toEqual([])
+    expect(analysis.retypeBlocked.map((n) => n.title)).toEqual(["Loop"])
+    await applyTemplateUpdate()
+
+    expect(new PlanNodeRepository().findById(loop)?.type).toBe("for-each")
+  })
+
   it("demotes the target of a removed edge — its inputs changed", async () => {
     const initial = baseTemplate()
     applyProjectTemplate(initial, {})
@@ -348,7 +418,7 @@ describe("template-update", () => {
 
     const planRepo = new PlanNodeRepository()
     const child = planRepo.findAll().find((n) => n.title === "Child")!
-    planRepo.patch(child.id, { status: "GENERATED", content: "written against the old inputs" })
+    seedState(child.id, "", { status: "GENERATED", content: "written against the old inputs" })
 
     const dropped = baseTemplate()
     dropped.plan!.nodes![1].inputs = []
@@ -356,8 +426,95 @@ describe("template-update", () => {
 
     await applyTemplateUpdate({ removeMissingEdges: true })
 
-    const after = new PlanNodeRepository().findAll().find((n) => n.title === "Child")!
-    expect(after.status).toBe("OUTDATED")
-    expect(after.content, "content is not touched").toBe("written against the old inputs")
+    expect(stateAt(child.id)?.status).toBe("OUTDATED")
+    expect(stateAt(child.id)?.content, "content is not touched").toBe("written against the old inputs")
+  })
+})
+
+describe("template-update — the parameters an update may change", () => {
+  let mod: typeof import("./template-update.js")
+
+  beforeEach(async () => {
+    setUpTestDb()
+    mod = await import("./template-update.js")
+  })
+
+  afterEach(() => {
+    tearDownTestDb()
+  })
+
+  function withParameters(): ProjectTemplate {
+    const template = baseTemplate()
+    template.wizardPages = [
+      {
+        id: "p",
+        title: "p",
+        fields: [
+          { name: "synopsis", type: "textarea", label: "Synopsis" },
+          {
+            name: "minAge",
+            type: "select",
+            label: "Minimum age",
+            editableOnUpdate: true,
+            defaultValue: "none",
+            options: [
+              { value: "none", label: "Not specified", text: "" },
+              { value: "21", label: "21+", text: "All characters are at least 21." },
+            ],
+          },
+          { name: "chunks", type: "integer", label: "Chunks", min: 1, max: 9, defaultValue: 4, editableOnUpdate: true },
+        ],
+      },
+    ]
+    // Concatenated to defuse biome's noTemplateCurlyInString.
+    template.plan!.nodes![0].aiUserInstructions = [`Rules: ${"$"}{minAge}`]
+    return template
+  }
+
+  function createProject(wizardData: Record<string, string>): void {
+    const template = withParameters()
+    writeTemplate("parameters.json", template)
+    applyProjectTemplate(template, wizardData)
+    SettingsRepository.setAppliedTemplateFile("parameters.json")
+    SettingsRepository.setAppliedTemplateWizardData(wizardData)
+  }
+
+  const promptOf = (title: string): string =>
+    JSON.parse(new PlanNodeRepository().findAll().find((n) => n.title === title)!.node_type_settings!).userPrompt
+
+  it("offers the fields the template marks editable, with the values the project holds", () => {
+    createProject({ synopsis: "S", minAge: "21" })
+
+    const offered = mod
+      .analyzeTemplateUpdate()
+      .parameters.map(({ page, field, value }) => [page.title, field.name, value])
+
+    expect(offered, "the default where the project holds none").toEqual([
+      ["p", "minAge", "21"],
+      ["p", "chunks", "4"],
+    ])
+  })
+
+  it("rewrites the prompts a changed parameter reaches, and keeps the new value", async () => {
+    createProject({ synopsis: "S", minAge: "none" })
+    expect(promptOf("Root")).toBe("Rules: ")
+
+    expect(mod.analyzeTemplateUpdate({ minAge: "21" }).updatedNodes.map((n) => n.title)).toEqual(["Root"])
+    await mod.applyTemplateUpdate({ parameters: { minAge: "21" } })
+
+    expect(promptOf("Root")).toBe("Rules: All characters are at least 21.")
+    expect(SettingsRepository.getAppliedTemplateWizardData()).toEqual({ synopsis: "S", minAge: "21" })
+    expect(mod.analyzeTemplateUpdate().updatedNodes, "in step with the new value").toEqual([])
+  })
+
+  it("refuses to change what the template does not mark editable", () => {
+    createProject({ synopsis: "S", minAge: "none" })
+    expect(() => mod.analyzeTemplateUpdate({ synopsis: "Another" })).toThrow(/synopsis/)
+  })
+
+  it("refuses a value the field does not offer", () => {
+    createProject({ synopsis: "S", minAge: "none" })
+    expect(() => mod.analyzeTemplateUpdate({ minAge: "18" })).toThrow(/Minimum age/)
+    expect(() => mod.analyzeTemplateUpdate({ chunks: 12 })).toThrow(/Chunks/)
   })
 })

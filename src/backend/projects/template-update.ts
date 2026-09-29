@@ -1,16 +1,20 @@
 import fs from "node:fs"
 import path from "node:path"
+import type { PlanNodeType } from "../../shared/plan-node-types.js"
 import type {
   ProjectTemplate,
   TemplateProjectPlanNode,
   TemplateProjectPlanNodeInput,
+  WizardField,
 } from "../../shared/project-template.js"
+import { buildFormSchema } from "../../shared/project-template-form.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
+import { usesInput } from "../plan/nodes/input-relevance.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
-import { normalizeAndReplaceContent } from "./apply-project-template.js"
+import { normalizeAndReplaceContent, wizardSubstitutions } from "./apply-project-template.js"
 import { getTemplateFolders } from "./project-templates.js"
 
 /**
@@ -34,6 +38,13 @@ export interface UpdatedNode {
   type: string
 }
 
+/** A node the template now gives another type. */
+export interface RetypedNode {
+  title: string
+  from: string
+  to: string
+}
+
 export interface NewEdge {
   sourceTitle: string
   targetTitle: string
@@ -55,6 +66,49 @@ export interface TemplateUpdateAnalysis {
    * `applyTemplateUpdate`.
    */
   removedEdges: NewEdge[]
+  /**
+   * Nodes whose type the template changed, and the project can follow:
+   * today only a sequential loop becoming parallel. Their iterations keep
+   * what they produced.
+   */
+  retypedNodes: RetypedNode[]
+  /** Type changes the project cannot follow, with the reason. */
+  retypeBlocked: (RetypedNode & { reason: string })[]
+  /**
+   * The template's parameters an update may change — the wizard fields it
+   * marks `editableOnUpdate` — with the value this update uses for each.
+   */
+  parameters: TemplateParameter[]
+}
+
+export interface TemplateParameter {
+  /** The wizard page the field is on: the dialog groups the parameters by it. */
+  page: { id: string; title: string }
+  field: WizardField
+  value: string
+}
+
+/**
+ * New values for some of the template's parameters, as the dialog sends them.
+ * Numbers come as numbers; the project keeps every value as a string.
+ */
+export type TemplateParameterChanges = Record<string, string | number>
+
+function editableFields(template: ProjectTemplate): { page: TemplateParameter["page"]; field: WizardField }[] {
+  return (template.wizardPages ?? []).flatMap((page) =>
+    page.fields
+      .filter((field) => field.editableOnUpdate && field.type !== "advice")
+      .map((field) => ({ page: { id: page.id, title: page.title }, field })),
+  )
+}
+
+/** The value a field has in the project, or the template's default where it has none. */
+function heldValue(field: WizardField, wizardData: Record<string, string>): string {
+  const held = wizardData[field.name]
+  const fallback = "defaultValue" in field && field.defaultValue !== undefined ? String(field.defaultValue) : ""
+  if (held === undefined) return fallback
+  if (field.type === "select" && !field.options.some((option) => option.value === held)) return fallback
+  return held
 }
 
 // Keys in node_type_settings that count as "instruction-shaped" for the
@@ -84,15 +138,33 @@ function locateTemplateFile(filename: string): string {
   )
 }
 
-function loadAppliedContext(): { template: ProjectTemplate; wizardData: Record<string, string>; filename: string } {
+interface AppliedContext {
+  template: ProjectTemplate
+  /** The values the project holds for the wizard fields, with the changes on top. */
+  wizardData: Record<string, string>
+  /** What each `${name}` becomes — see `wizardSubstitutions`. */
+  substitutions: Record<string, unknown>
+  filename: string
+}
+
+function loadAppliedContext(changes: TemplateParameterChanges = {}): AppliedContext {
   const filename = SettingsRepository.getAppliedTemplateFile()
   if (!filename) {
     throw makeErrorWithStatus("Project was not created from a template — no template to update from.", 400)
   }
   const filePath = locateTemplateFile(filename)
   const template = JSON.parse(fs.readFileSync(filePath, "utf8")) as ProjectTemplate
-  const wizardData = SettingsRepository.getAppliedTemplateWizardData() ?? {}
-  return { template, wizardData, filename }
+  const wizardData = { ...(SettingsRepository.getAppliedTemplateWizardData() ?? {}) }
+
+  const editable = editableFields(template)
+  for (const [name, value] of Object.entries(changes)) {
+    const field = editable.find((e) => e.field.name === name)?.field
+    if (!field) throw makeErrorWithStatus(`«${name}» is not a parameter an update may change`, 400)
+    const checked = buildFormSchema([field]).safeParse({ [name]: value })
+    if (!checked.success) throw makeErrorWithStatus(`«${field.label}» cannot be ${JSON.stringify(value)}`, 400)
+    wizardData[name] = String(value)
+  }
+  return { template, wizardData, substitutions: wizardSubstitutions(template, wizardData), filename }
 }
 
 function walkTemplate(
@@ -116,14 +188,14 @@ function walkTemplate(
  */
 function buildTemplateInstructionSettings(
   node: TemplateProjectPlanNode,
-  wizardData: Record<string, string>,
+  substitutions: Record<string, unknown>,
 ): Record<string, unknown> {
   // Substitute `${var}` inside string values of nodeTypeSettings so template
   // authors can wire wizard fields straight into settings (e.g. SplitSettings
   // `expectedPartsCount: "${chunksCount}"`). Mirrors apply-project-template.
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node.nodeTypeSettings ?? {})) {
-    out[k] = typeof v === "string" ? normalizeAndReplaceContent([v], wizardData) : v
+    out[k] = typeof v === "string" ? normalizeAndReplaceContent([v], substitutions) : v
   }
 
   if (node.type === "fix-problems") {
@@ -135,7 +207,7 @@ function buildTemplateInstructionSettings(
     ] as const) {
       const v = out[k]
       if (Array.isArray(v)) {
-        out[k] = normalizeAndReplaceContent(v as string[], wizardData)
+        out[k] = normalizeAndReplaceContent(v as string[], substitutions)
       }
     }
     // sourceNodeTitleToFix → sourceNodeIdToFix is translated at apply time
@@ -146,7 +218,7 @@ function buildTemplateInstructionSettings(
   }
 
   if (node.aiUserInstructions) {
-    out.userPrompt = normalizeAndReplaceContent(node.aiUserInstructions, wizardData)
+    out.userPrompt = normalizeAndReplaceContent(node.aiUserInstructions, substitutions)
   }
 
   return out
@@ -245,8 +317,9 @@ function projectEdgeTriples(): EdgeTripleStore {
   return store
 }
 
-export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
-  const { template, wizardData, filename } = loadAppliedContext()
+/** What an update would do — with `changes` to the template's parameters, if any. */
+export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): TemplateUpdateAnalysis {
+  const { template, wizardData, substitutions, filename } = loadAppliedContext(changes)
 
   const templateNodes = walkTemplate(template.plan?.nodes)
   const projectNodes = new PlanNodeRepository().findAll()
@@ -255,6 +328,9 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
   let unchangedCount = 0
   const updatedNodes: UpdatedNode[] = []
   const newNodes: UpdatedNode[] = []
+  const retypedNodes: RetypedNode[] = []
+  const retypeBlocked: (RetypedNode & { reason: string })[] = []
+  const nodeService = new PlanNodeService()
 
   for (const tNode of templateNodes) {
     const projectNode = projectByTitle.get(tNode.title)
@@ -262,7 +338,20 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
       newNodes.push({ title: tNode.title, type: tNode.type })
       continue
     }
-    const templateSettings = buildTemplateInstructionSettings(tNode, wizardData)
+    if (tNode.type !== projectNode.type) {
+      const change = { title: tNode.title, from: projectNode.type, to: tNode.type }
+      if (projectNode.type !== "for-each" || tNode.type !== "parallel") {
+        retypeBlocked.push({ ...change, reason: "only a sequential loop can become a parallel one" })
+      } else {
+        const blocking = nodeService.childrenBlockingParallel(projectNode.id)
+        if (blocking.length > 0) {
+          retypeBlocked.push({ ...change, reason: `it holds ${blocking.map((c) => `«${c.title}»`).join(", ")}` })
+        } else {
+          retypedNodes.push(change)
+        }
+      }
+    }
+    const templateSettings = buildTemplateInstructionSettings(tNode, substitutions)
     const projectSettings = parseProjectSettings(projectNode.node_type_settings)
     const templateAiSettingsJson = tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null
     const aiSettingsDiff = templateAiSettingsJson !== (projectNode.ai_settings ?? null)
@@ -305,11 +394,19 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
     newNodes,
     newEdges,
     removedEdges,
+    retypedNodes,
+    retypeBlocked,
+    parameters: editableFields(template).map(({ page, field }) => ({
+      page,
+      field,
+      value: heldValue(field, wizardData),
+    })),
   }
 }
 
 export interface TemplateUpdateApplyResult {
   appliedAt: string
+  retypedNodeCount: number
   updatedNodeCount: number
   newNodeCount: number
   newEdgeCount: number
@@ -328,13 +425,16 @@ export interface TemplateUpdateApplyOptions {
    * nothing.
    */
   removeMissingEdges?: boolean
+  /** New values for parameters the template marks `editableOnUpdate`; the project keeps them. */
+  parameters?: TemplateParameterChanges
 }
 
 export async function applyTemplateUpdate(
   options: TemplateUpdateApplyOptions = {},
 ): Promise<TemplateUpdateApplyResult> {
-  const { template, wizardData } = loadAppliedContext()
-  const analysis = analyzeTemplateUpdate()
+  const changes = options.parameters ?? {}
+  const { template, wizardData, substitutions } = loadAppliedContext(changes)
+  const analysis = analyzeTemplateUpdate(changes)
   const nodeRepo = new PlanNodeRepository()
   const edgeRepo = new PlanEdgeRepository()
   const nodeService = new PlanNodeService()
@@ -345,15 +445,22 @@ export async function applyTemplateUpdate(
     return new Map(nodeRepo.findAll().map((n) => [n.title, n]))
   }
 
+  // 0. Change the types the template changed, keeping what the nodes produced.
+  let projectMap = projectByTitleNow()
+  for (const { title } of analysis.retypedNodes) {
+    const pNode = projectMap.get(title)
+    if (pNode) nodeService.retypeToParallel(pNode.id)
+  }
+
   // 1. Rewrite instruction fields on changed nodes.
   const templateNodes = walkTemplate(template.plan?.nodes)
   const templateByTitle = new Map(templateNodes.map((n) => [n.title, n]))
-  let projectMap = projectByTitleNow()
+  projectMap = projectByTitleNow()
   for (const { title } of analysis.updatedNodes) {
     const tNode = templateByTitle.get(title)
     const pNode = projectMap.get(title)
     if (!tNode || !pNode) continue
-    const fresh = buildTemplateInstructionSettings(tNode, wizardData)
+    const fresh = buildTemplateInstructionSettings(tNode, substitutions)
     // Preserve any unrelated keys we don't manage.
     const current = parseProjectSettings(pNode.node_type_settings)
     const keys: readonly string[] =
@@ -368,10 +475,8 @@ export async function applyTemplateUpdate(
       node_type_settings: JSON.stringify(merged),
       ai_settings: aiSettingsForPatch,
     })
-    // Demote via the service so each container parent (e.g. for-each) gets
-    // a chance to mirror the demotion into its per-iteration snapshots and
-    // recursively bubble OUTDATED up to its own ancestors.
-    await nodeService.demoteToOutdated(pNode.id)
+    // New instructions: what the node produced in every iteration is stale.
+    nodeService.demoteEverywhere(pNode.id)
   }
 
   // 2. Insert new nodes. Parent is resolved by parent's title (if the new
@@ -392,8 +497,9 @@ export async function applyTemplateUpdate(
     const parentTitle = findParentTitle(tNode, template.plan?.nodes)
     const parentId = parentTitle ? (projectMap.get(parentTitle)?.id ?? null) : null
 
-    const initial = buildTemplateInstructionSettings(tNode, wizardData)
-    nodeRepo.insert({
+    const initial = buildTemplateInstructionSettings(tNode, substitutions)
+    nodeService.checkContainer(tNode.type as PlanNodeType, parentId)
+    const id = nodeRepo.insert({
       title: tNode.title,
       type: tNode.type as any,
       parent_id: parentId,
@@ -401,11 +507,10 @@ export async function applyTemplateUpdate(
       y: tNode.y ?? 0,
       width: tNode.width ?? null,
       height: tNode.height ?? null,
-      content: null,
       node_type_settings: Object.keys(initial).length > 0 ? JSON.stringify(initial) : null,
       ai_settings: tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null,
-      status: "EMPTY",
     })
+    nodeService.writeInitialState(id, null)
   }
   projectMap = projectByTitleNow()
 
@@ -417,11 +522,14 @@ export async function applyTemplateUpdate(
     const src = projectMap.get(e.sourceTitle)
     const tgt = projectMap.get(e.targetTitle)
     if (!src || !tgt) continue
+    nodeService.checkEdge(src.id, tgt.id)
     edgeRepo.insert({
       from_node_id: src.id,
       to_node_id: tgt.id,
       type: e.type as any,
     })
+    // A new input the prompt reads: what the node produced did not have it.
+    if (usesInput(tgt, src)) nodeService.demoteEverywhere(tgt.id)
   }
 
   // 4. Optionally drop edges the template no longer declares. The target
@@ -439,12 +547,16 @@ export async function applyTemplateUpdate(
         edgeRepo.delete(row.id)
         removedEdgeCount += 1
       }
-      await nodeService.demoteToOutdated(tgt.id)
+      nodeService.demoteEverywhere(tgt.id)
     }
   }
 
+  // 5. Keep the new parameter values: the next update compares against them.
+  if (Object.keys(changes).length > 0) SettingsRepository.setAppliedTemplateWizardData(wizardData)
+
   return {
     appliedAt: new Date().toISOString(),
+    retypedNodeCount: analysis.retypedNodes.length,
     updatedNodeCount: analysis.updatedNodes.length,
     newNodeCount: analysis.newNodes.length,
     newEdgeCount: analysis.newEdges.length,

@@ -7,7 +7,7 @@ import {
 } from "../../shared/fix-problems-plan-node.js"
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
-import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
+import type { NodeInputs } from "../plan/nodes/NodeInput.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
@@ -15,19 +15,22 @@ import { generateWithTelemetry } from "./generate-with-telemetry.js"
 import { parseFoundProblems } from "./parse-found-problems.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
+/**
+ * Asks the model what is wrong with `source`, the text being fixed. `inputs`
+ * are the node's inputs, resolved by the caller at the node's path.
+ */
 export async function findProblems(
   abortSignal: AbortSignal,
   node: PlanNodeRow,
+  inputs: NodeInputs<string>,
   source: string,
   iteration: number,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<FindProblemsResult> {
-  const planNodeService = new PlanNodeService()
   const settings = JSON.parse(node.node_type_settings || "{}") as FixProblemsPlanNodeSettings
 
   const nodeAiSettings = node.ai_settings
 
-  const inputs = planNodeService.findNodeInputsByType(node.id, "text")
   const replacements = nodeInputsToReplacements(inputs)
 
   // Override the source node with the source provided, because it may be not the first iteration
@@ -82,21 +85,21 @@ export async function findProblems(
   return parseFoundProblems(aiResult, node.title)
 }
 
+/** Asks the model to rewrite `source` without the problems found; `inputs` as for findProblems. */
 export async function fixProblems(
   abortSignal: AbortSignal,
   node: PlanNodeRow,
+  inputs: NodeInputs<string>,
   source: string,
   foundProblemsTemplateTitle: string,
   foundProblems: FindProblemsResult,
   iteration: number,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string> {
-  const planNodeService = new PlanNodeService()
   const settings = JSON.parse(node.node_type_settings || "{}") as FixProblemsPlanNodeSettings
 
   const nodeAiSettings = node.ai_settings
 
-  const inputs = planNodeService.findNodeInputsByType(node.id, "text")
   const replacements = nodeInputsToReplacements(inputs)
 
   // Override the source node with the source provided, because it may be not the first iteration

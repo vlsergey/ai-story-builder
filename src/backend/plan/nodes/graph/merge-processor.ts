@@ -1,5 +1,5 @@
 import type { MergeSettings } from "../../../../shared/node-settings.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { NodeInputs } from "../NodeInput.js"
 import type { PlanNodeService } from "../plan-node-service.js"
@@ -25,11 +25,11 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     context: RegenerationNodeContext | undefined,
     node: PlanNodeRow,
     settings: MergeSettings,
-  ): Promise<PlanNodeUpdate> {
+  ): Promise<PlanNodeStateUpdate> {
     const nodeTitle = node.title
 
     // Fetch inputs (expanded)
-    const nodeInputs = service.findNodeInputs(node.id)
+    const nodeInputs = service.findNodeInputs(node.id, node.path)
     const inputs = this.getExpandedInputs(nodeInputs)
 
     let content = ""
@@ -61,7 +61,7 @@ export class MergeProcessor implements NodeProcessor<MergeSettings> {
     // Remove trailing newlines
     content = content.trim()
 
-    const result: PlanNodeUpdate = {
+    const result: PlanNodeStateUpdate = {
       content: content,
     }
 

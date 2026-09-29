@@ -1,6 +1,6 @@
 import Handlebars from "handlebars"
 import type { FixProblemsPlanNodeSettings } from "../../../shared/fix-problems-plan-node.js"
-import type { PlanNodeRow } from "../../../shared/plan-graph.js"
+import type { PlanNodeDefinition } from "../../../shared/plan-graph.js"
 import { getNodePrompts } from "./graph/settings-helper.js"
 
 /**
@@ -53,7 +53,7 @@ export function templateVariables(template: string): Set<string> | null {
  * every input by construction (merge, format, script, containers and their
  * internal nodes).
  */
-function inputTemplates(node: PlanNodeRow): string[] | null {
+function inputTemplates(node: Pick<PlanNodeDefinition, "type" | "node_type_settings">): string[] | null {
   switch (node.type) {
     case "text":
     case "split": {
@@ -74,7 +74,7 @@ function inputTemplates(node: PlanNodeRow): string[] | null {
   }
 }
 
-function parseSettings<T>(node: PlanNodeRow): Partial<T> {
+function parseSettings<T>(node: Pick<PlanNodeDefinition, "node_type_settings">): Partial<T> {
   try {
     return (JSON.parse(node.node_type_settings ?? "{}") ?? {}) as Partial<T>
   } catch {
@@ -87,7 +87,10 @@ function parseSettings<T>(node: PlanNodeRow): Partial<T> {
  * split node reads an input only if one of its prompts names it; fix-problems
  * also reads the text it fixes. Everything else reads all its inputs.
  */
-export function usesInput(consumer: PlanNodeRow, source: PlanNodeRow): boolean {
+export function usesInput(
+  consumer: Pick<PlanNodeDefinition, "type" | "node_type_settings">,
+  source: Pick<PlanNodeDefinition, "id" | "title">,
+): boolean {
   if (consumer.type === "fix-problems") {
     const { sourceNodeIdToFix } = parseSettings<FixProblemsPlanNodeSettings>(consumer)
     // Without an explicit choice the only input is the one being fixed.

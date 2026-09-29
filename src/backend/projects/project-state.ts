@@ -2,7 +2,7 @@ import fs from "node:fs"
 import { openProjectDatabase } from "../db/index.js"
 import { getCurrentDbPath, isOpen, setCurrentDbPath } from "../db/state.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
-import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
+import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import type { ProjectInitialData } from "../types/index.js"
 import { applyRuntimeSettings } from "./project-settings.js"
@@ -44,11 +44,14 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
     setCurrentDbPath(dbPath)
 
     // Auto-create root plan node if none exist
-    const planRepo = new PlanNodeRepository()
-    const planCount = planRepo.count()
-    if (planCount === 0) {
+    const planService = new PlanNodeService()
+    // No run is going on while a project opens: what says it is was cut off.
+    const interrupted = planService.states.resetInterrupted()
+    if (interrupted > 0)
+      console.info(`[project] ${interrupted} node(s) left GENERATING by an unfinished run are pending`)
+    if (planService.count() === 0) {
       const rootTitle = SettingsRepository.getProjectTitle() ?? "Plan"
-      planRepo.insert({ title: rootTitle, parent_id: null, position: 0 })
+      planService.create({ title: rootTitle, parent_id: null, position: 0 })
     }
   } catch (e) {
     console.error(e)

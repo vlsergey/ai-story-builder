@@ -34,7 +34,11 @@
         "name": { "type": "string" },
         "label": { "type": "string" },
         "description": { "type": "string" },
-        "type": { "type": "string" }
+        "type": { "type": "string" },
+        "editableOnUpdate": {
+          "description": "The update-from-template dialog offers this field for change. Leave it off for a field that only seeds what a node starts with, like a synopsis: an update never rewrites content.",
+          "type": "boolean"
+        }
       }
     },
     "WizardTextAreaField": {
@@ -65,6 +69,40 @@
         }
       },
       "required": ["type"],
+      "unevaluatedProperties": false
+    },
+    "WizardSelectOption": {
+      "type": "object",
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "description": "What the project stores for this choice. Never empty: a select cannot hold an empty value.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": { "type": "string" },
+        "text": {
+          "description": "What `${name}` becomes in the prompts; the value itself when absent. Kept apart from the value so a template can reword it and an update carries the new wording to existing projects.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WizardSelectField": {
+      "allOf": [{ "$ref": "#/definitions/BaseWizardField" }],
+      "properties": {
+        "type": { "const": "select" },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/WizardSelectOption" }
+        },
+        "defaultValue": {
+          "description": "The value of one of the options.",
+          "type": "string"
+        }
+      },
+      "required": ["type", "options"],
       "unevaluatedProperties": false
     },
     "WizardIntegerField": {
@@ -104,6 +142,7 @@
         { "$ref": "#/definitions/WizardInputField" },
         { "$ref": "#/definitions/WizardTextAreaField" },
         { "$ref": "#/definitions/WizardSelectAgeRatingField" },
+        { "$ref": "#/definitions/WizardSelectField" },
         { "$ref": "#/definitions/WizardIntegerField" },
         { "$ref": "#/definitions/WizardAdviceField" }
       ]

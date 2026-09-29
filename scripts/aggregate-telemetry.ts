@@ -50,6 +50,8 @@ interface CallRecord {
   success: boolean
   iteration_index?: number | null
   reasoning_effort?: string | null
+  /** The iteration the call ran in; records written before it existed have none. */
+  path?: string | null
 }
 
 type BucketKey =
@@ -240,8 +242,9 @@ function sumOrNull(values: Array<number | null | undefined>): number | null {
  * many iterations each visit ran.
  *
  * A visit is a contiguous (time-ordered) sequence of records sharing
- * (run_id, node_title) within the bucket where iteration_index starts at 0
- * and grows. When we see iteration_index === 0 again, that's a new visit.
+ * (run_id, node_title, path) within the bucket where iteration_index starts
+ * at 0 and grows. When we see iteration_index === 0 again, that's a new
+ * visit. The path keeps iterations that run side by side apart.
  *
  * Returns null counts when no records in the bucket carry iteration_index —
  * single-shot purposes like `generate-plan-node-text-content` won't have it.
@@ -253,11 +256,11 @@ function analyseVisits(records: CallRecord[]): {
   const tagged = records.filter((r) => typeof r.iteration_index === "number")
   if (tagged.length === 0) return { iterations_per_visit: null, visits_count: null }
 
-  // Group by (run_id, node_title), sort each group by ts, walk and split into
+  // Group by (run_id, node_title, path), sort each group by ts, walk and split into
   // visits on iteration_index === 0 boundaries.
   const groups = new Map<string, CallRecord[]>()
   for (const r of tagged) {
-    const k = `${r.run_id}|${r.node_title ?? ""}`
+    const k = `${r.run_id}|${r.node_title ?? ""}|${r.path ?? ""}`
     const arr = groups.get(k) ?? []
     arr.push(r)
     groups.set(k, arr)

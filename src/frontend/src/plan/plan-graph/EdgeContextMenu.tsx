@@ -9,15 +9,15 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/ui-components/context-menu"
-import type { PlanEdgeRow, PlanNodeRow } from "@shared/plan-graph"
+import type { PlanEdgeRow, PlanNodeDefinition } from "@shared/plan-graph"
 import { LineDotRightHorizontalIcon, TrashIcon } from "lucide-react"
 import { useCallback } from "react"
 
 interface EdgeContextMenuProps {
   edgeData: {
     edge: PlanEdgeRow
-    source: PlanNodeRow
-    target: PlanNodeRow
+    source: PlanNodeDefinition
+    target: PlanNodeDefinition
   } | null
   triggerRef: React.RefObject<HTMLDivElement | null>
 }

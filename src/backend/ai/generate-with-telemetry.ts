@@ -1,6 +1,8 @@
 import type OpenAI from "openai"
+import type { AiEngineKey } from "../../shared/ai-engines.js"
 import { recordCall } from "../lib/telemetry/telemetry.js"
 import type { AiEngineAdapter, GenerateResponseRequest } from "./ai-engine-adapter.js"
+import { withEngineSlot } from "./engine-slots.js"
 
 function pickNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
@@ -35,7 +37,9 @@ export function extractProviderCostUsd(response: unknown): number | null {
 }
 
 /**
- * Wraps `adapter.generateResponse` with per-call telemetry recording.
+ * Wraps `adapter.generateResponse` with per-call telemetry recording, once
+ * the engine has a free slot (see `withEngineSlot`); the wait is not part of
+ * the recorded duration.
  *
  * Captures duration and output text length around the call, captures token
  * usage via the `response.completed` SSE event, and records one ai_call_stats
@@ -43,7 +47,7 @@ export function extractProviderCostUsd(response: unknown): number | null {
  * re-throwing — caller behaviour is unchanged.
  */
 export async function generateWithTelemetry(args: {
-  engineId: string
+  engineId: AiEngineKey
   adapter: AiEngineAdapter
   request: GenerateResponseRequest
   /**
@@ -67,6 +71,10 @@ export async function generateWithTelemetry(args: {
   iterationIndex?: number | null
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void
 }): Promise<string> {
+  return await withEngineSlot(args.engineId, args.request.abortSignal, () => generateAndRecord(args))
+}
+
+async function generateAndRecord(args: Parameters<typeof generateWithTelemetry>[0]): Promise<string> {
   const {
     engineId,
     adapter,

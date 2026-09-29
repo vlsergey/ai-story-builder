@@ -1,3 +1,4 @@
+import InstructionsTabTrigger from "@/ai/InstructionsTabTrigger"
 import { trpc } from "@/ipcClient"
 import { useTranslation } from "react-i18next"
 import { useTheme } from "@/lib/theme/theme-provider"
@@ -13,8 +14,6 @@ import CodeMirror, { EditorView } from "@uiw/react-codemirror"
 import { useId, useMemo } from "react"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import { Textarea } from "@/ui-components/textarea"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui-components/tooltip"
-import { CircleQuestionMarkIcon } from "lucide-react"
 import { Separator } from "@/ui-components/separator"
 import TransWrapper from "@/i18n/TransWrapper"
 
@@ -38,7 +37,7 @@ export default function FixProblemsNodeEditor({
   const { resolvedTheme } = useTheme()
 
   const inputEdges = trpc.plan.edges.findByToNodeIdAndType.useQuery({ id: dbValue.id, type: "text" }).data
-  const inputNodes = trpc.plan.nodes.getByIds.useQuery((inputEdges || []).map((t) => t.from_node_id)).data
+  const inputNodes = trpc.plan.nodes.findInputs.useQuery({ id: dbValue.id, path: dbValue.path }).data
   const inputs = useMemo<InputNode[]>(() => {
     return (inputEdges || [])
       .map((edge) => {
@@ -164,24 +163,8 @@ export default function FixProblemsNodeEditor({
       <FieldGroup>
         <Tabs defaultValue="user">
           <TabsList variant="line">
-            <TabsTrigger value="system">
-              <Tooltip>
-                <TooltipTrigger className="flex items-center gap-1">
-                  {t("ai.systemInstructions")}
-                  <CircleQuestionMarkIcon />
-                </TooltipTrigger>
-                <TooltipContent>{t("ai.systemInstructions.description")}</TooltipContent>
-              </Tooltip>
-            </TabsTrigger>
-            <TabsTrigger value="user">
-              <Tooltip>
-                <TooltipTrigger className="flex items-center gap-1">
-                  {t("ai.userInstructions")}
-                  <CircleQuestionMarkIcon />
-                </TooltipTrigger>
-                <TooltipContent>{t("ai.userInstructions.description")}</TooltipContent>
-              </Tooltip>
-            </TabsTrigger>
+            <InstructionsTabTrigger kind="system" />
+            <InstructionsTabTrigger kind="user" />
           </TabsList>
           <TabsContent value="system">
             <div className="w-full flex gap-2">

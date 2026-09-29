@@ -3,15 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { migrateDatabase } from "../migrations.js"
 import migration028 from "./028.js"
 
+/** A database at version 27, built by the chain, to seed with pre-028 rows. */
 function setupAt27(db: Database.Database) {
   db.pragma("foreign_keys = OFF")
-  migrateDatabase(db, true)
-  db.exec("DELETE FROM plan_nodes")
-  // migrateDatabase advanced through 028, which dropped the prompt columns.
-  // Re-add them so the test can seed pre-028 data and exercise the migration.
-  db.exec("ALTER TABLE plan_nodes ADD COLUMN ai_user_prompt TEXT")
-  db.exec("ALTER TABLE plan_nodes ADD COLUMN ai_system_prompt TEXT")
-  db.pragma("user_version = 27")
+  migrateDatabase(db, { enforceMigrations: true, toVersion: 27 })
 }
 
 function insertNode(

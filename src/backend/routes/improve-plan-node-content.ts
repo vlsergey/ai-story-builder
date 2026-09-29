@@ -3,7 +3,6 @@ import type { AiGenerationSettings } from "../../shared/ai-generation-settings.j
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { getEngineAdapter } from "../ai/ai-engine-adapter.js"
 import { generateWithTelemetry } from "../ai/generate-with-telemetry.js"
-import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 
@@ -15,21 +14,15 @@ function makeError(message: string, status: number): Error {
   return e
 }
 
-interface ImproveResult {
-  oldNode: PlanNodeRow
-  newContent: string
-}
-
+/**
+ * Rewrites the node's text at its path by its improve instruction and returns
+ * the new text. The caller decides whether it may still be written.
+ */
 export async function improvePlanNodeContent(
   abortSignal: AbortSignal,
-  nodeId: number,
+  planNode: PlanNodeRow,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
-): Promise<ImproveResult> {
-  const nodeRepo = new PlanNodeRepository()
-
-  const planNode = nodeRepo.findById(nodeId)
-  if (!planNode) throw makeError("node not found", 404)
-
+): Promise<string> {
   const { ai_improve_instruction: aiImproveInstruction, ai_settings: nodeAiSettings } = planNode
   if (!aiImproveInstruction) throw makeError("no ai improve instructions found", 400)
 
@@ -49,7 +42,7 @@ export async function improvePlanNodeContent(
     ...nodeEngineAiSettings,
   }
 
-  const newContent = await generateWithTelemetry({
+  return await generateWithTelemetry({
     engineId,
     adapter,
     request: {
@@ -58,7 +51,7 @@ export async function improvePlanNodeContent(
       systemPrompt,
       aiGenerationSettings: actualAiSettings,
       // TODO: fix at some moment, this is very nice to have feature
-      promptCacheKeys: ["improve-plan-node-content", String(nodeId)],
+      promptCacheKeys: ["improve-plan-node-content", String(planNode.id)],
       includeExistingLore: false,
       engineFileIds: [],
     },
@@ -69,9 +62,4 @@ export async function improvePlanNodeContent(
     purpose: "improve-plan-node-content",
     onEvent,
   })
-
-  return {
-    oldNode: planNode,
-    newContent,
-  }
 }

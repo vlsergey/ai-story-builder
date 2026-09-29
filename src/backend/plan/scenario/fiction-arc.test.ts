@@ -57,10 +57,10 @@ describe("the fiction-arc template", () => {
     expect(s.calls("text").filter((c) => c.node === "Профиль персонажа")).toHaveLength(2)
   })
 
-  // Fixed by the iteration-state rework: a change from outside a loop reaches
-  // only the iteration mounted in the rows. «Голоса персонажей» feeds the
-  // profiles but not the cast list, so nothing re-seeds the loop.
-  it.fails("re-writes every character's profile after the voices change", async () => {
+  // «Голоса персонажей» feeds the profiles but not the cast list: the change
+  // reaches every iteration without re-seeding the loop. Until the
+  // iteration-state rework it reached only the iteration on display.
+  it("re-writes every character's profile after the voices change", async () => {
     const s = await fictionArc()
     await s.run()
 

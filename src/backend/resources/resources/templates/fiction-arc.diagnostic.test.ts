@@ -2,9 +2,12 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { iterationKeys } from "../../../../shared/loop-iterations.js"
+import { childPath } from "../../../../shared/plan-node-path.js"
 import type { ProjectTemplate } from "../../../../shared/project-template.js"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
 import { PlanNodeRepository } from "../../../plan/nodes/plan-node-repository.js"
+import { PlanNodeService } from "../../../plan/nodes/plan-node-service.js"
 import { applyProjectTemplate } from "../../../projects/apply-project-template.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 
@@ -26,18 +29,19 @@ vi.mock("../../../settings/ai-settings.js", () => ({
 
 vi.mock("../../../ai/generate-plan-node-text-content.js", () => ({
   generatePlanNodeTextContent: vi.fn(
-    async (_signal: AbortSignal, node: { id: number; title: string; parent_id: number | null }) => {
+    async (
+      _signal: AbortSignal,
+      node: { id: number; title: string },
+      inputs: { sourceNode: { title: string }; input: unknown }[],
+    ) => {
       // Профиль персонажа is the load-bearing case: each for-each iteration
       // must see a different character via the sibling «Персонаж» (for-each-input)
       // and produce a profile that mentions that character. If the for-each is
       // broken and only one iteration fires, both profiles will name the same
       // character — assertions further down will catch that.
       if (node.title === "Профиль персонажа") {
-        const { PlanNodeRepository } = await import("../../../plan/nodes/plan-node-repository.js")
-        const repo = new PlanNodeRepository()
-        const siblings = repo.findByParentId(node.parent_id)
-        const personInput = siblings.find((n) => n.title === "Персонаж")
-        const rawInput = personInput?.content ?? "<no input>"
+        const personInput = inputs.find((i) => i.sourceNode.title === "Персонаж")
+        const rawInput = typeof personInput?.input === "string" ? personInput.input : "<no input>"
         // Input shape after the recent block-format change: "Имя — фраза" OR
         // "Имя, поле: значение, … — фраза". Pull the leading name segment.
         const charName = rawInput.split(/[,—-]/)[0]?.trim() || "<unnamed>"
@@ -108,9 +112,9 @@ describe("fiction-arc end-to-end (stubbed LLM)", () => {
     const { regenerateTreeNodesContents } = await import("../../../plan/nodes/generate/regenerateTreeNodesContents.js")
     await regenerateTreeNodesContents()
 
-    const planRepo = new PlanNodeRepository()
-    const nodes = planRepo.findAll()
-    const byTitle = new Map(nodes.map((n) => [n.title, n]))
+    const service = new PlanNodeService()
+    const nodes = new PlanNodeRepository().findAll()
+    const byTitle = new Map(nodes.map((n) => [n.title, service.getRow(n.id, "")]))
 
     const synopsis = byTitle.get("Синопсис")!
     expect(synopsis.status, "Синопсис should not be regenerated").toBe("MANUAL")
@@ -121,10 +125,8 @@ describe("fiction-arc end-to-end (stubbed LLM)", () => {
     expect(parts).toHaveLength(2)
 
     const cycle = byTitle.get("Цикл по персонажам")!
-    const cycleContent = JSON.parse(cycle.content || "{}") as { length?: number; overrides?: unknown[] }
-    // EXPECTED: length=2, two iteration overrides containing the input names.
-    // BUG candidate: if onInputContentChange didn't propagate, length will be 0 / undefined.
-    expect(cycleContent.length, `Цикл length should be 2, got ${cycleContent.length}`).toBe(2)
+    const keys = iterationKeys(cycle.type, cycle.content)
+    expect(keys, "one iteration per character").toHaveLength(2)
     expect(cycle.status).not.toBe("EMPTY")
 
     // Inspect children of the cast for-each
@@ -136,25 +138,11 @@ describe("fiction-arc end-to-end (stubbed LLM)", () => {
     expect(review, "Ревью персонажа child must exist").toBeTruthy()
     expect(output, "Выход child must exist").toBeTruthy()
 
-    // For-each output: should be a textArray of 2 polished profiles
-    const cycleOutputContent = JSON.parse(cycle.content || "{}") as {
-      currentIndex?: number
-      overrides?: Array<Record<string, { content?: string }>>
-    }
-    const outputs = (cycleOutputContent.overrides || []).map((override, idx) => {
-      const outNodeOverride = output ? override?.[`${output.id}`] : null
-      if (idx === (cycleOutputContent.currentIndex ?? 0)) {
-        return output?.content || outNodeOverride?.content || ""
-      }
-      return outNodeOverride?.content || ""
-    })
+    // The loop's output: each iteration's output child, in its own row
+    const outputs = keys.map((key) => service.getRow(output!.id, childPath("", cycle.id, key)).content ?? "")
 
     console.log("--- DIAGNOSTIC OUTPUT ---")
-    console.log("Cycle content:", JSON.stringify(cycleContent, null, 2))
-    console.log(
-      "Children of cycle:",
-      cycleChildren.map((c) => ({ title: c.title, status: c.status, content: c.content?.slice(0, 80) })),
-    )
+    console.log("Cycle content:", cycle.content)
     console.log("Per-iteration outputs:", outputs)
     console.log("--- END DIAGNOSTIC ---")
 

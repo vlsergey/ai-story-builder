@@ -1,5 +1,5 @@
 import type { ScriptSettings } from "../../../../shared/node-settings.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import { DEFAULT_SCRIPT_TIMEOUT_MS, runScript, type ScriptInput } from "../../../script/run-script.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { NodeInputs } from "../NodeInput.js"
@@ -28,13 +28,13 @@ export class ScriptProcessor implements NodeProcessor<ScriptSettings> {
     _context: RegenerationNodeContext | undefined,
     node: PlanNodeRow,
     settings: ScriptSettings,
-  ): Promise<PlanNodeUpdate> {
+  ): Promise<PlanNodeStateUpdate> {
     const source = settings.source ?? ""
     if (source.trim().length === 0) {
       return { content: "", status: "EMPTY" }
     }
 
-    const inputs = toScriptInputs(service.findNodeInputs(node.id))
+    const inputs = toScriptInputs(service.findNodeInputs(node.id, node.path))
     const result = runScript({
       source,
       inputs,

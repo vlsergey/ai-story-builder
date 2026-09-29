@@ -1,217 +1,74 @@
-import type { ForEachNodeContent, NodeOverride } from "../../../../shared/for-each-plan-node.js"
+import { type ForEachNodeContent, loopLength } from "../../../../shared/for-each-plan-node.js"
 import type { ForEachSettings } from "../../../../shared/node-settings.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
+import { childPath } from "../../../../shared/plan-node-path.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import { regenerateSubtreeNodesContents } from "../generate/regenerateTreeNodesContents.js"
-import { PlanNodeService } from "../plan-node-service.js"
+import type { PlanNodeService } from "../plan-node-service.js"
+import { loopChild, loopElements } from "./loop-input.js"
 import type { NodeProcessor } from "./node-processor.js"
 
+/**
+ * A loop over a list: its children run once per element, in order, each
+ * iteration with its own state at `<loop path>/<loop id>:<index>`. The loop
+ * itself stores only how many iterations it has.
+ */
 export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
   readonly defaultSettings: ForEachSettings = {}
 
-  getOutput(context: PlanNodeService, node: PlanNodeRow): string[] {
-    if ((node.content ?? "").length === 0) return []
-
-    const parsedContent = JSON.parse(node.content || "{}") as ForEachNodeContent
-
-    const outputs = context.findByParentIdAndType(node.id, "for-each-output")
-    if (outputs.length === 0) throw Error(`Missing for-each-output node for for-each node ${node.id}`)
-    if (outputs.length > 1)
-      throw Error(`Too many for-each-output nodes for for-each node ${node.id}: ${outputs.map((i) => i.id)}`)
-    const outputNode = outputs[0]
-
-    console.log(
-      `[ForEachProcessor] getOutput for node ${node.id}, overrides length: ${parsedContent.overrides?.length || 0}`,
+  /** One output per element: the output child's content in each iteration. */
+  getOutput(service: PlanNodeService, row: PlanNodeRow): string[] {
+    const length = loopLength(row.content)
+    if (length === 0) return []
+    const output = loopChild(service, row.id, "for-each-output")
+    return Array.from(
+      { length },
+      (_, index) => service.states.find(output.id, childPath(row.path, row.id, index))?.content ?? "",
     )
-    console.log(`[ForEachProcessor] outputNode.id: ${outputNode.id}, outputNode.content: ${outputNode.content}`)
-    if (parsedContent.overrides) {
-      parsedContent.overrides.forEach((override, idx) => {
-        console.log(`[ForEachProcessor] override[${idx}]:`, override)
-        if (override?.[outputNode.id]) {
-          console.log(`[ForEachProcessor]   output content: ${override[outputNode.id].content}`)
-        } else {
-          console.log(`[ForEachProcessor]   output content missing`)
-        }
-      })
-    }
-
-    return (parsedContent.overrides || []).map((override, index) => {
-      if (index !== parsedContent.currentIndex) {
-        // for non-current pages obtain content from stored overrides
-        const outputOverride = override ? override[`${outputNode.id}`] : null
-        return outputOverride?.content || ""
-      } else {
-        // if current page is selected, obtain content from node directly
-        return outputNode.content || ""
-      }
-    })
   }
 
-  async onInputContentChange(
-    service: PlanNodeService,
-    nodeData: PlanNodeRow,
-    changedInputNodeId: number,
-    settings: ForEachSettings,
-  ): Promise<PlanNodeUpdate | null> {
-    const inputs = this.getExpandedInputs(service, nodeData.id)
-    const internalInputNodeId = this.getInternalInputNodeId(service, nodeData.id)
-    const parsedContent = JSON.parse(nodeData.content || "{}") as ForEachNodeContent
-    console.log(
-      `[ForEachProcessor] Updating node ${nodeData.id} for new input content (${inputs.length} items) as content overrides for for-each-input node ${internalInputNodeId}`,
-    )
-
-    const allChildren = service.findByParentId(nodeData.id)
-    const internalInputIdStr = `${internalInputNodeId}`
-    const priorOverrides = parsedContent.overrides || []
-
-    // Build a fresh overrides array. For every iteration we explicitly write an
-    // entry for every child of the for-each — not just the for-each-input row.
-    // This is what lets `applyForEachNodeIterationToChildren` reset user-defined
-    // children when navigating to a not-yet-regenerated iteration; otherwise
-    // those children would silently retain the previous iteration's GENERATED
-    // content and the regen scheduler would skip them.
-    const newOverrides: Record<string, NodeOverride>[] = []
-    for (let iteration: number = 0; iteration < inputs.length; iteration++) {
-      const priorForIter = priorOverrides[iteration] || {}
-      const inputUnchanged = priorForIter[internalInputIdStr]?.content === inputs[iteration]
-
-      const overrideForIter: Record<string, NodeOverride> = {}
-      for (const child of allChildren) {
-        const idStr = `${child.id}`
-        if (child.id === internalInputNodeId) {
-          overrideForIter[idStr] = {
-            content: inputs[iteration],
-            summary: null,
-            word_count: null,
-            char_count: null,
-            byte_count: null,
-            // mark it outdated to regenerate summary
-            status: "OUTDATED",
-          }
-        } else if (inputUnchanged && priorForIter[idStr]) {
-          overrideForIter[idStr] = priorForIter[idStr]
-        } else {
-          overrideForIter[idStr] = {
-            content: null,
-            summary: null,
-            word_count: null,
-            char_count: null,
-            byte_count: null,
-            status: "OUTDATED",
-          }
-        }
-      }
-      newOverrides.push(overrideForIter)
-    }
-
-    // Replace current input. The per-iteration overrides above already mark
-    // for-each-input with summary: null + status: OUTDATED so each iteration
-    // gets a fresh summary; the mounted row must mirror that — otherwise the
-    // currently-visible iteration shows the previous run's stale summary
-    // after upstream contents changed.
-    await new PlanNodeService().patch(internalInputNodeId, false, {
-      content: inputs[parsedContent.currentIndex || 0],
-      status: "OUTDATED",
-      summary: null,
-    })
-
-    const newContent: ForEachNodeContent = {
-      ...parsedContent,
-      overrides: newOverrides,
-      length: inputs.length,
-    }
-
-    return {
-      content: JSON.stringify(newContent),
-      status: "OUTDATED",
-    }
-  }
-
-  private getInternalInputNodeId(context: PlanNodeService, nodeId: number): number {
-    const internalInputNodes = context.findByParentIdAndType(nodeId, "for-each-input")
-    if (internalInputNodes.length === 0) throw Error(`Missing for-each-input node for for-each node ${nodeId}`)
-    if (internalInputNodes.length > 1)
-      throw Error(`Too many for-each-input nodes for for-each node ${nodeId}: ${internalInputNodes.map((i) => i.id)}`)
-    return internalInputNodes[0].id
-  }
+  // A changed list only makes the loop stale — the cascade does that for any
+  // reader. The loop re-reads its list when it runs.
 
   async regenerate(
     service: PlanNodeService,
     context: RegenerationNodeContext,
-    node: PlanNodeRow,
-    settings: ForEachSettings,
-  ): Promise<PlanNodeUpdate | null> {
-    const parsedContent = JSON.parse(node.content || "{}") as ForEachNodeContent
-    const totalIterations = parsedContent.length || 0
+    row: PlanNodeRow,
+    _settings: ForEachSettings,
+  ): Promise<PlanNodeStateUpdate | null> {
+    const elements = loopElements(service, row)
+    const input = loopChild(service, row.id, "for-each-input")
 
-    console.log(`[ForEachProcessor] regenerating node ${node.id}, totalIterations=${totalIterations}`)
-    const oldPage = parsedContent.currentIndex || 0
+    // The iterations are recorded before they run, so that an editor, the
+    // graph and a run stopped half-way all see the list the loop works on.
+    // Iterations whose element vanished go with the same write, with
+    // everything nested in them.
+    const content = JSON.stringify({ length: elements.length } satisfies ForEachNodeContent)
+    const current = new Set(elements.map((_, index) => String(index)))
+    const recorded = await service.writeWhileRunning(row, { content }, () => {
+      service.states.deleteIterationsWhere(row.id, row.path, (key) => !current.has(key))
+    })
+    if (!recorded) return null
 
-    // Wait for all iterations to complete
-    await context.asCycle(totalIterations, async (cycleContext) => {
-      for (let iteration: number = 0; iteration < totalIterations; iteration++) {
-        await cycleContext.asContainer(iteration, async (childContext) => {
-          console.info(
-            `Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}...`,
-          )
-          service.changeForEachNodePage(node.id, iteration)
-          await regenerateSubtreeNodesContents(childContext, node.id)
-          // The just-generated iteration's children are persisted into
-          // overrides[iteration] by the next page change — either the next loop
-          // iteration's `changeForEachNodePage(iteration+1)` or the final
-          // restore-to-oldPage call below. No explicit save needed here.
-          console.info(
-            `Regeneration child nodes content of for-each node ${node.id} '${node.title}' for iteration ${iteration}... Done`,
-          )
-        })
+    // An element that is new or changed gets its iteration's input written;
+    // the cascade demotes what reads it in that iteration and nowhere else.
+    // The input itself is left to settle in its iteration's run, which counts
+    // and summarizes it like any other node.
+    for (let index = 0; index < elements.length; index++) {
+      const path = childPath(row.path, row.id, index)
+      if (service.states.find(input.id, path)?.content !== elements[index]) {
+        await service.patchState(input.id, path, false, { content: elements[index], status: "OUTDATED" })
+      }
+    }
+
+    console.log(`[ForEachProcessor] node ${row.id} at "${row.path}": ${elements.length} iteration(s)`)
+    await context.asCycle(elements.length, async (cycle) => {
+      for (let index = 0; index < elements.length; index++) {
+        await cycle.asContainer(index, (childContext) => regenerateSubtreeNodesContents(childContext, row.id))
       }
     })
 
-    console.log(`[ForEachProcessor] regeneration completed, restoring page to ${oldPage}`)
-    return service.changeForEachNodePage(node.id, oldPage)
-  }
-
-  async onChildDemoted(service: PlanNodeService, parentNode: PlanNodeRow, childId: number): Promise<void> {
-    // Mirror the child's demotion into every iteration's snapshot. The
-    // currently-mounted iteration's row was already patched by the caller;
-    // here we only touch the override snapshots so navigating to another
-    // page doesn't restore GENERATED content for a node whose instructions
-    // (or upstream contract) have changed.
-    const parsed = (JSON.parse(parentNode.content || "{}") || {}) as ForEachNodeContent
-    const overrides = parsed.overrides ?? []
-    let changed = false
-    for (const ov of overrides) {
-      if (!ov) continue
-      const entry = ov[`${childId}`]
-      if (entry && entry.status === "GENERATED") {
-        ov[`${childId}`] = { ...entry, status: "OUTDATED" }
-        changed = true
-      }
-    }
-    if (changed) {
-      parsed.overrides = overrides
-      await service.patch(parentNode.id, false, { content: JSON.stringify(parsed) })
-    }
-  }
-
-  private getExpandedInputs(context: PlanNodeService, nodeId: number): string[] {
-    const nodeInputs = context.findNodeInputs(nodeId)
-    const inputs: string[] = []
-
-    for (const nodeInput of nodeInputs) {
-      switch (nodeInput.edge.type) {
-        case "text":
-          inputs.push(nodeInput.input as string)
-          break
-        case "textArray": {
-          const parts = nodeInput.input as string[]
-          parts.forEach((part) => {
-            inputs.push(part)
-          })
-          break
-        }
-      }
-    }
-    return inputs
+    // A loop's text is its iterations' outputs: they have their own summaries.
+    return { content, summary: row.summary }
   }
 }

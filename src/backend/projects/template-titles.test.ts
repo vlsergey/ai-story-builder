@@ -211,7 +211,7 @@ describe("project template title-based references", () => {
   it("round-trips a graph with a cross-parent edge", async () => {
     const planRepo = new PlanNodeRepository()
     const edgeRepo = new PlanEdgeRepository()
-    const styleId = planRepo.insert({ title: "Style", type: "text", x: 0, y: 0, content: "STYLE" })
+    const styleId = planRepo.insert({ title: "Style", type: "text", x: 0, y: 0 })
     const feId = planRepo.insert({ title: "FE", type: "for-each", x: 0, y: 0 })
     planRepo.insert({ title: "Input", type: "for-each-input", parent_id: feId, x: 0, y: 0 })
     planRepo.insert({ title: "Output", type: "for-each-output", parent_id: feId, x: 0, y: 0 })

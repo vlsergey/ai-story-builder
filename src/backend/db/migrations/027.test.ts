@@ -3,29 +3,10 @@ import { describe, expect, it } from "vitest"
 import { migrateDatabase } from "../migrations.js"
 import migration027 from "./027.js"
 
-function seededDbAt26(): Database.Database {
-  const db = new Database(":memory:")
-  // Run forward to version 26, then we'll apply 027 manually so we can inspect
-  // the pre-state more easily. Simpler: run all migrations, then walk back is
-  // impossible — instead, seed at version 0 via schema and let the full chain
-  // run through 26 by stopping the loop early. Easiest: just run migrateDatabase
-  // (advances to CURRENT_VERSION which already includes 027), and seed BEFORE
-  // applying — using an explicit pre-027 state via raw SQL.
-  return db
-}
-
+/** A database at version 26, built by the chain, to seed with pre-027 rows. */
 function setupAt26(db: Database.Database) {
-  // Manually run migrations 0..CURRENT_VERSION so we can insert split rows in
-  // their legacy shape, then apply 027 in isolation to assert translation.
   db.pragma("foreign_keys = OFF")
-  migrateDatabase(db, true)
-  // Now we're at CURRENT_VERSION. Wipe data and resurrect any columns dropped
-  // by migrations >27 so seeding pre-027 rows still works.
-  db.exec("DELETE FROM plan_nodes")
-  const cols = (db.pragma("table_info(plan_nodes)") as { name: string }[]).map((c) => c.name)
-  if (!cols.includes("ai_user_prompt")) db.exec("ALTER TABLE plan_nodes ADD COLUMN ai_user_prompt TEXT")
-  if (!cols.includes("ai_system_prompt")) db.exec("ALTER TABLE plan_nodes ADD COLUMN ai_system_prompt TEXT")
-  db.pragma("user_version = 26")
+  migrateDatabase(db, { enforceMigrations: true, toVersion: 26 })
 }
 
 function insertSplitNode(
@@ -62,7 +43,7 @@ function readSplit(db: Database.Database, id: number) {
 
 describe("migration 027: regex split → LLM split", () => {
   it("translates a markdown-heading regex into a friendly prompt", () => {
-    const db = seededDbAt26()
+    const db = new Database(":memory:")
     setupAt26(db)
     insertSplitNode(db, { id: 1, title: "By Heading", settings: { separator: "^## ", dropFirst: 0, dropLast: 0 } })
 
@@ -76,7 +57,7 @@ describe("migration 027: regex split → LLM split", () => {
   })
 
   it("translates a numbered-list regex into a friendly prompt", () => {
-    const db = seededDbAt26()
+    const db = new Database(":memory:")
     setupAt26(db)
     insertSplitNode(db, { id: 2, title: "By Number", settings: { separator: "^\\d+\\. ", dropFirst: 0, dropLast: 0 } })
 
@@ -88,7 +69,7 @@ describe("migration 027: regex split → LLM split", () => {
   })
 
   it("falls back to quoting the regex for unknown patterns", () => {
-    const db = seededDbAt26()
+    const db = new Database(":memory:")
     setupAt26(db)
     insertSplitNode(db, {
       id: 3,
@@ -104,7 +85,7 @@ describe("migration 027: regex split → LLM split", () => {
   })
 
   it("bakes dropFirst and dropLast into the prompt", () => {
-    const db = seededDbAt26()
+    const db = new Database(":memory:")
     setupAt26(db)
     insertSplitNode(db, { id: 4, title: "Drop Both", settings: { separator: "^## ", dropFirst: 2, dropLast: 1 } })
 
@@ -117,7 +98,7 @@ describe("migration 027: regex split → LLM split", () => {
   })
 
   it("preserves an existing ai_user_prompt by appending the translation", () => {
-    const db = seededDbAt26()
+    const db = new Database(":memory:")
     setupAt26(db)
     insertSplitNode(db, {
       id: 5,
@@ -135,7 +116,7 @@ describe("migration 027: regex split → LLM split", () => {
   })
 
   it("keeps EMPTY and MANUAL statuses unchanged", () => {
-    const db = seededDbAt26()
+    const db = new Database(":memory:")
     setupAt26(db)
     insertSplitNode(db, {
       id: 6,
@@ -157,7 +138,7 @@ describe("migration 027: regex split → LLM split", () => {
   })
 
   it("does nothing to non-split nodes", () => {
-    const db = seededDbAt26()
+    const db = new Database(":memory:")
     setupAt26(db)
     db.prepare(
       `INSERT INTO plan_nodes (id, title, type, node_type_settings, ai_user_prompt, status)

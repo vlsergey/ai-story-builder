@@ -1,32 +1,9 @@
 import { describe, expect, it } from "vitest"
-import type { PlanEdgeRow, PlanNodeRow } from "../../../../shared/plan-graph.js"
-import { computeLevelDependencies } from "./computeLevelDependencies.js"
+import type { PlanEdgeRow } from "../../../../shared/plan-graph.js"
+import { computeLevelDependencies, type LevelNode } from "./computeLevelDependencies.js"
 
-function node(id: number, parent_id: number | null = null): PlanNodeRow {
-  return {
-    id,
-    parent_id,
-    title: `n${id}`,
-    type: "text",
-    content: null,
-    position: 0,
-    created_at: "",
-    x: 0,
-    y: 0,
-    summary: null,
-    ai_sync_info: null,
-    word_count: 0,
-    char_count: 0,
-    byte_count: 0,
-    review_base_content: null,
-    ai_improve_instruction: null,
-    node_type_settings: null,
-    status: "EMPTY",
-    ai_settings: null,
-    in_review: 0,
-    width: null,
-    height: null,
-  } as PlanNodeRow
+function node(id: number, parent_id: number | null = null): LevelNode {
+  return { id, parent_id }
 }
 
 function edge(id: number, from: number, to: number): PlanEdgeRow {

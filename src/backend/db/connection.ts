@@ -24,3 +24,12 @@ export function withDbWrite<T>(block: (db: Database) => T): T {
 export function withDbRead<T>(block: (db: Database) => T): T {
   return withDb(true, block)
 }
+
+/**
+ * Runs `block` in one transaction: all of its writes land, or none of them.
+ * A call inside another transaction becomes a savepoint.
+ */
+export function withDbTransaction<T>(block: (db: Database) => T): T {
+  const db = getCurrentDb()
+  return db.transaction(() => block(db))()
+}

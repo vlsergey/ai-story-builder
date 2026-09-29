@@ -1,31 +1,45 @@
-import { trpc } from "@/ipcClient"
 import PaginationWrapper from "@/lib/PaginationWrapper"
-import type { ForEachNodeContent } from "@shared/for-each-plan-node"
-import type { PlanNodeRow } from "@shared/plan-graph"
-import { useCallback, useMemo } from "react"
+import type { NodePath } from "@shared/plan-node-path"
+import { useCallback, useEffect, useMemo } from "react"
+import { useIterationSelection } from "../iteration-selection"
 
 interface ForEachPlanNodeFooterProps {
-  node: PlanNodeRow
+  loopId: number
+  /** The loop's own path: where it runs, in the iterations of the loops around it. */
+  path: NodePath
+  /** The loop's iterations, in order, by the keys its children's paths use. */
+  iterationKeys: string[]
 }
 
-export default function ForEachPlanNodeFooter({ node }: ForEachPlanNodeFooterProps) {
-  const parsedContent = useMemo(() => JSON.parse(node.content || "{}") as ForEachNodeContent, [node.content])
+/**
+ * Pages through a loop's iterations. Choosing one only changes what the graph
+ * shows — nothing is written, and it works while the loop is generating.
+ */
+export default function ForEachPlanNodeFooter({ loopId, path, iterationKeys }: ForEachPlanNodeFooterProps) {
+  const { selected, select, running, showKeys } = useIterationSelection()
+  const runningKeys = running(loopId, path)
+  const runningPages = useMemo(
+    () => new Set(runningKeys.map((key) => iterationKeys.indexOf(key)).filter((page) => page >= 0)),
+    [runningKeys, iterationKeys],
+  )
+  useEffect(() => showKeys(loopId, path, iterationKeys), [loopId, path, iterationKeys, showKeys])
 
-  const changePage = trpc.plan.nodes.forEachNodes.changePage.useMutation()
   const handlePageChange = useCallback(
     ({ target: { value } }: { target: { value: number } }) => {
-      changePage.mutateAsync({ nodeId: node.id, page: value })
+      const key = iterationKeys[value]
+      if (key !== undefined) select(loopId, path, key)
     },
-    [node.id],
+    [iterationKeys, loopId, path, select],
   )
 
   return (
     <div className="for-each-plan-node-footer">
       <PaginationWrapper
-        disabled={changePage.isPending || node.status === "GENERATING"}
-        page={parsedContent.currentIndex || 0}
+        disabled={false}
+        page={Math.max(0, iterationKeys.indexOf(selected(loopId, path)))}
         onPageChange={handlePageChange}
-        totalPages={parsedContent.length || 0}
+        totalPages={iterationKeys.length}
+        markedPages={runningPages}
       />
     </div>
   )

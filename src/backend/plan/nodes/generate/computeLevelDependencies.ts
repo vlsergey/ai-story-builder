@@ -1,4 +1,4 @@
-import type { PlanEdgeRow, PlanNodeRow } from "../../../../shared/plan-graph.js"
+import type { PlanEdgeRow } from "../../../../shared/plan-graph.js"
 
 /**
  * Builds the dependency graph the scheduler uses to decide processing order
@@ -28,20 +28,26 @@ import type { PlanEdgeRow, PlanNodeRow } from "../../../../shared/plan-graph.js"
  * internal edges (both endpoints map to the same sibling) are ignored;
  * cross-sibling edges become the dependency.
  */
-export interface LevelDependencies {
+export interface LevelDependencies<N extends LevelNode = LevelNode> {
   /** Direct children of `parentId` — the nodes the scheduler iterates over. */
-  nodes: PlanNodeRow[]
+  nodes: N[]
   /** For each sibling id: the sibling ids it depends on (incoming). */
   incomingEdges: Map<number, number[]>
   /** For each sibling id: the sibling ids that depend on it (outgoing). */
   outgoingEdges: Map<number, number[]>
 }
 
-export function computeLevelDependencies(args: {
+/** What the projection needs of a node: where it sits in the tree. */
+export interface LevelNode {
+  id: number
+  parent_id: number | null
+}
+
+export function computeLevelDependencies<N extends LevelNode>(args: {
   parentId: number | null
-  allNodes: PlanNodeRow[]
-  allEdges: PlanEdgeRow[]
-}): LevelDependencies {
+  allNodes: N[]
+  allEdges: Pick<PlanEdgeRow, "from_node_id" | "to_node_id">[]
+}): LevelDependencies<N> {
   const { parentId, allNodes, allEdges } = args
 
   const nodes = allNodes.filter((n) => n.parent_id === parentId)

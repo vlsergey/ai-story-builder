@@ -26,6 +26,7 @@ export interface BaseWizardField {
   label: string
   description?: string
   type: string
+  editableOnUpdate?: boolean
 }
 
 export interface WizardTextAreaField extends BaseWizardField {
@@ -40,6 +41,18 @@ export interface WizardInputField extends BaseWizardField {
 
 export interface WizardSelectAgeRatingField extends BaseWizardField {
   type: "select-age-rating"
+  defaultValue?: string
+}
+
+export interface WizardSelectOption {
+  value: string
+  label: string
+  text?: string
+}
+
+export interface WizardSelectField extends BaseWizardField {
+  type: "select"
+  options: WizardSelectOption[]
   defaultValue?: string
 }
 
@@ -62,6 +75,7 @@ export type WizardField =
   | WizardInputField
   | WizardTextAreaField
   | WizardSelectAgeRatingField
+  | WizardSelectField
   | WizardIntegerField
   | WizardAdviceField
 

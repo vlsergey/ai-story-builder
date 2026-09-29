@@ -37,7 +37,7 @@ import process from "node:process"
  */
 import Database from "better-sqlite3"
 import { Command } from "commander"
-import { getProjectsFolder, resolveProjectPath } from "./lib/project-paths.js"
+import { getProjectsFolder, migrateProject } from "./lib/project-paths.js"
 
 interface CliArgs {
   project: string
@@ -72,10 +72,13 @@ function readSettingJson(db: Database.Database, key: string): unknown {
   }
 }
 
+/** A top-level node's content: its state at the root path. */
 function readNodeContent(db: Database.Database, title: string): string | null {
-  const row = db.prepare("SELECT content FROM plan_nodes WHERE title = ?").get(title) as
-    | { content: string | null }
-    | undefined
+  const row = db
+    .prepare(
+      "SELECT s.content FROM plan_nodes n JOIN plan_node_states s ON s.node_id = n.id AND s.path = '' WHERE n.title = ?",
+    )
+    .get(title) as { content: string | null } | undefined
   return row?.content ?? null
 }
 
@@ -134,7 +137,7 @@ function aggregateStats(db: Database.Database): AggregatedStats {
   const cycle = nodes.find((n) => n.title === "Цикл по чанкам")
   let chunksCount = 1
   if (cycle) {
-    const row = db.prepare("SELECT content FROM plan_nodes WHERE id = ?").get(cycle.id) as
+    const row = db.prepare("SELECT content FROM plan_node_states WHERE node_id = ? AND path = ''").get(cycle.id) as
       | { content: string | null }
       | undefined
     try {
@@ -337,9 +340,12 @@ function templateToPattern(template: string): string | null {
 function recoverWizardValues(db: Database.Database, planNodes: TemplatePlanNode[]): Record<string, string> {
   const out: Record<string, string> = {}
   for (const tNode of planNodes) {
-    const projRow = db.prepare("SELECT content, node_type_settings FROM plan_nodes WHERE title = ?").get(tNode.title) as
-      | { content: string | null; node_type_settings: string | null }
-      | undefined
+    const projRow = db
+      .prepare(
+        `SELECT s.content, n.node_type_settings FROM plan_nodes n
+         LEFT JOIN plan_node_states s ON s.node_id = n.id AND s.path = '' WHERE n.title = ?`,
+      )
+      .get(tNode.title) as { content: string | null; node_type_settings: string | null } | undefined
     if (!projRow) continue
 
     // content array → resolved content string.
@@ -404,7 +410,7 @@ function quoteBlock(text: string): string {
 
 function main() {
   const args = parseCli()
-  const projectPath = resolveProjectPath(args.project)
+  const projectPath = migrateProject(args.project)
   const projectDir = path.dirname(projectPath)
   const projectName = path.basename(projectPath, ".sqlite")
 

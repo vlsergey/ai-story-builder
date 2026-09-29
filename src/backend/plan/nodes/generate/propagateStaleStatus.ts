@@ -1,7 +1,19 @@
-import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
+import { iterationKeys, LOOP_TYPES, loopsAround as loopsAroundIn } from "../../../../shared/loop-iterations.js"
+import type { PlanNodeDefinition, PlanNodeStatus } from "../../../../shared/plan-graph.js"
+import {
+  childPath,
+  lastSegment,
+  type NodePath,
+  parentPath,
+  ROOT_PATH,
+  truncatePath,
+} from "../../../../shared/plan-node-path.js"
+import { withDbTransaction } from "../../../db/connection.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { usesInput } from "../input-relevance.js"
+import { planNodeEventManager } from "../plan-node-event-manager.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
+import { type PlanNodeStateRecord, PlanNodeStateRepository } from "../plan-node-state-repository.js"
 import { hasRegenerationCriteria } from "./regeneration-criteria.js"
 
 /**
@@ -9,161 +21,140 @@ import { hasRegenerationCriteria } from "./regeneration-criteria.js"
  * no randomness. Re-running one over unchanged inputs reproduces its content
  * exactly, emptiness included.
  */
-const DETERMINISTIC_TYPES = new Set<PlanNodeRow["type"]>([
+const DETERMINISTIC_TYPES = new Set<PlanNodeDefinition["type"]>([
   "merge",
   "script",
   "format",
   // A loop is EMPTY only when its list is: over the same list it stays empty.
   "for-each",
+  "parallel",
   "for-each-input",
   "for-each-output",
   "for-each-index",
   "for-each-prev-outputs",
 ])
 
-/**
- * Which EMPTY nodes actually mean "work is pending".
- *
- * EMPTY says "has no content" — on its own it does not say whether that is a
- * finished answer or an unfinished one. For a deterministic node fed by
- * settled inputs it is finished: re-running yields the same nothing, so every
- * reader downstream is still fresh. For a generative node it is unfinished —
- * an empty answer today may be a full one tomorrow — so it stays contagious.
- *
- * Conflating the two is what dragged a whole for-each loop back through the
- * model: one merge node aggregating previous iterations is legitimately EMPTY
- * on iteration 0, it fed six siblings, they were pre-marked OUTDATED, that
- * promoted the container bottom-up, and an hour of prose regenerated for
- * nothing. Bottom-up propagation already carved out this case; forward
- * propagation did not.
- */
-function computeContagiousEmpty(
-  allNodes: PlanNodeRow[],
-  incoming: Map<number, number[]>,
-  byId: Map<number, PlanNodeRow>,
-  forwardStale: Set<PlanNodeRow["status"]>,
-): Set<number> {
-  const contagious = new Set<number>()
-  for (const n of allNodes) {
-    if (n.status === "EMPTY" && !DETERMINISTIC_TYPES.has(n.type) && hasRegenerationCriteria(n)) contagious.add(n.id)
-  }
-  let grew = true
-  while (grew) {
-    grew = false
-    for (const n of allNodes) {
-      if (n.status !== "EMPTY" || contagious.has(n.id)) continue
-      const pendingSource = (incoming.get(n.id) ?? []).some((srcId) => {
-        const src = byId.get(srcId)
-        if (!src) return false
-        return src.status === "EMPTY" ? contagious.has(src.id) : pending(src, forwardStale)
-      })
-      if (pendingSource) {
-        contagious.add(n.id)
-        grew = true
-      }
-    }
-  }
-  return contagious
-}
-
-/**
- * Whether a node in one of the `stale` statuses is work still to be done. A
- * node with nothing to generate from — a synopsis the user typed — is never
- * redone, whatever its status says, so its content is final: with «regenerate
- * manual» on, it used to drag everything downstream of it through the model.
- */
-function pending(node: PlanNodeRow, stale: Set<PlanNodeRow["status"]>): boolean {
-  return stale.has(node.status) && hasRegenerationCriteria(node)
-}
-
 export interface PropagateOptions {
   regenerateManual: boolean
   regenerateGenerated: boolean
 }
 
+/** One node in one iteration. */
+interface Instance {
+  node: PlanNodeDefinition
+  path: NodePath
+  /** Undefined while the node has produced nothing in this iteration: pending work. */
+  state: PlanNodeStateRecord | undefined
+}
+
+const keyOf = (nodeId: number, path: NodePath) => `${nodeId}@${path}`
+
 /**
  * Before a regeneration sweep starts, propagate "stale" status through the
- * graph so the topological scheduler doesn't accidentally consider a
- * GENERATED downstream node ready to run while one of its (transitively)
- * upstream inputs still needs to regenerate.
+ * graph so the topological scheduler doesn't consider a GENERATED node ready
+ * while something it depends on still has work to do. It works on instances —
+ * a node in one iteration — and runs to a fixpoint:
  *
- * Three rules, applied repeatedly to fixpoint:
- *   1. Forward via input edges — if any upstream node this node actually
- *      reads (`usesInput`) has a stale status, mark this GENERATED node OUTDATED.
- *   2. Bottom-up via parent_id — if any descendant of a container is stale,
- *      mark the GENERATED container OUTDATED (so the scheduler enters it
- *      and its regenerate method handles the inner sub-tree).
- *   3. Top-down for for-each-input — these helper nodes are populated by
- *      their parent for-each container, not by edges or self-regeneration,
- *      so neither rule 1 nor rule 2 ever fires. If the container is stale,
- *      the mounted iteration's input row inherits the stale status — without
- *      that the row sits GENERATED with the previous iteration's content
- *      and summary, blocks summary regen, and confuses the UI.
+ *   1. Forward via input edges — an instance whose input (read at its path,
+ *      and only if its prompt uses it) is stale becomes OUTDATED. A source
+ *      outside a loop feeds every iteration of it.
+ *   2. A loop has two conditions. It *needs a visit* when a child in one of
+ *      its current iterations is stale or has not run there yet: then it is
+ *      OUTDATED, so the scheduler enters it. Its *output is stale* when its
+ *      output child is, in some iteration — and only that feeds rule 1. A
+ *      side node failing inside a loop is not a reason to redo everything
+ *      downstream of the loop.
+ *   3. A `for-each-prev-outputs` in iteration j reads the loop's output in
+ *      iterations 0 … j−1: it is stale when one of them is.
  *
- * Stale-source set per rule:
- *   - forward: ERROR, OUTDATED, and EMPTY — but only a *contagious* EMPTY,
- *     see computeContagiousEmpty. A deterministic node fed by settled inputs
- *     re-runs to the same emptiness, so its EMPTY is an answer, not a debt.
- *   - bottom-up: ERROR, OUTDATED only  (EMPTY descendants do NOT propagate
- *     to their container — for-each-internal merge nodes like «Сборка
- *     предыдущих сцен» are legitimately EMPTY on iter 0, and that is not a
- *     sign of pending work)
- *   - top-down (for-each-input): ERROR, OUTDATED only — same rationale as
- *     bottom-up; an EMPTY container is not pending work
+ * Stale sources per rule:
+ *   - forward: ERROR, OUTDATED, pending, and EMPTY — but only a *contagious*
+ *     EMPTY, see computeContagiousEmpty. A deterministic node fed by settled
+ *     inputs re-runs to the same emptiness, so its EMPTY is an answer.
+ *   - needs a visit: ERROR, OUTDATED, pending, a contagious EMPTY — not any
+ *     EMPTY: a merge of earlier iterations is legitimately empty in iteration 0.
+ *   - GENERATING, before a run starts, is a run that never finished: pending.
  *   - + MANUAL  when `regenerateManual` is on (user wants their edits redone)
  *   - + GENERATED when `regenerateGenerated` is on (user wants a full re-run)
  *
- * Targets we ever flip: GENERATED → OUTDATED. We never demote MANUAL
- * (user-authoritative) nor disturb in-flight (GENERATING) / already-stale
- * statuses.
+ * Only GENERATED instances are ever flipped, to OUTDATED. MANUAL stays the
+ * user's; GENERATING, pending and already stale ones are left alone.
  */
 export function propagateStaleStatus(
   options: PropagateOptions = { regenerateManual: false, regenerateGenerated: false },
-): {
-  markedNodeIds: number[]
-} {
-  const forwardStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR", "EMPTY"])
-  const bottomUpStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR"])
-  // top-down mirrors bottom-up's "real work pending" set — EMPTY container
-  // does not warrant demoting the input row.
-  const topDownStale = new Set<PlanNodeRow["status"]>(["OUTDATED", "ERROR"])
+): { marked: { nodeId: number; path: NodePath }[] } {
+  const forwardStale = new Set<PlanNodeStatus>(["OUTDATED", "ERROR", "EMPTY", "GENERATING"])
+  const visitStale = new Set<PlanNodeStatus>(["OUTDATED", "ERROR", "GENERATING"])
   if (options.regenerateManual) {
     forwardStale.add("MANUAL")
-    bottomUpStale.add("MANUAL")
-    topDownStale.add("MANUAL")
+    visitStale.add("MANUAL")
   }
   if (options.regenerateGenerated) {
     forwardStale.add("GENERATED")
-    bottomUpStale.add("GENERATED")
-    topDownStale.add("GENERATED")
+    visitStale.add("GENERATED")
   }
 
-  const nodeRepo = new PlanNodeRepository()
-  const edgeRepo = new PlanEdgeRepository()
-
-  const allNodes = nodeRepo.findAll()
-  const byId = new Map<number, PlanNodeRow>(allNodes.map((n) => [n.id, n]))
-
+  const definitions = new PlanNodeRepository().findAll()
+  const byId = new Map(definitions.map((n) => [n.id, n]))
+  const childrenOf = new Map<number | null, PlanNodeDefinition[]>()
+  for (const n of definitions) {
+    const list = childrenOf.get(n.parent_id) ?? []
+    list.push(n)
+    childrenOf.set(n.parent_id, list)
+  }
   const incoming = new Map<number, number[]>()
-  for (const e of edgeRepo.findAll()) {
+  for (const e of new PlanEdgeRepository().findAll()) {
     const list = incoming.get(e.to_node_id) ?? []
     list.push(e.from_node_id)
     incoming.set(e.to_node_id, list)
   }
+  const stateRepo = new PlanNodeStateRepository()
+  const states = new Map(stateRepo.findAll().map((s) => [keyOf(s.node_id, s.path), s]))
+  const stateAt = (nodeId: number, path: NodePath) => states.get(keyOf(nodeId, path))
 
-  const childrenByParent = new Map<number, PlanNodeRow[]>()
-  for (const n of allNodes) {
-    if (n.parent_id != null) {
-      const list = childrenByParent.get(n.parent_id) ?? []
-      list.push(n)
-      childrenByParent.set(n.parent_id, list)
+  const loopsCache = new Map<number, number[]>()
+  const loopsAround = (nodeId: number): number[] => {
+    let loops = loopsCache.get(nodeId)
+    if (!loops) {
+      loops = loopsAroundIn(nodeId, (id) => byId.get(id))
+      loopsCache.set(nodeId, loops)
     }
+    return loops
   }
 
+  /** The iterations of `loop` at `path` it currently has. */
+  const iterationsOf = (loop: PlanNodeDefinition, path: NodePath): NodePath[] =>
+    iterationKeys(loop.type, stateAt(loop.id, path)?.content).map((key) => childPath(path, loop.id, key))
+
+  // Every instance that should exist: outside loops at '', inside a loop in
+  // each of its current iterations. Rows left under vanished keys are not
+  // instances; the loop's next run deletes them. A parent chain that loops
+  // back on itself is broken data: its nodes are simply not reached.
+  const instances: Instance[] = []
+  const visited = new Set<number>()
+  const collect = (parentId: number | null, paths: NodePath[]) => {
+    for (const node of childrenOf.get(parentId) ?? []) {
+      if (visited.has(node.id)) continue
+      visited.add(node.id)
+      for (const path of paths) instances.push({ node, path, state: stateAt(node.id, path) })
+      collect(node.id, LOOP_TYPES.has(node.type) ? paths.flatMap((p) => iterationsOf(node, p)) : paths)
+    }
+  }
+  collect(null, [ROOT_PATH])
+
+  const criteria = new Map<number, boolean>()
+  const regenerable = (node: PlanNodeDefinition): boolean => {
+    let result = criteria.get(node.id)
+    if (result === undefined) {
+      result = hasRegenerationCriteria(node)
+      criteria.set(node.id, result)
+    }
+    return result
+  }
   // The same relevance rule as the cascade: a stale input the prompt never
   // reads cannot make the node stale. Settings do not change here, so memoize.
   const relevance = new Map<string, boolean>()
-  const reads = (consumer: PlanNodeRow, source: PlanNodeRow): boolean => {
+  const reads = (consumer: PlanNodeDefinition, source: PlanNodeDefinition): boolean => {
     const key = `${consumer.id}:${source.id}`
     let result = relevance.get(key)
     if (result === undefined) {
@@ -173,36 +164,119 @@ export function propagateStaleStatus(
     return result
   }
 
-  const marked: number[] = []
+  /**
+   * Whether the instance is work still to be done, for a status in `stale`. A
+   * node with nothing to generate from — a synopsis the user typed — is never
+   * redone, whatever its status says, so its content is final.
+   */
+  const pending = (node: PlanNodeDefinition, state: PlanNodeStateRecord | undefined, stale: Set<PlanNodeStatus>) =>
+    regenerable(node) && (state === undefined || stale.has(state.status))
+
+  const outputOf = (loop: PlanNodeDefinition) =>
+    (childrenOf.get(loop.id) ?? []).find((child) => child.type === "for-each-output")
+
+  /** Whether what `node` outputs at `path` is going to change, as a reader sees it. */
+  const outputStale = (node: PlanNodeDefinition, path: NodePath, contagious: Set<string>): boolean => {
+    if (LOOP_TYPES.has(node.type)) {
+      // A loop's output is its output child's, iteration by iteration. A loop
+      // that never ran here has no known output at all.
+      if (stateAt(node.id, path) === undefined) return true
+      const output = outputOf(node)
+      return !!output && iterationsOf(node, path).some((p) => outputStale(output, p, contagious))
+    }
+    const state = stateAt(node.id, path)
+    if (state?.status === "EMPTY") return contagious.has(keyOf(node.id, path))
+    return pending(node, state, forwardStale)
+  }
+
+  /** Whether an input of the instance, read at its path, is stale. */
+  const inputStale = ({ node, path }: Instance, contagious: Set<string>): boolean => {
+    const sourceIds = incoming.get(node.id) ?? []
+    const consumerLoops = loopsAround(node.id)
+    for (const sourceId of sourceIds) {
+      const source = byId.get(sourceId)
+      if (!source || !reads(node, source)) continue
+      const sourceLoops = loopsAround(sourceId)
+      // A source in a loop the reader is not in has no iteration to read; the
+      // engine refuses such an edge when it resolves it.
+      if (sourceLoops.some((loop, i) => consumerLoops[i] !== loop)) continue
+      if (outputStale(source, truncatePath(path, sourceLoops.length), contagious)) return true
+    }
+    const segment = lastSegment(path)
+    if (node.type === "for-each-prev-outputs" && segment && segment.containerId === node.parent_id) {
+      const loop = byId.get(segment.containerId)
+      const output = loop && outputOf(loop)
+      for (let k = 0; output && k < Number(segment.key); k++) {
+        if (outputStale(output, childPath(parentPath(path), segment.containerId, k), contagious)) return true
+      }
+    }
+    return false
+  }
+
+  /**
+   * Which EMPTY instances actually mean "work is pending". For a deterministic
+   * node fed by settled inputs, EMPTY is a finished answer: re-running yields
+   * the same nothing. For a generative node it is unfinished — an empty answer
+   * today may be a full one tomorrow — so it stays contagious. Conflating the
+   * two dragged a whole loop back through the model: a merge of earlier
+   * iterations is legitimately EMPTY in iteration 0.
+   */
+  const computeContagiousEmpty = (): Set<string> => {
+    const contagious = new Set<string>()
+    const empty = instances.filter((i) => i.state?.status === "EMPTY")
+    for (const i of empty) {
+      if (!DETERMINISTIC_TYPES.has(i.node.type) && regenerable(i.node)) contagious.add(keyOf(i.node.id, i.path))
+    }
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const i of empty) {
+        const key = keyOf(i.node.id, i.path)
+        if (contagious.has(key) || !inputStale(i, contagious)) continue
+        contagious.add(key)
+        grew = true
+      }
+    }
+    return contagious
+  }
+
+  /**
+   * Whether a loop instance has a child, in one of its current iterations,
+   * still to run — or to try again: a generative child that came back empty is
+   * retried as it would be outside a loop.
+   */
+  const needsVisit = ({ node, path }: Instance, contagious: Set<string>): boolean => {
+    if (!LOOP_TYPES.has(node.type)) return false
+    const children = childrenOf.get(node.id) ?? []
+    return iterationsOf(node, path).some((p) =>
+      children.some((c) => {
+        const state = stateAt(c.id, p)
+        return state?.status === "EMPTY" ? contagious.has(keyOf(c.id, p)) : pending(c, state, visitStale)
+      }),
+    )
+  }
+
+  const marked: Instance[] = []
   let changed = true
   while (changed) {
     changed = false
-    const contagiousEmpty = computeContagiousEmpty(allNodes, incoming, byId, forwardStale)
-    for (const node of allNodes) {
-      if (node.status !== "GENERATED") continue
-
-      const upstreamStale = (incoming.get(node.id) ?? []).some((fromId) => {
-        const src = byId.get(fromId)
-        if (!src || !reads(node, src)) return false
-        return src.status === "EMPTY" ? contagiousEmpty.has(src.id) : pending(src, forwardStale)
-      })
-
-      const childStale = (childrenByParent.get(node.id) ?? []).some((c) => pending(c, bottomUpStale))
-
-      const parentStale = (() => {
-        if (node.type !== "for-each-input") return false
-        if (node.parent_id == null) return false
-        const parent = byId.get(node.parent_id)
-        return parent != null && pending(parent, topDownStale)
-      })()
-
-      if (upstreamStale || childStale || parentStale) {
-        nodeRepo.patch(node.id, { status: "OUTDATED" })
-        node.status = "OUTDATED"
-        marked.push(node.id)
-        changed = true
-      }
+    const contagious = computeContagiousEmpty()
+    for (const instance of instances) {
+      if (instance.state?.status !== "GENERATED") continue
+      if (!inputStale(instance, contagious) && !needsVisit(instance, contagious)) continue
+      const demoted: PlanNodeStateRecord = { ...instance.state, status: "OUTDATED" }
+      instance.state = demoted
+      states.set(keyOf(instance.node.id, instance.path), demoted)
+      marked.push(instance)
+      changed = true
     }
   }
-  return { markedNodeIds: marked }
+
+  withDbTransaction(() => {
+    for (const { node, path } of marked) stateRepo.upsert(node.id, path, { status: "OUTDATED" })
+  })
+  for (const nodeId of new Set(marked.map((i) => i.node.id))) {
+    planNodeEventManager.emitUpdate(nodeId, "stale input or child, before a run")
+  }
+  return { marked: marked.map(({ node, path }) => ({ nodeId: node.id, path })) }
 }

@@ -32,7 +32,8 @@ export default function MergeNodeEditor({
   const { resolvedTheme } = useTheme()
 
   const inputEdges = trpc.plan.edges.findByToNodeId.useQuery(value.id).data
-  const inputNodes = trpc.plan.nodes.getByIds.useQuery((inputEdges || []).map((t) => t.from_node_id)).data
+  // The inputs as this iteration reads them.
+  const inputNodes = trpc.plan.nodes.findInputs.useQuery({ id: value.id, path: value.path }).data
   const serverInputs = useMemo<InputNode[]>(() => {
     return (inputEdges || [])
       .map((edge) => {

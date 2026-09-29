@@ -12,6 +12,9 @@ import { findTemplates, getTemplate, getTemplateFolders } from "./project-templa
 import { deleteRecentProject, getRecentProjects } from "./recent-projects.js"
 import { analyzeTemplateUpdate, applyTemplateUpdate } from "./template-update.js"
 
+/** New values for the template's parameters an update may change, by field name. */
+const TEMPLATE_PARAMETER_CHANGES = z.record(z.string(), z.union([z.string(), z.number()]))
+
 export function buildProjectRoutes(t: RouteBuilder) {
   return t.router({
     applyProjectSettings: t.procedure
@@ -33,9 +36,15 @@ export function buildProjectRoutes(t: RouteBuilder) {
     getProjectsFolder: t.procedure.query(() => getProjectsFolder()),
     getTemplate: t.procedure.input(z.string()).query(({ input }) => getTemplate(input)),
     getTemplatesFolders: t.procedure.query(() => getTemplateFolders()),
-    analyzeTemplateUpdate: t.procedure.query(() => analyzeTemplateUpdate()),
+    analyzeTemplateUpdate: t.procedure
+      .input(z.object({ parameters: TEMPLATE_PARAMETER_CHANGES.optional() }).optional())
+      .query(({ input }) => analyzeTemplateUpdate(input?.parameters)),
     applyTemplateUpdate: t.procedure
-      .input(z.object({ removeMissingEdges: z.boolean().optional() }).optional())
+      .input(
+        z
+          .object({ removeMissingEdges: z.boolean().optional(), parameters: TEMPLATE_PARAMETER_CHANGES.optional() })
+          .optional(),
+      )
       .mutation(({ input }) => applyTemplateUpdate(input ?? {})),
   })
 }

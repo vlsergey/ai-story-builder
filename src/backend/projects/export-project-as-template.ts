@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs"
 import type { ExportProjectAsTemplateOptions } from "../../shared/export-as-template-options.js"
-import type { PlanNodeRow } from "../../shared/plan-graph.js"
+import type { PlanNodeDefinition } from "../../shared/plan-graph.js"
 import type {
   ProjectTemplate,
   TemplateProjectLoreNode,
@@ -17,7 +17,7 @@ import { SettingsRepository } from "../settings/settings-repository.js"
 // for-each. They are exempt from global plan-title uniqueness.
 const INTERNAL_PLAN_NODE_TYPES = new Set<string>(["for-each-input", "for-each-output"])
 
-function checkPlanTitlesGloballyUnique(rows: ReadonlyArray<PlanNodeRow>): void {
+function checkPlanTitlesGloballyUnique(rows: ReadonlyArray<PlanNodeDefinition>): void {
   const seen = new Map<string, number>()
   for (const row of rows) {
     if (INTERNAL_PLAN_NODE_TYPES.has(row.type)) continue
@@ -67,7 +67,7 @@ function translateFixProblemsSettings(
   return { ...rest, sourceNodeTitleToFix: title }
 }
 
-function buildExportedPlanNode(node: PlanNodeRow, idToTitle: Map<number, string>): TemplateProjectPlanNode {
+function buildExportedPlanNode(node: PlanNodeDefinition, idToTitle: Map<number, string>): TemplateProjectPlanNode {
   const exported: TemplateProjectPlanNode = {
     title: node.title,
     type: node.type,
@@ -117,7 +117,7 @@ export async function exportProjectAsTemplate(options: ExportProjectAsTemplateOp
   checkPlanTitlesGloballyUnique(nodes)
 
   const idToTitle = new Map<number, string>(nodes.map((n) => [n.id, n.title]))
-  const rawNodesById = new Map<number, PlanNodeRow>(nodes.map((n) => [n.id, n]))
+  const rawNodesById = new Map<number, PlanNodeDefinition>(nodes.map((n) => [n.id, n]))
   const exportedById = new Map<number, TemplateProjectPlanNode>()
 
   for (const node of nodes) {

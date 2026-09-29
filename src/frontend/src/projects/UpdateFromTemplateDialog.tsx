@@ -3,38 +3,98 @@ import useAlert from "@/native/useAlert"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui-components/accordion"
 import { Button } from "@/ui-components/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui-components/dialog"
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/ui-components/field"
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/ui-components/field"
 import { Switch } from "@/ui-components/switch"
-import { useCallback, useId, useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import type { WizardField } from "@shared/project-template"
+import { buildFormSchema } from "@shared/project-template-form"
+import { useCallback, useEffect, useId, useMemo, useState } from "react"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { ControllableWizardFieldRenderer } from "./create-wizard/TemplateSettingsWizardPage"
+
+/** A parameter of the template an update may change, with the value the project holds. */
+interface TemplateParameter {
+  /** The wizard page the field is on. */
+  page: { id: string; title: string }
+  field: WizardField
+  value: string
+}
+
+/** New values for some of the parameters, by field name. */
+type ParameterChanges = Record<string, string | number>
+
+const sameChanges = (a: ParameterChanges, b: ParameterChanges) => JSON.stringify(a) === JSON.stringify(b)
 
 export default function UpdateFromTemplateDialog() {
-  const { t } = useTranslation(["projects", "translation"])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  trpc.native.menuState.backToFrontMenuActions.subscribe.useSubscription(undefined, {
+    onData(action) {
+      if (action === "update-from-template") setIsDialogOpen(true)
+    },
+  })
+
+  return (
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+        {/* The content unmounts on close: each opening starts afresh. */}
+        <UpdateFromTemplateBody onClose={() => setIsDialogOpen(false)} />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * The analysis is a snapshot of how the project differs from its template at
+ * this moment, so it is kept no longer than the dialog is open: the next
+ * opening analyses the project as it is then, and its parameters start from
+ * the values it holds then.
+ */
+const SNAPSHOT = { cacheTime: 0, retry: false, refetchOnWindowFocus: false } as const
+
+/** One opening of the dialog. */
+function UpdateFromTemplateBody({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation(["projects", "translation"])
   const [isApplying, setIsApplying] = useState(false)
   const [removeMissingEdges, setRemoveMissingEdges] = useState(false)
   const removeEdgesFieldId = useId()
   const removeEdgesDescriptionId = useId()
+  const [changes, setChanges] = useState<ParameterChanges>({})
 
   const trpcUtils = trpc.useUtils()
-  const analyzeQuery = trpc.project.analyzeTemplateUpdate.useQuery(undefined, { enabled: isDialogOpen, retry: false })
+  // The project as it is: the parameters start from its values.
+  const projectQuery = trpc.project.analyzeTemplateUpdate.useQuery({ parameters: {} }, SNAPSHOT)
+  // The update as the dialog stands: with the parameters the user changed.
+  const analyzeQuery = trpc.project.analyzeTemplateUpdate.useQuery(
+    { parameters: changes },
+    { ...SNAPSHOT, keepPreviousData: true },
+  )
   const applyMutation = trpc.project.applyTemplateUpdate.useMutation().mutateAsync
 
-  const alert = useAlert()
+  // A value the field does not allow blocks the apply: it would apply the last
+  // valid one, not what the dialog shows.
+  const [parametersInvalid, setParametersInvalid] = useState(false)
+  const handleParametersChange = useCallback((next: ParameterChanges | null) => {
+    setParametersInvalid(next === null)
+    if (next !== null) setChanges((previous) => (sameChanges(previous, next) ? previous : next))
+  }, [])
 
-  trpc.native.menuState.backToFrontMenuActions.subscribe.useSubscription(undefined, {
-    onData(action) {
-      if (action === "update-from-template") {
-        setIsDialogOpen(true)
-      }
-    },
-  })
+  const alert = useAlert()
 
   const handleApply = useCallback(async () => {
     setIsApplying(true)
     try {
-      await applyMutation({ removeMissingEdges })
-      setIsDialogOpen(false)
+      await applyMutation({ removeMissingEdges, parameters: changes })
+      onClose()
       await trpcUtils.plan.invalidate()
       await trpcUtils.project.invalidate()
     } catch (err) {
@@ -42,128 +102,248 @@ export default function UpdateFromTemplateDialog() {
     } finally {
       setIsApplying(false)
     }
-  }, [alert, trpcUtils, removeMissingEdges])
+  }, [alert, trpcUtils, removeMissingEdges, changes, onClose])
 
+  const projectParameters = projectQuery.data?.parameters
   const analysis = analyzeQuery.data
   const error = analyzeQuery.error
   const isLoading = analyzeQuery.isLoading
-  const hasChanges =
+  const hasNodeChanges =
     !!analysis &&
     (analysis.updatedNodes.length > 0 ||
+      analysis.retypedNodes.length > 0 ||
+      analysis.retypeBlocked.length > 0 ||
       analysis.newNodes.length > 0 ||
       analysis.newEdges.length > 0 ||
       analysis.removedEdges.length > 0)
+  // A changed parameter is worth applying on its own: the project keeps it.
+  const hasChanges = hasNodeChanges || Object.keys(changes).length > 0
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={(value) => setIsDialogOpen(value)}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {analysis
-              ? t("UpdateFromTemplateDialog.title", { file: analysis.templateFile })
-              : t("UpdateFromTemplateDialog.titleLoading")}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 py-2 text-sm">
-          {isLoading && <div>{t("UpdateFromTemplateDialog.analysing")}</div>}
-          {error && <div className="text-destructive">{error.message}</div>}
-          {analysis && !hasChanges && <div>{t("UpdateFromTemplateDialog.noChanges")}</div>}
-          {analysis && hasChanges && (
-            <>
-              <div>{t("UpdateFromTemplateDialog.unchangedCount", { count: analysis.unchangedCount })}</div>
-              <Accordion type="multiple" className="w-full">
-                {analysis.updatedNodes.length > 0 && (
-                  <AccordionItem value="updated">
-                    <AccordionTrigger>
-                      {t("UpdateFromTemplateDialog.updatedNodesHeader", { count: analysis.updatedNodes.length })}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="ml-4 list-disc">
-                        {analysis.updatedNodes.map((n) => (
-                          <li key={n.title}>{n.title}</li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-                {analysis.newNodes.length > 0 && (
-                  <AccordionItem value="new-nodes">
-                    <AccordionTrigger>
-                      {t("UpdateFromTemplateDialog.newNodesHeader", { count: analysis.newNodes.length })}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="ml-4 list-disc">
-                        {analysis.newNodes.map((n) => (
-                          <li key={n.title}>{n.title}</li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-                {analysis.newEdges.length > 0 && (
-                  <AccordionItem value="new-edges">
-                    <AccordionTrigger>
-                      {t("UpdateFromTemplateDialog.newEdgesHeader", { count: analysis.newEdges.length })}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="ml-4 list-disc">
-                        {analysis.newEdges.map((e) => (
-                          <li key={`${e.sourceTitle}->${e.targetTitle}:${e.type}`}>
-                            {e.sourceTitle} → {e.targetTitle}
-                          </li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-                {analysis.removedEdges.length > 0 && (
-                  <AccordionItem value="removed-edges">
-                    <AccordionTrigger>
-                      {t("UpdateFromTemplateDialog.removedEdgesHeader", { count: analysis.removedEdges.length })}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="ml-4 list-disc">
-                        {analysis.removedEdges.map((e) => (
-                          <li key={`${e.sourceTitle}->${e.targetTitle}:${e.type}`}>
-                            {e.sourceTitle} → {e.targetTitle}
-                          </li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-              </Accordion>
-              {analysis.removedEdges.length > 0 && (
-                <Field orientation="responsive">
-                  <FieldContent>
-                    <FieldLabel htmlFor={removeEdgesFieldId}>
-                      {t("UpdateFromTemplateDialog.removeMissingEdgesLabel")}
-                    </FieldLabel>
-                    <FieldDescription id={removeEdgesDescriptionId}>
-                      {t("UpdateFromTemplateDialog.removeMissingEdgesDescription")}
-                    </FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    aria-describedby={removeEdgesDescriptionId}
-                    id={removeEdgesFieldId}
-                    checked={removeMissingEdges}
-                    onCheckedChange={setRemoveMissingEdges}
-                  />
-                </Field>
+    <>
+      <DialogHeader>
+        <DialogTitle>
+          {analysis
+            ? t("UpdateFromTemplateDialog.title", { file: analysis.templateFile })
+            : t("UpdateFromTemplateDialog.titleLoading")}
+        </DialogTitle>
+      </DialogHeader>
+      {/* The body scrolls; the title and the buttons stay in view. */}
+      <div className="space-y-3 py-2 pr-1 text-sm min-h-0 flex-1 overflow-y-auto">
+        {isLoading && <div>{t("UpdateFromTemplateDialog.analysing")}</div>}
+        {error && <div className="text-destructive">{error.message}</div>}
+        {projectParameters && projectParameters.length > 0 && (
+          <TemplateParameters parameters={projectParameters} onChange={handleParametersChange} />
+        )}
+        {analysis && !hasChanges && <div>{t("UpdateFromTemplateDialog.noChanges")}</div>}
+        {analysis && hasNodeChanges && (
+          <>
+            <div>{t("UpdateFromTemplateDialog.unchangedCount", { count: analysis.unchangedCount })}</div>
+            <Accordion type="multiple" className="w-full">
+              {analysis.updatedNodes.length > 0 && (
+                <AccordionItem value="updated">
+                  <AccordionTrigger>
+                    {t("UpdateFromTemplateDialog.updatedNodesHeader", { count: analysis.updatedNodes.length })}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="ml-4 list-disc">
+                      {analysis.updatedNodes.map((n) => (
+                        <li key={n.title}>{n.title}</li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
               )}
-              <div className="text-muted-foreground">{t("UpdateFromTemplateDialog.disclaimer")}</div>
-            </>
-          )}
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isApplying}>
-            {t("UpdateFromTemplateDialog.cancel")}
-          </Button>
-          <Button type="button" onClick={handleApply} disabled={isApplying || !hasChanges}>
-            {isApplying ? t("UpdateFromTemplateDialog.applying") : t("UpdateFromTemplateDialog.apply")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              {analysis.retypedNodes.length > 0 && (
+                <AccordionItem value="retyped">
+                  <AccordionTrigger>
+                    {t("UpdateFromTemplateDialog.retypedNodesHeader", { count: analysis.retypedNodes.length })}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="ml-4 list-disc">
+                      {analysis.retypedNodes.map((n) => (
+                        <li key={n.title}>
+                          {t("UpdateFromTemplateDialog.retypedNode", { title: n.title, from: n.from, to: n.to })}
+                        </li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+              {analysis.retypeBlocked.length > 0 && (
+                <AccordionItem value="retype-blocked">
+                  <AccordionTrigger>
+                    {t("UpdateFromTemplateDialog.retypeBlockedHeader", { count: analysis.retypeBlocked.length })}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="ml-4 list-disc">
+                      {analysis.retypeBlocked.map((n) => (
+                        <li key={n.title}>
+                          {t("UpdateFromTemplateDialog.retypeBlockedNode", {
+                            title: n.title,
+                            from: n.from,
+                            to: n.to,
+                            reason: n.reason,
+                          })}
+                        </li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+              {analysis.newNodes.length > 0 && (
+                <AccordionItem value="new-nodes">
+                  <AccordionTrigger>
+                    {t("UpdateFromTemplateDialog.newNodesHeader", { count: analysis.newNodes.length })}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="ml-4 list-disc">
+                      {analysis.newNodes.map((n) => (
+                        <li key={n.title}>{n.title}</li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+              {analysis.newEdges.length > 0 && (
+                <AccordionItem value="new-edges">
+                  <AccordionTrigger>
+                    {t("UpdateFromTemplateDialog.newEdgesHeader", { count: analysis.newEdges.length })}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="ml-4 list-disc">
+                      {analysis.newEdges.map((e) => (
+                        <li key={`${e.sourceTitle}->${e.targetTitle}:${e.type}`}>
+                          {e.sourceTitle} → {e.targetTitle}
+                        </li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+              {analysis.removedEdges.length > 0 && (
+                <AccordionItem value="removed-edges">
+                  <AccordionTrigger>
+                    {t("UpdateFromTemplateDialog.removedEdgesHeader", { count: analysis.removedEdges.length })}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="ml-4 list-disc">
+                      {analysis.removedEdges.map((e) => (
+                        <li key={`${e.sourceTitle}->${e.targetTitle}:${e.type}`}>
+                          {e.sourceTitle} → {e.targetTitle}
+                        </li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+            </Accordion>
+            {analysis.removedEdges.length > 0 && (
+              <Field orientation="responsive">
+                <FieldContent>
+                  <FieldLabel htmlFor={removeEdgesFieldId}>
+                    {t("UpdateFromTemplateDialog.removeMissingEdgesLabel")}
+                  </FieldLabel>
+                  <FieldDescription id={removeEdgesDescriptionId}>
+                    {t("UpdateFromTemplateDialog.removeMissingEdgesDescription")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  aria-describedby={removeEdgesDescriptionId}
+                  id={removeEdgesFieldId}
+                  checked={removeMissingEdges}
+                  onCheckedChange={setRemoveMissingEdges}
+                />
+              </Field>
+            )}
+            <div className="text-muted-foreground">{t("UpdateFromTemplateDialog.disclaimer")}</div>
+          </>
+        )}
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose} disabled={isApplying}>
+          {t("UpdateFromTemplateDialog.cancel")}
+        </Button>
+        <Button type="button" onClick={handleApply} disabled={isApplying || !hasChanges || parametersInvalid}>
+          {isApplying ? t("UpdateFromTemplateDialog.applying") : t("UpdateFromTemplateDialog.apply")}
+        </Button>
+      </DialogFooter>
+    </>
+  )
+}
+
+const NO_ADVICE: Record<string, string> = {}
+
+/**
+ * The template's parameters an update may change, starting from the values
+ * the project holds. Reports the ones set to another value, or null while
+ * some field holds a value it does not allow.
+ */
+function TemplateParameters({
+  parameters,
+  onChange,
+}: {
+  parameters: TemplateParameter[]
+  onChange: (changes: ParameterChanges | null) => void
+}) {
+  const { t } = useTranslation(["projects", "translation"])
+  const schema = useMemo(() => buildFormSchema(parameters.map((p) => p.field)), [parameters])
+  const held = useMemo(() => Object.fromEntries(parameters.map((p) => [p.field.name, p.value])), [parameters])
+  const form = useForm({ resolver: zodResolver(schema), mode: "onChange", defaultValues: held })
+  const values = useWatch({ control: form.control })
+
+  useEffect(() => {
+    const checked = schema.safeParse(values)
+    if (!checked.success) {
+      onChange(null)
+      return
+    }
+    const changed = Object.entries(checked.data).filter(([name, value]) => String(value) !== held[name])
+    onChange(Object.fromEntries(changed) as ParameterChanges)
+  }, [values, schema, held, onChange])
+
+  // One fold per wizard page, as the create wizard has one page per group.
+  const pages = useMemo(() => {
+    const byPage = new Map<string, { title: string; parameters: TemplateParameter[] }>()
+    for (const parameter of parameters) {
+      const page = byPage.get(parameter.page.id) ?? { title: parameter.page.title, parameters: [] }
+      page.parameters.push(parameter)
+      byPage.set(parameter.page.id, page)
+    }
+    return [...byPage.entries()]
+  }, [parameters])
+
+  return (
+    <FieldSet>
+      <FieldLegend>{t("UpdateFromTemplateDialog.parametersHeader")}</FieldLegend>
+      <FieldDescription>{t("UpdateFromTemplateDialog.parametersDescription")}</FieldDescription>
+      <Accordion type="multiple" className="w-full">
+        {pages.map(([id, page]) => (
+          <AccordionItem key={id} value={id}>
+            <AccordionTrigger>{page.title}</AccordionTrigger>
+            <AccordionContent>
+              <FieldGroup>
+                {page.parameters.map(({ field: wizardField }) => (
+                  <Controller
+                    key={wizardField.name}
+                    name={wizardField.name}
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <ControllableWizardFieldRenderer
+                        wizardField={wizardField}
+                        field={field}
+                        fieldState={fieldState}
+                        settings={undefined}
+                        adviceContext={NO_ADVICE}
+                      />
+                    )}
+                  />
+                ))}
+              </FieldGroup>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </FieldSet>
   )
 }

@@ -10,7 +10,9 @@ import {
 export function buildRoutes(t: RouteBuilder) {
   return t.router({
     startForAll: t.procedure.mutation(() => regenerateTreeNodesContents()),
-    startForNode: t.procedure.input(z.int()).mutation(({ input }) => regenerateTreeNodesContents(input)),
+    startForNode: t.procedure
+      .input(z.object({ nodeId: z.int(), path: z.string() }))
+      .mutation(({ input }) => regenerateTreeNodesContents(input)),
     stop: t.procedure.mutation(() => stop()),
     subscribeToResponseStreamEvents: t.procedure.subscription(() => subscribeToResponseStreamEvents()),
     subscribeToStatusEvents: t.procedure.subscription(() => subscribeToStatusEvents()),

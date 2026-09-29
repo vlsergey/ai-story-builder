@@ -1,5 +1,5 @@
 import type { LoreSettings } from "../../../../shared/node-settings.js"
-import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
@@ -10,16 +10,17 @@ import type { NodeProcessor } from "./node-processor.js"
 export class LoreProcessor implements NodeProcessor<LoreSettings> {
   readonly defaultSettings: LoreSettings = {}
 
-  getOutput(context: PlanNodeService, node: PlanNodeRow): unknown {
-    return node.content ?? ""
+  getOutput(_service: PlanNodeService, row: PlanNodeRow): unknown {
+    return row.content ?? ""
   }
 
+  /** Lore is written by the user: a run leaves its text, and its summary, as they are. */
   async regenerate(
-    service: PlanNodeService,
-    context: RegenerationNodeContext,
-    node: PlanNodeRow,
-    settings: LoreSettings,
-  ): Promise<PlanNodeRow> {
-    return node
+    _service: PlanNodeService,
+    _context: RegenerationNodeContext,
+    row: PlanNodeRow,
+    _settings: LoreSettings,
+  ): Promise<PlanNodeStateUpdate | null> {
+    return { summary: row.summary }
   }
 }

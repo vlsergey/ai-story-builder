@@ -1,5 +1,9 @@
 import fs from "node:fs"
 import path from "node:path"
+import Database from "better-sqlite3"
+import { openProjectDatabase } from "../../src/backend/db/index.js"
+import { assertReadableVersion, CURRENT_VERSION } from "../../src/backend/db/migrations.js"
+import { setCurrentDbPath } from "../../src/backend/db/state.js"
 import { getProjectsFolder } from "../../src/backend/projects/project-folder.js"
 
 /**
@@ -22,6 +26,33 @@ export function resolveProjectPath(spec: string): string {
     if (fs.existsSync(candidate)) return candidate
   }
   throw new Error(`Project not found: tried ${spec} and ${candidates.join(", ")}`)
+}
+
+/**
+ * Brings a project file to the current schema, as the app does when it opens
+ * one: a file from an older version is backed up and migrated, one from a
+ * newer version is refused. A current file is left alone — no backup for a
+ * script that only reads. Returns the resolved path.
+ */
+export function migrateProject(spec: string): string {
+  const dbPath = resolveProjectPath(spec)
+  const probe = new Database(dbPath, { readonly: true, fileMustExist: true })
+  let version: number
+  try {
+    assertReadableVersion(probe)
+    version = probe.pragma("user_version", { simple: true }) as number
+  } finally {
+    probe.close()
+  }
+  if (version < CURRENT_VERSION) openProjectDatabase(dbPath).close()
+  return dbPath
+}
+
+/** Migrates the project if needed and makes it the database the repositories use. */
+export function openProject(spec: string): string {
+  const dbPath = migrateProject(spec)
+  setCurrentDbPath(dbPath)
+  return dbPath
 }
 
 /** Re-exported so callers don't need to know the layered backend path. */

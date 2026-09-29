@@ -20,6 +20,14 @@ vi.mock("../plan/editors/NodeTypeEditors", () => ({
   },
 }))
 
+// The node's state comes from the iteration on display, not from its data.
+vi.mock("../plan/iteration-selection", () => ({
+  useNodeDisplayState: () => ({
+    path: "7:2",
+    state: { node_id: 5, path: "7:2", status: "GENERATED", word_count: 100 },
+  }),
+}))
+
 // Mock getNodeTypeDefinition
 vi.mock("@shared/node-edge-dictionary", () => ({
   getNodeTypeDefinition: vi.fn(() => ({
@@ -28,19 +36,22 @@ vi.mock("@shared/node-edge-dictionary", () => ({
   })),
 }))
 
-describe("PlanTextNode double-click", () => {
+describe("PlanTextNode double-click", async () => {
+  // Loaded while collecting the tests: module loading is slow on a CI runner,
+  // and must not count against a test's own time.
+  const { default: PlanTextNode } = await import("../plan/plan-graph/SimpleNode")
+
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it("double-clicking the node div dispatches open-plan-node-editor", async () => {
-    const { default: PlanTextNode } = await import("../plan/plan-graph/SimpleNode")
-
-    const dispatched: number[] = []
+    const dispatched: { id: number; path: string }[] = []
     const originalDispatch = window.dispatchEvent.bind(window)
     vi.spyOn(window, "dispatchEvent").mockImplementation((event) => {
       if (event instanceof CustomEvent && event.type === OPEN_PLAN_NODE_EDITOR_EVENT) {
-        dispatched.push((event as CustomEvent<{ node: { id: number } }>).detail.node.id)
+        const { node, path } = (event as CustomEvent<{ node: { id: number }; path: string }>).detail
+        dispatched.push({ id: node.id, path })
       }
       return originalDispatch(event)
     })
@@ -49,10 +60,7 @@ describe("PlanTextNode double-click", () => {
       id: 5,
       title: "Scene 1",
       type: "text" as const,
-      word_count: 100,
-      summary: null,
-      changes_status: null,
-      status: "EMPTY" as const,
+      parent_id: 7,
       onDelete: () => {},
     }
 
@@ -77,6 +85,6 @@ describe("PlanTextNode double-click", () => {
     expect(nodeDiv).not.toBeNull()
     fireEvent.doubleClick(nodeDiv!)
 
-    expect(dispatched).toContain(5)
+    expect(dispatched, "opens the node in the iteration on display").toEqual([{ id: 5, path: "7:2" }])
   })
 })

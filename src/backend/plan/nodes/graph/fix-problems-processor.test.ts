@@ -28,7 +28,7 @@ describe("FixProblemsProcessor", () => {
       content: "source content",
       summary: "source-summary-text",
     })
-    service.repo.patch(source.id, { status: "GENERATED" })
+    service.states.upsert(source.id, "", { status: "GENERATED" })
 
     const fp = service.create({
       type: "fix-problems",
@@ -46,6 +46,7 @@ describe("FixProblemsProcessor", () => {
     const fakeContext = {
       abortSignal: new AbortController().signal,
       nodeId: fp.id,
+      path: "",
       asCycle: async (_n: unknown, block: (ctx: any) => Promise<unknown>) => {
         await block({
           asNode: async (_i: number, b: (nc: any) => Promise<unknown>) => {
@@ -55,7 +56,7 @@ describe("FixProblemsProcessor", () => {
       },
     } as any
 
-    const patch = await proc.regenerate(service, fakeContext, service.getById(fp.id), proc.defaultSettings as any)
+    const patch = await proc.regenerate(service, fakeContext, service.getRow(fp.id, ""), proc.defaultSettings as any)
 
     expect(patch, "regenerate should return a patch").toBeTruthy()
     expect(patch!.summary, "summary must be inherited from source").toBe("source-summary-text")
@@ -65,7 +66,7 @@ describe("FixProblemsProcessor", () => {
   it("copies null summary cleanly when source has no summary yet", async () => {
     const service = new PlanNodeService()
     const source = service.create({ type: "text", title: "Source", content: "x" })
-    service.repo.patch(source.id, { status: "GENERATED" })
+    service.states.upsert(source.id, "", { status: "GENERATED" })
 
     const fp = service.create({
       type: "fix-problems",
@@ -83,6 +84,7 @@ describe("FixProblemsProcessor", () => {
     const fakeContext = {
       abortSignal: new AbortController().signal,
       nodeId: fp.id,
+      path: "",
       asCycle: async (_n: unknown, block: (ctx: any) => Promise<unknown>) => {
         await block({
           asNode: async (_i: number, b: (nc: any) => Promise<unknown>) => {
@@ -92,7 +94,7 @@ describe("FixProblemsProcessor", () => {
       },
     } as any
 
-    const patch = await proc.regenerate(service, fakeContext, service.getById(fp.id), proc.defaultSettings as any)
+    const patch = await proc.regenerate(service, fakeContext, service.getRow(fp.id, ""), proc.defaultSettings as any)
 
     expect(patch!.summary).toBeNull()
   })

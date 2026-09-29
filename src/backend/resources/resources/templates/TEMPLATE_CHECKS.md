@@ -73,6 +73,8 @@ The LLM's prompt cache keys on the longest matching **prefix** of the user messa
 
 5.2. Wizard field `placeholder` is a **concrete example** that fits the field's purpose, not a meta description like "Enter text here".
 
+5.3. **`editableOnUpdate` marks what the update-from-template dialog may change**: parameters that shape the prompts, like the rating, the minimum character age or the chunk count. Leave it off a field that only seeds what a node starts with, like the synopsis — an update never rewrites content, and a large text has no place in that dialog.
+
 (Existence and non-emptiness of `label`/`description`/`placeholder` are checked by the structural test — judge here only whether the copy is helpful.)
 
 ---
@@ -175,6 +177,14 @@ For per-iteration nodes inside a for-each — the ones that emit ONE element of 
    Typical pattern at the very top of each prompt (assuming the field is named `ageRating`): `## Возрастной рейтинг произведения\n\n${ageRating}. <one sentence saying the content must stay in range>.`
 
    This rule is enforced by [`templates-structure.test.ts`](./templates-structure.test.ts) — see "LLM-call nodes reference the age-rating wizard var". The reverse is not enforced: templates without an age-rating field skip the check.
+
+12.2. **The minimum character age is a parameter, and every LLM call carries it.** A template with an age rating declares a `minCharacterAge` select whose options say it in the template's language — «Всем героям не менее 21 года.», "All characters are at least 21 years old." — plus a "not specified" option with an empty text. Grok refuses adult content unless every character is 21 or older, and other engines are likely to follow. The prompts put it on the rating's line:
+
+   `${ageRating}. ${minCharacterAge}`
+
+   Enforced by [`templates-structure.test.ts`](./templates-structure.test.ts) — see "every LLM call carries the minimum character age".
+
+12.3. **No prompt branches on a wizard value at call time.** A wizard value is known once the template applies; an `{{#if}}` over a `${…}` substitution leaves a condition settled long ago in the text the user reads — `(eq "18+" "18+")`. Put the choice into a `select` field's option `text`, which the apply substitutes. Enforced by "no prompt branches on a wizard value at call time".
 
 ---
 

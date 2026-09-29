@@ -158,6 +158,28 @@ describe("a run", () => {
   })
 })
 
+describe("a hand-written node moved out of a loop", () => {
+  afterEach(() => tearDownTestDb())
+
+  it("settles on the next run instead of staying stale", async () => {
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "Брат запирает сестру на балконе.")
+      g.split("Персонажи", { prompt: "Перечисли персонажей:\n{{[Синопсис]}}" })
+      g.loop("Цикл", { over: "Персонажи", element: "Персонаж", result: "Выход" }, (b) => {
+        b.source("Заметка", "")
+        b.text("Профиль", { prompt: "Профиль:\n{{[Персонаж]}}" })
+        b.result("Профиль")
+      })
+    })
+    await s.run()
+    await s.move("Заметка", null)
+
+    await s.run()
+
+    expect(s.status("Заметка")).toBe("EMPTY")
+  })
+})
+
 describe("regenerating one node from its editor", () => {
   afterEach(() => tearDownTestDb())
 

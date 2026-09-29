@@ -97,6 +97,20 @@ describe("an edit between runs", () => {
     expect(s.generated()).toEqual([])
   })
 
+  it("re-runs the readers of a node the user deleted", async () => {
+    const s = PlanScenario.build((g) => {
+      g.source("Первая часть", "Брат запирает сестру.")
+      g.source("Вторая часть", "Сестра выбирается сама.")
+      g.merge("Рукопись", ["Первая часть", "Вторая часть"])
+    })
+    await s.run()
+
+    s.remove("Вторая часть")
+    await s.run()
+
+    expect(s.content("Рукопись")).toBe("Брат запирает сестру.")
+  })
+
   it("keeps the word count in step with the text", async () => {
     const s = await settledStory()
 
@@ -132,6 +146,42 @@ describe("an edit while the node is being written", () => {
       .at(-1)
     expect(lastPlanCall?.userPrompt).toContain("подробный")
     expect(s.content("План")).toBe(lastPlanCall?.response)
+  })
+
+  it("to its improvement note keeps the result, and its readers read it", async () => {
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "Брат запирает сестру на балконе.")
+      g.text("План", { prompt: "Составь план:\n{{[Синопсис]}}" })
+      g.text("Проза", { prompt: "Напиши прозу:\n{{[План]}}" })
+    })
+    s.engine.on(async (call) => {
+      if (call.node === "План") await s.noteImprovement("План", "Короче.")
+      return undefined
+    })
+
+    await s.run()
+
+    const plan = s.calls("text").filter((c) => c.node === "План")
+    expect(plan).toHaveLength(1)
+    expect(s.status("План")).toBe("GENERATED")
+    expect(s.content("План")).toBe(plan[0].response)
+    expect(s.calls("text").find((c) => c.node === "Проза")?.userPrompt).toContain(plan[0].response)
+  })
+
+  it("to its summary keeps the result", async () => {
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "Брат запирает сестру на балконе.")
+      g.text("План", { prompt: "Составь план:\n{{[Синопсис]}}" })
+    })
+    s.engine.on(async (call) => {
+      if (call.kind === "text" && call.node === "План") await s.summarizeMeanwhile("План")
+      return undefined
+    })
+
+    await s.run()
+
+    expect(s.status("План")).toBe("GENERATED")
+    expect(s.calls("text").filter((c) => c.node === "План")).toHaveLength(1)
   })
 
   it("to its input discards the result, and the node is written again from the new input", async () => {
@@ -189,6 +239,19 @@ describe("an edit while the node is being written", () => {
 
     expect(s.content("Мир")).toBe("Мой мир.")
     expect(s.status("Мир")).toBe("MANUAL")
+  })
+
+  it("does not keep a summary of a text that changed while the summary was being written", async () => {
+    const s = await settledStory()
+    s.engine.on(async (call) => {
+      if (call.kind === "summary") await s.type("План", "Новый план.")
+      return undefined
+    })
+
+    await s.summarize("План")
+
+    expect(s.content("План")).toBe("Новый план.")
+    expect(s.summary("План")).toBeNull()
   })
 
   it("discards an improvement whose text changed while it was being written", async () => {

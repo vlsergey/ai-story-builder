@@ -1,6 +1,6 @@
 import z, { type ZodObject, type ZodType } from "zod"
-import { AGE_RATING_INFO, AGE_RATING_ORDER } from "./ai-engines"
-import type { WizardField } from "./project-template"
+import { AGE_RATING_INFO, AGE_RATING_ORDER } from "./ai-engines.js"
+import type { WizardField } from "./project-template.js"
 
 export function buildFormSchema(wizardFields: WizardField[]): ZodObject<Record<string, ZodType>> {
   const zObjectArgs = Object.fromEntries(
@@ -24,6 +24,9 @@ export function buildFormSchema(wizardFields: WizardField[]): ZodObject<Record<s
           result = z.enum(labels as [string, ...string[]])
           break
         }
+        case "select":
+          result = z.enum(field.options.map((option) => option.value) as [string, ...string[]])
+          break
         case "integer":
           result = z.coerce.number().int().min(field.min).max(field.max)
           break

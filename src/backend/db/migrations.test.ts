@@ -8,6 +8,32 @@ function inMemoryDb() {
   return new Database(":memory:")
 }
 
+/** Tables with their columns, indexes and foreign keys — what a query can tell apart. */
+function describeSchema(db: Database.Database) {
+  const tables = (
+    db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .all() as { name: string }[]
+  ).map((r) => r.name)
+  return tables.map((table) => ({
+    table,
+    columns: (db.pragma(`table_info(${table})`) as Record<string, unknown>[])
+      .map(({ name, type, notnull, dflt_value, pk }) => ({ name, type, notnull, dflt_value, pk }))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name))),
+    indexes: (db.pragma(`index_list(${table})`) as { name: string; unique: number }[])
+      .filter((index) => !index.name.startsWith("sqlite_autoindex"))
+      .map((index) => ({
+        name: index.name,
+        unique: index.unique,
+        columns: (db.pragma(`index_info(${index.name})`) as { name: string }[]).map((c) => c.name),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    foreignKeys: (db.pragma(`foreign_key_list(${table})`) as Record<string, unknown>[]).map(
+      ({ table: target, from, to, on_delete }) => ({ target, from, to, on_delete }),
+    ),
+  }))
+}
+
 describe("migrateDatabase", () => {
   it("applies all migrations without throwing", () => {
     const db = inMemoryDb()
@@ -62,6 +88,28 @@ describe("migrateDatabase", () => {
     const row = db.prepare("SELECT value FROM settings WHERE key = 'test_key'").get() as { value: string }
     expect(row.value).toBe("test_val")
 
+    db.close()
+  })
+
+  it("builds the same schema by running the chain as schema.sql gives a fresh database", () => {
+    // The test below compares schema.sql with itself — a fresh database loads
+    // it. This one checks that the chain of migrations ends where schema.sql is.
+    const chained = inMemoryDb()
+    migrateDatabase(chained, { enforceMigrations: true })
+    const fresh = inMemoryDb()
+    migrateDatabase(fresh)
+
+    expect(describeSchema(chained)).toEqual(describeSchema(fresh))
+    chained.close()
+    fresh.close()
+  })
+
+  it("stops at the version asked for", () => {
+    const db = inMemoryDb()
+    migrateDatabase(db, { toVersion: CURRENT_VERSION - 1 })
+    expect(db.pragma("user_version", { simple: true })).toBe(CURRENT_VERSION - 1)
+    migrateDatabase(db)
+    expect(db.pragma("user_version", { simple: true })).toBe(CURRENT_VERSION)
     db.close()
   })
 
