@@ -3,10 +3,7 @@ import type { ParallelSettings } from "../../../../shared/node-settings.js"
 import { expandParallel, parseParallelContent } from "../../../../shared/parallel-plan-node.js"
 import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import { childPath } from "../../../../shared/plan-node-path.js"
-import { maxConcurrentCalls } from "../../../ai/engine-slots.js"
-import { SettingsRepository } from "../../../settings/settings-repository.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
-import { regenerateSubtreeNodesContents } from "../generate/regenerateTreeNodesContents.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import { loopChild, loopElements } from "./loop-input.js"
 import type { NodeProcessor } from "./node-processor.js"
@@ -15,11 +12,11 @@ import type { NodeProcessor } from "./node-processor.js"
 export const elementHash = (element: string) => createHash("sha256").update(element, "utf8").digest("hex")
 
 /**
- * A loop whose iterations run side by side. An iteration is keyed by the
- * element it works on (`<loop path>/<loop id>:<hash prefix>`), so identical
- * elements run once, and an element inserted or removed upstream leaves the
- * others' results alone. No iteration can read another: there is no order to
- * read them in.
+ * A loop whose iterations are keyed by the element they work on
+ * (`<loop path>/<loop id>:<hash prefix>`), so identical elements run once, and
+ * an element inserted or removed upstream leaves the others' results alone.
+ * No iteration can read another: there is no order to read them in, and all
+ * of them run side by side.
  */
 export class ParallelProcessor implements NodeProcessor<ParallelSettings> {
   readonly defaultSettings: ParallelSettings = {}
@@ -34,9 +31,9 @@ export class ParallelProcessor implements NodeProcessor<ParallelSettings> {
 
   async regenerate(
     service: PlanNodeService,
-    context: RegenerationNodeContext,
+    _context: RegenerationNodeContext,
     row: PlanNodeRow,
-    settings: ParallelSettings,
+    _settings: ParallelSettings,
   ): Promise<PlanNodeStateUpdate | null> {
     const elements = loopElements(service, row)
     const input = loopChild(service, row.id, "for-each-input")
@@ -62,16 +59,7 @@ export class ParallelProcessor implements NodeProcessor<ParallelSettings> {
       }
     }
 
-    const keys = [...expansion.elements.keys()]
-    const engine = SettingsRepository.getCurrentBackend()
-    const own = Number(settings.concurrency)
-    const concurrency = Number.isInteger(own) && own >= 1 ? own : engine ? maxConcurrentCalls(engine) : 1
-    console.log(
-      `[ParallelProcessor] node ${row.id} at "${row.path}": ${keys.length} iteration(s), ${concurrency} at once`,
-    )
-    await context.asCycle(keys.length, (cycle) =>
-      cycle.asContainers(keys, concurrency, (childContext) => regenerateSubtreeNodesContents(childContext, row.id)),
-    )
+    console.log(`[ParallelProcessor] node ${row.id} at "${row.path}": ${expansion.elements.size} iteration(s)`)
 
     // A loop's text is its iterations' outputs: they have their own summaries.
     return { content, summary: row.summary }

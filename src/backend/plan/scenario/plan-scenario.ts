@@ -120,23 +120,22 @@ export class GraphBuilder {
   }
 
   /**
-   * A loop over the list `over` whose elements run side by side, each once:
-   * `element` holds an element, whatever is wired into `result` is its output.
-   * `concurrency` caps how many run at once, below what the engine takes.
+   * A loop over the list `over` whose iterations are keyed by their element,
+   * each element once: `element` holds an element, whatever is wired into
+   * `result` is its output.
    */
   parallel(
     title: string,
-    spec: { over: string; element: string; result: string; concurrency?: number },
+    spec: { over: string; element: string; result: string },
     body: (b: LoopBuilder) => void,
   ): void {
     const service = new PlanNodeService()
     const repo = new PlanNodeRepository()
-    const settings = spec.concurrency === undefined ? {} : { concurrency: spec.concurrency }
     const { id } = service.create({
       title,
       type: "parallel",
       parent_id: this.parentId,
-      node_type_settings: JSON.stringify(settings),
+      node_type_settings: JSON.stringify({}),
     })
     repo.patch(repo.findByParentIdAndType(id, "for-each-input")[0].id, { title: spec.element })
     repo.patch(repo.findByParentIdAndType(id, "for-each-output")[0].id, { title: spec.result })
@@ -520,9 +519,7 @@ export class PlanScenario {
 
   /** Titles of the nodes the progress panel showed as being written during the last run. */
   shownInProgress(): string[] {
-    const titles = this.statusEvents.flatMap((event) =>
-      event.currentRegenerationStack.flatMap((item) => (item.type === "node" ? [item.node.title] : [])),
-    )
+    const titles = this.statusEvents.flatMap((event) => event.running.map(({ node }) => node.title))
     return [...new Set(titles)]
   }
 

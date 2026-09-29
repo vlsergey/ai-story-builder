@@ -71,11 +71,8 @@ export interface LoreSettings extends LlmCallPrompts {}
 
 export type ForEachSettings = unknown
 
-/** A parallel loop's settings. */
-export interface ParallelSettings {
-  /** How many iterations run at once; the engine's own limit when unset. */
-  concurrency?: number
-}
+/** A parallel loop has no settings: how many of its iterations run at once is the engine's limit. */
+export type ParallelSettings = unknown
 export type ForEachInputSettings = unknown
 export type ForEachOutputSettings = unknown
 

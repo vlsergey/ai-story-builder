@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
 import { seedEdge, seedNode } from "../plan-node-fixtures.js"
 import { PlanNodeService } from "../plan-node-service.js"
-import { regenerateSubtreeNodesContents } from "./regenerateTreeNodesContents.js"
+import { regenerateTreeNodesContents } from "./regenerateTreeNodesContents.js"
 
 const PROMPT = JSON.stringify({ userPrompt: "stub" })
 
@@ -31,23 +31,6 @@ describe("a run that does not converge", () => {
       this.states.upsert(ctx.nodeId, "", { status: "GENERATED", content: `gen-${ctx.nodeId}` })
       return this.getRow(ctx.nodeId, "")
     })
-    const abortController = new AbortController()
-    const context = {
-      abortSignal: abortController.signal,
-      options: { regenerateManual: false, regenerateGenerated: false },
-      path: "",
-      onNodeSkip: () => {},
-      onNodeStart: async <T>(node: { id: number; path: string }, block: (ctx: any) => Promise<{ result: T }>) =>
-        (
-          await block({
-            nodeId: node.id,
-            path: node.path,
-            abortSignal: abortController.signal,
-            onResponseStreamEvent: () => {},
-          })
-        ).result,
-    }
-
-    await expect(regenerateSubtreeNodesContents(context as any, null)).rejects.toThrow(/did not converge/)
+    await expect(regenerateTreeNodesContents()).rejects.toThrow(/did not converge/)
   })
 })

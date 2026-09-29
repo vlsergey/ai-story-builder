@@ -13,9 +13,10 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef
  * for-each's index, a parallel loop's element hash — so a parallel loop's page
  * stays on its element when others are inserted before it.
  *
- * Until the user picks an iteration, the display follows the one a sequential
- * loop is generating; a new run follows again. A parallel loop runs several at
- * once and is not followed.
+ * Until the user picks an iteration, the display follows a sequential loop to
+ * the earliest of the iterations it is generating — iterations that do not
+ * read the ones before them run side by side; a new run follows again. A
+ * parallel loop is not followed: it has no order to follow.
  */
 interface IterationSelection {
   /** Whether the node definitions are loaded: until then a display path is not known. */
@@ -60,14 +61,22 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
         )
       }
       wasRunning.current = event.inProcess
-      const running: Record<string, string> = {}
+      // The iterations that run now, per loop, read off the paths of the nodes being written.
       const allRunning: Record<string, string[]> = {}
-      for (const item of event.currentRegenerationStack) {
-        if (item.type !== "iteration") continue
-        const loop = keyOf(item.container.id, item.container.path)
-        const key = item.key ?? String(item.zeroBasedIterationIndex)
-        allRunning[loop] = [...(allRunning[loop] ?? []), key]
-        if (item.container.type === "for-each") running[loop] = key
+      for (const { node } of event.running) {
+        let loopPath = ROOT_PATH
+        for (const segment of parsePath(node.path)) {
+          const loop = keyOf(segment.containerId, loopPath)
+          const keys = allRunning[loop] ?? []
+          if (!keys.includes(segment.key)) allRunning[loop] = [...keys, segment.key]
+          loopPath = childPath(loopPath, segment.containerId, segment.key)
+        }
+      }
+      // A sequential loop is followed at the earliest of its iterations that run.
+      const running: Record<string, string> = {}
+      for (const [loop, keys] of Object.entries(allRunning)) {
+        if (typeOf(Number.parseInt(loop, 10)) !== "for-each") continue
+        running[loop] = keys.reduce((earliest, key) => (Number(key) < Number(earliest) ? key : earliest))
       }
       setRunningKeys((previous) => (JSON.stringify(previous) === JSON.stringify(allRunning) ? previous : allRunning))
       setFollowed((previous) =>

@@ -1,29 +1,20 @@
 import EventEmitter from "node:events"
 import type { Observable } from "@trpc/server/observable"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
-import { childPath, type NodePath, ROOT_PATH } from "../../../../shared/plan-node-path.js"
-import type {
-  RegenerateStatusEvent,
-  RegenerationStackItem,
-  RegenerationStackItemIteration,
-} from "../../../../shared/RegenerateEvent.js"
+import { LOOP_TYPES } from "../../../../shared/loop-iterations.js"
+import type { PlanNodeRow, PlanNodeStatus } from "../../../../shared/plan-graph.js"
+import { childPath, type NodePath } from "../../../../shared/plan-node-path.js"
+import type { RegenerateStatusEvent, RunningNode } from "../../../../shared/RegenerateEvent.js"
+import { maxConcurrentCalls } from "../../../ai/engine-slots.js"
 import { emitterToObservable, emitterToSingleArgObservable } from "../../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../../lib/make-errors.js"
 import { finishRun, runForNode, startRun } from "../../../lib/telemetry/telemetry.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
-import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
-import { PlanNodeRepository } from "../plan-node-repository.js"
 import { hasState, PlanNodeService } from "../plan-node-service.js"
-import { computeLevelDependencies } from "./computeLevelDependencies.js"
 import { propagateStaleStatus } from "./propagateStaleStatus.js"
-import type {
-  PlanNodeAiGenerationStatus,
-  RegenerationContainerContext,
-  RegenerationCycleContext,
-  RegenerationNodeContext,
-} from "./RegenerationContext.js"
+import type { PlanNodeAiGenerationStatus, RegenerationNodeContext } from "./RegenerationContext.js"
 import { hasRegenerationCriteria } from "./regeneration-criteria.js"
+import { type RunBook, type RunScope, schedule, unitKey } from "./schedule.js"
 
 interface RegenerateEvents {
   responseStream: [nodeId: number, path: NodePath, contentPath: (string | number)[], event: ResponseStreamEvent]
@@ -37,7 +28,7 @@ function emitRegenerateStatusEvent() {
     inProcess,
     stopping: abortController == null ? true : abortController.signal.aborted,
     // A copy: subscribers may hold the event after the run has moved on.
-    currentRegenerationStack: [...running.values()],
+    running: [...running.values()],
     firstError,
     firstErrorAt,
     generatedNew,
@@ -75,12 +66,8 @@ export function subscribeToResponseStreamEvents(): Observable<ResponseStreamEven
 let abortController: AbortController | null = null
 let inProcess = false
 
-/**
- * What runs now, in the order it started: nodes, and the loop iterations they
- * run in. A parallel loop runs several iterations at once, so this is a set of
- * entries rather than one chain; each entry carries its path.
- */
-const running = new Map<object, RegenerationStackItem>()
+/** What is being written now, by unit, in the order it started. */
+const running = new Map<string, RunningNode>()
 let firstError: unknown = null
 let firstErrorAt: RegenerateStatusEvent["firstErrorAt"] = null
 
@@ -89,23 +76,13 @@ let generatedSame: number = 0
 let generatedEmpty: number = 0
 let skipped: number = 0
 
+/** How many times one unit may start in a run: more means cascades keep demoting it. */
+const MAX_STARTS = 10
+
 export function stop(): void {
   if (inProcess && !abortController?.signal.aborted) {
     abortController?.abort()
     emitRegenerateStatusEvent()
-  }
-}
-
-/** Runs `block` shown as `item` among what runs now. */
-async function withStackItem<T>(item: RegenerationStackItem, emit: boolean, block: () => Promise<T>): Promise<T> {
-  const entry = {}
-  running.set(entry, item)
-  if (emit) emitRegenerateStatusEvent()
-  try {
-    return await block()
-  } finally {
-    running.delete(entry)
-    if (emit) emitRegenerateStatusEvent()
   }
 }
 
@@ -118,9 +95,14 @@ function classifyResult(before: PlanNodeRow, after: PlanNodeRow): PlanNodeAiGene
 }
 
 /**
- * Generate content for all nodes in topological order, respecting dependencies.
- * With a target, regenerates that node at that path only and resolves to its
- * row afterwards.
+ * Generates what the graph needs, or — with a target — regenerates that node
+ * at that path and resolves to its row afterwards.
+ *
+ * The graph says what may run now (see `schedule`); the run starts it, as
+ * many units at once as the engine takes, and looks again whenever one ends.
+ * A loop only opens its iterations; their nodes are units like any other, so
+ * independent nodes run side by side wherever they are. Once a node has
+ * failed nothing new starts, and what already runs is let finish.
  */
 export async function regenerateTreeNodesContents(): Promise<undefined>
 export async function regenerateTreeNodesContents(target: { nodeId: number; path: NodePath }): Promise<PlanNodeRow>
@@ -141,8 +123,7 @@ export async function regenerateTreeNodesContents(target?: {
 
   const myAbortController = new AbortController()
   abortController = myAbortController
-  // Once a node has failed the run is lost: nothing new starts anywhere, in
-  // any branch however deep; what already runs finishes and lands.
+  const abortSignal = myAbortController.signal
   let failed = false
   emitRegenerateStatusEvent()
 
@@ -152,9 +133,9 @@ export async function regenerateTreeNodesContents(target?: {
   }
 
   console.info("[regenerateTreeNodesContents] Starting regeneration")
-  // Propagate stale status before the scheduler starts. Without this, a
-  // GENERATED downstream node looks ready to run while an upstream (or a
-  // loop's child in some iteration) still has OUTDATED/ERROR/EMPTY status.
+  // Propagate stale status before the run starts. Without this, a GENERATED
+  // downstream node looks done while an upstream (or a loop's child in some
+  // iteration) still has OUTDATED/ERROR/EMPTY status.
   const { marked } = propagateStaleStatus({
     regenerateManual: options.regenerateManual,
     regenerateGenerated: options.regenerateGenerated,
@@ -163,166 +144,247 @@ export async function regenerateTreeNodesContents(target?: {
     const list = marked.map(({ nodeId, path }) => (path ? `${nodeId}@${path}` : `${nodeId}`)).join(",")
     console.info(`[regenerateTreeNodesContents] pre-marked OUTDATED via propagation: ${list}`)
   }
+
+  const service = new PlanNodeService()
+
+  const shouldRegenerate: Record<PlanNodeStatus, boolean> = {
+    ERROR: true,
+    EMPTY: true,
+    GENERATING: true,
+    GENERATED: options.regenerateGenerated,
+    OUTDATED: true,
+    MANUAL: options.regenerateManual,
+  }
+
+  /** The first failure is the run's: it names the node, and nothing new starts after it. */
+  function recordFailure(row: PlanNodeRow, e: unknown) {
+    if (abortSignal.aborted) return // a stop is not a failure
+    if (firstError == null) {
+      firstError = e
+      firstErrorAt = { nodeId: row.id, title: row.title, path: row.path }
+    }
+    failed = true
+  }
+
+  function count(status: PlanNodeAiGenerationStatus) {
+    if (status === "SAME") generatedSame++
+    else if (status === "EMPTY") generatedEmpty++
+    else generatedNew++
+  }
+
+  function nodeContext(row: PlanNodeRow): RegenerationNodeContext {
+    const key = unitKey(row.id, row.path)
+    return {
+      abortSignal,
+      nodeId: row.id,
+      path: row.path,
+      options,
+      onResponseStreamEvent: (contentPath: (string | number)[], event: ResponseStreamEvent) => {
+        if (abortSignal.aborted) throw Error("Stop was required")
+        eventEmitter.emit("responseStream", row.id, row.path, contentPath, event)
+      },
+      asCycle: async (total, block) =>
+        block({
+          abortSignal,
+          options,
+          asNode: async (index, attempt) => {
+            if (abortSignal.aborted) throw Error("Stop was required")
+            const entry = running.get(key)
+            if (entry) {
+              running.set(key, { ...entry, attempt: { index, total } })
+              emitRegenerateStatusEvent()
+            }
+            return await attempt(nodeContext(row))
+          },
+        }),
+    }
+  }
+
+  /** Runs `block` shown among what runs now. */
+  async function shownRunning<T>(row: PlanNodeRow, block: () => Promise<T>): Promise<T> {
+    const key = unitKey(row.id, row.path)
+    running.set(key, { node: refOf(row) })
+    emitRegenerateStatusEvent()
+    try {
+      return await runForNode({ nodeId: row.id, path: row.path }, block)
+    } finally {
+      running.delete(key)
+      emitRegenerateStatusEvent()
+    }
+  }
+
+  /** One node, not a loop: regenerated and counted. */
+  async function regenerateNode(row: PlanNodeRow): Promise<PlanNodeRow> {
+    const after = await shownRunning(row, () => service.regenerate(nodeContext(row)))
+    count(classifyResult(row, after))
+    return after
+  }
+
+  /**
+   * Runs the graph — or, with a scope, one loop and all inside it — until
+   * nothing is left to do, the run is stopped, or a node has failed.
+   */
+  async function orchestrate(scope: RunScope): Promise<void> {
+    const book: RunBook = { done: new Set(), running: new Set(), opened: new Map(), revisit: new Set() }
+    /** The loops' rows before they opened: what their result is compared with. */
+    const beforeOpening = new Map<string, PlanNodeRow>()
+    const tasks = new Map<string, Promise<void>>()
+    const starts = new Map<string, number>()
+    /** When each unit was first seen ready: the oldest starts first. */
+    const readySince = new Map<string, number>()
+    let seen = 0
+    // The target of a single-node run runs whatever its status says.
+    const forced = scope ? unitKey(scope.loop.nodeId, scope.loop.path) : null
+
+    const limit = () => {
+      const engine = SettingsRepository.getCurrentBackend()
+      return engine ? maxConcurrentCalls(engine) : 1
+    }
+    const mustRun = (row: PlanNodeRow, key: string) =>
+      key === forced || book.revisit.has(key) || (shouldRegenerate[row.status] && hasRegenerationCriteria(row))
+
+    function start(row: PlanNodeRow) {
+      const key = unitKey(row.id, row.path)
+      const started = (starts.get(key) ?? 0) + 1
+      starts.set(key, started)
+      if (started > MAX_STARTS) {
+        recordFailure(row, Error(`Regeneration did not converge: «${row.title}» at "${row.path}" kept being demoted`))
+        return
+      }
+      book.running.add(key)
+      const task = (async () => {
+        try {
+          if (LOOP_TYPES.has(row.type)) {
+            book.revisit.delete(key)
+            const opened = await shownRunning(row, () => service.openLoop(nodeContext(row)))
+            // Null: the row changed meanwhile. Not done, not opened: it runs again.
+            if (opened) {
+              book.opened.set(key, opened)
+              beforeOpening.set(key, row)
+            }
+          } else {
+            await regenerateNode(row)
+            book.done.add(key)
+          }
+        } catch (e) {
+          recordFailure(row, e)
+        } finally {
+          book.running.delete(key)
+          tasks.delete(key)
+        }
+      })()
+      tasks.set(key, task)
+    }
+
+    async function close(row: PlanNodeRow) {
+      const key = unitKey(row.id, row.path)
+      const opened = book.opened.get(key)
+      if (!opened) return
+      book.opened.delete(key)
+      try {
+        const after = await runForNode({ nodeId: row.id, path: row.path }, () =>
+          service.closeLoop(opened, nodeContext(opened.row)),
+        )
+        count(classifyResult(beforeOpening.get(key) ?? row, after))
+        book.done.add(key)
+      } catch (e) {
+        recordFailure(row, e)
+      }
+    }
+
+    /** A unit with nothing to do: settled as it is. */
+    async function skip(row: PlanNodeRow) {
+      console.log(
+        `[regenerateTreeNodesContents] skipping node ${row.id} '${row.title}' of type ${row.type} with status '${row.status}' at "${row.path}"`,
+      )
+      // A node with nothing to generate from settles here: pending, it would
+      // stay pending for good. What it holds is the user's; nothing is EMPTY.
+      if (!hasRegenerationCriteria(row) && (!hasState(row) || row.status === "OUTDATED")) {
+        await service.patchState(row.id, row.path, false, { status: row.content?.trim() ? "MANUAL" : "EMPTY" })
+      }
+      skipped++
+      emitRegenerateStatusEvent()
+    }
+
+    try {
+      for (;;) {
+        if (!abortSignal.aborted && !failed) {
+          const { ready, closable, pending } = schedule(service, book, scope)
+          if (closable.length > 0) {
+            for (const row of closable) await close(row)
+            continue
+          }
+          for (const row of ready) {
+            const key = unitKey(row.id, row.path)
+            if (!readySince.has(key)) readySince.set(key, seen++)
+          }
+          ready.sort((a, b) => readySince.get(unitKey(a.id, a.path))! - readySince.get(unitKey(b.id, b.path))!)
+
+          let settledAny = false
+          for (const row of ready) {
+            const key = unitKey(row.id, row.path)
+            if (!mustRun(row, key)) {
+              await skip(row)
+              book.done.add(key)
+              settledAny = true
+            } else if (tasks.size < limit()) {
+              start(row)
+            }
+          }
+          // A skip may have made more units ready.
+          if (settledAny) continue
+          if (tasks.size === 0) {
+            if (failed) break
+            if (pending > 0) {
+              throw Error(`Regeneration cannot proceed: ${pending} node(s) wait for each other`)
+            }
+            return
+          }
+        } else if (tasks.size === 0) {
+          break
+        }
+        // Tasks never reject: a failure is recorded where it happens.
+        await Promise.race(tasks.values())
+      }
+    } finally {
+      // Whatever ended the loop, the run does not end while units still write.
+      await Promise.allSettled([...tasks.values()])
+      // Stopped or failed with loops still open: a loop around the failure
+      // failed with it; the others were cut short, to be redone.
+      for (const [key, opened] of book.opened) {
+        const inside = childPath(opened.row.path, opened.row.id, "")
+        const failedInside = failed && firstErrorAt !== null && firstErrorAt?.path.startsWith(inside) === true
+        await service.abandonLoop(opened, failedInside ? "ERROR" : "OUTDATED")
+        book.opened.delete(key)
+      }
+    }
+  }
+
   startRun()
   let runSucceeded = true
   try {
-    /** The context of one level: the top level, or one iteration of a loop. */
-    function containerContext(path: NodePath): RegenerationContainerContext {
-      return {
-        abortSignal: myAbortController.signal,
-        options,
-        path,
-        onNodeSkip() {
-          skipped++
-          emitRegenerateStatusEvent()
-        },
-        async onNodeStart<T>(
-          node: PlanNodeRow,
-          block: (context: RegenerationNodeContext) => Promise<{ result: T; status: PlanNodeAiGenerationStatus }>,
-        ) {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          if (failed) throw Error("The run failed elsewhere")
-          return await withStackItem({ type: "node", node: refOf(node) }, true, async () => {
-            try {
-              const blockResult = await runForNode({ nodeId: node.id, path: node.path }, () => block(nodeContext(node)))
-              switch (blockResult.status) {
-                case "SAME":
-                  generatedSame++
-                  break
-                case "EMPTY":
-                  generatedEmpty++
-                  break
-                case "GENERATED":
-                  generatedNew++
-                  break
-              }
-              return blockResult.result
-            } catch (e) {
-              // The innermost node fails first; the loops around it only pass
-              // the error on. A stop is not a failure. The error ends the run
-              // as it travels up; branches of a parallel loop already running
-              // are let finish, so their work is not thrown away.
-              if (firstError == null && !myAbortController.signal.aborted) {
-                firstError = e
-                firstErrorAt = { nodeId: node.id, title: node.title, path: node.path }
-              }
-              if (!myAbortController.signal.aborted) failed = true
-              throw e
-            }
-          })
-        },
-      }
-    }
-
-    function cycleContext(totalIterations: number | undefined, container: PlanNodeRow): RegenerationCycleContext {
-      return {
-        abortSignal: myAbortController.signal,
-        options,
-        asNode: async <T>(zeroBasedIterationIndex: number, block: (context: RegenerationNodeContext) => Promise<T>) => {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          const stackItem: RegenerationStackItemIteration = {
-            type: "iteration",
-            container: refOf(container),
-            totalIterations,
-            zeroBasedIterationIndex,
-          }
-          return await withStackItem(stackItem, true, () => block(nodeContext(container)))
-        },
-        asContainer: async <T>(
-          zeroBasedIterationIndex: number,
-          block: (context: RegenerationContainerContext) => Promise<T>,
-        ) => {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          if (failed) throw Error("The run failed elsewhere")
-          const stackItem: RegenerationStackItemIteration = {
-            type: "iteration",
-            container: refOf(container),
-            totalIterations,
-            zeroBasedIterationIndex,
-          }
-          // The only place a child path is made: the scheduler and the path cannot disagree.
-          const path = childPath(container.path, container.id, zeroBasedIterationIndex)
-          return await withStackItem(stackItem, false, () => block(containerContext(path)))
-        },
-        asContainers: async <T>(
-          keys: string[],
-          concurrency: number,
-          block: (context: RegenerationContainerContext) => Promise<T>,
-        ) => {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          const results: T[] = []
-          let next = 0
-          let failure: { error: unknown } | null = null
-          // Each worker takes the next iteration until none is left. After a
-          // failure no new iteration starts, but the running ones finish:
-          // the run must not end while branches still write.
-          const worker = async () => {
-            while (failure === null && !failed && next < keys.length && !myAbortController.signal.aborted) {
-              const index = next++
-              const stackItem: RegenerationStackItemIteration = {
-                type: "iteration",
-                container: refOf(container),
-                totalIterations,
-                zeroBasedIterationIndex: index,
-                key: keys[index],
-              }
-              const path = childPath(container.path, container.id, keys[index])
-              try {
-                results[index] = await withStackItem(stackItem, true, () => block(containerContext(path)))
-              } catch (error) {
-                failure ??= { error }
-              }
-            }
-          }
-          const limit = Number.isInteger(concurrency) && concurrency >= 1 ? concurrency : 1
-          const workers = Math.min(limit, keys.length)
-          await Promise.all(Array.from({ length: workers }, worker))
-          if (failure) throw (failure as { error: unknown }).error
-          if (failed) throw Error("The run failed elsewhere")
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          return results
-        },
-      }
-    }
-
-    function nodeContext(node: PlanNodeRow): RegenerationNodeContext {
-      return {
-        abortSignal: myAbortController.signal,
-        nodeId: node.id,
-        path: node.path,
-        options,
-        onResponseStreamEvent: (contentPath: (string | number)[], event: ResponseStreamEvent) => {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          eventEmitter.emit("responseStream", node.id, node.path, contentPath, event)
-        },
-        async asCycle<T>(
-          totalIterations: number | undefined,
-          block: (context: RegenerationCycleContext) => Promise<T>,
-        ): Promise<T> {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          return await block(cycleContext(totalIterations, node))
-        },
-      }
-    }
-
     if (target === undefined) {
-      await regenerateSubtreeNodesContents(containerContext(ROOT_PATH), null)
-      return undefined
+      await orchestrate(null)
+    } else {
+      service.checkPath(target.nodeId, target.path)
+      const node = service.getRow(target.nodeId, target.path)
+      if (LOOP_TYPES.has(node.type)) {
+        await orchestrate({ loop: target })
+      } else {
+        try {
+          await regenerateNode(node)
+        } catch (e) {
+          recordFailure(node, e)
+        }
+      }
     }
-
-    // A single node goes through onNodeStart like any other, so it is counted
-    // and its failure becomes the run's first error.
-    const service = new PlanNodeService()
-    service.checkPath(target.nodeId, target.path)
-    const node = service.getRow(target.nodeId, target.path)
-    await containerContext(target.path).onNodeStart(node, async (context) => {
-      const result = await service.regenerate(context)
-      return { result, status: classifyResult(node, result) }
-    })
-    return service.getRow(target.nodeId, target.path)
+    if (failed) throw firstError
+    // A stopped run did not do its work: its caller learns so, as from a failure.
+    if (abortSignal.aborted) throw Error("Stop was required")
+    return target === undefined ? undefined : service.getRow(target.nodeId, target.path)
   } catch (err) {
     runSucceeded = false
-    if (firstError == null && !myAbortController.signal.aborted) {
+    if (firstError == null && !abortSignal.aborted) {
       firstError = err
     }
     throw err
@@ -331,172 +393,5 @@ export async function regenerateTreeNodesContents(target?: {
     inProcess = false
     abortController = null
     emitRegenerateStatusEvent()
-  }
-}
-
-/**
- * Generate content for all nodes of one level in topological order, respecting
- * dependencies: the children of `parentId`, in the iteration `context.path`.
- */
-export async function regenerateSubtreeNodesContents(
-  context: RegenerationContainerContext,
-  parentId: number | null,
-): Promise<void> {
-  const path = context.path
-  console.info(`[regenerateSubtreeNodesContents] Starting regeneration for parentId=${parentId} at "${path}"`)
-
-  const planNodeService = new PlanNodeService()
-  // Build the dependency graph for this level using a projection that maps
-  // every edge to the sibling-level it belongs to. Crucially, an edge whose
-  // target lives INSIDE one of this level's containers is still attributed
-  // to that container — otherwise the scheduler would happily process the
-  // container before its cross-boundary input is ready.
-  // See computeLevelDependencies for details and the concrete bug it fixes.
-  const allNodes = new PlanNodeRepository().findAll()
-  const allEdges = new PlanEdgeRepository().findAll()
-  const { nodes, incomingEdges, outgoingEdges } = computeLevelDependencies({ parentId, allNodes, allEdges })
-  const nodeIds = nodes.map((n) => n.id)
-
-  // Set of nodes that have been checked (processed)
-  const checked = new Set<number>()
-  // Queue of nodes to check (initialized with nodes that have no incoming edges)
-  const queue: number[] = nodeIds.filter((id) => incomingEdges.get(id)!.length === 0)
-
-  const shouldRegenerate: Record<PlanNodeRow["status"], boolean> = {
-    ERROR: true,
-    EMPTY: true,
-    GENERATING: true,
-    GENERATED: context.options.regenerateGenerated,
-    OUTDATED: true,
-    MANUAL: context.options.regenerateManual,
-  }
-
-  /** The node's live state in this level's iteration; undefined once the node is deleted. */
-  const liveRow = (id: number): PlanNodeRow | undefined =>
-    planNodeService.repo.findById(id) ? planNodeService.getRow(id, path) : undefined
-
-  // Guard against pathological loops caused by repeated cascade demotions.
-  // Realistic ceiling: every node may be re-processed a small constant
-  // number of times. 10× the node count is generous. Only re-runs count:
-  // waiting for sources is legitimate and, in a bad order, takes n² turns.
-  let demotionBudget = nodeIds.length * 10
-  const spendOnDemotion = () => {
-    if (demotionBudget-- <= 0) {
-      // Breaking out here would report a half-done run as a success.
-      throw Error(`Regeneration did not converge at parentId=${parentId}: nodes ${queue.join(",")} kept being demoted`)
-    }
-  }
-  // Consecutive deferrals: a whole pass over the queue with nobody ready means
-  // nobody ever will be — the graph has a cycle.
-  let deferredInARow = 0
-
-  while (queue.length > 0 && !context.abortSignal.aborted) {
-    if (deferredInARow > queue.length) {
-      throw Error(`Regeneration cannot proceed at parentId=${parentId}: nodes ${queue.join(",")} wait for each other`)
-    }
-    const nodeId = queue.shift()!
-    // Refetch the live row — sibling regenerations earlier in this loop may
-    // have fired markAsOutdatedAndNotifyDownstreamNodes cascades that demoted
-    // this node's status (e.g. for-each-prev-outputs regen → merge demoted →
-    // scene demoted), and we must NOT decide based on a stale snapshot.
-    const node = liveRow(nodeId)
-    if (!node) continue
-
-    // Sources may also have been demoted by intervening cascades. If a source
-    // was checked but its live status indicates an external demotion, un-check
-    // it so it re-runs before we process this node.
-    //
-    // A source counts as "demoted" only when its status is OUTDATED — that's
-    // the value markAsOutdatedAndNotifyDownstreamNodes assigns when a cascade
-    // fires. EMPTY is NOT a demotion: it's a valid
-    // terminal state for a merge whose input was legitimately empty (e.g., a
-    // for-each-prev-outputs on iteration 0), and counting it as one creates
-    // an infinite re-queue loop where the merge re-runs every time its
-    // downstream consumer tries to process it. ERROR is excluded for the same
-    // reason — retrying tends to hit the same failure.
-    const sources = incomingEdges.get(nodeId)!
-    let anySourceDemoted = false
-    for (const srcId of sources) {
-      if (!checked.has(srcId)) continue
-      const liveSrc = liveRow(srcId)
-      if (liveSrc && liveSrc.status === "OUTDATED" && hasRegenerationCriteria(liveSrc)) {
-        console.log(
-          `[regenerateSubtreeNodesContents] source ${srcId} demoted to OUTDATED since it was processed; re-queueing it before ${nodeId}`,
-        )
-        checked.delete(srcId)
-        if (!queue.includes(srcId)) queue.push(srcId)
-        anySourceDemoted = true
-      }
-    }
-    if (anySourceDemoted) {
-      // Defer current node until the demoted sources catch up.
-      spendOnDemotion()
-      deferredInARow = 0
-      queue.push(nodeId)
-      continue
-    }
-
-    // Check if all sources are already checked
-    const allSourcesChecked = sources.every((srcId) => checked.has(srcId))
-    if (!allSourcesChecked) {
-      // Not ready yet, put back at the end of queue (will be revisited later)
-      console.log(
-        `[regenerateSubtreeNodesContents] node ${nodeId} not ready, missing sources: ${sources.filter((srcId) => !checked.has(srcId)).join(",")}`,
-      )
-      deferredInARow++
-      queue.push(nodeId)
-      continue
-    }
-    deferredInARow = 0
-
-    const willRegenerate = shouldRegenerate[node.status] && hasRegenerationCriteria(node)
-    console.log(
-      `[regenerateSubtreeNodesContents] willRegenerate=${willRegenerate} (regenerateManual=${context.options.regenerateManual})`,
-    )
-
-    if (willRegenerate) {
-      await context.onNodeStart(node, async (childContext) => {
-        const result = await planNodeService.regenerate(childContext)
-        return { result, status: classifyResult(node, result) }
-      })
-      // Its prompt or an input changed while it was being written, so its
-      // result was dropped: write it again before anything reads it. Nothing
-      // else would — a node without readers is never re-queued as a source.
-      if (liveRow(nodeId)?.status === "OUTDATED" && !context.abortSignal.aborted) {
-        spendOnDemotion()
-        queue.unshift(nodeId)
-        continue
-      }
-    } else {
-      console.log(
-        `[regenerateSubtreeNodesContents] skipping node ${nodeId} '${node.title}' of type ${node.type} with status '${node.status}' at "${path}"`,
-      )
-      // A node with nothing to generate from settles here: pending, it would
-      // stay pending for good. What it holds is the user's; nothing is EMPTY.
-      if (!hasRegenerationCriteria(node) && (!hasState(node) || node.status === "OUTDATED")) {
-        await planNodeService.patchState(nodeId, path, false, { status: node.content?.trim() ? "MANUAL" : "EMPTY" })
-      }
-      // Determine skip reason based on node status and regenerateManual
-      let skipReason = ""
-      if (node.status === "MANUAL" && !context.options.regenerateManual) {
-        skipReason = "MANUAL node (regenerateManual is false)"
-      } else if (node.status === "GENERATED") {
-        skipReason = "already GENERATED"
-      } else {
-        skipReason = `status ${node.status} (no regeneration condition met)`
-      }
-      context.onNodeSkip(node, skipReason)
-    }
-
-    // Mark as checked
-    checked.add(nodeId)
-
-    // Add outgoing nodes to queue if not already in queue and not checked
-    const outgoing = outgoingEdges.get(nodeId)!
-    for (const outId of outgoing) {
-      if (!checked.has(outId) && !queue.includes(outId)) {
-        queue.push(outId)
-      }
-    }
   }
 }

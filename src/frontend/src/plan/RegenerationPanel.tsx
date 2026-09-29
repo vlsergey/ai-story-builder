@@ -1,9 +1,5 @@
 import { ButtonGroup } from "@/ui-components/button-group"
-import type {
-  RegenerateStatusEvent,
-  RegenerationStackItemIteration,
-  RegenerationStackItemNode,
-} from "@shared/RegenerateEvent"
+import type { RegenerateStatusEvent, RunningNode } from "@shared/RegenerateEvent"
 import type { DockviewPanelApi } from "dockview"
 import { PlayIcon, SquareIcon } from "lucide-react"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
@@ -50,12 +46,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   // of them, as the stream watcher does, and ignores the others.
   const streams = useRef<FollowedStreams>(NO_STREAMS)
   const runningNodes = useMemo(
-    () =>
-      new Set(
-        (event?.currentRegenerationStack ?? []).flatMap((item) =>
-          item.type === "node" ? [runningKeyOf(item.node.id, item.node.path)] : [],
-        ),
-      ),
+    () => new Set((event?.running ?? []).map(({ node }) => runningKeyOf(node.id, node.path))),
     [event],
   )
   useEffect(() => {
@@ -107,36 +98,18 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
     startMutation.mutateAsync()
   }, [])
 
-  const renderCurrentRegenerationStack = () => {
-    if (!event?.currentRegenerationStack?.length) return null
+  const renderRunning = () => {
+    if (!event?.running?.length) return null
     return (
       <div className="mt-4">
         <div className="text-xs text-muted-foreground mb-2">{t("regeneration.current_nodes")}</div>
         <div className="space-y-1">
-          {event.currentRegenerationStack.map((stackItem, idx, arr) => {
-            const hasNext = arr.length > idx + 1
-            const next = hasNext ? arr[idx + 1] : undefined
-
-            // A loop's own line is left out when the next line is one of its iterations.
-            if (
-              stackItem.type === "node" &&
-              next?.type === "iteration" &&
-              next.container.id === stackItem.node.id &&
-              next.container.path === stackItem.node.path
-            ) {
-              return null
-            }
-
-            return (
-              <div key={idx} className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary/60"></div>
-                {stackItem.type === "node" && <StackItemNode item={stackItem as RegenerationStackItemNode} />}
-                {stackItem.type === "iteration" && (
-                  <StackItemIteration item={stackItem as RegenerationStackItemIteration} />
-                )}
-              </div>
-            )
-          })}
+          {event.running.map((item) => (
+            <div key={runningKeyOf(item.node.id, item.node.path)} className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-primary/60"></div>
+              <RunningNodeLine item={item} />
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -220,7 +193,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
       ) : event.inProcess ? (
         <div className="space-y-4">
           {renderStats()}
-          {renderCurrentRegenerationStack()}
+          {renderRunning()}
           {renderError()}
         </div>
       ) : (
@@ -249,19 +222,8 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   )
 }
 
-function StackItemIteration({ item }: { item: RegenerationStackItemIteration }) {
-  return (
-    <span>
-      <span className="text-xs text-muted-foreground">
-        {item.container.title} (ID: {item.container.id}):{" "}
-      </span>
-      <span className="text-xs font-medium truncate">{item.zeroBasedIterationIndex + 1}</span>
-      {item.totalIterations && <span className="text-xs text-muted-foreground"> / {item.totalIterations}</span>}
-    </span>
-  )
-}
-
-function StackItemNode({ item }: { item: RegenerationStackItemNode }) {
+/** A node being written: its title, its iteration, and — for a node that tries again — which try. */
+function RunningNodeLine({ item }: { item: RunningNode }) {
   const { labelOf } = useIterationSelection()
   return (
     <span>
@@ -271,6 +233,13 @@ function StackItemNode({ item }: { item: RegenerationStackItemNode }) {
         (ID: {item.node.id}
         {item.node.path ? `, ${labelOf(item.node.path)}` : ""})
       </span>
+      {item.attempt && (
+        <span className="text-xs text-muted-foreground">
+          {" "}
+          — {item.attempt.index + 1}
+          {item.attempt.total ? ` / ${item.attempt.total}` : ""}
+        </span>
+      )}
     </span>
   )
 }

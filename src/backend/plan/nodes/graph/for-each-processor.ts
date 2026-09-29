@@ -3,15 +3,17 @@ import type { ForEachSettings } from "../../../../shared/node-settings.js"
 import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import { childPath } from "../../../../shared/plan-node-path.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
-import { regenerateSubtreeNodesContents } from "../generate/regenerateTreeNodesContents.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import { loopChild, loopElements } from "./loop-input.js"
 import type { NodeProcessor } from "./node-processor.js"
 
 /**
- * A loop over a list: its children run once per element, in order, each
- * iteration with its own state at `<loop path>/<loop id>:<index>`. The loop
- * itself stores only how many iterations it has.
+ * A loop over a list: its children run once per element, each iteration with
+ * its own state at `<loop path>/<loop id>:<index>`. The loop itself stores
+ * only how many iterations it has. Running it records the iterations and
+ * their elements; the run then schedules the children of each iteration on
+ * their own. An iteration that reads the ones before it — through
+ * `for-each-prev-outputs` — waits for them; the others run side by side.
  */
 export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
   readonly defaultSettings: ForEachSettings = {}
@@ -32,7 +34,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
 
   async regenerate(
     service: PlanNodeService,
-    context: RegenerationNodeContext,
+    _context: RegenerationNodeContext,
     row: PlanNodeRow,
     _settings: ForEachSettings,
   ): Promise<PlanNodeStateUpdate | null> {
@@ -62,11 +64,6 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     }
 
     console.log(`[ForEachProcessor] node ${row.id} at "${row.path}": ${elements.length} iteration(s)`)
-    await context.asCycle(elements.length, async (cycle) => {
-      for (let index = 0; index < elements.length; index++) {
-        await cycle.asContainer(index, (childContext) => regenerateSubtreeNodesContents(childContext, row.id))
-      }
-    })
 
     // A loop's text is its iterations' outputs: they have their own summaries.
     return { content, summary: row.summary }

@@ -37,10 +37,10 @@ function wakeWaiting(engineId: AiEngineKey, queue: EngineQueue): void {
 
 /**
  * Runs `call` once the engine has a free slot. Every model call goes through
- * here, so however many branches of a parallel loop are ready, the engine
- * never gets more requests at once than it takes. Calls start in the order
- * they came; a freed slot goes straight to the next one waiting. An aborted
- * signal gives up the wait.
+ * here, so however many nodes a run has ready — or calls come from an editor
+ * meanwhile — the engine never gets more requests at once than it takes.
+ * Calls start in the order they came; a freed slot goes straight to the next
+ * one waiting. An aborted signal gives up the wait.
  */
 export async function withEngineSlot<T>(
   engineId: AiEngineKey,

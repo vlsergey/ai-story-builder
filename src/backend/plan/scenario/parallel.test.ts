@@ -11,19 +11,15 @@ vi.mock("../../ai/ai-engine-adapter.js", async () => (await import("./fake-engin
  * A character loop that runs its elements side by side: each character gets a
  * profile, written in the project's style.
  */
-function characters(names: string[], options: { concurrency?: number } = {}): PlanScenario {
+function characters(names: string[]): PlanScenario {
   const s = PlanScenario.build((g) => {
     g.source("Синопсис", "Брат запирает сестру на балконе.")
     g.text("Стиль", { prompt: "Сформулируй правила стиля." })
     g.split("Персонажи", { prompt: "Перечисли персонажей:\n{{[Синопсис]}}" })
-    g.parallel(
-      "Персонажи параллельно",
-      { over: "Персонажи", element: "Персонаж", result: "Выход", concurrency: options.concurrency },
-      (b) => {
-        b.text("Профиль", { prompt: "Профиль персонажа:\n{{[Персонаж]}}\nСтиль:\n{{[Стиль]}}" })
-        b.result("Профиль")
-      },
-    )
+    g.parallel("Персонажи параллельно", { over: "Персонажи", element: "Персонаж", result: "Выход" }, (b) => {
+      b.text("Профиль", { prompt: "Профиль персонажа:\n{{[Персонаж]}}\nСтиль:\n{{[Стиль]}}" })
+      b.result("Профиль")
+    })
     g.merge("Сводка", ["Персонажи параллельно"])
   })
   let cast = names
@@ -107,15 +103,6 @@ describe("a parallel loop", () => {
     expect(peak()).toBe(2)
   })
 
-  it("writes no more elements at once than the loop allows", async () => {
-    const s = characters(["Аня", "Боря", "Вера", "Гоша"], { concurrency: 1 })
-    const peak = measureOverlap(s)
-
-    await s.run()
-
-    expect(peak()).toBe(1)
-  })
-
   it("over a settled project asks the model nothing", async () => {
     const s = characters(["Аня", "Боря"])
     await s.run()
@@ -196,13 +183,13 @@ describe("a parallel loop", () => {
   })
 
   it("that fails starts nothing new anywhere, however deep, once the failure is known", async () => {
-    // Two chapters side by side, each writing six scenes one after another.
+    // Two chapters side by side, six scenes each, at most two calls at once.
     const s = PlanScenario.build((g) => {
       g.source("Синопсис", "История.")
       g.split("Главы", { prompt: "Главы:\n{{[Синопсис]}}" })
       g.parallel("Главы параллельно", { over: "Главы", element: "Глава", result: "Выход главы" }, (b) => {
         b.split("Сцены", { prompt: "Сцены главы:\n{{[Глава]}}" })
-        b.parallel("Сцены главы", { over: "Сцены", element: "Сцена", result: "Выход сцены", concurrency: 1 }, (c) => {
+        b.parallel("Сцены главы", { over: "Сцены", element: "Сцена", result: "Выход сцены" }, (c) => {
           c.text("Текст сцены", { prompt: "Напиши сцену:\n{{[Сцена]}}" })
           c.result("Текст сцены")
         })
@@ -216,6 +203,7 @@ describe("a parallel loop", () => {
       const chapter = call.userPrompt.includes("Глава A") ? "A" : "B"
       return JSON.stringify({ parts: Array.from({ length: 6 }, (_, i) => `${chapter} сцена ${i}`) })
     })
+    s.setEngineConcurrency(2)
     let failedAt = Number.POSITIVE_INFINITY
     s.engine.on(async (call) => {
       if (call.node !== "Текст сцены") return undefined
@@ -231,14 +219,6 @@ describe("a parallel loop", () => {
 
     const startedAfter = s.engine.calls.slice(failedAt).filter((c) => c.node === "Текст сцены")
     expect(startedAfter).toEqual([])
-  })
-
-  it("with an unreadable limit of its own, runs at the engine's", async () => {
-    const s = characters(["Аня", "Боря", "Вера"], { concurrency: "all" as unknown as number })
-
-    await s.run()
-
-    expect(profileCalls(s)).toHaveLength(3)
   })
 
   it("keeps its results when a run dies while its keys grow", async () => {

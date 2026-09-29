@@ -117,6 +117,13 @@ export function hasState(row: PlanNodeRow): boolean {
   return row.rev !== ""
 }
 
+/** A loop `openLoop` started: its row as it runs, what it produced, and the keys of its iterations. */
+export interface OpenedLoop {
+  row: PlanNodeRow
+  patch: PlanNodeStateUpdate
+  keys: string[]
+}
+
 /**
  * The status a finished regeneration stores. A processor that reported ERROR
  * (a script or template failure) or EMPTY is believed; otherwise the output
@@ -296,6 +303,14 @@ export class PlanNodeService {
   /** The node as the iteration at `path` sees it; pending state if it has produced nothing there. */
   getRow(id: number, path: NodePath): PlanNodeRow {
     return compose(this.getDefinition(id), path, this.states.find(id, path))
+  }
+
+  /** The given nodes as they stand at `path`, read in one query: what a run's schedule looks at again and again. */
+  rowsAt(definitions: PlanNodeDefinition[], path: NodePath): Map<number, PlanNodeRow> {
+    const states = new Map(this.states.findAtPath(path).map((state) => [state.node_id, state]))
+    return new Map(
+      definitions.map((definition) => [definition.id, compose(definition, path, states.get(definition.id))]),
+    )
   }
 
   /** What the graph shows of every node that has produced something at exactly `path`. */
@@ -752,65 +767,118 @@ export class PlanNodeService {
 
   // ─── Regeneration ────────────────────────────────────────────────────────────
 
-  async regenerate<T extends Record<string, any> = Record<string, any>>(
+  /** Regenerates the node at the context's path and lands the result. For a loop, see `openLoop`. */
+  async regenerate(context: RegenerationNodeContext): Promise<PlanNodeRow> {
+    const node = await this.beginRegeneration(context)
+    try {
+      const patch = await this.produce(node, context)
+      return await this.finishRegeneration(node, patch, context)
+    } catch (e) {
+      return await this.failRegeneration(node, context, e)
+    }
+  }
+
+  /**
+   * Starts a loop at the context's path: records the iterations it runs and
+   * gives each one its element. The loop stays GENERATING; its children run
+   * as units of the run, each in its iteration, and `closeLoop` lands the
+   * loop once they are done. Null when the row changed meanwhile, so that the
+   * loop opened nothing.
+   */
+  async openLoop(context: RegenerationNodeContext): Promise<OpenedLoop | null> {
+    const node = await this.beginRegeneration(context)
+    try {
+      const patch = await this.produce(node, context)
+      const current = this.getRow(node.id, node.path)
+      if (!hasState(current) || current.status !== "GENERATING") return null
+      return { row: node, patch, keys: iterationKeys(node.type, patch.content ?? current.content) }
+    } catch (e) {
+      return await this.failRegeneration(node, context, e)
+    }
+  }
+
+  /** Lands a loop whose iterations are done — unless the row changed while they ran. */
+  async closeLoop(opened: OpenedLoop, context: RegenerationNodeContext): Promise<PlanNodeRow> {
+    try {
+      return await this.finishRegeneration(opened.row, opened.patch, context)
+    } catch (e) {
+      return await this.failRegeneration(opened.row, context, e)
+    }
+  }
+
+  /** Leaves a loop opened by `openLoop` whose iterations did not all get done: stopped, or failed. */
+  async abandonLoop(opened: OpenedLoop, status: "OUTDATED" | "ERROR"): Promise<void> {
+    await this.landRegeneration(opened.row, { status })
+  }
+
+  private async beginRegeneration(context: RegenerationNodeContext): Promise<PlanNodeRow> {
+    return (await this.patchState(context.nodeId, context.path, false, { status: "GENERATING" })) as PlanNodeRow
+  }
+
+  /** What the node's processor makes of it: its new state, not stored yet. */
+  private async produce<T extends Record<string, any> = Record<string, any>>(
+    node: PlanNodeRow,
+    context: RegenerationNodeContext,
+  ): Promise<PlanNodeStateUpdate> {
+    const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
+    if (!nodeProcessor.regenerate) return {}
+    const settings =
+      node.node_type_settings !== null
+        ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
+        : nodeProcessor.defaultSettings
+    return pick((await nodeProcessor.regenerate(this, context, node, settings)) || {}, PLAN_NODE_STATE_KEYS)
+  }
+
+  /** Completes what the processor produced — status, summary, counts — and lands it. */
+  private async finishRegeneration(
+    node: PlanNodeRow,
+    produced: PlanNodeStateUpdate,
     context: RegenerationNodeContext,
   ): Promise<PlanNodeRow> {
-    const { nodeId, path } = context
-    const node = (await this.patchState(nodeId, path, false, { status: "GENERATING" })) as PlanNodeRow
+    if (context.abortSignal.aborted) {
+      console.warn("[PlanNodeService]", "regenerate", `Stop node ${node.id} regeneration due to abort signal`)
+      return await this.landRegeneration(node, { status: "OUTDATED" })
+    }
 
-    try {
-      const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
+    let patch = produced
+    const output = this.getProcessor(node.type).getOutput(this, { ...node, ...patch })
+    const status = outcomeStatus(patch.status, output)
 
-      let patch: PlanNodeStateUpdate = {}
-      if (nodeProcessor.regenerate) {
-        const settings =
-          node.node_type_settings !== null
-            ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
-            : nodeProcessor.defaultSettings
-        patch = pick((await nodeProcessor.regenerate(this, context, node, settings)) || {}, PLAN_NODE_STATE_KEYS)
-      }
-
-      if (context.abortSignal.aborted) {
-        console.warn("[PlanNodeService]", "regenerate", `Stop node ${nodeId} regeneration due to abort signal`)
-        return await this.landRegeneration(node, { status: "OUTDATED" })
-      }
-
-      const output = nodeProcessor.getOutput(this, { ...node, ...patch })
-      const status = outcomeStatus(patch.status, output)
-
-      if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
-        if (status === "GENERATED") {
-          try {
-            patch = {
-              ...patch,
-              summary: (await generateSummary(context.abortSignal, ["plan-node-summary", `${nodeId}`], output)) || "",
-            }
-          } catch (e) {
-            console.error(e)
-            patch = { ...patch, summary: `(error): ${e}` }
+    if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
+      if (status === "GENERATED") {
+        try {
+          patch = {
+            ...patch,
+            summary: (await generateSummary(context.abortSignal, ["plan-node-summary", `${node.id}`], output)) || "",
           }
-        } else {
-          patch = { ...patch, summary: null }
+        } catch (e) {
+          console.error(e)
+          patch = { ...patch, summary: `(error): ${e}` }
         }
       } else {
-        patch = { ...patch, summary: patch.summary || null }
+        patch = { ...patch, summary: null }
       }
-      // Counted from the output: a loop's element or a node reading earlier
-      // iterations produces text without writing content.
-      patch = { ...patch, status, ...this.countsOfOutput(output) }
-
-      if (context.abortSignal.aborted) {
-        console.warn("[PlanNodeService]", "regenerate", `Stop node ${nodeId} regeneration due to abort signal`)
-        return await this.landRegeneration(node, { status: "OUTDATED" })
-      }
-
-      return await this.landRegeneration(node, patch)
-    } catch (e) {
-      console.error(`Unable to regenerate node ${nodeId} at "${path}"`, e)
-      // A stopped node is left to be redone, not marked broken.
-      await this.landRegeneration(node, { status: context.abortSignal.aborted ? "OUTDATED" : "ERROR" })
-      throw e
+    } else {
+      patch = { ...patch, summary: patch.summary || null }
     }
+    // Counted from the output: a loop's element or a node reading earlier
+    // iterations produces text without writing content.
+    patch = { ...patch, status, ...this.countsOfOutput(output) }
+
+    if (context.abortSignal.aborted) {
+      console.warn("[PlanNodeService]", "regenerate", `Stop node ${node.id} regeneration due to abort signal`)
+      return await this.landRegeneration(node, { status: "OUTDATED" })
+    }
+
+    return await this.landRegeneration(node, patch)
+  }
+
+  /** Marks a node whose regeneration threw — broken, or left to be redone after a stop — and rethrows. */
+  private async failRegeneration(node: PlanNodeRow, context: RegenerationNodeContext, e: unknown): Promise<never> {
+    console.error(`Unable to regenerate node ${node.id} at "${node.path}"`, e)
+    // A stopped node is left to be redone, not marked broken.
+    await this.landRegeneration(node, { status: context.abortSignal.aborted ? "OUTDATED" : "ERROR" })
+    throw e
   }
 
   /**
