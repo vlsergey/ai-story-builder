@@ -301,6 +301,18 @@ describe("propagateStaleStatus", () => {
     expect(nodes.findById(reader)!.status).toBe("OUTDATED")
   })
 
+  it("treats a loop over an empty list as a final answer", () => {
+    const nodes = new PlanNodeRepository()
+    const edges = new PlanEdgeRepository()
+    const list = nodes.insert({ title: "List", type: "split", parent_id: null, status: "GENERATED", content: "[]" })
+    const loop = nodes.insert({ title: "Loop", type: "for-each", parent_id: null, status: "EMPTY" })
+    const draft = nodes.insert({ title: "Draft", type: "merge", parent_id: null, status: "GENERATED" })
+    edges.insert({ from_node_id: list, to_node_id: loop, type: "textArray" })
+    edges.insert({ from_node_id: loop, to_node_id: draft, type: "textArray" })
+
+    expect(propagateStaleStatus().markedNodeIds).toEqual([])
+  })
+
   it("carries the exemption through a chain of EMPTY deterministic nodes", () => {
     const nodes = new PlanNodeRepository()
     const edges = new PlanEdgeRepository()
