@@ -22,6 +22,7 @@ import type {
   RegenerationCycleContext,
   RegenerationNodeContext,
 } from "./RegenerationContext.js"
+import { hasRegenerationCriteria } from "./regeneration-criteria.js"
 
 interface RegenerateEvents {
   nodeUpdate: [node: PlanNodeRow]
@@ -296,25 +297,6 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<Plan
   }
 }
 
-// LLM-calling node types need a non-blank userPrompt to have anything to
-// generate from. A text node populated from a wizard substitution (e.g. the
-// "Synopsis" node in fiction-arc.ru.json) has content but no prompt — it's the
-// SOURCE of generation, not a target. Skip such nodes during regeneration.
-export function hasRegenerationCriteria(node: PlanNodeRow): boolean {
-  if (node.type === "text" || node.type === "split" || node.type === "lore") {
-    let userPrompt: unknown = null
-    if (node.node_type_settings) {
-      try {
-        userPrompt = (JSON.parse(node.node_type_settings) as { userPrompt?: unknown }).userPrompt
-      } catch {
-        // ignore — treat as no prompt
-      }
-    }
-    if (typeof userPrompt !== "string" || userPrompt.trim().length === 0) return false
-  }
-  return true
-}
-
 /**
  * Generate content for all nodes in topological order, respecting dependencies.
  */
@@ -422,6 +404,13 @@ export async function regenerateSubtreeNodesContents(
         const result = await planNodeService.regenerate(childContext)
         return { result, status: classifyResult(node, result) }
       })
+      // Its prompt or an input changed while it was being written, so its
+      // result was dropped: write it again before anything reads it. Nothing
+      // else would — a node without readers is never re-queued as a source.
+      if (nodeRepo.findById(nodeId)?.status === "OUTDATED" && !context.abortSignal.aborted) {
+        queue.unshift(nodeId)
+        continue
+      }
     } else {
       console.log(
         `[regenerateSubtreeNodesContents] skipping node ${nodeId} '${node.title}' of type ${node.type} with status '${node.status}'`,
