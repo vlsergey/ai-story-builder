@@ -30,12 +30,26 @@ export interface RunBook {
 export type RunScope = { loop: { nodeId: number; path: NodePath } } | null
 
 export interface Schedule {
-  /** Units that may start now. Each still needs the run's decision: run it, or skip it. */
+  /**
+   * Units that may start now, in the order of the graph: depth first, a
+   * loop's earlier iterations before its later ones. Each still needs the
+   * run's decision: run it, or skip it.
+   */
   ready: PlanNodeRow[]
   /** Opened loops whose iterations are all done: to be closed. */
   closable: PlanNodeRow[]
+  /** Opened loops, and how far their iterations have got. */
+  loops: LoopProgress[]
   /** Units in the run's reach that are not done yet: waiting, ready or running. */
-  pending: number
+  pending: PlanNodeRow[]
+}
+
+export interface LoopProgress {
+  row: PlanNodeRow
+  total: number
+  done: number
+  /** The earliest iteration not done yet. */
+  current: string
 }
 
 /**
@@ -143,29 +157,32 @@ export function schedule(service: PlanNodeService, book: RunBook, scope: RunScop
 
   const ready: PlanNodeRow[] = []
   const closable: PlanNodeRow[] = []
-  let pending = 0
+  const loops: LoopProgress[] = []
+  const pending: PlanNodeRow[] = []
 
   /**
-   * One unit: true when it is done, else it is counted and, if it can start
-   * or close, listed. `blocked`: a loop around it waits for a source again.
+   * One unit: true when it is done, else it is listed as pending and, if it
+   * can start or close, as such. `blocked`: a loop around it waits for a
+   * source again.
    */
   function visit(node: PlanNodeDefinition, path: NodePath, sourcesDone: boolean, blocked: boolean): boolean {
     if (isDone(node.id, path)) return true
-    pending++
-    const key = unitKey(node.id, path)
-    if (book.running.has(key)) return false
     const row = rowAt(node.id, path)
     if (!row) return false
+    pending.push(row)
+    const key = unitKey(node.id, path)
+    if (book.running.has(key)) return false
     const opened = book.opened.get(key)
     if (opened) {
       if (row.status === "GENERATING") {
-        let iterationsDone = true
+        let done = 0
+        let current: string | undefined
         for (const iteration of opened.keys) {
-          if (!visitLevel(node.id, childPath(path, node.id, iteration), blocked || !sourcesDone)) {
-            iterationsDone = false
-          }
+          if (visitLevel(node.id, childPath(path, node.id, iteration), blocked || !sourcesDone)) done++
+          else current ??= iteration
         }
-        if (iterationsDone && sourcesDone && !blocked) closable.push(row)
+        loops.push({ row, total: opened.keys.length, done, current: current ?? opened.keys.at(-1) ?? "" })
+        if (done === opened.keys.length && sourcesDone && !blocked) closable.push(row)
         return false
       }
       // Demoted while its iterations ran: what it opened is stale. It opens
@@ -196,5 +213,5 @@ export function schedule(service: PlanNodeService, book: RunBook, scope: RunScop
   } else {
     visitLevel(null, ROOT_PATH, false)
   }
-  return { ready, closable, pending }
+  return { ready, closable, loops, pending }
 }

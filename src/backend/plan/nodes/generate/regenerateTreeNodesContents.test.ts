@@ -33,4 +33,24 @@ describe("a run that does not converge", () => {
     })
     await expect(regenerateTreeNodesContents()).rejects.toThrow(/did not converge/)
   })
+
+  it("starts nothing new once it has given up, though another node is ready", async () => {
+    // The same pair, and E, ready from the start but always behind them in
+    // the graph's order: with one call at a time it never gets its turn.
+    const a = seedNode({ title: "A", settings: PROMPT, at: { "": "OUTDATED" } })
+    const b = seedNode({ title: "B", settings: PROMPT, at: { "": "OUTDATED" } })
+    const e = seedNode({ title: "E", settings: PROMPT, at: { "": "OUTDATED" } })
+    const started: number[] = []
+    vi.spyOn(PlanNodeService.prototype, "regenerate").mockImplementation(async function (this: PlanNodeService, ctx) {
+      started.push(ctx.nodeId)
+      if (ctx.nodeId === a) this.states.upsert(b, "", { status: "OUTDATED" })
+      if (ctx.nodeId === b) this.states.upsert(a, "", { status: "OUTDATED" })
+      this.states.upsert(ctx.nodeId, "", { status: "GENERATED", content: `gen-${ctx.nodeId}` })
+      return this.getRow(ctx.nodeId, "")
+    })
+
+    await expect(regenerateTreeNodesContents()).rejects.toThrow(/did not converge/)
+
+    expect(started).not.toContain(e)
+  })
 })

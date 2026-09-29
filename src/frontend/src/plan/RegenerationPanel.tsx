@@ -1,5 +1,5 @@
 import { ButtonGroup } from "@/ui-components/button-group"
-import type { RegenerateStatusEvent, RunningNode } from "@shared/RegenerateEvent"
+import type { RegenerateStatusEvent, RunningLoop, RunningNode } from "@shared/RegenerateEvent"
 import type { DockviewPanelApi } from "dockview"
 import { PlayIcon, SquareIcon } from "lucide-react"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
@@ -99,11 +99,17 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   }, [])
 
   const renderRunning = () => {
-    if (!event?.running?.length) return null
+    if (!event?.running?.length && !event?.loops?.length) return null
     return (
       <div className="mt-4">
         <div className="text-xs text-muted-foreground mb-2">{t("regeneration.current_nodes")}</div>
         <div className="space-y-1">
+          {event.loops.map((loop) => (
+            <div key={`loop ${runningKeyOf(loop.node.id, loop.node.path)}`} className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-primary/30"></div>
+              <RunningLoopLine loop={loop} />
+            </div>
+          ))}
           {event.running.map((item) => (
             <div key={runningKeyOf(item.node.id, item.node.path)} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-primary/60"></div>
@@ -219,6 +225,21 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
         <ResponseStreamWatcher className="flex-1 min-h-0 text-muted-foreground text-xs" running={runningNodes} />
       </div>
     </div>
+  )
+}
+
+/** A loop running its iterations: how many are done, of how many. */
+function RunningLoopLine({ loop }: { loop: RunningLoop }) {
+  const { labelOf } = useIterationSelection()
+  return (
+    <span>
+      <span className="text-xs text-muted-foreground">
+        {loop.node.title} (ID: {loop.node.id}
+        {loop.node.path ? `, ${labelOf(loop.node.path)}` : ""}):{" "}
+      </span>
+      <span className="text-xs font-medium">{loop.done}</span>
+      <span className="text-xs text-muted-foreground"> / {loop.total}</span>
+    </span>
   )
 }
 

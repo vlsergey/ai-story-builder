@@ -4,7 +4,7 @@ import type { ResponseStreamEvent } from "openai/resources/responses/responses.j
 import { LOOP_TYPES } from "../../../../shared/loop-iterations.js"
 import type { PlanNodeRow, PlanNodeStatus } from "../../../../shared/plan-graph.js"
 import { childPath, type NodePath } from "../../../../shared/plan-node-path.js"
-import type { RegenerateStatusEvent, RunningNode } from "../../../../shared/RegenerateEvent.js"
+import type { RegenerateStatusEvent, RunningLoop, RunningNode } from "../../../../shared/RegenerateEvent.js"
 import { maxConcurrentCalls } from "../../../ai/engine-slots.js"
 import { emitterToObservable, emitterToSingleArgObservable } from "../../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../../lib/make-errors.js"
@@ -14,7 +14,7 @@ import { hasState, PlanNodeService } from "../plan-node-service.js"
 import { propagateStaleStatus } from "./propagateStaleStatus.js"
 import type { PlanNodeAiGenerationStatus, RegenerationNodeContext } from "./RegenerationContext.js"
 import { hasRegenerationCriteria } from "./regeneration-criteria.js"
-import { type RunBook, type RunScope, schedule, unitKey } from "./schedule.js"
+import { type LoopProgress, type RunBook, type RunScope, schedule, unitKey } from "./schedule.js"
 
 interface RegenerateEvents {
   responseStream: [nodeId: number, path: NodePath, contentPath: (string | number)[], event: ResponseStreamEvent]
@@ -29,6 +29,7 @@ function emitRegenerateStatusEvent() {
     stopping: abortController == null ? true : abortController.signal.aborted,
     // A copy: subscribers may hold the event after the run has moved on.
     running: [...running.values()],
+    loops: runningLoops,
     firstError,
     firstErrorAt,
     generatedNew,
@@ -68,6 +69,8 @@ let inProcess = false
 
 /** What is being written now, by unit, in the order it started. */
 const running = new Map<string, RunningNode>()
+/** The loops whose iterations run now, and how far they have got. */
+let runningLoops: RunningLoop[] = []
 let firstError: unknown = null
 let firstErrorAt: RegenerateStatusEvent["firstErrorAt"] = null
 
@@ -87,6 +90,14 @@ export function stop(): void {
 }
 
 const refOf = (row: PlanNodeRow) => ({ id: row.id, title: row.title, type: row.type, path: row.path })
+
+/** Shows how far the loops have got — when that changed. */
+function showLoops(progress: LoopProgress[]) {
+  const next = progress.map(({ row, total, done, current }) => ({ node: refOf(row), total, done, current }))
+  if (JSON.stringify(next) === JSON.stringify(runningLoops)) return
+  runningLoops = next
+  emitRegenerateStatusEvent()
+}
 
 /** How a finished regeneration is counted in the run's totals. */
 function classifyResult(before: PlanNodeRow, after: PlanNodeRow): PlanNodeAiGenerationStatus {
@@ -115,6 +126,7 @@ export async function regenerateTreeNodesContents(target?: {
   firstError = null
   firstErrorAt = null
   running.clear()
+  runningLoops = []
 
   generatedEmpty = 0
   generatedSame = 0
@@ -230,9 +242,6 @@ export async function regenerateTreeNodesContents(target?: {
     const beforeOpening = new Map<string, PlanNodeRow>()
     const tasks = new Map<string, Promise<void>>()
     const starts = new Map<string, number>()
-    /** When each unit was first seen ready: the oldest starts first. */
-    const readySince = new Map<string, number>()
-    let seen = 0
     // The target of a single-node run runs whatever its status says.
     const forced = scope ? unitKey(scope.loop.nodeId, scope.loop.path) : null
 
@@ -309,19 +318,19 @@ export async function regenerateTreeNodesContents(target?: {
     try {
       for (;;) {
         if (!abortSignal.aborted && !failed) {
-          const { ready, closable, pending } = schedule(service, book, scope)
+          const { ready, closable, loops, pending } = schedule(service, book, scope)
+          showLoops(loops)
           if (closable.length > 0) {
             for (const row of closable) await close(row)
             continue
           }
-          for (const row of ready) {
-            const key = unitKey(row.id, row.path)
-            if (!readySince.has(key)) readySince.set(key, seen++)
-          }
-          ready.sort((a, b) => readySince.get(unitKey(a.id, a.path))! - readySince.get(unitKey(b.id, b.path))!)
 
+          // In the graph's order: a loop gets its earlier iterations done
+          // first, so a run stopped half-way leaves whole iterations behind.
           let settledAny = false
           for (const row of ready) {
+            // A start or a skip may have ended the run: nothing new after it.
+            if (abortSignal.aborted || failed) break
             const key = unitKey(row.id, row.path)
             if (!mustRun(row, key)) {
               await skip(row)
@@ -334,9 +343,12 @@ export async function regenerateTreeNodesContents(target?: {
           // A skip may have made more units ready.
           if (settledAny) continue
           if (tasks.size === 0) {
-            if (failed) break
-            if (pending > 0) {
-              throw Error(`Regeneration cannot proceed: ${pending} node(s) wait for each other`)
+            if (abortSignal.aborted || failed) break
+            if (pending.length > 0) {
+              const stuck = pending[0]
+              firstErrorAt = { nodeId: stuck.id, title: stuck.title, path: stuck.path }
+              const named = pending.slice(0, 5).map((row) => `«${row.title}» at "${row.path}"`)
+              throw Error(`Regeneration cannot proceed: ${named.join(", ")} wait for each other`)
             }
             return
           }
@@ -350,13 +362,23 @@ export async function regenerateTreeNodesContents(target?: {
       // Whatever ended the loop, the run does not end while units still write.
       await Promise.allSettled([...tasks.values()])
       // Stopped or failed with loops still open: a loop around the failure
-      // failed with it; the others were cut short, to be redone.
+      // failed with it; the others were cut short, to be redone. One that
+      // cannot be written — deleted meanwhile — must not keep the others
+      // GENERATING, nor stand in for how the run ended.
       for (const [key, opened] of book.opened) {
         const inside = childPath(opened.row.path, opened.row.id, "")
         const failedInside = failed && firstErrorAt !== null && firstErrorAt?.path.startsWith(inside) === true
-        await service.abandonLoop(opened, failedInside ? "ERROR" : "OUTDATED")
+        try {
+          await service.abandonLoop(opened, failedInside ? "ERROR" : "OUTDATED")
+        } catch (e) {
+          console.error(
+            `[regenerateTreeNodesContents] could not leave loop ${opened.row.id} at "${opened.row.path}"`,
+            e,
+          )
+        }
         book.opened.delete(key)
       }
+      showLoops([])
     }
   }
 

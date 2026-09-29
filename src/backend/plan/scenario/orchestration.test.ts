@@ -152,4 +152,67 @@ describe("a run", () => {
 
     expect(peak()).toBe(3)
   })
+
+  it("gets a loop's earlier iterations done first when calls go one at a time", async () => {
+    // A run stopped half-way then leaves whole chapters behind, not a plan of each.
+    const s = chapters(
+      (b) => {
+        b.text("План главы", { prompt: "План главы:\n{{[Глава]}}" })
+        b.text("Текст главы", { prompt: "Напиши {{[Глава]}} по плану:\n{{[План главы]}}" })
+        b.result("Текст главы")
+      },
+      ["Глава-1", "Глава-2", "Глава-3"],
+    )
+    s.setEngineConcurrency(1)
+
+    await s.run()
+
+    const order = s
+      .calls("text")
+      .filter((c) => c.node === "План главы" || c.node === "Текст главы")
+      .map((c) => `${c.node} ${c.userPrompt.match(/Глава-\d/)?.[0]}`)
+    expect(order).toEqual([
+      "План главы Глава-1",
+      "Текст главы Глава-1",
+      "План главы Глава-2",
+      "Текст главы Глава-2",
+      "План главы Глава-3",
+      "Текст главы Глава-3",
+    ])
+  })
+
+  it("opens a loop again when something inside it goes stale after it closed", async () => {
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "История по главам.")
+      g.source("Стиль", "Сухо.")
+      g.split("Главы", { prompt: "Главы:\n{{[Синопсис]}}" })
+      g.loop("Цикл по главам", { over: "Главы", element: "Глава", result: "Выход главы" }, (b) => {
+        b.text("Текст главы", { prompt: "Напиши {{[Глава]}} в стиле:\n{{[Стиль]}}" })
+        b.result("Текст главы")
+      })
+      g.text("Послесловие", { prompt: "Послесловие к главам:\n{{[Цикл по главам]}}" })
+    })
+    s.engine.on((call) => (call.node === "Главы" ? JSON.stringify({ parts: ["Глава-1", "Глава-2"] }) : undefined))
+    // The loop has closed by the time the afterword is written: the user
+    // changes the style then, and every chapter reads the style.
+    let edited = false
+    s.engine.on(async (call) => {
+      if (call.node === "Послесловие" && !edited) {
+        edited = true
+        await s.type("Стиль", "Пышно.")
+      }
+      return undefined
+    })
+
+    await s.run()
+
+    const chapterCalls = s.calls("text").filter((c) => c.node === "Текст главы")
+    expect(chapterCalls, "each chapter again, in the new style").toHaveLength(4)
+    expect(chapterCalls.slice(2).every((c) => c.userPrompt.includes("Пышно."))).toBe(true)
+    expect(
+      s.calls("text").filter((c) => c.node === "Послесловие"),
+      "and the afterword after them",
+    ).toHaveLength(2)
+    expect(s.status("Послесловие")).toBe("GENERATED")
+  })
 })

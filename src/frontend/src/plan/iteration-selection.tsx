@@ -14,9 +14,9 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef
  * stays on its element when others are inserted before it.
  *
  * Until the user picks an iteration, the display follows a sequential loop to
- * the earliest of the iterations it is generating — iterations that do not
- * read the ones before them run side by side; a new run follows again. A
- * parallel loop is not followed: it has no order to follow.
+ * the earliest of its iterations not done yet — iterations that do not read
+ * the ones before them run side by side; a new run follows again. A parallel
+ * loop is not followed: it has no order to follow.
  */
 interface IterationSelection {
   /** Whether the node definitions are loaded: until then a display path is not known. */
@@ -72,11 +72,11 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
           loopPath = childPath(loopPath, segment.containerId, segment.key)
         }
       }
-      // A sequential loop is followed at the earliest of its iterations that run.
+      // A sequential loop is followed at the earliest of its iterations not
+      // done yet: it stays put while that iteration's nodes take turns.
       const running: Record<string, string> = {}
-      for (const [loop, keys] of Object.entries(allRunning)) {
-        if (typeOf(Number.parseInt(loop, 10)) !== "for-each") continue
-        running[loop] = keys.reduce((earliest, key) => (Number(key) < Number(earliest) ? key : earliest))
+      for (const loop of event.loops) {
+        if (loop.node.type === "for-each") running[keyOf(loop.node.id, loop.node.path)] = loop.current
       }
       setRunningKeys((previous) => (JSON.stringify(previous) === JSON.stringify(allRunning) ? previous : allRunning))
       setFollowed((previous) =>

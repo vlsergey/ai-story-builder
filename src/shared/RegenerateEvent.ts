@@ -14,12 +14,24 @@ export interface RunningNode {
   attempt?: { index: number; total?: number }
 }
 
+/** A loop running its iterations, and how far it has got. */
+export interface RunningLoop {
+  node: RegenerationNodeRef
+  /** Iterations done, of `total`. */
+  done: number
+  total: number
+  /** The key of the earliest iteration not done yet: where a sequential loop is followed. */
+  current: string
+}
+
 export interface RegenerateStatusEvent {
   inProcess: boolean
   stopping: boolean
 
   /** What is being written now, in the order it started. */
   running: RunningNode[]
+  /** The loops whose iterations are being run. */
+  loops: RunningLoop[]
   firstError?: unknown
   /** The node that failed first, and the iteration it failed in. */
   firstErrorAt?: { nodeId: number; title: string; path: NodePath } | null
