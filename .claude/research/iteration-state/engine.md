@@ -35,9 +35,9 @@ only migration steps and lore reordering use transactions).
 
 A generation takes minutes, and its row may change meanwhile: a prompt edit
 demotes it, an upstream edit drops its iteration, the user deletes the node.
-Today the result lands regardless (phase 0 #16); with parallel branches and
-editing during runs it would land on demoted rows, on vanished paths, over MANUAL
-text.
+Since phase 0 (#16) `master` lands a result only if the row is still
+GENERATING. With parallel branches, renames and deletes that check is not
+enough: a status cannot tell a row from its deleted and re-created successor.
 
 - Every state row carries `rev`, replaced by a fresh random value on every write,
   demotion and rename. It is never reused, so a deleted and re-created row cannot

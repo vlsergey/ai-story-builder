@@ -1,133 +1,103 @@
 # Iteration state — testing
 
-*2026-09-29, revised after review. Part of the architecture proposal; see [README.md](README.md).*
+*2026-09-29, revised after review; the harness and layer 1 landed on `master` in
+phase 0. Part of the architecture proposal; see [README.md](README.md).*
 
 ## Principles
 
-- **Test behaviour, not storage.** Today's loop tests read `overrides` directly,
-  so they pin the implementation and cannot prove "no behaviour change". The
-  observable of a run is: the outputs, the statuses, and **which calls reached the
-  model** — the call log of a deterministic fake adapter.
-- **Characterize through a driver.** Scenarios talk to a thin driver —
-  `edit(node, iteration, fields)`, `run()`, `outputs()`, `calls()` — implemented
-  once over mounting (`changePage` + `patch`) and once over paths (`patchState`).
-  Only the driver changes in phase 1; an edit in iteration 2 is the action under
-  test, not fixture setup, so it cannot hide in the fixtures.
-- **Encode fixed behaviour, never a known bug.** Characterization is written after
-  the phase 0 fixes. A scenario that stays broken on `master` — nested loops, a
-  vanished iteration — is an expected failure (`it.fails`) that phase 1 must flip.
-- **Check invariants after every test.** A cheap structural checker catches whole
-  classes of bugs — orphan rows, wrong paths — that scenarios catch only by luck.
-- **Make concurrency deterministic.** Interleavings are driven by promises the test
-  resolves by hand, not by timers.
+- **Scenarios, not internals.** A test drives the project the way a user does —
+  build a graph, run it, edit, run again — and observes what the user would:
+  which nodes the model was asked to write (the fake engine's call log), what
+  they now say, their statuses. Tests that read `overrides`, spy on
+  `PlanNodeService` or hand-build scheduler contexts pin the implementation and
+  cannot prove "no behaviour change"; phase 0's own low-level tests were replaced.
+- **One place knows storage.** The driver's `stateAt` and `show` are the only code
+  that knows how iterations are stored. Phase 1 rewrites them; the scenarios stay.
+- **Pin, don't patch, what the rework fixes.** A bug of the current storage is a
+  scenario stating the right behaviour, marked `it.fails` with a line saying why.
+  When the rework makes it pass, vitest reports it and it becomes `it`. Before
+  trusting an `it.fails`, run it as `it` once and check it fails on its own
+  assertion, not on a harness error.
+- **Deterministic concurrency** (phase 2): interleavings driven by calls the test
+  holds and releases, never timers.
 
-## Infrastructure
+## The harness — `src/backend/plan/scenario`
 
-1. **`FakeAdapter`** — content derived from its inputs (a short hash of the
-   rendered prompt), so outputs are checkable and a re-run yields the same text;
-   records every call `{nodeId, path, purpose, prompt}`; manual gates to hold a
-   call in flight; can fail a chosen call. Replaces the ad hoc mocks
-   (`generate-summary.test.ts`, the fiction-arc diagnostic's LLM mock).
-2. **Graph builder** — a small DSL for containers, children and edges, so a
-   scenario reads as a graph rather than as thirty `insert` calls.
-3. **The driver** above.
-4. **`checkStateInvariants(db)`** (phase 1):
-   - a node outside loops has at most one row, at `''`;
-   - a row's path has one segment per container ancestor, naming exactly those
-     ancestors in order;
-   - every segment's key exists in its container's own state, so no row sits
-     under a vanished iteration;
-   - container rows have the right content shape; counts match the output;
-   - nothing is GENERATING when no run is active;
-   - after a successful run, no child of a visited container is missing or
-     OUTDATED at a current key.
-5. **`migrateDatabase(db, { toVersion })`** (phase 1), so migration tests build a
-   v32 DB by running the chain.
-6. **Property testing:** `fast-check` as a dev dependency for the path algebra, key
-   allocation and migration shapes — or seeded hand-written generators.
+- **`fake-engine.ts`** — replaces `ai/ai-engine-adapter.js` via `vi.mock` in each
+  scenario file. Default answers derive from the rendered prompts — unchanged
+  inputs, same text — so a wasted re-run shows up as a call. Splits answer two
+  parts, reviews find nothing. Handlers (`engine.on`) script answers, fail calls,
+  or act while a call is in flight: edit, stop the run. Calls are logged with
+  their kind (text, split, find/fix-problems, summary, improve), node, prompts
+  and response.
+- **`plan-scenario.ts`** — `PlanScenario.build` with a graph builder: `source`,
+  `text`, `split`, `merge`, `format`, `fixProblems`, `loop` with `result` and
+  `previousResults`, `connect`; edges into generated nodes follow the names their
+  prompts use. `fromTemplate` applies a shipped template. User actions: `run`,
+  `regenerate`, `stop`, `type`, `setPrompt`, `improve`, `startReview`, `show`,
+  `setRegenerate`, `extend`. Observations: `calls`, `generated`, `content` and
+  `status` (optionally per iteration), `wordCount`, `inReview`, `loopResults`,
+  `nodes`, `reachableFrom`, `shownInProgress`, `lastStatus`.
 
-## Layers, most valuable first
+## Layers
 
-**1. Characterization** (phase 0, after its fixes). For `for-each`: outputs after
-a full run; what re-runs when a root input, one element, one child's prompt or one
-child's content changes — including a source outside the loop, which must reach
-every iteration (phase 0 #14); prev-outputs and index values per iteration; the
-fiction-arc graph end to end. Assert on the call log.
+**1. Characterization — done.** `regeneration.test.ts` (first run, settings,
+single node, failures, stop, statuses), `editing.test.ts` (what an edit re-runs
+and what it spares; edits while a node is being written), `loops.test.ts` (one
+result per element, sequential memory, nested loops; the storage bugs as
+`it.fails`), `fiction-arc.test.ts` (the shipped template end to end).
 
-**2. Idempotence.** A second run over a settled graph makes **zero** model calls —
-the regression test for the invalidation-bug class of `accfede` — across every
-scenario, including a prompt-less node inside a loop and a loop child just added
-by a template update. A deterministic node that reproduces its content causes no
-downstream call.
+**2. Idempotence.** A second run over a settled project asks the model nothing —
+covered for plain graphs, loops and the whole template. Phase 1 keeps it for
+nested and parallel loops and for a loop child added by a template update.
 
-**3. Scope of the cascade** — where correctness now lives. Change a child in
-iteration 2 of a sequential loop: iteration 2's downstream and later iterations'
-prev-outputs re-run, iterations 0–1 do not. In a parallel loop: only iteration 2.
-A source outside the loop demotes every iteration's consumer; a prompt change
-every non-MANUAL row. An ERROR in a side node re-runs that node only — no other
-iteration, nothing downstream of the loop — while a stale output re-runs the
-loop's consumers. Nested loops: outer element 1 touches only `27:1/…`. A move
-deletes the node's rows; a move that would create a rejected edge is refused.
+**3. Scope of the cascade.** Covered today: an edit re-runs exactly its readers,
+spares nodes wired to it that do not read it, spares MANUAL text, and a
+same-text re-run spares everything downstream; on the template, an edited style
+re-runs nothing it cannot reach. Pinned for the rework: a change from outside a
+loop reaching every iteration; an unchanged element staying untouched when its
+list changes. Phase 1 adds: an ERROR in a side node re-runs that node only; a
+move that would create a rejected edge is refused.
 
-**4. Staleness and expansion.** An ERROR in an iteration nobody displays still
-makes the container need a visit (today it does not). A new iteration with no
-rows is pending. A deterministic node's EMPTY with settled inputs is not
-contagious, nor is the EMPTY of a node with nothing to generate from; a generative
-node's is. A shrunk input deletes vanished iterations and the output has `length`
-entries. An outer loop grows: an inner loop fed from outside it expands in the new
-iteration and produces its full output.
+**4. Staleness and expansion.** Phase 1: an ERROR in an iteration nobody displays
+still makes the loop need a visit; a node with nothing to generate from settles;
+an inner loop fed from outside expands in a new outer iteration. Pinned: a
+shorter or empty list leaves no phantom output.
 
-**5. Late writes** (phase 1 — editing during a run is one of its review gates):
-a prompt edit while its node generates drops the result and the node re-runs;
-improve during a run loses to the generation, or the generation to improve —
-never silently; a node deleted mid-generation stays deleted; an editor saving
-after a generation finished gets a conflict; an editor bound to a vanished path
-cannot write.
+**5. Late writes.** Covered today: a prompt edit, an input edit, or text typed
+while a node is being written — the result is dropped, the node runs again or
+keeps the user's text; an improve whose text changed meanwhile is refused.
+Phase 1 moves the same scenarios onto row versions and adds: a node deleted
+mid-generation stays deleted; an editor bound to a vanished iteration cannot
+write.
 
-**6. Concurrency** (phase 2), with gated fake calls:
-- in-flight calls never exceed the per-node cap, nor the run-wide cap across two
-  nested parallel containers;
-- iteration A's writes never demote iteration B's finished rows;
-- one failing iteration: its siblings settle first, then the error surfaces and
-  names its path; `inProcess` stays set until every branch has settled;
-- abort mid-run: nothing left GENERATING, in-flight nodes end OUTDATED;
-- identical elements make one call and fill both positions;
-- two iterations of one node stream into separate buffers; progress shows two
-  active entries;
-- **seeded stress**: many random interleavings with a fixed seed list; after each,
-  every node settled, invariants hold, the safety counter was never reached.
+**6. Concurrency** (phase 2), with held calls: the per-node and run-wide caps; one
+iteration never demotes another's rows; a failing iteration lets its siblings
+settle, then names its path; abort leaves nothing GENERATING; identical elements
+make one call; two iterations stream into separate buffers; seeded stress runs
+checking the invariants after each.
 
-**7. Keys and paths** (pure, property-based): `parse`/`format` round-trip;
-`childPath`/`parentPath` inverse; `isAtOrBelow` is a partial order and
-`'27:2'` is not below `'27:20'`; **the SQL at-or-below predicate agrees with
-`isAtOrBelow`** on a generated corpus. Key allocation: at least 6 characters,
-unique among distinct elements, grows under an injected colliding hash, never
-shrinks, unchanged elements keep their key; after growth the full hash decides
-which element owned old rows; `renameKey` moves nested rows and rolls back whole.
+**7. Keys and paths** (pure): `parse`/`format` round-trip, `isAtOrBelow` a partial
+order with `'27:2'` not below `'27:20'`, the SQL at-or-below predicate agreeing
+with it, key growth under an injected colliding hash, `renameKey` all-or-nothing.
 
-**8. Migration** — as in [migration.md](migration.md): named synthetic fixtures
-for every anomaly found in real data, the equivalence oracle, a property test
-over random container shapes, `checkStateInvariants` on every result, a dry run
-on **copies** of local projects. Real project files never enter the repository:
-they hold people's stories.
+**8. Migration** — as in [migration.md](migration.md): synthetic fixtures for every
+anomaly found in real data, the equivalence oracle, `checkStateInvariants` on
+every result, a dry run on **copies** of local projects. Real project files never
+enter the repository: they hold people's stories.
 
-**9. UI** (testing-library): switching the displayed iteration issues **no**
-mutation and works while the container is GENERATING; follow-unless-pinned;
-selection survives an upstream insertion; an editor opened at `27:2` keeps
-writing to `27:2` after the display moves to `27:0` — the data-loss regression of
-today; a lost `rev` shows a conflict; a state event for `27:2` invalidates only
-that path's queries; the precedence function, table-driven, with EMPTY-as-final
-and missing rows. Then the review on the running app.
+**9. UI** (testing-library): switching the displayed iteration issues no mutation;
+an editor opened on one iteration keeps writing to it after the display moves;
+a lost `rev` shows a conflict; the precedence function, table-driven.
 
-**10. Around it:** schema drift (chain-built DB against `schema.sql`); telemetry
-records `node_id` and `path`, and two concurrent calls record their own paths —
-AsyncLocalStorage leaking across branches is the classic failure; smoke tests for
-the rewritten scripts on a migrated fixture; the downgrade guard, in its phase 0
-release, refuses a newer file.
+**10. Around it:** schema drift, telemetry paths under concurrency, script smoke
+tests, and the downgrade guard (done: `open-project-database.test.ts`).
 
-## When
+## Invariants — phase 1
 
-Fake adapter, graph builder, driver and layer 1 land on `master` in phase 0, after
-its fixes. `checkStateInvariants` and `migrateDatabase({toVersion})` come with
-phase 1 step 1 — path rows do not exist before it — and layers 2–5 and 7–10 grow
-with phase 1. Layer 6 is phase 2's entry ticket.
+`checkStateInvariants(db)`, run after every engine and migration test: a node
+outside loops has at most one row, at `''`; a row's path names exactly its
+container ancestors; every key exists in its container's state; container rows
+have the right shape and counts match the output; nothing is GENERATING outside
+a run; after a successful run no child of a visited container is missing or
+OUTDATED at a current key.

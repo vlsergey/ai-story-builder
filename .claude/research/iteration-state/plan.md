@@ -1,80 +1,39 @@
 # Iteration state — plan
 
-*2026-09-29, revised after review. Part of the architecture proposal; see [README.md](README.md).
-Every item here was found by reading code; each is confirmed by a failing test
-before it is fixed.*
+*2026-09-29, revised after review; phase 0 done the same day. Part of the
+architecture proposal; see [README.md](README.md).*
 
-## Phase 0 — bugs to fix on `master` first
+## Phase 0 — done on `master`
 
-These exist today and are independent of the rework. Fixing them first keeps the
-rework's behaviour-preservation tests from locking wrong behaviour in.
+The rule, set by the project owner: a bug that only the new storage fixes is not
+fixed on `master` — a scenario test pins it with `it.fails`, and phase 1 must
+flip it. Everything else was fixed test-first. Tests are scenarios
+([testing.md](testing.md)).
 
-1. `shouldRegenerate.GENERATED` follows `regenerateManual`, not
-   `regenerateGenerated` (`regenerateTreeNodesContents.ts:338`, since `33b73d1`).
-2. `PlanNodeService.regenerate` overwrites the processor's status by output
-   truthiness (`plan-node-service.ts:495-525`): a script or format ERROR is stored
-   as GENERATED, and `[]` counts as output — `for-each-prev-outputs` is GENERATED
-   on iteration 0.
-3. The cascade demotes consumers whose prompt does not use the changed input, and
-   MANUAL ones: it marks the consumer OUTDATED before asking its processor, whose
-   "no change" answer (`return null`) cannot undo that, so the text processor's
-   own check (`text-processor.ts:42`) never fires (`plan-node-service.ts:207-229`).
-   Propagation's forward rule is just as structural (`propagateStaleStatus.ts:157-161`);
-   the fix gives both one relevance predicate. **Seen live**: in the 2026-09-29
-   sandbox run the cascade demoted parked MANUAL nodes below the plan and the
-   scheduler ran into them.
-4. `DO_NOT_NOTIFY` is checked as "every key": one excluded key cancels the whole
-   cascade — `aiImprove` and `startReview` change content without demoting
-   anything downstream.
-5. Word, char and byte counts are computed in `create` only, from raw content, and
-   go stale on every later write; the graph shows them.
-6. When the scheduler's safety counter runs out it breaks the loop and reports
-   success (`regenerateTreeNodesContents.ts:350-355`).
-7. An aborted node usually ends as ERROR rather than OUTDATED
-   (`plan-node-service.ts:534-537`).
-8. Regenerating a single node bypasses `onNodeStart`: no counters, and its own
-   failure never sets `firstError` (`regenerateTreeNodesContents.ts:260-277`).
-9. "Stack item mismatch" is thrown from `finally` and hides the error in flight.
-10. `RegenerateStatusEvent` references the live stack array, so a queued event can
-    serialise a later state.
-11. `currentIndex` outlives a shortened list: `inputs[currentIndex]` is undefined
-    (`for-each-processor.ts:113`).
-12. The editor's "Update" button stores `startForNode`'s void result as the node
-    value (`PlanNodeEditor.tsx:147-149`, since `fd8c4f4`) — found statically, to
-    be reproduced first.
-13. `batchPatch` fires its patches without awaiting them (`router.ts:112-118`): the
-    mutation resolves before the writes land and a failure is an unhandled
-    rejection. Its only caller sends layout keys, which never cascade.
-14. **A change from outside a loop reaches the mounted iteration only.** The
-    cascade (`plan-node-service.ts:201-232`) and a prompt edit (`:416-418`) demote
-    the mounted row; only template updates mirror into snapshots. Each
-    fiction-arc template has 25 edges entering a loop — edit Style or World, and
-    the other characters keep their old profiles. Fix: mirror into every snapshot
-    when the change comes from outside the loop or from the definition, writing
-    snapshots through the repository — `patch` marks the container GENERATED
-    (`for-each-processor.ts:193`).
-15. fix-problems labels its fix stream with the next attempt's index: `iteration++`
-    (`fix-problems-processor.ts:90`) runs before the fix callback reads it (`:106`).
-16. A result lands on a row that changed while it was computed: `regenerate`
-    writes without looking (`plan-node-service.ts:467-533`), so a prompt edit
-    during generation is lost; `aiImprove` writes MANUAL over whatever the row
-    holds by then (`:662-681`). Fix on `master`: land the result only if the row
-    is still GENERATING; phase 1 turns this into a row version.
-17. An older build opens a newer database silently: the migration loop skips
-    `fromVersion > CURRENT_VERSION` (`migrations.ts:152`). The guard must ship in a
-    release **before** 033 — the build users roll back to is the one that refuses.
-18. A notification with no content change resets every iteration of a loop: the
-    cascade fires on a status-only patch, and `onInputContentChange` marks every
-    iteration's input OUTDATED whether its element changed or not
-    (`for-each-processor.ts:81-90`); each input then re-runs and cascades through
-    its iteration. The 2026-09-29 log shows the chunk loop rebuilding its
-    snapshots after a status-only demotion of its input.
+| # | bug | outcome |
+|---|---|---|
+| 1 | `shouldRegenerate.GENERATED` followed `regenerateManual` | fixed `df38f40` |
+| 2 | status came from output truthiness: a template ERROR stored as GENERATED, `[]` as output | fixed `55825fe` |
+| 3 | the cascade demoted MANUAL consumers and ones whose prompt ignores the input; the text processor looked for `{{T}}` where templates write `{{[T]}}` | fixed `df8c4ce`: one relevance rule from the Handlebars AST, shared with propagation |
+| 4 | the cascade fired on keys, not changes: `in_review` cancelled it, starting to generate demoted every reader | fixed `df8c4ce` |
+| 5 | counts computed in `create` only, from raw JSON | fixed `c27ffef` |
+| 6 | an exhausted safety counter reported success | fixed `df38f40` |
+| 7 | an aborted node ended ERROR | fixed `55825fe` |
+| 8, 12 | a single node bypassed `onNodeStart`; `startForNode` returned nothing, which the editor stored as the node | fixed `df38f40` |
+| 9, 10 | "Stack item mismatch" hid the real error; status events shared the live stack | fixed `df38f40` |
+| 11 | a shorter or empty list leaves a phantom output | pinned `8741c24` |
+| 13 | `batchPatch` did not await its patches | fixed `43aadc7` |
+| 14 | a change from outside a loop, or a prompt edit, reaches the mounted iteration only | pinned `8741c24`, also on the fiction-arc template |
+| 15 | fix-problems labels its fix stream with the next attempt | dropped: the UI only resets its buffer on a new label, nothing visible |
+| 16 | a result landed over a row changed meanwhile | fixed `55825fe`; the node runs again in the same run, `8741c24` |
+| 17 | an older build opened a newer database silently | fixed `0bbdaf9`, ships before 033 |
+| 18 | an unchanged element is re-run and re-summarized when its list changes | pinned `8741c24` |
+| 19 | *found by a scenario*: with «regenerate manual» on, a typed synopsis counted as stale and dragged everything below it through the model | fixed `8741c24` |
+| 20 | *found by a scenario*: a node whose result was dropped stayed OUTDATED when nothing read it | fixed `8741c24` |
 
-**Fixed by the rework itself**, no separate change: the editor saving the old
-iteration's text after a page switch; single-node actions landing in whichever
-iteration is mounted; review fields surviving a page switch; nested loops sharing
-their inner rows; staleness seen for the mounted page only; the phantom output.
-Dead code and the rest of what goes: [removals.md](removals.md).
+Also pinned in `src/backend/plan/scenario/loops.test.ts`: a review crossing
+iterations, a nested loop showing another part's scenes. The rest of what goes
+with mounting: [removals.md](removals.md).
 
 ## Phase 1 — state model, `for-each` on it, no behaviour change
 
@@ -99,6 +58,12 @@ On branch `iteration-state`. In order:
    buffers.
 5. **Scripts** rewritten or removed.
 
+**The behaviour check is the scenario suite** in `src/backend/plan/scenario`:
+it passes unchanged except for its driver — `stateAt` and `show` in
+`plan-scenario.ts` are the only code that knows how iterations are stored — and
+every `it.fails` there becomes `it`. Plus: the sandbox story re-runs to the same
+plan structure.
+
 **Tests that encode mounting** and are rewritten, keeping their intent:
 `plan-node-repository.test.ts` (all), `plan-node-service.test.ts:232-269`,
 `for-each-index-processor.test.ts`, `template-update.test.ts:182-258`, the
@@ -111,14 +76,8 @@ moves out of node data). Tests that seed or read state through
 returns definitions, so its rewrite must be shown to fail first. `027.test.ts` and
 `028.test.ts` read `plan_nodes.status` after running the whole chain. The fake
 contexts in the scheduler and fix-problems tests change; their assertions stay.
-
-**Tests that must pass unchanged** — the behaviour check: the other
-template-update tests, template titles and coordinates, apply-project-template,
-the behavioural assertions of the fiction-arc diagnostic,
-computeLevelDependencies, the format processor, generate-summary, telemetry, lore,
-backup, migrations 029/031/032, the root-only propagation cases, the other
-frontend tests, and the characterization suite ([testing.md](testing.md)). Plus:
-the sandbox story re-runs to the same plan structure.
+The rest — template, migration, lore, telemetry and frontend tests — passes
+unchanged.
 
 **Review gates:** implementation review of the backend before the UI lands; UI
 review on the running app — switching iterations during a run, editing a child in
@@ -149,4 +108,4 @@ functions, the scheduler, propagation, template apply/update, seven scripts
 editors, the progress panel and 15 test files. The scheduler is where the
 forward-EMPTY invalidation bug lived; the cascade's scope is where correctness now
 lives — mis-scoped between concurrent branches it livelocks, and the safety
-counter today reports that as success (phase 0, item 6).
+counter now fails such a run instead of reporting success.

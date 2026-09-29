@@ -24,10 +24,9 @@ From `(X, P)`: consumers in X's scope at `P`; consumers inside a loop fed from
 outside at every row at or below `P`; if X's parent is a container,
 `onChildStateChanged` — the output child cascades from the container at
 `parentPath(P)`, and a sequential loop demotes prev-outputs at later iterations.
-It never crosses into a sibling iteration. It fires only when a value consumers
-read — content or summary — actually changed, and demotes only consumers that use
-the input (phase 0 #3), instead of today's "any key outside `DO_NOT_NOTIFY`",
-under which a status-only demotion re-expands a whole loop (phase 0 #18).
+It never crosses into a sibling iteration. As on `master` since phase 0 (#3, #4),
+it fires only when content, summary or parent actually changed, and demotes only
+consumers whose prompts use the input.
 
 ## Staleness propagation
 

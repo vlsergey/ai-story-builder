@@ -68,7 +68,8 @@ full state to paint one badge.
   event invalidates every node query and rebuilds the whole graph.
 - Stream events gain `path`: `[nodeId, path, contentPath, event]`. `contentPath`
   stays — it is a position inside the content and carries fix-problems' own
-  attempt index (off by one for the fix stream today, phase 0 #15). Buffers in
+  attempt index (off by one for the fix stream; harmless while nothing maps the
+  label to an attempt, phase 0 #15). Buffers in
   `ResponseStreamWatcher`, `TextNodeEditor` and `AiThinkingPanel` are keyed by
   `(nodeId, path)`; today two iterations of one node would be glued into one
   buffer.

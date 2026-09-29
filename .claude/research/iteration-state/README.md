@@ -1,8 +1,9 @@
 # Iteration state — rework proposal
 
 *2026-09-29. Status: **proposal for architecture review**, branch `iteration-state`,
-revised after an independent fact-check and design critique. Nothing is
-implemented. Re-verify pointers before relying on them.*
+revised after an independent fact-check and design critique. Phase 0 is done on
+`master` ([plan.md](plan.md)); the rework itself is not started. Re-verify
+pointers before relying on them.*
 
 ## In short
 
@@ -34,7 +35,7 @@ makes loops sequential by construction and breeds the hacks listed in
 | [ui.md](ui.md) | view state vs processing state, fetching, events, editors, progress |
 | [migration.md](migration.md) | migration 033, backups, downgrade guard, templates and scripts |
 | [testing.md](testing.md) | test infrastructure and layers, in order of value |
-| [plan.md](plan.md) | 18 phase 0 bugs, phases 1–3, review gates, size and risk |
+| [plan.md](plan.md) | phase 0 results, phases 1–3, review gates, size and risk |
 
 ## Decisions already taken
 
@@ -52,6 +53,8 @@ By the project owner, 2026-09-29:
 8. A parallel container allows fewer child types than `for-each`
    (no `for-each-prev-outputs`, no `for-each-index`).
 9. The rework gets a mandatory post-review of architecture, implementation and UI.
+10. Tests are scenarios, not internals. A bug that only the new storage fixes is
+    not fixed on `master`: a scenario pins it with `it.fails`.
 
 ## Proposed here, open to review
 
@@ -68,7 +71,8 @@ By the project owner, 2026-09-29:
 - A prompt edit leaves MANUAL rows alone.
 - Generation functions take resolved inputs; edges from inside a loop to outside
   it, or across sibling loops, are rejected, reparenting included.
-- Phase 0 fixes 18 pre-existing bugs on `master` before any storage change.
+- Phase 0 — done: 16 pre-existing bugs fixed on `master`, the storage-bound ones
+  pinned by scenarios, one dropped as invisible.
 
 ## Open questions
 
@@ -81,12 +85,11 @@ By the project owner, 2026-09-29:
 4. Add `fast-check` as a dev dependency for property tests?
 5. Concurrency defaults: 4 per parallel container, a run-wide cap per engine,
    1 for Ollama. Enough, too many?
-6. Fix the phase 0 bugs first, each test-first, before the rework starts?
-7. A prompt edit on a MANUAL node: keep it MANUAL (proposed), or demote it as the
+6. A prompt edit on a MANUAL node: keep it MANUAL (proposed), or demote it as the
    mounted row is demoted today?
-8. Text typed into a prompt-less node inside a loop exists at one path. Offer
+7. Text typed into a prompt-less node inside a loop exists at one path. Offer
    "apply to every iteration", or treat such text as part of the definition?
-9. The migration clears review state on loop children, since it may belong to
+8. The migration clears review state on loop children, since it may belong to
    another iteration. Acceptable, or keep it at the mounted page with a warning?
 
 ## Review log
@@ -98,3 +101,6 @@ By the project owner, 2026-09-29:
   → row versions), four major (over-demotion through the top-down rule, pending
   rows with no producer, inner loops never re-expanded, migration gaps), four
   minor. All folded in.
+- **2026-09-29, phase 0** on `master`, `df38f40`…`0bbdaf9`. The owner set the
+  rule: scenario tests only, and storage-bound bugs pinned with `it.fails`
+  rather than fixed. The scenario harness found two more bugs, both fixed.

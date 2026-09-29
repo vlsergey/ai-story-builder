@@ -142,6 +142,6 @@ overrides, `currentIndex` and `NodeUpdateEvent`; update them when phase 1 lands.
 The editor saving the previous iteration's text after a page switch;
 single-node actions landing in whichever iteration is mounted; review fields
 surviving a page switch; nested loops sharing their inner rows; staleness seen
-for one iteration; the phantom 25th output. Changes from outside a loop reaching
-only the mounted iteration are fixed on `master` first (phase 0 #14), with the
-other pre-existing bugs in [plan.md](plan.md).
+for one iteration; the phantom 25th output; changes from outside a loop reaching
+only the mounted iteration. Scenario tests pin each of them on `master` with
+`it.fails` — phase 0 in [plan.md](plan.md).
