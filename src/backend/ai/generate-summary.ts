@@ -3,6 +3,7 @@ import { makeErrorWithStatus } from "../lib/make-errors.js"
 import {
   getCurrentEngineDefaultAiGenerationSettings,
   getCurrentEngineGenerateSummaryInstructions,
+  getCurrentEngineSummaryAiGenerationSettings,
 } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import type { JsonSchemaSpec } from "./ai-engine-adapter.js"
@@ -70,10 +71,15 @@ export async function generateSummary(
       promptCacheKeys: ["generate-summary", ...promptCacheKeys],
       includeExistingLore,
       engineFileIds,
-      // Pass engine defaults explicitly so telemetry can record the model.
-      // The adapter would fall back to the same defaults internally, but the
-      // wrapper only sees what's in the request.
-      aiGenerationSettings: getCurrentEngineDefaultAiGenerationSettings(),
+      // The summary settings the engine editor offers, on top of the defaults.
+      // They used to be ignored: summaries ran on the full default settings —
+      // web search and reasoning included — while every real project had
+      // configured them to be cheap. Passed explicitly so telemetry records the
+      // model actually used.
+      aiGenerationSettings: {
+        ...getCurrentEngineDefaultAiGenerationSettings(),
+        ...getCurrentEngineSummaryAiGenerationSettings(),
+      },
     },
     // The static part of the summary call is just the instructions; the rest
     // (the content being summarised) is dynamic input.

@@ -23,7 +23,3 @@ export function getCurrentEngineSummaryAiGenerationSettings(): AiGenerationSetti
 export function getCurrentEngineGenerateSummaryInstructions(): string | undefined {
   return getCurrentEngineConfig().generateSummaryInstructions
 }
-
-export function getDefaultAiSettings(): AiGenerationSettings {
-  return getCurrentEngineConfig()?.defaultAiSettings ?? {}
-}

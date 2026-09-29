@@ -20,10 +20,15 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
     const folderId = engineConfig?.folder_id?.trim()
     if (!apiKey || !folderId) throw new Error("Yandex api_key and folder_id are required")
 
-    const actualAiSettings = {
-      ...engineConfig.defaultAiSettings,
+    // Engine defaults live in `defaultAiGenerationSettings` — that is what the
+    // engine editor writes and what the other adapters read. This used to read
+    // `defaultAiSettings`, a key nothing writes; it went unnoticed only because
+    // every caller also merges the defaults into the request itself.
+    const actualAiSettings: YandexAiGenerationSettings = {
+      ...engineConfig.defaultAiGenerationSettings,
       ...req.aiGenerationSettings,
     }
+    const maxOutputTokens = actualAiSettings.max_completion_tokens
 
     const model = actualAiSettings.model || `gpt://${folderId}/yandexgpt/latest`
     const client = createYandexClient(apiKey, folderId)
@@ -37,8 +42,12 @@ export class YandexAdapter implements AiEngineAdapter<YandexAiGenerationSettings
       model,
       instructions: req.systemPrompt ?? "",
       input: req.userPrompt || "",
-      ...(actualAiSettings.maxCompletionTokens != null
-        ? { max_output_tokens: actualAiSettings.maxCompletionTokens }
+      // `max_completion_tokens` is the key the settings form stores. The
+      // adapter read `maxCompletionTokens`, which nothing writes, so the
+      // limit set in the UI never reached Yandex. A number is sent as-is;
+      // only an absent setting is left to the provider.
+      ...(typeof maxOutputTokens === "number" && Number.isFinite(maxOutputTokens)
+        ? { max_output_tokens: maxOutputTokens }
         : {}),
     }
 
