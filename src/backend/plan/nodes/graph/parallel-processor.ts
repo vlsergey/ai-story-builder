@@ -4,7 +4,6 @@ import { expandParallel, parseParallelContent } from "../../../../shared/paralle
 import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import { childPath } from "../../../../shared/plan-node-path.js"
 import { maxConcurrentCalls } from "../../../ai/engine-slots.js"
-import { withDbTransaction } from "../../../db/connection.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import { regenerateSubtreeNodesContents } from "../generate/regenerateTreeNodesContents.js"
@@ -43,15 +42,17 @@ export class ParallelProcessor implements NodeProcessor<ParallelSettings> {
     const input = loopChild(service, row.id, "for-each-input")
     const expansion = expandParallel(parseParallelContent(row.content), elements, elementHash)
 
-    // The iterations are recorded before they run, as a for-each does.
+    // The iterations are recorded before they run, as a for-each does. Keys
+    // that grew carry their iterations' rows along, and iterations whose
+    // element is gone go, with everything nested in them — in the same
+    // transaction: a run dying half-way cannot leave the record ahead of the
+    // rows, or the next run would take grown keys for new ones.
     const content = JSON.stringify(expansion.content)
-    if (!(await service.writeWhileRunning(row, { content }))) return null
-    // Keys that grew carry their iterations' rows along; iterations whose
-    // element is gone go, with everything nested in them.
-    withDbTransaction(() => {
+    const moved = await service.writeWhileRunning(row, { content }, () => {
       for (const { from, to } of expansion.renamed) service.states.renameIteration(row.id, row.path, from, to)
       service.states.deleteIterationsWhere(row.id, row.path, (key) => !expansion.elements.has(key))
     })
+    if (!moved) return null
 
     // A key names its element for good: only a new iteration gets its input.
     for (const [key, element] of expansion.elements) {
@@ -63,7 +64,8 @@ export class ParallelProcessor implements NodeProcessor<ParallelSettings> {
 
     const keys = [...expansion.elements.keys()]
     const engine = SettingsRepository.getCurrentBackend()
-    const concurrency = settings.concurrency ?? (engine ? maxConcurrentCalls(engine) : 1)
+    const own = Number(settings.concurrency)
+    const concurrency = Number.isInteger(own) && own >= 1 ? own : engine ? maxConcurrentCalls(engine) : 1
     console.log(
       `[ParallelProcessor] node ${row.id} at "${row.path}": ${keys.length} iteration(s), ${concurrency} at once`,
     )

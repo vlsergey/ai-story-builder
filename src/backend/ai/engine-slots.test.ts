@@ -40,6 +40,28 @@ describe("engine slots", () => {
     expect(await peakConcurrency("ollama", 8)).toBe(2)
   })
 
+  it("starts the calls already waiting when the limit is raised", async () => {
+    SettingsRepository.setAllAiEnginesConfig({ grok: { max_concurrent_calls: 1 } })
+    let release: () => void = () => {}
+    let running = 0
+    let peak = 0
+    const call = () =>
+      withEngineSlot("grok", undefined, async () => {
+        running++
+        peak = Math.max(peak, running)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        running--
+      })
+    const busy = withEngineSlot("grok", undefined, () => new Promise<void>((resolve) => (release = resolve)))
+    const waiting = [call(), call(), call()]
+
+    SettingsRepository.setAllAiEnginesConfig({ grok: { max_concurrent_calls: 5 } })
+    release()
+    await Promise.all([busy, ...waiting])
+
+    expect(peak).toBe(3)
+  })
+
   it("gives up waiting for a slot when the call is aborted", async () => {
     SettingsRepository.setAllAiEnginesConfig({ grok: { max_concurrent_calls: 1 } })
     let release: () => void = () => {}

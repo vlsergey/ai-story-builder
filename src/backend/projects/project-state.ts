@@ -45,6 +45,10 @@ export function openProject(dbPath: string): { path: string; layout: unknown; pr
 
     // Auto-create root plan node if none exist
     const planService = new PlanNodeService()
+    // No run is going on while a project opens: what says it is was cut off.
+    const interrupted = planService.states.resetInterrupted()
+    if (interrupted > 0)
+      console.info(`[project] ${interrupted} node(s) left GENERATING by an unfinished run are pending`)
     if (planService.count() === 0) {
       const rootTitle = SettingsRepository.getProjectTitle() ?? "Plan"
       planService.create({ title: rootTitle, parent_id: null, position: 0 })

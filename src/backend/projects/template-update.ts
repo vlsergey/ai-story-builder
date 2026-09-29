@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import type { PlanNodeType } from "../../shared/plan-node-types.js"
 import type {
   ProjectTemplate,
   TemplateProjectPlanNode,
@@ -433,6 +434,7 @@ export async function applyTemplateUpdate(
     const parentId = parentTitle ? (projectMap.get(parentTitle)?.id ?? null) : null
 
     const initial = buildTemplateInstructionSettings(tNode, wizardData)
+    nodeService.checkContainer(tNode.type as PlanNodeType, parentId)
     const id = nodeRepo.insert({
       title: tNode.title,
       type: tNode.type as any,

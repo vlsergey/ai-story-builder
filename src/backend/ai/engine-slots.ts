@@ -27,11 +27,20 @@ function queueOf(engineId: AiEngineKey): EngineQueue {
   return queue
 }
 
+/** Starts waiting calls while the engine has room: the limit may have been raised meanwhile. */
+function wakeWaiting(engineId: AiEngineKey, queue: EngineQueue): void {
+  while (queue.waiting.length > 0 && queue.running < maxConcurrentCalls(engineId)) {
+    queue.running++
+    queue.waiting.shift()?.()
+  }
+}
+
 /**
  * Runs `call` once the engine has a free slot. Every model call goes through
  * here, so however many branches of a parallel loop are ready, the engine
- * never gets more requests at once than it takes. An aborted signal gives up
- * the wait.
+ * never gets more requests at once than it takes. Calls start in the order
+ * they came; a freed slot goes straight to the next one waiting. An aborted
+ * signal gives up the wait.
  */
 export async function withEngineSlot<T>(
   engineId: AiEngineKey,
@@ -39,29 +48,37 @@ export async function withEngineSlot<T>(
   call: () => Promise<T>,
 ): Promise<T> {
   const queue = queueOf(engineId)
-  while (queue.running >= maxConcurrentCalls(engineId)) {
-    await new Promise<void>((resolve, reject) => {
-      if (signal?.aborted) {
-        reject(new Error("This operation was aborted"))
-        return
-      }
-      const wake = () => {
-        signal?.removeEventListener("abort", onAbort)
-        resolve()
-      }
-      const onAbort = () => {
-        queue.waiting.splice(queue.waiting.indexOf(wake), 1)
-        reject(new Error("This operation was aborted"))
-      }
-      signal?.addEventListener("abort", onAbort, { once: true })
-      queue.waiting.push(wake)
-    })
+  if (signal?.aborted) throw new Error("This operation was aborted")
+  if (queue.waiting.length === 0 && queue.running < maxConcurrentCalls(engineId)) {
+    // A free slot and nobody before this call: it starts right away.
+    queue.running++
+  } else {
+    await waitForSlot(engineId, queue, signal)
   }
-  queue.running++
   try {
     return await call()
   } finally {
     queue.running--
-    queue.waiting.shift()?.()
+    wakeWaiting(engineId, queue)
   }
+}
+
+/** Queues the call until `wakeWaiting` gives it a slot, or the signal aborts it. */
+function waitForSlot(engineId: AiEngineKey, queue: EngineQueue, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const start = () => {
+      signal?.removeEventListener("abort", onAbort)
+      resolve()
+    }
+    const onAbort = () => {
+      const at = queue.waiting.indexOf(start)
+      if (at < 0) return // it already has its slot
+      queue.waiting.splice(at, 1)
+      reject(new Error("This operation was aborted"))
+    }
+    signal?.addEventListener("abort", onAbort, { once: true })
+    queue.waiting.push(start)
+    // The limit may have been raised since the calls before this one queued.
+    wakeWaiting(engineId, queue)
+  })
 }

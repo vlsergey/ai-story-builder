@@ -100,6 +100,18 @@ describe("PlanNodeStateRepository", () => {
     expect(states.find(id, "5:1")?.status).toBe("MANUAL")
   })
 
+  it("turns what a run left GENERATING into pending, and only that", () => {
+    const states = new PlanNodeStateRepository()
+    const id = node("A")
+    states.upsert(id, "", { status: "GENERATING", content: "half" })
+    states.upsert(id, "5:0", { status: "GENERATED", content: "done" })
+
+    expect(states.resetInterrupted()).toBe(1)
+
+    expect(states.find(id, "")).toMatchObject({ status: "OUTDATED", content: "half" })
+    expect(states.find(id, "5:0")?.status).toBe("GENERATED")
+  })
+
   it("goes with its node", () => {
     const states = new PlanNodeStateRepository()
     const id = node("A")

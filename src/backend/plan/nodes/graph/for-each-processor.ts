@@ -41,11 +41,14 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
 
     // The iterations are recorded before they run, so that an editor, the
     // graph and a run stopped half-way all see the list the loop works on.
+    // Iterations whose element vanished go with the same write, with
+    // everything nested in them.
     const content = JSON.stringify({ length: elements.length } satisfies ForEachNodeContent)
-    if (!(await service.writeWhileRunning(row, { content }))) return null
-    // Iterations whose element vanished go, with everything nested in them.
     const current = new Set(elements.map((_, index) => String(index)))
-    service.states.deleteIterationsWhere(row.id, row.path, (key) => !current.has(key))
+    const recorded = await service.writeWhileRunning(row, { content }, () => {
+      service.states.deleteIterationsWhere(row.id, row.path, (key) => !current.has(key))
+    })
+    if (!recorded) return null
 
     // An element that is new or changed gets its iteration's input written;
     // the cascade demotes what reads it in that iteration and nowhere else.

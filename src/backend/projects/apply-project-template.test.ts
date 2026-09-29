@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest"
-import { normalizeAndReplaceContent } from "./apply-project-template.js"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import type { ProjectTemplate } from "../../shared/project-template.js"
+import { setUpTestDb, tearDownTestDb } from "../db/test-db-utils.js"
+import { applyProjectTemplate, normalizeAndReplaceContent } from "./apply-project-template.js"
 
 describe("normalizeAndReplaceContent — wizard variable substitution", () => {
   it("joins lines with \\n", () => {
@@ -26,5 +28,35 @@ describe("normalizeAndReplaceContent — wizard variable substitution", () => {
     expect(normalizeAndReplaceContent(["${round(1400/n)}"], { n: 3 })).toBe("")
     expect(normalizeAndReplaceContent(["${nonsense(@@}"], {})).toBe("")
     expect(normalizeAndReplaceContent(["${missing+1}"], {})).toBe("")
+  })
+})
+
+describe("applyProjectTemplate — where nodes may go", () => {
+  beforeEach(() => setUpTestDb())
+  afterEach(() => tearDownTestDb())
+
+  it("refuses the memory of earlier iterations inside a parallel loop", () => {
+    const template = {
+      label: "t",
+      description: "t",
+      wizardPages: [],
+      plan: {
+        nodes: [
+          { title: "List", type: "split", aiUserInstructions: ["List."], inputs: [] },
+          {
+            title: "Loop",
+            type: "parallel",
+            inputs: [{ sourceNodeTitle: "List", type: "textArray" }],
+            children: [
+              { title: "Element", type: "for-each-input" },
+              { title: "Earlier", type: "for-each-prev-outputs" },
+              { title: "Result", type: "for-each-output" },
+            ],
+          },
+        ],
+      },
+    } as unknown as ProjectTemplate
+
+    expect(() => applyProjectTemplate(template, {})).toThrow(/for-each-prev-outputs/)
   })
 })

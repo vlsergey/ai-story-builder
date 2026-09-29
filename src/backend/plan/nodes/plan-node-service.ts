@@ -241,6 +241,36 @@ export class PlanNodeService {
     }
   }
 
+  /**
+   * The current path of an iteration an editor holds under an older name: a
+   * parallel loop's key that grew is a prefix of the key it grew into. Null
+   * when no iteration — or more than one — answers to it.
+   */
+  currentPathFor(nodeId: number, path: NodePath): NodePath | null {
+    const loops = this.loopsAround(nodeId)
+    let segments: ReturnType<typeof parsePath>
+    try {
+      segments = parsePath(path)
+    } catch {
+      return null
+    }
+    if (segments.length !== loops.length) return null
+    let current = ROOT_PATH
+    for (const [depth, segment] of segments.entries()) {
+      const loop = this.repo.findById(loops[depth])
+      if (!loop || segment.containerId !== loop.id) return null
+      const keys = iterationKeys(loop.type, this.states.find(loop.id, current)?.content)
+      const matches = keys.includes(segment.key)
+        ? [segment.key]
+        : loop.type === "parallel"
+          ? keys.filter((key) => key.startsWith(segment.key))
+          : []
+      if (matches.length !== 1) return null
+      current = childPath(current, loop.id, matches[0])
+    }
+    return current
+  }
+
   /** Whether `path` names an iteration the node's loops have now, in the form they name it. */
   isCurrentPath(nodeId: number, path: NodePath): boolean {
     const loops = this.loopsAround(nodeId)
@@ -449,7 +479,7 @@ export class PlanNodeService {
   }
 
   /** Refuses a node type in a container its definition does not allow it in. */
-  private checkContainer(type: PlanNodeType, parentId: number | null): void {
+  checkContainer(type: PlanNodeType, parentId: number | null): void {
     const allowed = getNodeTypeDefinition(type)?.allowedContainers
     if (!allowed) return
     const container = parentId === null ? "root" : this.repo.findById(parentId)?.type
@@ -829,21 +859,49 @@ export class PlanNodeService {
 
   /**
    * A running node writes its own row before its run ends — a loop recording
-   * the iterations it is about to run. The write lands only if nothing else
-   * wrote the row since the run started, and the run's own result will then
-   * land over it. Returns false when the row changed: the run is moot.
+   * the iterations it is about to run. `alongside` makes the matching changes
+   * to other rows (a loop moving or deleting its iterations) in the same
+   * transaction: the record and the rows never disagree, whatever happens
+   * next. The write lands over writes that left the row GENERATING, and the
+   * run's own result then lands over it. Returns false when the row changed
+   * in a way that makes the run moot.
    */
-  async writeWhileRunning(running: PlanNodeRow, update: PlanNodeStateUpdate): Promise<boolean> {
-    const landed = await this.patchState(
-      running.id,
-      running.path,
-      false,
-      { ...update, status: "GENERATING" },
-      running.rev,
-    )
-    if (!landed) return false
-    Object.assign(running, landed)
-    return true
+  async writeWhileRunning(
+    running: PlanNodeRow,
+    update: PlanNodeStateUpdate,
+    alongside: () => void = () => {},
+  ): Promise<boolean> {
+    const lost = Symbol("the row changed")
+    let rev = running.rev
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const before = this.getRow(running.id, running.path)
+      let record: PlanNodeStateRecord
+      try {
+        record = withDbTransaction(() => {
+          alongside()
+          const written = this.states.updateIfUnchanged(
+            running.id,
+            running.path,
+            { ...update, status: "GENERATING" },
+            rev,
+          )
+          if (!written) throw lost
+          return written
+        })
+      } catch (e) {
+        if (e !== lost) throw e
+        const current = this.repo.findById(running.id) ? this.getRow(running.id, running.path) : undefined
+        if (!current || !hasState(current) || current.status !== "GENERATING") return false
+        rev = current.rev
+        continue
+      }
+      const after = compose(before, running.path, record)
+      Object.assign(running, after)
+      planNodeEventManager.emitUpdate(running.id, `state at "${running.path}" while running`)
+      if (after.content !== before.content) await this.markAsOutdatedAndNotifyDownstreamNodes(running.id, running.path)
+      return true
+    }
+    return false
   }
 
   // ─── Editor actions ──────────────────────────────────────────────────────────

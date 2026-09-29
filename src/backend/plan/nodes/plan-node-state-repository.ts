@@ -132,6 +132,19 @@ export class PlanNodeStateRepository {
     })
   }
 
+  /**
+   * A row still GENERATING when a project opens belongs to a run that never
+   * ended — the app was closed or crashed. It is pending work, not work in
+   * progress. Returns how many rows it found.
+   */
+  resetInterrupted(): number {
+    return withDbWrite(
+      (db) =>
+        db.prepare("UPDATE plan_node_states SET status = 'OUTDATED', rev = ? WHERE status = 'GENERATING'").run(newRev())
+          .changes,
+    )
+  }
+
   /** Deletes rows at `ancestor` or below it, optionally of some nodes only. */
   deleteAtOrBelow(ancestor: NodePath, nodeIds?: number[]): number {
     return withDbWrite((db) => {

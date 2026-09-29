@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { tearDownTestDb } from "../../db/test-db-utils.js"
+import { PlanNodeStateRepository } from "../nodes/plan-node-state-repository.js"
 import type { FakeCall } from "./fake-engine.js"
 import { PlanScenario } from "./plan-scenario.js"
 
@@ -192,6 +193,83 @@ describe("a parallel loop", () => {
 
     expect(s.failure()?.node).toBe("Профиль")
     expect(profileCalls(s).filter((c) => c.response !== undefined)).toHaveLength(2)
+  })
+
+  it("that fails starts nothing new anywhere, however deep, once the failure is known", async () => {
+    // Two chapters side by side, each writing six scenes one after another.
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "История.")
+      g.split("Главы", { prompt: "Главы:\n{{[Синопсис]}}" })
+      g.parallel("Главы параллельно", { over: "Главы", element: "Глава", result: "Выход главы" }, (b) => {
+        b.split("Сцены", { prompt: "Сцены главы:\n{{[Глава]}}" })
+        b.parallel("Сцены главы", { over: "Сцены", element: "Сцена", result: "Выход сцены", concurrency: 1 }, (c) => {
+          c.text("Текст сцены", { prompt: "Напиши сцену:\n{{[Сцена]}}" })
+          c.result("Текст сцены")
+        })
+        b.merge("Глава целиком", ["Сцены главы"])
+        b.result("Глава целиком")
+      })
+    })
+    s.engine.on((call) => {
+      if (call.node === "Главы") return JSON.stringify({ parts: ["Глава A", "Глава B"] })
+      if (call.node !== "Сцены") return undefined
+      const chapter = call.userPrompt.includes("Глава A") ? "A" : "B"
+      return JSON.stringify({ parts: Array.from({ length: 6 }, (_, i) => `${chapter} сцена ${i}`) })
+    })
+    let failedAt = Number.POSITIVE_INFINITY
+    s.engine.on(async (call) => {
+      if (call.node !== "Текст сцены") return undefined
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      if (call.userPrompt.includes("A сцена 0")) {
+        failedAt = s.engine.calls.length
+        throw new Error("model is down")
+      }
+      return undefined
+    })
+
+    await expect(s.run()).rejects.toThrow("model is down")
+
+    const startedAfter = s.engine.calls.slice(failedAt).filter((c) => c.node === "Текст сцены")
+    expect(startedAfter).toEqual([])
+  })
+
+  it("with an unreadable limit of its own, runs at the engine's", async () => {
+    const s = characters(["Аня", "Боря", "Вера"], { concurrency: "all" as unknown as number })
+
+    await s.run()
+
+    expect(profileCalls(s)).toHaveLength(3)
+  })
+
+  it("keeps its results when a run dies while its keys grow", async () => {
+    const [first, second] = namesSharingAKey()
+    const s = characters([first])
+    await s.run()
+    const [kept] = s.loopResults("Персонажи параллельно")
+    const rename = vi.spyOn(PlanNodeStateRepository.prototype, "renameIteration").mockImplementationOnce(() => {
+      throw new Error("the disk is gone")
+    })
+
+    await recast(s, [first, second])
+    await s.run().catch(() => {})
+    rename.mockRestore()
+    await s.run()
+
+    expect(profileCalls(s).map((c) => c.userPrompt.includes(second))).toEqual([true])
+    expect(s.loopResults("Персонажи параллельно")[0]).toBe(kept)
+  })
+
+  it("tells the progress panel what runs, not what it wrote", async () => {
+    const s = characters(["Аня", "Боря"])
+    await s.run()
+    const texts = profileCalls(s).map((c) => c.response ?? "")
+
+    await s.setPrompt("Профиль", "Короткий профиль:\n{{[Персонаж]}}")
+    await s.run()
+
+    const events = JSON.stringify(s.statusEvents)
+    for (const text of texts) expect(events).not.toContain(text)
+    expect(s.shownInProgress()).toContain("Профиль")
   })
 
   it("has no memory of earlier iterations: there are none", () => {

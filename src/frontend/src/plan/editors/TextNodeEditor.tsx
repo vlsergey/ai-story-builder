@@ -57,6 +57,7 @@ function writePrompts(
 
 export default function TextNodeEditor({
   disabled,
+  iterationMissing,
   initialValue,
   value,
   onSave: save,
@@ -206,7 +207,7 @@ export default function TextNodeEditor({
       onImprove={handleImprove}
       onAcceptChanges={handleAcceptChanges}
       onChange={handleEditorChange}
-      readOnly={disabled || tempContent !== null}
+      readOnly={disabled || iterationMissing || tempContent !== null}
       status={statusOverride || status}
       value={editorValue}
     />

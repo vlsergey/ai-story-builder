@@ -1,9 +1,12 @@
 import type { PlanNodeRow } from "./plan-graph.js"
 import type { NodePath } from "./plan-node-path.js"
 
+/** A node as the progress panel names it: which node, and where it runs. Never its texts. */
+export type RegenerationNodeRef = Pick<PlanNodeRow, "id" | "title" | "type" | "path">
+
 export interface RegenerationStackItemIteration {
   type: "iteration"
-  container: PlanNodeRow
+  container: RegenerationNodeRef
   zeroBasedIterationIndex: number
   totalIterations?: number
   /** The iteration's key in its children's paths, when it is not the index — a parallel loop's hash. */
@@ -12,7 +15,7 @@ export interface RegenerationStackItemIteration {
 
 export interface RegenerationStackItemNode {
   type: "node"
-  node: PlanNodeRow
+  node: RegenerationNodeRef
 }
 
 export type RegenerationStackItem = RegenerationStackItemIteration | RegenerationStackItemNode

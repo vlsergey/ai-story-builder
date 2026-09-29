@@ -133,7 +133,9 @@ export const appRouter = t.router({
         .query(({ input }) => new PlanNodeService().findStatesAtPath(input)),
       getById: t.procedure.input(nodeAtPath).query(({ input }): PlanNodeInIteration => {
         const service = new PlanNodeService()
-        return { ...service.getRow(input.id, input.path), current: service.isCurrentPath(input.id, input.path) }
+        const current = service.isCurrentPath(input.id, input.path)
+        const movedTo = current ? null : service.currentPathFor(input.id, input.path)
+        return { ...service.getRow(input.id, input.path), current, movedTo }
       }),
       patch: t.procedure
         .input(

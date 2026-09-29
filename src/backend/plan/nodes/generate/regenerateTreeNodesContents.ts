@@ -109,6 +109,8 @@ async function withStackItem<T>(item: RegenerationStackItem, emit: boolean, bloc
   }
 }
 
+const refOf = (row: PlanNodeRow) => ({ id: row.id, title: row.title, type: row.type, path: row.path })
+
 /** How a finished regeneration is counted in the run's totals. */
 function classifyResult(before: PlanNodeRow, after: PlanNodeRow): PlanNodeAiGenerationStatus {
   if ((after.content?.length || 0) === 0) return "EMPTY"
@@ -139,6 +141,9 @@ export async function regenerateTreeNodesContents(target?: {
 
   const myAbortController = new AbortController()
   abortController = myAbortController
+  // Once a node has failed the run is lost: nothing new starts anywhere, in
+  // any branch however deep; what already runs finishes and lands.
+  let failed = false
   emitRegenerateStatusEvent()
 
   const options = {
@@ -176,7 +181,8 @@ export async function regenerateTreeNodesContents(target?: {
           block: (context: RegenerationNodeContext) => Promise<{ result: T; status: PlanNodeAiGenerationStatus }>,
         ) {
           if (myAbortController.signal.aborted) throw Error("Stop was required")
-          return await withStackItem({ type: "node", node }, true, async () => {
+          if (failed) throw Error("The run failed elsewhere")
+          return await withStackItem({ type: "node", node: refOf(node) }, true, async () => {
             try {
               const blockResult = await runForNode({ nodeId: node.id, path: node.path }, () => block(nodeContext(node)))
               switch (blockResult.status) {
@@ -200,6 +206,7 @@ export async function regenerateTreeNodesContents(target?: {
                 firstError = e
                 firstErrorAt = { nodeId: node.id, title: node.title, path: node.path }
               }
+              if (!myAbortController.signal.aborted) failed = true
               throw e
             }
           })
@@ -215,7 +222,7 @@ export async function regenerateTreeNodesContents(target?: {
           if (myAbortController.signal.aborted) throw Error("Stop was required")
           const stackItem: RegenerationStackItemIteration = {
             type: "iteration",
-            container,
+            container: refOf(container),
             totalIterations,
             zeroBasedIterationIndex,
           }
@@ -226,9 +233,10 @@ export async function regenerateTreeNodesContents(target?: {
           block: (context: RegenerationContainerContext) => Promise<T>,
         ) => {
           if (myAbortController.signal.aborted) throw Error("Stop was required")
+          if (failed) throw Error("The run failed elsewhere")
           const stackItem: RegenerationStackItemIteration = {
             type: "iteration",
-            container,
+            container: refOf(container),
             totalIterations,
             zeroBasedIterationIndex,
           }
@@ -249,11 +257,11 @@ export async function regenerateTreeNodesContents(target?: {
           // failure no new iteration starts, but the running ones finish:
           // the run must not end while branches still write.
           const worker = async () => {
-            while (failure === null && next < keys.length && !myAbortController.signal.aborted) {
+            while (failure === null && !failed && next < keys.length && !myAbortController.signal.aborted) {
               const index = next++
               const stackItem: RegenerationStackItemIteration = {
                 type: "iteration",
-                container,
+                container: refOf(container),
                 totalIterations,
                 zeroBasedIterationIndex: index,
                 key: keys[index],
@@ -266,9 +274,11 @@ export async function regenerateTreeNodesContents(target?: {
               }
             }
           }
-          const workers = Math.max(1, Math.min(concurrency, keys.length))
+          const limit = Number.isInteger(concurrency) && concurrency >= 1 ? concurrency : 1
+          const workers = Math.min(limit, keys.length)
           await Promise.all(Array.from({ length: workers }, worker))
           if (failure) throw (failure as { error: unknown }).error
+          if (failed) throw Error("The run failed elsewhere")
           if (myAbortController.signal.aborted) throw Error("Stop was required")
           return results
         },

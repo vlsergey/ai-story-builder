@@ -10,7 +10,7 @@ import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { useTranslation } from "react-i18next"
 import { useDebouncedCallback } from "use-debounce"
 import { trpc } from "../../ipcClient"
-import { iterationLabel, useIterationSelection } from "../iteration-selection"
+import { useIterationSelection } from "../iteration-selection"
 import { NodeTypeEditors } from "./NodeTypeEditors"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 
@@ -25,16 +25,18 @@ export interface PlanNodeEditorProps {
 }
 
 export default function PlanNodeEditor({ nodeId, path: boundPath, panelApi }: PlanNodeEditorProps) {
-  const { ready, displayPath } = useIterationSelection()
+  const { ready, displayPath, labelOf } = useIterationSelection()
   // A tab from a layout saved before editors had a path opens at the
   // iteration on display, and remembers it from then on.
   const [resolvedPath, setResolvedPath] = useState<NodePath | undefined>(boundPath)
   useEffect(() => {
     if (resolvedPath === undefined && ready) setResolvedPath(displayPath(nodeId))
   }, [resolvedPath, ready, displayPath, nodeId])
-  const path = boundPath ?? resolvedPath
+  // A parallel loop's key that grew: the tab follows its iteration to the new key.
+  const [followed, setFollowed] = useState<NodePath | undefined>()
+  const path = followed ?? boundPath ?? resolvedPath
   useEffect(() => {
-    if (boundPath === undefined && path !== undefined) panelApi.updateParameters?.({ nodeId, path })
+    if (path !== undefined && path !== boundPath) panelApi.updateParameters?.({ nodeId, path })
   }, [boundPath, path, nodeId, panelApi])
 
   const planNodeQuery = trpc.plan.nodes.getById.useQuery(
@@ -42,10 +44,13 @@ export default function PlanNodeEditor({ nodeId, path: boundPath, panelApi }: Pl
     { enabled: path !== undefined },
   )
   const node = planNodeQuery.data
+  useEffect(() => {
+    if (node?.movedTo) setFollowed(node.movedTo)
+  }, [node?.movedTo])
 
   useEffect(() => {
-    if (node?.title) panelApi.setTitle(path ? `${node.title} ${iterationLabel(path)}` : node.title)
-  }, [panelApi, node?.title, path])
+    if (node?.title) panelApi.setTitle(path ? `${node.title} ${labelOf(path)}` : node.title)
+  }, [panelApi, node?.title, path, labelOf])
 
   if (path === undefined || planNodeQuery.isLoading) {
     return (
@@ -74,27 +79,32 @@ export default function PlanNodeEditor({ nodeId, path: boundPath, panelApi }: Pl
 
   return (
     <div className="h-full overflow-auto">
-      {!node.current && <IterationGone />}
+      {!node.current && <IterationMissing />}
       <ErrorBoundary FallbackComponent={ErrorFallback}>
         <PlanNodeEditorWrapper
+          // A new iteration is a new row to edit.
+          key={path}
           Editor={NodeTypeEditor}
           initialValue={node}
           serverValue={node}
-          iterationGone={!node.current}
+          iterationMissing={!node.current}
         />
       </ErrorBoundary>
     </div>
   )
 }
 
-/** The loop no longer has the iteration this tab was opened on: nothing here can be saved. */
-function IterationGone() {
+/**
+ * The loop does not have the iteration this tab shows: it has not run yet, or
+ * its element is gone. The node's prompt and settings still save.
+ */
+function IterationMissing() {
   const { t } = useTranslation()
   return (
-    <Alert variant="destructive">
+    <Alert>
       <CircleAlertIcon />
-      <AlertTitle>{t("PlanNodeEditor.iterationGone.title")}</AlertTitle>
-      <AlertDescription>{t("PlanNodeEditor.iterationGone.message")}</AlertDescription>
+      <AlertTitle>{t("PlanNodeEditor.iterationMissing.title")}</AlertTitle>
+      <AlertDescription>{t("PlanNodeEditor.iterationMissing.message")}</AlertDescription>
     </Alert>
   )
 }
@@ -105,7 +115,7 @@ interface PlanNodeEditorWrapperProps {
   initialValue: PlanNodeRow
   /** The row as the server has it now; adopted whenever the editor holds no unsaved edits. */
   serverValue: PlanNodeRow
-  iterationGone: boolean
+  iterationMissing: boolean
   Editor: FC<TypedPlanNodeEditorProps>
 }
 
@@ -119,7 +129,7 @@ const STATE_FIELDS = new Set<string>([
   "ai_improve_instruction",
 ])
 
-const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue, iterationGone }: PlanNodeEditorWrapperProps) => {
+const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue, iterationMissing }: PlanNodeEditorWrapperProps) => {
   const nodeId = initialValue.id
   const path = initialValue.path
   const [firstInitialValue] = useState<PlanNodeRow>(initialValue)
@@ -165,15 +175,13 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue, iterationGon
 
   const saveImpl = useCallback(
     async (manual: boolean, valueToSave: PlanNodeRow) => {
-      if (iterationGone) {
-        setStatus("ERROR")
-        return
-      }
       setStatus("SAVING")
 
       // What the user changed, relative to what the editor last had from the server.
       const diff: Partial<PlanNodeRow> = getDifference(lastSaved, valueToSave)
       delete diff.rev
+      // Without the iteration, only what applies to every iteration saves.
+      if (iterationMissing) for (const key of STATE_FIELDS) delete diff[key as keyof PlanNodeRow]
       if (Object.keys(diff).length === 0) {
         setStatus("SAVED")
         return
@@ -221,7 +229,7 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue, iterationGon
         base = fresh
       }
     },
-    [adopt, alert, confirm, iterationGone, lastSaved, nodeId, path, remember, t, utils],
+    [adopt, alert, confirm, iterationMissing, lastSaved, nodeId, path, remember, t, utils],
   )
 
   const debounceSave = useDebouncedCallback(saveImpl, 1000)
@@ -273,7 +281,8 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue, iterationGon
     <Editor
       dbValue={lastSaved}
       // While the iteration is being written, the text is the model's to write.
-      disabled={iterationGone || regenerateMutation.isPending || lastSaved.status === "GENERATING"}
+      disabled={regenerateMutation.isPending || lastSaved.status === "GENERATING"}
+      iterationMissing={iterationMissing}
       initialValue={firstInitialValue}
       value={value}
       nodeTypeSettings={nodeTypeSettings}

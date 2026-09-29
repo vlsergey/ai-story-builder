@@ -252,6 +252,7 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
       }
 
       const finalContent = content ? normalizeAndReplaceContent(content, templateData) : null
+      nodeService.checkContainer(type, parentNewId)
 
       const insertedId = planRepo.insert({
         title,

@@ -4,46 +4,29 @@ import { Field, FieldContent } from "@/ui-components/field"
 import { Textarea } from "@/ui-components/textarea"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { type FollowedStreams, followStreams, NO_STREAMS, pruneStreams } from "./followed-stream"
 
 interface ResponseStreamWatcherProps {
   className?: string
+  /** The nodes running now, as `runningKeyOf` names them: a stream of any other node has ended. */
+  running?: ReadonlySet<string>
 }
 
-interface LastNodeAndContentPath {
-  nodeId: number
-  /** The iteration the node streams in: two iterations of one node are two streams. */
-  path: string
-  contentPath: (number | string)[]
-  content: string
-}
-
-export default function ResponseStreamWatcher({ className }: ResponseStreamWatcherProps) {
+/** The text the model is writing now: of several streams, the one followed. */
+export default function ResponseStreamWatcher({ className, running }: ResponseStreamWatcherProps) {
   const { t } = useTranslation()
   const ref = useRef<HTMLTextAreaElement>(null)
-  const [state, setState] = useState<LastNodeAndContentPath>({
-    nodeId: 0,
-    path: "",
-    contentPath: [],
-    content: "",
-  })
+  const [streams, setStreams] = useState<FollowedStreams>(NO_STREAMS)
 
   trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
-    onData({ nodeId, path, contentPath, event }) {
-      const needReset =
-        state.nodeId !== nodeId || state.path !== path || !areArraysEqual(state.contentPath, contentPath)
-      if (event.type === "response.output_text.delta") {
-        if (needReset) {
-          setState({ nodeId, path, contentPath, content: event.delta })
-        } else {
-          setState((state) => ({ ...state, content: state.content + event.delta }))
-        }
-      } else {
-        if (needReset) {
-          setState({ nodeId, path, contentPath, content: "" })
-        }
-      }
+    onData(event) {
+      setStreams((state) => followStreams(state, event))
     },
   })
+  useEffect(() => {
+    if (running) setStreams((state) => pruneStreams(state, running))
+  }, [running])
+  const content = streams.followed === null ? "" : (streams.texts[streams.followed] ?? "")
 
   // biome-ignore lint: scroll on content change
   useEffect(() => {
@@ -51,7 +34,7 @@ export default function ResponseStreamWatcher({ className }: ResponseStreamWatch
       top: ref.current.scrollHeight,
       behavior: "smooth",
     })
-  }, [state.content])
+  }, [content])
 
   return (
     <Field className={className}>
@@ -63,11 +46,8 @@ export default function ResponseStreamWatcher({ className }: ResponseStreamWatch
         placeholder={t("ResponseStreamWatcher.placeholder")}
         ref={ref}
         readOnly
-        value={state.content}
+        value={content}
       />
     </Field>
   )
 }
-
-const areArraysEqual = (arr1: any[], arr2: any[]) =>
-  arr1.length === arr2.length && arr1.every((val, index) => val === arr2[index])

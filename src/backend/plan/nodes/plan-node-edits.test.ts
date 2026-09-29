@@ -70,6 +70,30 @@ describe("editing a node through the service", () => {
     expect(stateAt(child, `${loop}:1`)?.content).toBe("x")
   })
 
+  it("finds the iteration a grown key moved to", () => {
+    const service = new PlanNodeService()
+    const loop = seedNode({
+      title: "Loop",
+      type: "parallel",
+      at: {
+        "": {
+          status: "GENERATED",
+          content: JSON.stringify({
+            keyLength: 7,
+            hashes: { abc1234: "abc1234ff", abc1239: "abc1239ff" },
+            order: ["abc1234", "abc1239"],
+          }),
+        },
+      },
+    })
+    const child = seedNode({ title: "Child", parent: loop, at: { [`${loop}:abc1234`]: "GENERATED" } })
+
+    expect(service.isCurrentPath(child, `${loop}:abc123`)).toBe(false)
+    expect(service.currentPathFor(child, `${loop}:abc1234`)).toBe(`${loop}:abc1234`)
+    expect(service.currentPathFor(child, `${loop}:abc12`), "names two iterations now").toBeNull()
+    expect(service.currentPathFor(child, `${loop}:ffffff`)).toBeNull()
+  })
+
   it("does not hang on a node that is its own ancestor", () => {
     const service = new PlanNodeService()
     const a = seedNode({ title: "A" })

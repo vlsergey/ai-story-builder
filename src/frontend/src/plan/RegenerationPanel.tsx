@@ -7,7 +7,7 @@ import type {
 import type { DockviewPanelApi } from "dockview"
 import { PlayIcon, SquareIcon } from "lucide-react"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { trpc } from "../ipcClient"
 import { useTranslation } from "react-i18next"
 import AiThinkingPanel, { type AiThinkingPanelHandle } from "../ai/AiThinkingPanel"
@@ -15,11 +15,20 @@ import { Button } from "../ui-components/button"
 import { Card } from "../ui-components/card"
 import RegenerateOptionsForm from "./RegenerateOptionsForm"
 import { dispatchOpenPlanNodeEditor } from "../lib/plan-graph-events"
-import { iterationLabel } from "./iteration-selection"
+import {
+  type FollowedStreams,
+  followStreams,
+  NO_STREAMS,
+  pruneStreams,
+  runningKeyOf,
+  streamKeyOf,
+} from "./followed-stream"
+import { useIterationSelection } from "./iteration-selection"
 import ResponseStreamWatcher from "./ResponseStreamWatcher"
 
 export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPanelApi }) {
   const { t } = useTranslation()
+  const { labelOf } = useIterationSelection()
   const [event, setEvent] = useState<RegenerateStatusEvent | null>(null)
 
   useEffect(() => {
@@ -37,8 +46,28 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   type Mode = "idle" | "dispatched" | "thinking" | "streaming"
   const [mode, setMode] = useState<Mode>("idle")
   const aiThinkingPanelRef = useRef<AiThinkingPanelHandle>(null)
+  // Several branches of a parallel loop stream at once: the panel follows one
+  // of them, as the stream watcher does, and ignores the others.
+  const streams = useRef<FollowedStreams>(NO_STREAMS)
+  const runningNodes = useMemo(
+    () =>
+      new Set(
+        (event?.currentRegenerationStack ?? []).flatMap((item) =>
+          item.type === "node" ? [runningKeyOf(item.node.id, item.node.path)] : [],
+        ),
+      ),
+    [event],
+  )
+  useEffect(() => {
+    streams.current = pruneStreams(streams.current, runningNodes)
+  }, [runningNodes])
   trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
-    onData({ event }) {
+    onData(streamEvent) {
+      const { event } = streamEvent
+      const before = streams.current.followed
+      streams.current = followStreams(streams.current, streamEvent)
+      if (streamKeyOf(streamEvent) !== streams.current.followed) return
+      if (before !== streams.current.followed) aiThinkingPanelRef.current?.onComplete()
       if (event.type === "response.created") {
         setMode("dispatched")
         aiThinkingPanelRef.current?.onComplete()
@@ -129,7 +158,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
               className="ml-1 underline"
               onClick={() => dispatchOpenPlanNodeEditor({ id: at.nodeId, title: at.title }, at.path)}
             >
-              «{at.title}»{at.path ? ` ${iterationLabel(at.path)}` : ""}
+              «{at.title}»{at.path ? ` ${labelOf(at.path)}` : ""}
             </button>
           )}
         </div>
@@ -214,7 +243,7 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
         <AiThinkingPanel ref={aiThinkingPanelRef} className="text-muted-foreground" />
       </div>
       <div className={mode === "streaming" ? "flex-1 min-h-0 flex flex-col" : "hidden"}>
-        <ResponseStreamWatcher className="flex-1 min-h-0 text-muted-foreground text-xs" />
+        <ResponseStreamWatcher className="flex-1 min-h-0 text-muted-foreground text-xs" running={runningNodes} />
       </div>
     </div>
   )
@@ -233,13 +262,14 @@ function StackItemIteration({ item }: { item: RegenerationStackItemIteration }) 
 }
 
 function StackItemNode({ item }: { item: RegenerationStackItemNode }) {
+  const { labelOf } = useIterationSelection()
   return (
     <span>
       <span className="text-xs font-medium truncate">{item.node.title}</span>
       <span className="text-xs text-muted-foreground">
         {" "}
         (ID: {item.node.id}
-        {item.node.path ? `, ${iterationLabel(item.node.path)}` : ""})
+        {item.node.path ? `, ${labelOf(item.node.path)}` : ""})
       </span>
     </span>
   )
