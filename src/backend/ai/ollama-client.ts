@@ -63,10 +63,12 @@ export function buildChatRequest(args: {
   messages.push({ role: "user", content: args.userPrompt ?? "" })
 
   const options: OllamaChatRequest["options"] = {}
-  if (isPositive(args.settings.temperature)) options.temperature = args.settings.temperature
-  if (isPositive(args.settings.top_p)) options.top_p = args.settings.top_p
-  if (isPositive(args.settings.num_ctx)) options.num_ctx = args.settings.num_ctx
-  if (isPositive(args.settings.max_output_tokens)) options.num_predict = args.settings.max_output_tokens
+  // A zero is sent as a zero; only an absent setting is left to the model.
+  // The settings schema decides which numbers are acceptable.
+  if (isNumber(args.settings.temperature)) options.temperature = args.settings.temperature
+  if (isNumber(args.settings.top_p)) options.top_p = args.settings.top_p
+  if (isNumber(args.settings.num_ctx)) options.num_ctx = args.settings.num_ctx
+  if (isNumber(args.settings.max_output_tokens)) options.num_predict = args.settings.max_output_tokens
 
   const req: OllamaChatRequest = { model: args.model, messages, stream: true }
   if (Object.keys(options).length > 0) req.options = options
@@ -74,6 +76,10 @@ export function buildChatRequest(args: {
   if (args.responseSchema && args.enforceSchema !== false) req.format = args.responseSchema.schema
 
   return req
+}
+
+function isNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v)
 }
 
 function isPositive(v: unknown): v is number {

@@ -42,7 +42,7 @@ interface AiGenerationSettingsFormProps {
   onChange: (aiGenerationSettings: AiGenerationSettings | null) => void
 }
 
-function AiGenerationSettingsForm({
+export function AiGenerationSettingsForm({
   aiEngineDef,
   className,
   defaultAiGenerationSettings,

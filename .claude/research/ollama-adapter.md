@@ -137,8 +137,10 @@ JSON is truncated and unparseable. Hosted models stop on their own; a local one
 has no such instinct.
 
 Set `max_output_tokens` to something the node's purpose justifies (a findings list
-needs far less than prose). Zero means "no limit" and on a local model that is a
-trap, not a convenience.
+needs far less than prose). An empty field is "no limit"; since 2026-09-29 a 0 is
+rejected by the settings schema rather than read as "no limit" — the old form stored
+an emptied field as 0 and the adapters dropped zeros, which hid each other. On a
+local model "no limit" is a trap, not a convenience.
 
 Everything upstream of that node completed and stayed proportionate: reviews edited
 their documents rather than inflating them (world 13 545 → 14 625 chars across two

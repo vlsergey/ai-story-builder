@@ -45,7 +45,18 @@ describe("buildChatRequest — options", () => {
     expect(r.options).toEqual({ temperature: 0.8, top_p: 0.9, num_ctx: 32768, num_predict: 2000 })
   })
 
-  it.each([0, -1, Number.NaN, undefined, null, "8"])("drops non-positive or non-numeric %p", (v) => {
+  // A zero is a value, not a request for the default. This test used to
+  // assert the opposite — that 0 is dropped — which is how "the user left the
+  // field empty" and "the user asked for zero" became the same thing.
+  it.each([
+    ["temperature", 0],
+    ["top_p", 0],
+  ])("sends %s = 0 as 0", (key, v) => {
+    const r = buildChatRequest({ ...base, settings: { [key]: v } } as never)
+    expect(r.options).toEqual({ [key]: v })
+  })
+
+  it.each([Number.NaN, undefined, null, "8"])("drops what is not a number: %p", (v) => {
     const r = buildChatRequest({ ...base, settings: { temperature: v, num_ctx: v } } as never)
     expect(r.options).toBeUndefined()
   })

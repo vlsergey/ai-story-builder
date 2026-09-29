@@ -48,9 +48,9 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
       instructions: req.systemPrompt ?? "",
       input: req.userPrompt || "",
       prompt_cache_key: uuidV4PromptCacheKey,
-      max_output_tokens: onlyIfPositiveNumber(actualAiSettings.max_output_tokens),
-      temperature: onlyIfPositiveNumber(actualAiSettings.temperature),
-      top_p: onlyIfPositiveNumber(actualAiSettings.top_p),
+      max_output_tokens: onlyIfNumber(actualAiSettings.max_output_tokens),
+      temperature: onlyIfNumber(actualAiSettings.temperature),
+      top_p: onlyIfNumber(actualAiSettings.top_p),
     }
 
     // Reasoning effort: only for reasoning-capable models. xAI accepts
@@ -105,12 +105,15 @@ export class GrokAdapter implements AiEngineAdapter<GrokAiGenerationSettings> {
   }
 }
 
-function onlyIfPositiveNumber(value: unknown): number | undefined {
-  if (typeof value === "number" && value > 0) {
-    return value
-  } else {
-    return undefined
-  }
+/**
+ * Send what the settings hold, including 0 — a zero is a value, not a request
+ * for the provider's default. Only an absent setting is left out. Whether a
+ * number is acceptable is the settings schema's call, not the adapter's; this
+ * used to drop every 0 because the settings form stored empty fields as 0, and
+ * the two bugs hid each other.
+ */
+function onlyIfNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined
 }
 
 function generateDeterministicV4(seed: string): string {

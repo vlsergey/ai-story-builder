@@ -18,6 +18,22 @@
  */
 import { type ZodType, z } from "zod"
 
+/**
+ * An optional numeric setting: an empty field means "not set — the provider
+ * decides" and comes out as undefined. It is never stored as 0.
+ *
+ * `z.coerce.number()` alone turns "" into 0. That made "left the field empty"
+ * and "asked for zero" the same stored value, and pushed every adapter into
+ * guessing that a 0 meant "empty" — so a real zero could never be sent, and a
+ * token limit of 0 quietly meant "no limit".
+ */
+function optionalNumber(schema: ZodType): ZodType {
+  return z.preprocess(
+    (v) => (v === null || (typeof v === "string" && v.trim() === "") ? undefined : v),
+    schema.optional(),
+  )
+}
+
 export const AGE_RATING_ORDER = ["G", "PG", "12", "16", "18", "NC21"] as const
 export type AgeRating = (typeof AGE_RATING_ORDER)[number]
 
@@ -117,9 +133,9 @@ export const GROK_ENGINE_DEF = {
     { key: "team_id", type: "input" },
   ],
   aiSettingsFields: [
-    { key: "max_output_tokens", defaultValue: "0", type: "integer", schema: z.coerce.number().int().min(0) },
-    { key: "temperature", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(2) },
-    { key: "top_p", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(1) },
+    { key: "max_output_tokens", type: "integer", schema: optionalNumber(z.coerce.number().int().min(1)) },
+    { key: "temperature", defaultValue: "1", type: "decimal", schema: optionalNumber(z.coerce.number().min(0).max(2)) },
+    { key: "top_p", defaultValue: "1", type: "decimal", schema: optionalNumber(z.coerce.number().min(0).max(1)) },
     { key: "x_search", type: "checkbox", schema: z.coerce.boolean() },
     { key: "web_search", type: "checkbox", schema: z.coerce.boolean() },
     {
@@ -161,7 +177,7 @@ export const YANDEX_ENGINE_DEF = {
     { key: "folder_id", type: "input" },
   ],
   aiSettingsFields: [
-    { key: "max_completion_tokens", defaultValue: "0", type: "integer", schema: z.coerce.number().int().min(0) },
+    { key: "max_completion_tokens", type: "integer", schema: optionalNumber(z.coerce.number().int().min(1)) },
     {
       key: "webSearch",
       type: "select",
@@ -203,12 +219,12 @@ export const OLLAMA_ENGINE_DEF = {
   },
   configFields: [{ key: "base_url", type: "input" }],
   aiSettingsFields: [
-    { key: "max_output_tokens", defaultValue: "0", type: "integer", schema: z.coerce.number().int().min(0) },
-    { key: "temperature", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(2) },
-    { key: "top_p", defaultValue: "1", type: "decimal", schema: z.coerce.number().min(0).max(1) },
+    { key: "max_output_tokens", type: "integer", schema: optionalNumber(z.coerce.number().int().min(1)) },
+    { key: "temperature", defaultValue: "1", type: "decimal", schema: optionalNumber(z.coerce.number().min(0).max(2)) },
+    { key: "top_p", defaultValue: "1", type: "decimal", schema: optionalNumber(z.coerce.number().min(0).max(1)) },
     // Ollama truncates to the model's default window (often 4096) without
     // warning, so a long prompt silently loses its head. Set the real window.
-    { key: "num_ctx", defaultValue: "32768", type: "integer", schema: z.coerce.number().int().min(0) },
+    { key: "num_ctx", defaultValue: "32768", type: "integer", schema: optionalNumber(z.coerce.number().int().min(1)) },
     { key: "think", type: "checkbox", schema: z.coerce.boolean() },
   ],
   maxFilesPerRequest: 0,
