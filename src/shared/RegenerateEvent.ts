@@ -1,4 +1,5 @@
 import type { PlanNodeRow } from "./plan-graph.js"
+import type { NodePath } from "./plan-node-path.js"
 
 export interface RegenerationStackItemIteration {
   type: "iteration"
@@ -20,6 +21,8 @@ export interface RegenerateStatusEvent {
 
   currentRegenerationStack: RegenerationStackItem[]
   firstError?: unknown
+  /** The node that failed first, and the iteration it failed in. */
+  firstErrorAt?: { nodeId: number; title: string; path: NodePath } | null
 
   generatedNew: number
   generatedSame: number

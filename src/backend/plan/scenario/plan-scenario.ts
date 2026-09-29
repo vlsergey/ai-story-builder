@@ -4,7 +4,14 @@ import { fileURLToPath } from "node:url"
 import { loopLength } from "../../../shared/for-each-plan-node.js"
 import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
 import type { PlanNodeDefinition, PlanNodeRow, PlanNodeStatus } from "../../../shared/plan-graph.js"
-import { childPath, lastSegment, type NodePath, parentPath, ROOT_PATH } from "../../../shared/plan-node-path.js"
+import {
+  childPath,
+  lastSegment,
+  type NodePath,
+  parentPath,
+  parsePath,
+  ROOT_PATH,
+} from "../../../shared/plan-node-path.js"
 import type { PlanNodeType } from "../../../shared/plan-node-types.js"
 import type { ProjectTemplate } from "../../../shared/project-template.js"
 import type { RegenerateStatusEvent } from "../../../shared/RegenerateEvent.js"
@@ -429,6 +436,13 @@ export class PlanScenario {
   /** The last status event of the last run: counters, first error. */
   get lastStatus(): RegenerateStatusEvent | undefined {
     return this.statusEvents.at(-1)
+  }
+
+  /** Where the last run failed, as the progress panel names it: the node, and its iteration in each loop. */
+  failure(): { node: string; iterations: number[] } | undefined {
+    const at = this.lastStatus?.firstErrorAt
+    if (!at) return undefined
+    return { node: at.title, iterations: parsePath(at.path).map((segment) => Number(segment.key)) }
   }
 
   /** Titles of the nodes the progress panel showed as being written during the last run. */

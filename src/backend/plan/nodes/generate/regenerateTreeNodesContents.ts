@@ -10,7 +10,7 @@ import type {
 } from "../../../../shared/RegenerateEvent.js"
 import { emitterToObservable, emitterToSingleArgObservable } from "../../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../../lib/make-errors.js"
-import { finishRun, startRun } from "../../../lib/telemetry/telemetry.js"
+import { finishRun, runForNode, startRun } from "../../../lib/telemetry/telemetry.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
@@ -39,6 +39,7 @@ function emitRegenerateStatusEvent() {
     // A copy: subscribers may hold the event after the stack has moved on.
     currentRegenerationStack: [...currentRegenerationStack],
     firstError,
+    firstErrorAt,
     generatedNew,
     generatedSame,
     generatedEmpty,
@@ -76,6 +77,7 @@ let inProcess = false
 
 const currentRegenerationStack: RegenerationStackItem[] = []
 let firstError: unknown = null
+let firstErrorAt: RegenerateStatusEvent["firstErrorAt"] = null
 
 let generatedNew: number = 0
 let generatedSame: number = 0
@@ -138,6 +140,7 @@ export async function regenerateTreeNodesContents(target?: {
   if (inProcess) throw makeErrorWithStatus("Some regeneration is already in process", 429)
   inProcess = true
   firstError = null
+  firstErrorAt = null
   currentRegenerationStack.length = 0
 
   generatedEmpty = 0
@@ -195,7 +198,7 @@ export async function regenerateTreeNodesContents(target?: {
           }
           return await withStackItem({ type: "node", node }, true, async () => {
             try {
-              const blockResult = await block(nodeContext(node))
+              const blockResult = await runForNode({ nodeId: node.id, path: node.path }, () => block(nodeContext(node)))
               switch (blockResult.status) {
                 case "SAME":
                   generatedSame++
@@ -209,8 +212,10 @@ export async function regenerateTreeNodesContents(target?: {
               }
               return blockResult.result
             } catch (e) {
+              // The innermost node fails first; the loops around it only pass the error on.
               if (firstError == null) {
                 firstError = e
+                firstErrorAt = { nodeId: node.id, title: node.title, path: node.path }
               }
               myAbortController.abort()
               throw e

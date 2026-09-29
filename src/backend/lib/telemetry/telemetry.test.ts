@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { getCurrentDb } from "../../db/state.js"
 import { setUpTestDb, tearDownTestDb } from "../../db/test-db-utils.js"
-import { __resetForTests, finishRun, recordCall, startRun } from "./telemetry.js"
+import { __resetForTests, finishRun, recordCall, runForNode, startRun } from "./telemetry.js"
 
 describe("telemetry", () => {
   beforeEach(() => {
@@ -75,6 +75,33 @@ describe("telemetry", () => {
       "generate-plan-node-text-content": 1,
     })
     expect(runRows[0].cost_usd).toBeCloseTo(0.03, 4)
+  })
+
+  it("attributes a call to the node and the iteration it ran for", async () => {
+    startRun()
+    const call = {
+      engine_id: "grok",
+      model: "grok-3",
+      purpose: "generate-plan-node-text-content",
+      node_title: "Профиль персонажа",
+      instructions_chars: 1,
+      input_chars: 1,
+      output_chars: 1,
+      duration_ms: 1,
+      success: true,
+    }
+    await runForNode({ nodeId: 42, path: "7:2" }, async () => {
+      await Promise.resolve()
+      recordCall(call)
+    })
+    recordCall(call)
+    finishRun()
+
+    const rows = getCurrentDb().prepare("SELECT node_id, path FROM ai_call_stats ORDER BY id").all()
+    expect(rows).toEqual([
+      { node_id: 42, path: "7:2" },
+      { node_id: null, path: null },
+    ])
   })
 
   it("persists cost_usd = null when the provider didn't report one (no local fallback)", () => {

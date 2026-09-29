@@ -116,9 +116,13 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
   const renderError = () => {
     if (!event?.firstError) return null
     const errorString = String(event.firstError)
+    const at = event.firstErrorAt
     return (
       <Card className="mt-4 p-3 bg-destructive/10 border-destructive/30">
-        <div className="text-xs font-semibold text-destructive mb-1">{t("regeneration.error")}</div>
+        <div className="text-xs font-semibold text-destructive mb-1">
+          {t("regeneration.error")}
+          {at && ` «${at.title}»${at.path ? ` ${iterationLabel(at.path)}` : ""}`}
+        </div>
         <pre className="text-xs text-destructive whitespace-pre-wrap break-words">{errorString}</pre>
       </Card>
     )

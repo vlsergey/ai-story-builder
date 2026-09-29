@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import { randomUUID } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
@@ -15,6 +16,22 @@ import { SettingsRepository } from "../../settings/settings-repository.js"
  * template-duration estimator can aggregate across projects (per-(engine,
  * model, node_type, purpose) curves don't generalise from one project alone).
  */
+
+/** The node a call is made for, and the iteration it runs in. */
+export interface CallNode {
+  nodeId: number
+  path: string
+}
+
+const callNode = new AsyncLocalStorage<CallNode>()
+
+/**
+ * Runs `block` as the work of one node in one iteration: every call recorded
+ * inside it, however deep, is attributed to that node and path.
+ */
+export function runForNode<T>(node: CallNode, block: () => T): T {
+  return callNode.run(node, block)
+}
 
 export interface RecordCallArgs {
   engine_id: string
@@ -171,6 +188,7 @@ function recordOrphanCall(args: RecordCallArgs): void {
 function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: RecordCallArgs): void {
   const tsIso = ts.toISOString()
   const cacheKeysJson = args.prompt_cache_keys ? JSON.stringify(args.prompt_cache_keys) : null
+  const node = callNode.getStore()
 
   if (isOpen()) {
     try {
@@ -180,8 +198,8 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
         node_title, node_type,
         instructions_chars, input_chars, output_chars,
         input_tokens, output_tokens, cached_prompt_tokens,
-        duration_ms, cost_usd, success, error_message, iteration_index, reasoning_effort
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        duration_ms, cost_usd, success, error_message, iteration_index, reasoning_effort, node_id, path
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         tsIso,
         run_id,
         args.engine_id,
@@ -202,6 +220,8 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
         args.error_message ?? null,
         args.iteration_index ?? null,
         args.reasoning_effort ?? null,
+        node?.nodeId ?? null,
+        node?.path ?? null,
       )
     } catch (err) {
       console.warn("[telemetry] failed to write ai_call_stats:", err)
@@ -229,6 +249,8 @@ function writeCallRecord(run_id: string, ts: Date, cost: number | null, args: Re
     error_message: args.error_message ?? null,
     iteration_index: args.iteration_index ?? null,
     reasoning_effort: args.reasoning_effort ?? null,
+    node_id: node?.nodeId ?? null,
+    path: node?.path ?? null,
   })
 }
 

@@ -496,7 +496,7 @@ describe("migration 033: per-iteration state", () => {
 
     migrateDatabase(db)
 
-    expect(db.pragma("user_version", { simple: true })).toBe(33)
+    expect(db.pragma("user_version", { simple: true })).toBeGreaterThanOrEqual(33)
     expect(state(db, 1)?.content).toBe("x")
   })
 })

@@ -42,6 +42,7 @@ import migration030 from "./migrations/030.js"
 import migration031 from "./migrations/031.js"
 import migration032 from "./migrations/032.js"
 import migration033 from "./migrations/033.js"
+import migration034 from "./migrations/034.js"
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -111,9 +112,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration032,
   // version 32 → 33: node state per iteration in plan_node_states; loop snapshots and state columns go
   migration033,
+  // version 33 → 34: telemetry names the node and the iteration of each call
+  migration034,
 ]
 
-export const CURRENT_VERSION = 33
+export const CURRENT_VERSION = 34
 
 function loadSchemaFromFile(db: Database): void {
   for (const candidate of [

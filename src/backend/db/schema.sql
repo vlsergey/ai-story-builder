@@ -22,7 +22,9 @@ CREATE TABLE ai_call_stats (
   success INTEGER NOT NULL,
   error_message TEXT,
   iteration_index INTEGER,
-  reasoning_effort TEXT
+  reasoning_effort TEXT,
+  node_id INTEGER,
+  path TEXT
 );
 
 CREATE TABLE ai_run_stats (

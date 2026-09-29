@@ -106,6 +106,20 @@ describe("a loop", () => {
     expect(prose[1].userPrompt).toContain(prose[0].response)
   })
 
+  it("that fails names the element it failed on", async () => {
+    const s = characters(["Аня", "Боря"])
+    s.engine.on((call) => {
+      if (call.node === "Профиль" && call.userPrompt.includes("Боря")) throw new Error("model is down")
+      return undefined
+    })
+
+    await expect(s.run()).rejects.toThrow("model is down")
+
+    expect(s.failure()).toEqual({ node: "Профиль", iterations: [1] })
+    expect(s.status("Профиль", 0)).toBe("GENERATED")
+    expect(s.status("Профиль", 1)).toBe("ERROR")
+  })
+
   it("counts the words of every element, not only the one on display", async () => {
     const s = characters(["Аня Иванова", "Боря"])
 
