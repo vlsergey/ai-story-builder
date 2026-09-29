@@ -5,7 +5,8 @@ import { getNodePrompts } from "./graph/settings-helper.js"
 
 /**
  * Top-level variable names a Handlebars template reads: `{{X}}`, `{{[Title with spaces]}}`,
- * helper arguments such as `(contains [X] "a")`, `{{#each [X]}}`, `{{../[X]}}`.
+ * helper arguments such as `(contains [X] "a")`, `{{#each [X]}}`, `{{../[X]}}`,
+ * `{{@root.[X]}}` and `{{lookup . "X"}}`.
  * Helper names come along too — harmless, no node is titled `if`.
  * Returns `null` when the template does not parse: the caller must then assume
  * it reads everything.
@@ -28,7 +29,16 @@ export function templateVariables(template: string): Set<string> | null {
     if (record.type === "PathExpression") {
       const parts = record.parts as string[]
       if (!record.data && parts.length > 0) names.add(parts[0])
+      // `{{@root.[Title]}}` reaches the top-level context from inside a block.
+      if (record.data && parts[0] === "root" && parts.length > 1) names.add(parts[1])
       return
+    }
+    // `{{lookup . "Title"}}` names the input in a string.
+    const path = record.path as { original?: unknown } | undefined
+    if (path?.original === "lookup") {
+      for (const param of (record.params as { type?: string; value?: unknown }[] | undefined) ?? []) {
+        if (param.type === "StringLiteral" && typeof param.value === "string") names.add(param.value)
+      }
     }
     for (const [key, value] of Object.entries(record)) {
       if (key !== "loc") visit(value)

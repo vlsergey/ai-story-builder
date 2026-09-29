@@ -60,11 +60,12 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
 
 /**
  * A patch reaches downstream nodes only when one of these actually changes:
- * consumers read content and summary, and a move changes which iteration of a
- * loop a node belongs to. Rewriting a value unchanged — a deterministic node
- * re-run, a node starting to generate — must not demote anything.
+ * consumers read content, and a move changes which iteration of a loop a node
+ * belongs to. Rewriting a value unchanged — a deterministic node re-run, a
+ * node starting to generate — must not demote anything, and neither may a new
+ * summary: prompts read content, never summaries.
  */
-const CASCADING_KEYS = ["content", "summary", "parent_id"] as const
+const CASCADING_KEYS = ["content", "parent_id"] as const
 
 /**
  * Statuses a changed input demotes. MANUAL is the user's own text; OUTDATED
@@ -76,13 +77,14 @@ const DEMOTABLE_BY_INPUT_CHANGE: ReadonlySet<PlanNodeStatus> = new Set(["GENERAT
 /**
  * The status a finished regeneration stores. A processor that reported ERROR
  * (a script or template failure) or EMPTY is believed; otherwise the output
- * decides, and an empty list is no output. Other reported statuses are not
+ * decides. A list is output even when empty: a split that found no side plots
+ * has answered, and an EMPTY there would be retried — and would demote
+ * everything downstream — on every run. Other reported statuses are not
  * trusted: some processors return their whole row, GENERATING included.
  */
 function outcomeStatus(reported: PlanNodeStatus | undefined, output: unknown): PlanNodeStatus {
   if (reported === "ERROR" || reported === "EMPTY") return reported
-  const hasOutput = Array.isArray(output) ? output.length > 0 : !!output
-  return hasOutput ? "GENERATED" : "EMPTY"
+  return Array.isArray(output) || output ? "GENERATED" : "EMPTY"
 }
 
 /**
@@ -549,7 +551,9 @@ export class PlanNodeService {
           summary: patch.summary || null,
         }
       }
-      patch = { ...patch, status }
+      // Counted from the output: a loop's element or a node reading earlier
+      // iterations produces text without writing content.
+      patch = { ...patch, status, ...this.countsOfOutput(output) }
 
       if (context.abortSignal.aborted) {
         console.warn("[PlanNodeService]", "regenerate", `Stop node ${context.nodeId} regeneration due to abort signal`)
@@ -682,14 +686,21 @@ export class PlanNodeService {
    * content is JSON, and counting it would measure the envelope.
    */
   private countsOf(node: PlanNodeRow): Pick<PlanNodeRow, "word_count" | "char_count" | "byte_count"> {
-    let text = node.content ?? ""
     try {
-      const output = this.getProcessor(node.type).getOutput(this, node)
-      if (typeof output === "string") text = output
-      else if (Array.isArray(output)) text = output.filter((part) => typeof part === "string").join("\n\n")
+      return this.countsOfOutput(this.getProcessor(node.type).getOutput(this, node))
     } catch {
       // No output yet (a loop before its children exist): count the raw content.
+      return this.countsOfOutput(node.content ?? "")
     }
+  }
+
+  private countsOfOutput(output: unknown): Pick<PlanNodeRow, "word_count" | "char_count" | "byte_count"> {
+    const text =
+      typeof output === "string"
+        ? output
+        : Array.isArray(output)
+          ? output.filter((part) => typeof part === "string").join("\n\n")
+          : ""
     return { word_count: this.countWords(text), char_count: this.countChars(text), byte_count: this.countBytes(text) }
   }
 

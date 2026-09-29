@@ -335,13 +335,22 @@ export async function regenerateSubtreeNodesContents(
   const nodeRepo = new PlanNodeRepository()
   // Guard against pathological loops caused by repeated cascade demotions.
   // Realistic ceiling: every node may be re-processed a small constant
-  // number of times. 10× the node count is generous.
-  let safetyCounter = nodeIds.length * 10
-
-  while (queue.length > 0 && !context.abortSignal.aborted) {
-    if (safetyCounter-- <= 0) {
+  // number of times. 10× the node count is generous. Only re-runs count:
+  // waiting for sources is legitimate and, in a bad order, takes n² turns.
+  let demotionBudget = nodeIds.length * 10
+  const spendOnDemotion = () => {
+    if (demotionBudget-- <= 0) {
       // Breaking out here would report a half-done run as a success.
       throw Error(`Regeneration did not converge at parentId=${parentId}: nodes ${queue.join(",")} kept being demoted`)
+    }
+  }
+  // Consecutive deferrals: a whole pass over the queue with nobody ready means
+  // nobody ever will be — the graph has a cycle.
+  let deferredInARow = 0
+
+  while (queue.length > 0 && !context.abortSignal.aborted) {
+    if (deferredInARow > queue.length) {
+      throw Error(`Regeneration cannot proceed at parentId=${parentId}: nodes ${queue.join(",")} wait for each other`)
     }
     const nodeId = queue.shift()!
     // Refetch the live row — sibling regenerations earlier in this loop may
@@ -356,8 +365,8 @@ export async function regenerateSubtreeNodesContents(
     // it so it re-runs before we process this node.
     //
     // A source counts as "demoted" only when its status is OUTDATED — that's
-    // the value markAsOutdatedAndNotifyDownstreamNodes / TextProcessor.onInputContentChange
-    // assign when a cascade fires. EMPTY is NOT a demotion: it's a valid
+    // the value markAsOutdatedAndNotifyDownstreamNodes assigns when a cascade
+    // fires. EMPTY is NOT a demotion: it's a valid
     // terminal state for a merge whose input was legitimately empty (e.g., a
     // for-each-prev-outputs on iteration 0), and counting it as one creates
     // an infinite re-queue loop where the merge re-runs every time its
@@ -379,6 +388,8 @@ export async function regenerateSubtreeNodesContents(
     }
     if (anySourceDemoted) {
       // Defer current node until the demoted sources catch up.
+      spendOnDemotion()
+      deferredInARow = 0
       queue.push(nodeId)
       continue
     }
@@ -390,9 +401,11 @@ export async function regenerateSubtreeNodesContents(
       console.log(
         `[regenerateSubtreeNodesContents] node ${nodeId} not ready, missing sources: ${sources.filter((srcId) => !checked.has(srcId)).join(",")}`,
       )
+      deferredInARow++
       queue.push(nodeId)
       continue
     }
+    deferredInARow = 0
 
     const willRegenerate = shouldRegenerate[node.status] && hasRegenerationCriteria(node)
     console.log(
@@ -408,6 +421,7 @@ export async function regenerateSubtreeNodesContents(
       // result was dropped: write it again before anything reads it. Nothing
       // else would — a node without readers is never re-queued as a source.
       if (nodeRepo.findById(nodeId)?.status === "OUTDATED" && !context.abortSignal.aborted) {
+        spendOnDemotion()
         queue.unshift(nodeId)
         continue
       }

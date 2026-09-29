@@ -122,16 +122,39 @@ describe("a run", () => {
     expect(s.wordCount("Персонажи")).toBe(3)
   })
 
-  it("leaves a split that finds nothing EMPTY", async () => {
+  it("takes a split that finds nothing as an answer, and does not ask again", async () => {
     const s = PlanScenario.build((g) => {
       g.source("Синопсис", "Никого нет.")
-      g.split("Персонажи", { prompt: "Перечисли персонажей:\n{{[Синопсис]}}" })
+      g.split("Побочные линии", { prompt: "Перечисли побочные линии:\n{{[Синопсис]}}" })
+      g.loop("Цикл по линиям", { over: "Побочные линии", element: "Линия", result: "Линия: итог" }, (b) => {
+        b.text("Текст линии", { prompt: "Раскрой линию:\n{{[Линия]}}" })
+        b.result("Текст линии")
+      })
+      g.text("Финал", { prompt: "Напиши финал:\n{{[Синопсис]}}" })
     })
     s.engine.on((call) => (call.kind === "split" ? JSON.stringify({ parts: [] }) : undefined))
+    await s.run()
 
     await s.run()
 
-    expect(s.status("Персонажи")).toBe("EMPTY")
+    expect(s.calls()).toEqual([])
+  })
+
+  it("runs a long chain whose inputs arrive in the worst order", async () => {
+    // Each chapter reads the previous one, and the synopsis reaches the last
+    // chapter first: the scheduler has to defer and retry a lot, legitimately.
+    const chapters = Array.from({ length: 20 }, (_, i) => `Глава ${i + 1}`)
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "Двадцать глав на балконе.")
+      chapters.forEach((title, i) => {
+        g.text(title, { prompt: i === 0 ? "Начни историю." : `Продолжи:\n{{[${chapters[i - 1]}]}}` })
+      })
+      for (const title of [...chapters].reverse()) g.connect("Синопсис", title)
+    })
+
+    await s.run()
+
+    expect(s.generated()).toEqual(chapters)
   })
 })
 

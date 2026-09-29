@@ -15,6 +15,13 @@ describe("templateVariables", () => {
     )
   })
 
+  it("finds an input read from the root inside a block, or through lookup", () => {
+    const variables = templateVariables(
+      '{{#each [Список]}}{{@root.[Синопсис]}}{{/each}} {{lookup . "Стиль"}} {{#if (lookup . "Мир")}}ok{{/if}}',
+    )
+    expect([...(variables ?? [])]).toEqual(expect.arrayContaining(["Синопсис", "Стиль", "Мир"]))
+  })
+
   it("ignores data variables and this", () => {
     const variables = templateVariables("{{#each [List]}}{{@index}}{{this}}{{/each}}")
     expect(variables?.has("index")).toBe(false)

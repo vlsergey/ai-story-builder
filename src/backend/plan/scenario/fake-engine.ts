@@ -94,7 +94,9 @@ function defaultResponse(call: FakeCall): string {
   const digest = createHash("sha256").update(`${call.systemPrompt}\u0000${call.userPrompt}`).digest("hex").slice(0, 8)
   switch (call.kind) {
     case "split":
-      return JSON.stringify({ parts: [`${call.node} 1`, `${call.node} 2`] })
+      // Two parts that change with the input, as a real model's would: an
+      // upstream edit re-seeds the loops over this list.
+      return JSON.stringify({ parts: [`${call.node} 1 #${digest}`, `${call.node} 2 #${digest}`] })
     case "find-problems":
       return JSON.stringify({ foundProblems: [] })
     default:

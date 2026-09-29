@@ -24,13 +24,15 @@ export function createProject({ title, templateFilePath, templateData }: Project
   const dbPath = path.join(projectsDir, `${safeName}.sqlite`)
 
   if (fs.existsSync(dbPath)) {
+    // Opened like any project: backed up, refused if newer, migrated if older.
+    openProjectDatabase(dbPath).close()
     setCurrentDbPath(dbPath)
     updateRecent(dbPath)
     return { path: dbPath, reused: true, ...getProjectInitialData(dbPath) }
   }
 
   try {
-    openProjectDatabase(dbPath)
+    openProjectDatabase(dbPath).close()
     setCurrentDbPath(dbPath)
 
     if (templateFilePath) {

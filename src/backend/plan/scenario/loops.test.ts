@@ -87,6 +87,41 @@ describe("a loop", () => {
     expect(second.userPrompt).toContain(first.response)
   })
 
+  it("that is sequential re-writes the later iterations when an earlier result changes", async () => {
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "Три сцены на балконе.")
+      g.text("Стиль", { prompt: "Сформулируй правила стиля." })
+      g.split("Сцены", { prompt: "Раздели на сцены:\n{{[Синопсис]}}" })
+      g.loop("Цикл по сценам", { over: "Сцены", element: "Сцена", result: "Итог" }, (b) => {
+        b.previousResults("Предыдущие")
+        b.merge("Сборка предыдущих", ["Предыдущие"])
+        b.text("Проза сцены", {
+          prompt: "Напиши сцену:\n{{[Сцена]}}\nРанее:\n{{[Сборка предыдущих]}}\nСтиль:\n{{[Стиль]}}",
+        })
+        b.result("Проза сцены")
+      })
+    })
+    s.engine.on((call) => (call.node === "Сцены" ? JSON.stringify({ parts: ["Первая", "Вторая"] }) : undefined))
+    await s.run()
+
+    // The first scene is re-written; the second must follow, since it reads the first.
+    await s.type("Стиль", "Короткие фразы.")
+    await s.run()
+
+    const prose = s.calls("text").filter((c) => c.node === "Проза сцены")
+    expect(prose).toHaveLength(2)
+    expect(prose[1].userPrompt).toContain(prose[0].response)
+  })
+
+  it("counts the words of every element, not only the one on display", async () => {
+    const s = characters(["Аня Иванова", "Боря"])
+
+    await s.run()
+
+    expect(s.wordCount("Персонаж", 0)).toBe(2)
+    expect(s.wordCount("Персонаж", 1)).toBe(1)
+  })
+
   it("nested in another loop writes every scene of every part", async () => {
     const s = nestedParts()
 
