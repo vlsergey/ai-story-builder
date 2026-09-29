@@ -29,8 +29,6 @@ import { getTemplateFolders } from "./project-templates.js"
  * `apply` performs the diff's instructions: overwrites instruction fields on
  * changed nodes (marking them OUTDATED), inserts new nodes, inserts new
  * edges. Project-only nodes/edges are left alone.
- *
- * Design notes in [.claude/research/template-update.md](.claude/research/template-update.md).
  */
 
 export interface UpdatedNode {

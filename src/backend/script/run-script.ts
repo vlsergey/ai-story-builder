@@ -49,9 +49,9 @@ export function coerceOutput(value: unknown): string {
  * generation (`eval`, `new Function`) is disabled, and synchronous execution
  * is capped by `timeoutMs`.
  *
- * NOTE: `node:vm` is isolation, not a hardened security boundary — see
- * `.claude/research/script-node.md`. It is proportionate for locally authored
- * templates; swapping in a WASM engine later only changes this file.
+ * NOTE: `node:vm` is isolation, not a hardened security boundary. It is
+ * proportionate for locally authored templates; swapping in a WASM engine
+ * later only changes this file.
  */
 export function runScript(options: RunScriptOptions): RunScriptResult {
   const { source, inputs, timeoutMs = DEFAULT_SCRIPT_TIMEOUT_MS } = options

@@ -16,12 +16,12 @@
 |---|---|---|
 | Типы узлов | `text`, `split`, `merge`, `fix-problems`, `for-each` (+`-input`/`-output`/`-prev-outputs`/`-index`), `lore` | `src/shared/plan-node-types.ts`, `node-edge-dictionary.ts` |
 | Типы рёбер | `text`, `textArray` — и всё | там же |
-| Исполнение | **строго последовательное**: топологическая очередь, `await` на каждом узле | `src/backend/plan/nodes/generate/regenerateTreeNodesContents.ts:309+` |
+| Execution | by readiness: the graph names the nodes whose sources are done, one orchestrator runs them side by side up to the engine's limit | `src/backend/plan/nodes/generate/schedule.ts`, `regenerateTreeNodesContents.ts` |
 | Циклы | обратных рёбер нет; единственный встроенный цикл — внутри `fix-problems` (`maxIterations` × `minSeverityToFix`) | `fix-problems-processor.ts`, `src/shared/fix-problems-plan-node.ts` |
 | Логика в промптах | Handlebars: `eq/ne/contains/startsWith/endsWith/or/and/not/matches` + `add/subtract/multiply/divide/ceil/floor/round/min/max` | `src/backend/ai/replaceTemplates.ts:41-95` |
-| `lore` | зарегистрирован, но **passthrough-заглушка**; инжекта в промпт нет | `.claude/research/lore.md` |
+| `lore` | registered, but a **passthrough stub**: nothing is injected into prompts | `src/backend/plan/nodes/graph/lore-processor.ts` |
 | Внешние данные / скрипты / файлы | нет ни одного узла с побочным эффектом. Узел = текст на входе → текст на выходе | по списку типов |
-| Человек в процессе | визард (один раз, до графа) + статусы `MANUAL`/`in_review` на узле | `plan-graph.md` |
+| Human in the loop | the wizard (once, before the graph) and the `MANUAL`/`in_review` states of a node | `src/shared/plan-graph.ts` |
 
 И фактическая начинка цикла чанка в шаблоне (важно: часть того, что «есть только в скилле», там уже есть):
 

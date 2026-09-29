@@ -36,7 +36,7 @@ Do not change directories with `cd` — this ensures proper dependency resolutio
 
 ### Architecture research notes
 
-When investigating the codebase produces findings worth keeping across sessions (module maps, data-flow traces, refactor plans, design decisions), persist them as Markdown files under `.claude/research/`. One topic per file, descriptive kebab-case names (e.g. `template-export-format.md`, `plan-graph-execution.md`).
+When investigating the codebase produces findings worth keeping across sessions (module maps, data-flow traces, refactor plans, design decisions), persist them as Markdown files under `.agents/research/`. The folder is local: it is not tracked in git, so never link to it from tracked files. One topic per file, descriptive kebab-case names (e.g. `template-export-format.md`, `plan-graph-execution.md`).
 
 Rules for these notes:
 - **English only** — language of the codebase, regardless of the conversation language.

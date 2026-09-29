@@ -99,19 +99,13 @@ A project's plan is a graph of typed nodes connected by typed edges (`text`, `te
 
 Nodes have a status (`EMPTY`, `MANUAL`, `GENERATING`, `GENERATED`, `OUTDATED`, `ERROR`) that drives the regeneration scheduler.
 
-Deep dive: [`.claude/research/plan-graph.md`](.claude/research/plan-graph.md).
-
 ### Lore tree
 
 A separate hierarchical store for facts about the world — characters, locations, rules, terminology — that doesn't fit in any one plan node. Accessible from the canvas, hand-editable, persists across regenerations.
 
-Deep dive: [`.claude/research/lore.md`](.claude/research/lore.md).
-
 ### Templates
 
 JSON files validated against [`src/schemas/project-template.json`](src/schemas/project-template.json). Used for both bundled "system" templates (read-only, shipped with the app) and user-saved templates exported from a working project. References between nodes are by title — no IDs in the format. Cross-parent edges work (a top-level node feeding into a node inside a `for-each`) thanks to a sibling-first-then-global title resolution.
-
-Deep dive: [`.claude/research/project-templates.md`](.claude/research/project-templates.md).
 
 ### AI integration
 
@@ -121,8 +115,6 @@ Provider-adapter pattern. Each provider implements `generateResponse` over `stre
 - **Yandex GPT** — Yandex Cloud's own protocol.
 
 Adding a third provider is a single file under `src/backend/ai/` plus a registration line.
-
-Deep dive: [`.claude/research/ai-integration.md`](.claude/research/ai-integration.md).
 
 ---
 
@@ -137,11 +129,8 @@ src/
   preload/           Electron preload script
   shared/            Auto-generated types from JSON schemas
   schemas/           JSON schemas (source of truth)
-.claude/research/    Architecture notes — module maps, design decisions
 scripts/             Codegen, schema generation, template layout
 ```
-
-Detail map: [`.claude/research/overview.md`](.claude/research/overview.md).
 
 ### Scripts
 
@@ -174,8 +163,7 @@ Templates live as JSON under `src/backend/resources/resources/templates/`. After
 ## Repository conventions
 
 - Database changes go through migrations in [`src/backend/db/migrations/`](src/backend/db/migrations) — never edit initial `CREATE TABLE` statements. The schema file is auto-generated.
-- Architecture notes worth keeping across sessions live in [`.claude/research/`](.claude/research/) — one topic per file, English, date-stamped.
-- See [`CLAUDE.md`](CLAUDE.md) for the full set of project conventions used during development.
+- See [`AGENTS.md`](AGENTS.md) for the full set of project conventions used during development.
 
 ---
 
