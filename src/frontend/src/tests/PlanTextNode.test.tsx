@@ -36,14 +36,16 @@ vi.mock("@shared/node-edge-dictionary", () => ({
   })),
 }))
 
-describe("PlanTextNode double-click", () => {
+describe("PlanTextNode double-click", async () => {
+  // Loaded while collecting the tests: module loading is slow on a CI runner,
+  // and must not count against a test's own time.
+  const { default: PlanTextNode } = await import("../plan/plan-graph/SimpleNode")
+
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it("double-clicking the node div dispatches open-plan-node-editor", async () => {
-    const { default: PlanTextNode } = await import("../plan/plan-graph/SimpleNode")
-
     const dispatched: { id: number; path: string }[] = []
     const originalDispatch = window.dispatchEvent.bind(window)
     vi.spyOn(window, "dispatchEvent").mockImplementation((event) => {
