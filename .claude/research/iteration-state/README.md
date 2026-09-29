@@ -71,8 +71,9 @@ By the project owner, 2026-09-29:
 - A prompt edit leaves MANUAL rows alone.
 - Generation functions take resolved inputs; edges from inside a loop to outside
   it, or across sibling loops, are rejected, reparenting included.
-- Phase 0 — done: 16 pre-existing bugs fixed on `master`, the storage-bound ones
-  pinned by scenarios, one dropped as invisible.
+- Phase 0 — done: the pre-existing bugs fixed on `master`, the storage-bound
+  ones pinned by scenarios, one dropped as invisible; nine more found by the
+  scenarios and a review, all fixed.
 
 ## Open questions
 
@@ -104,3 +105,7 @@ By the project owner, 2026-09-29:
 - **2026-09-29, phase 0** on `master`, `df38f40`…`0bbdaf9`. The owner set the
   rule: scenario tests only, and storage-bound bugs pinned with `it.fails`
   rather than fixed. The scenario harness found two more bugs, both fixed.
+- **2026-09-29, review of phase 0**: two regressions of its fixes, four more
+  gaps, blind spots in the harness and a template bug (the first chunk always
+  got continuation instructions). All fixed test-first: `ef8d517`,
+  `a20348b`, `7705e15`.

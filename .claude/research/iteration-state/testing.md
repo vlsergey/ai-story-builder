@@ -26,18 +26,21 @@ phase 0. Part of the architecture proposal; see [README.md](README.md).*
 - **`fake-engine.ts`** — replaces `ai/ai-engine-adapter.js` via `vi.mock` in each
   scenario file. Default answers derive from the rendered prompts — unchanged
   inputs, same text — so a wasted re-run shows up as a call. Splits answer two
-  parts, reviews find nothing. Handlers (`engine.on`) script answers, fail calls,
-  or act while a call is in flight: edit, stop the run. Calls are logged with
-  their kind (text, split, find/fix-problems, summary, improve), node, prompts
-  and response.
+  parts that follow their input, as a real model's would; reviews find nothing.
+  Handlers (`engine.on`) script answers, fail calls, or act while a call is in
+  flight: edit, stop the run. Calls are logged with their kind (text, split,
+  find/fix-problems, summary, improve), node, prompts and response.
 - **`plan-scenario.ts`** — `PlanScenario.build` with a graph builder: `source`,
   `text`, `split`, `merge`, `format`, `fixProblems`, `loop` with `result` and
   `previousResults`, `connect`; edges into generated nodes follow the names their
-  prompts use. `fromTemplate` applies a shipped template. User actions: `run`,
-  `regenerate`, `stop`, `type`, `setPrompt`, `improve`, `startReview`, `show`,
-  `setRegenerate`, `extend`. Observations: `calls`, `generated`, `content` and
-  `status` (optionally per iteration), `wordCount`, `inReview`, `loopResults`,
-  `nodes`, `reachableFrom`, `shownInProgress`, `lastStatus`.
+  prompt text uses — matched as text, never through `templateVariables`, so the
+  relevance rule under test cannot decide which edges exist. `fromTemplate`
+  applies a shipped template. User actions: `run`, `regenerate`, `stop`, `type`,
+  `setPrompt`, `improve`, `summarize`, `startReview`, `show`, `setRegenerate`,
+  `extend`. Observations: `calls`, `generated`, `content`, `status` and
+  `wordCount` (optionally per iteration), `inReview`, `loopResults`, `nodes`
+  (every iteration of a loop's child), `reachableFrom`, `shownInProgress`,
+  `lastStatus`.
 
 ## Layers
 

@@ -13,7 +13,7 @@ flip it. Everything else was fixed test-first. Tests are scenarios
 | # | bug | outcome |
 |---|---|---|
 | 1 | `shouldRegenerate.GENERATED` followed `regenerateManual` | fixed `df38f40` |
-| 2 | status came from output truthiness: a template ERROR stored as GENERATED, `[]` as output | fixed `55825fe` |
+| 2 | status came from output truthiness: a template ERROR stored as GENERATED | fixed `55825fe`; an empty list stays an answer, `a20348b` |
 | 3 | the cascade demoted MANUAL consumers and ones whose prompt ignores the input; the text processor looked for `{{T}}` where templates write `{{[T]}}` | fixed `df8c4ce`: one relevance rule from the Handlebars AST, shared with propagation |
 | 4 | the cascade fired on keys, not changes: `in_review` cancelled it, starting to generate demoted every reader | fixed `df8c4ce` |
 | 5 | counts computed in `create` only, from raw JSON | fixed `c27ffef` |
@@ -30,6 +30,13 @@ flip it. Everything else was fixed test-first. Tests are scenarios
 | 18 | an unchanged element is re-run and re-summarized when its list changes | pinned `8741c24` |
 | 19 | *found by a scenario*: with «regenerate manual» on, a typed synopsis counted as stale and dragged everything below it through the model | fixed `8741c24` |
 | 20 | *found by a scenario*: a node whose result was dropped stayed OUTDATED when nothing read it | fixed `8741c24` |
+| 21 | *found by review*, a regression of #4: a sequential loop no longer refreshed later iterations after an earlier result changed | fixed `a20348b`: prev-outputs copies what it reads into its content |
+| 22 | *found by review*, a regression of #2: a split's legitimate `[]` became EMPTY, retried and demoting downstream on every run | fixed `a20348b` |
+| 23 | *found by review*: the safety counter failed valid runs deferred in a bad order | fixed `a20348b`: only re-runs count; a pass with nobody ready is a cycle |
+| 24 | *found by review*: a summary-only write demoted every reader | fixed `a20348b` |
+| 25 | *found by review*: loop elements outside the display showed 0 words | fixed `a20348b` |
+| 26 | *found by review*: refused opens rotated out the readable backups; creating a project over an existing file skipped the guard and the migrations | fixed `7705e15` |
+| 27 | *found by review*: fiction-arc branched on «Номер чанка» without its edge, so the first chunk got the continuation instructions | fixed `ef8d517`, both languages; the structural test now reads references through the AST |
 
 Also pinned in `src/backend/plan/scenario/loops.test.ts`: a review crossing
 iterations, a nested loop showing another part's scenes. The rest of what goes
