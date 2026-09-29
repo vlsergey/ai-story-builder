@@ -136,8 +136,17 @@ function loadSchemaFromFile(db: Database): void {
  *                          instead of loading schema.sql. Useful for generating schema.
  */
 export function migrateDatabase(db: Database, enforceMigrations = false): void {
-  db.pragma("foreign_keys = OFF")
   const fromVersion = db.pragma("user_version", { simple: true }) as number
+  if (fromVersion > CURRENT_VERSION) {
+    // The loop below would simply not run, and the first query touching a
+    // changed table would fail somewhere far from here.
+    throw new Error(
+      `This project was saved by a newer version of the app (database version ${fromVersion}; ` +
+        `this version reads up to ${CURRENT_VERSION}). Update the app to open it.`,
+    )
+  }
+
+  db.pragma("foreign_keys = OFF")
 
   // Fresh database – load schema.sql and set version to CURRENT_VERSION
   if (fromVersion === 0 && !enforceMigrations) {

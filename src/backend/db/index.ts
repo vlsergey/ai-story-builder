@@ -11,7 +11,12 @@ import { CURRENT_VERSION, migrateDatabase } from "./migrations.js"
 export function openProjectDatabase(dbPath: string): Database.Database {
   createBackup(dbPath)
   const db = new Database(dbPath)
-  migrateDatabase(db)
+  try {
+    migrateDatabase(db)
+  } catch (e) {
+    db.close()
+    throw e
+  }
   return db
 }
 
