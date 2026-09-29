@@ -98,12 +98,12 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
       const keys = known[loop]
       // A key the loop no longer names may have grown: a parallel loop's
       // longer key starts with it.
-      const fit = (key: string | undefined) => {
+      const named = (key: string | undefined) => {
         if (key === undefined || !keys || keys.includes(key)) return key
         const grown = keys.filter((known) => known.startsWith(key))
         return grown.length === 1 ? grown[0] : undefined
       }
-      return fit(picked[loop]) ?? fit(followed[loop]) ?? keys?.[0] ?? "0"
+      return named(picked[loop]) ?? named(followed[loop]) ?? keys?.[0] ?? "0"
     },
     [picked, followed, known],
   )
