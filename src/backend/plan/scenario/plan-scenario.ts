@@ -17,7 +17,6 @@ import {
   subscribeToStatusEvents,
 } from "../nodes/generate/regenerateTreeNodesContents.js"
 import { ForEachProcessor } from "../nodes/graph/for-each-processor.js"
-import { templateVariables } from "../nodes/input-relevance.js"
 import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
 import { PlanNodeService } from "../nodes/plan-node-service.js"
 import { type FakeCall, type FakeCallKind, fakeEngine } from "./fake-engine.js"
@@ -130,12 +129,13 @@ export class GraphBuilder {
   }
 
   private wireFromPrompts(title: string, templates: (string | undefined)[]): void {
-    const names = new Set<string>()
-    for (const template of templates) {
-      for (const name of (template && templateVariables(template)) || []) names.add(name)
+    // Wired from the prompt text itself, not from `templateVariables`: the
+    // relevance rule under test must not decide which edges a scenario has.
+    const text = templates.filter(Boolean).join("\n")
+    for (const node of new PlanNodeRepository().findAll()) {
+      if (node.title === title) continue
+      if (text.includes(`[${node.title}]`) || text.includes(`{{${node.title}}}`)) this.edge(node.title, title, "text")
     }
-    const known = new Set(new PlanNodeRepository().findAll().map((n) => n.title))
-    for (const name of names) if (name !== title && known.has(name)) this.edge(name, title, "text")
   }
 }
 
@@ -265,6 +265,12 @@ export class PlanScenario {
     })
   }
 
+  /** The editor's "Generate summary" button. */
+  async summarize(title: string): Promise<void> {
+    this.since = this.engine.calls.length
+    await new PlanNodeService().aiGenerateSummary(nodeId(title))
+  }
+
   /** Starts a review of the node, as the editor's review mode does. */
   async startReview(title: string): Promise<void> {
     await new PlanNodeService().startReview(nodeId(title))
@@ -309,17 +315,23 @@ export class PlanScenario {
     return this.stateAt(title, iteration).status
   }
 
-  wordCount(title: string): number {
-    return rowByTitle(title).word_count
+  wordCount(title: string, iteration?: number): number {
+    return this.stateAt(title, iteration).word_count
   }
 
   inReview(title: string, iteration?: number): boolean {
     return this.stateAt(title, iteration).in_review === 1
   }
 
-  /** Every node's title and status. */
+  /** Every node's status; a loop's child once per iteration, titled `Title #i`. */
   nodes(): { title: string; status: PlanNodeStatus }[] {
-    return new PlanNodeRepository().findAll().map((n) => ({ title: n.title, status: n.status }))
+    const all = new PlanNodeRepository().findAll()
+    return all.flatMap((node) => {
+      const parent = all.find((p) => p.id === node.parent_id)
+      if (parent?.type !== "for-each") return [{ title: node.title, status: node.status }]
+      const length = (JSON.parse(parent.content || "{}") as ForEachNodeContent).length ?? 0
+      return Array.from({ length }, (_, i) => ({ title: `${node.title} #${i}`, status: this.status(node.title, i) }))
+    })
   }
 
   /**
@@ -368,7 +380,7 @@ export class PlanScenario {
   private stateAt(
     title: string,
     iteration?: number,
-  ): { content: string | null; status: PlanNodeStatus; in_review: number } {
+  ): { content: string | null; status: PlanNodeStatus; in_review: number; word_count: number } {
     const row = rowByTitle(title)
     if (iteration === undefined) return row
     const loop = row.parent_id === null ? undefined : new PlanNodeRepository().findById(row.parent_id)
@@ -376,12 +388,13 @@ export class PlanScenario {
     const parsed = JSON.parse(loop.content || "{}") as ForEachNodeContent
     if (iteration === (parsed.currentIndex ?? 0)) return row
     const entry = parsed.overrides?.[iteration]?.[`${row.id}`]
-    if (!entry) return { content: null, status: "OUTDATED", in_review: 0 }
+    if (!entry) return { content: null, status: "OUTDATED", in_review: 0, word_count: 0 }
     return {
       content: entry.content ?? null,
       status: (entry.status ?? "EMPTY") as PlanNodeStatus,
       // Review fields are not snapshotted: the row's are the only ones there are.
       in_review: row.in_review,
+      word_count: entry.word_count ?? 0,
     }
   }
 

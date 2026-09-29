@@ -88,6 +88,15 @@ describe("an edit between runs", () => {
     expect(s.generated()).toContain("Мир")
   })
 
+  it("does not re-run readers when only a summary is written — prompts never read summaries", async () => {
+    const s = await settledStory()
+
+    await s.summarize("План")
+    await s.run()
+
+    expect(s.generated()).toEqual([])
+  })
+
   it("keeps the word count in step with the text", async () => {
     const s = await settledStory()
 

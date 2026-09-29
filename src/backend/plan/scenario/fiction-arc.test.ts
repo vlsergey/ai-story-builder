@@ -47,13 +47,24 @@ describe("the fiction-arc template", () => {
     expect(s.generated().length).toBeGreaterThan(0)
   })
 
-  // Fixed by the iteration-state rework: a change from outside a loop reaches
-  // only the iteration mounted in the rows.
-  it.fails("re-writes every character's profile after the style changes", async () => {
+  it("re-writes every character's profile after the style changes — the cast list is rebuilt from it", async () => {
     const s = await fictionArc()
     await s.run()
 
     await s.type("Стиль", "Короткие фразы, без канцелярита.")
+    await s.run()
+
+    expect(s.calls("text").filter((c) => c.node === "Профиль персонажа")).toHaveLength(2)
+  })
+
+  // Fixed by the iteration-state rework: a change from outside a loop reaches
+  // only the iteration mounted in the rows. «Голоса персонажей» feeds the
+  // profiles but not the cast list, so nothing re-seeds the loop.
+  it.fails("re-writes every character's profile after the voices change", async () => {
+    const s = await fictionArc()
+    await s.run()
+
+    await s.type("Голоса персонажей", "Аня говорит отрывисто, Боря — длинными периодами.")
     await s.run()
 
     expect(s.calls("text").filter((c) => c.node === "Профиль персонажа")).toHaveLength(2)

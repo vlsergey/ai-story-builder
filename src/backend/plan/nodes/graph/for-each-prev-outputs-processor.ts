@@ -1,5 +1,6 @@
 import type { ForEachNodeContent } from "../../../../shared/for-each-plan-node.js"
-import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 import type { NodeProcessor } from "./node-processor.js"
 
@@ -57,5 +58,20 @@ export class ForEachPrevOutputsProcessor implements NodeProcessor<unknown> {
     }
     console.log("[ForEachPrevOutputsProcessor] results", results)
     return results
+  }
+
+  /**
+   * Keeps the outputs it reads in its own content. They live in the loop's
+   * snapshots, not in this row, so without the copy nothing downstream would
+   * learn that an earlier iteration's result changed: the cascade follows
+   * content. On the first iteration there is nothing before it — EMPTY.
+   */
+  async regenerate(
+    service: PlanNodeService,
+    _context: RegenerationNodeContext,
+    node: PlanNodeRow,
+  ): Promise<PlanNodeUpdate> {
+    const outputs = this.getOutput(service, node)
+    return outputs.length === 0 ? { content: null, status: "EMPTY" } : { content: JSON.stringify(outputs) }
   }
 }
