@@ -44,7 +44,28 @@ with mounting: [removals.md](removals.md).
 
 ## Phase 1 — state model, `for-each` on it, no behaviour change
 
-On branch `iteration-state`. In order:
+**Landed** on `iteration-state`: `f9ac300`, `7d38671`. The scenario suite passes
+with only its driver changed; all eight `it.fails` flipped. 033 dry run on copies
+of the nine local projects: 1164/1164 loop-child iterations read as the old model
+read them; one WARN (the known 25th snapshot of «Брат и сёстры»).
+Where the code went beyond or differs from the plan below:
+
+- A loop writes a changed element's input as OUTDATED; the iteration's own run
+  settles it, so it is counted and summarized like any node (the scenario
+  "does not summarize unchanged elements" needs exactly that).
+- A prompt edit also demotes GENERATING rows, so the in-flight result is dropped.
+- Adding, removing or retyping an edge demotes the target everywhere if its
+  prompt reads the source.
+- Every external write names a current iteration (`checkPath`, 404 otherwise).
+  Editor saves of state fields are compare-and-set; on a 409 the editor saves on
+  top when only statuses moved, and asks when the text changed.
+- Telemetry `node_id`/`path` come from an AsyncLocalStorage set per node run
+  (migration 034). The progress event names the first failure (`firstErrorAt`).
+- **Deferred:** the tree of progress frames (only concurrency needs it — phase 2),
+  `iterationStatuses` and path-carrying node events (the UI still invalidates
+  every node query on any event), a missing row shown as EMPTY in the graph.
+
+The plan as written:
 
 1. **Tooling:** `migrateDatabase(db, {toVersion})` with `migrateDatabase(db, true)`
    still working, the structural schema test, real transactions, the pinned

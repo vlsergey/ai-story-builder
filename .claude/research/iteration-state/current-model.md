@@ -1,7 +1,8 @@
 # Iteration state — the current model
 
-*2026-09-29, revised after review. How `for-each` keeps its children's state today,
-and what that costs. The proposal that replaces it: [README.md](README.md).*
+*2026-09-29. How `for-each` kept its children's state **before phase 1** and what
+that cost. Replaced on `iteration-state` (`f9ac300`); kept because migration 033
+reads this layout. Line pointers are to `master` before the rework.*
 
 ## Mounting an iteration into the definition rows
 

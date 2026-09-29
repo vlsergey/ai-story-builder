@@ -1,9 +1,8 @@
 # Iteration state — rework proposal
 
-*2026-09-29. Status: **proposal for architecture review**, branch `iteration-state`,
-revised after an independent fact-check and design critique. Phase 0 is done on
-`master` ([plan.md](plan.md)); the rework itself is not started. Re-verify
-pointers before relying on them.*
+*2026-09-29. Status: phase 0 done on `master`; **phase 1 landed** on branch
+`iteration-state` ([plan.md](plan.md)), its implementation review under way;
+phases 2–3 next. Re-verify pointers before relying on them.*
 
 ## In short
 
@@ -27,7 +26,7 @@ makes loops sequential by construction and breeds the hacks listed in
 
 | note | what it covers |
 |---|---|
-| [current-model.md](current-model.md) | how mounting works today and what it costs |
+| [current-model.md](current-model.md) | how mounting worked before phase 1 — what migration 033 reads |
 | [removals.md](removals.md) | every hack that goes, and what replaces it |
 | [data-model.md](data-model.md) | the state table, the path, missing vs EMPTY, iteration identity |
 | [engine.md](engine.md) | paths, repository, write ordering, processors, input resolution |
@@ -77,17 +76,16 @@ By the project owner, 2026-09-29:
 
 ## Open questions
 
-1. Is `ai_improve_instruction` state (one improve session over one content, per
-   iteration) or definition (the user's standing instruction, shared by all)?
-   033 needs the answer: it drops the column.
+1. ~~`ai_improve_instruction`: state or definition?~~ State, per iteration
+   (decided; 033 moves it with the rest).
 2. Phase 3: teach the template updater to change a node's type, or move existing
    projects' character loops with a one-off migration?
 3. Is 6 hex characters the right minimum key length?
 4. Add `fast-check` as a dev dependency for property tests?
-5. Concurrency defaults: 4 per parallel container, a run-wide cap per engine,
-   1 for Ollama. Enough, too many?
-6. A prompt edit on a MANUAL node: keep it MANUAL (proposed), or demote it as the
-   mounted row is demoted today?
+5. ~~Concurrency defaults~~ Decided: a setting of the engine — Ollama 1,
+   Yandex and Grok 10; a parallel container may override it lower. The
+   container type is called `parallel`.
+6. ~~A prompt edit on a MANUAL node~~ Decided: it stays MANUAL.
 7. Text typed into a prompt-less node inside a loop exists at one path. Offer
    "apply to every iteration", or treat such text as part of the definition?
 8. The migration clears review state on loop children, since it may belong to

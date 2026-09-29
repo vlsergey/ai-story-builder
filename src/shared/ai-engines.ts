@@ -116,6 +116,26 @@ export const CAPABILITY_KEYS: Array<keyof AiEngineCapabilities> = [
   "knowledgeBaseAttachment",
 ]
 
+/**
+ * How many calls the engine takes at once. A setting of the engine: a cloud
+ * API serves many requests side by side, a local model one at a time.
+ */
+function maxConcurrentCallsField<D extends string>(defaultValue: D) {
+  return {
+    key: "max_concurrent_calls",
+    type: "integer",
+    defaultValue,
+    schema: optionalNumber(z.coerce.number().int().min(1)),
+  } as const
+}
+
+/** The engine's `max_concurrent_calls` when its settings leave it empty. */
+export function defaultMaxConcurrentCalls(engineId: AiEngineKey): number {
+  const engine: AiEngineDefinition | undefined = BUILTIN_ENGINES.find((e) => e.id === engineId)
+  const field = engine?.configFields.find((f) => f.key === "max_concurrent_calls")
+  return Number(field?.defaultValue ?? 1)
+}
+
 export const GROK_ENGINE_DEF = {
   id: "grok",
   provider: "xAI",
@@ -131,6 +151,7 @@ export const GROK_ENGINE_DEF = {
     { key: "api_key", type: "password" },
     { key: "management_key", type: "password" },
     { key: "team_id", type: "input" },
+    maxConcurrentCallsField("10"),
   ],
   aiSettingsFields: [
     { key: "max_output_tokens", type: "integer", schema: optionalNumber(z.coerce.number().int().min(1)) },
@@ -175,6 +196,7 @@ export const YANDEX_ENGINE_DEF = {
   configFields: [
     { key: "api_key", type: "password" },
     { key: "folder_id", type: "input" },
+    maxConcurrentCallsField("10"),
   ],
   aiSettingsFields: [
     { key: "max_completion_tokens", type: "integer", schema: optionalNumber(z.coerce.number().int().min(1)) },
@@ -217,7 +239,8 @@ export const OLLAMA_ENGINE_DEF = {
     knowledgeBase: false,
     knowledgeBaseAttachment: false,
   },
-  configFields: [{ key: "base_url", type: "input" }],
+  // One call at a time by default: the daemon serves whoever else uses it too.
+  configFields: [{ key: "base_url", type: "input" }, maxConcurrentCallsField("1")],
   aiSettingsFields: [
     { key: "max_output_tokens", type: "integer", schema: optionalNumber(z.coerce.number().int().min(1)) },
     { key: "temperature", defaultValue: "1", type: "decimal", schema: optionalNumber(z.coerce.number().min(0).max(2)) },
