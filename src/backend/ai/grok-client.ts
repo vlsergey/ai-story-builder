@@ -48,6 +48,18 @@ export async function grokGenerate(
   // anything — one call asks one question and wants one answer.
   const itemText = new Map<number, string>()
   const itemOrder: number[] = []
+  const answer = () => {
+    for (let i = itemOrder.length - 1; i >= 0; i--) {
+      const candidate = itemText.get(itemOrder[i]) ?? ""
+      if (candidate.length > 0) return candidate
+    }
+    return ""
+  }
+  // A call that yields no answer must say why: an empty string passes for
+  // success, and the caller then fails on "an empty answer" with the reason lost.
+  let completed = false
+  let refusal = ""
+  let lastEventType = "none"
 
   for await (const event of stream) {
     if (isVerboseLogging()) {
@@ -56,6 +68,7 @@ export async function grokGenerate(
     }
 
     onEvent?.(event)
+    lastEventType = event.type
 
     switch (event.type) {
       case "response.output_text.delta": {
@@ -66,7 +79,15 @@ export async function grokGenerate(
         break
       }
 
+      case "response.refusal.delta":
+        refusal += event.delta
+        break
+
+      case "error":
+        throw new Error(`Grok stream error: ${event.code ?? "no code"}: ${event.message}`)
+
       case "response.completed":
+        completed = true
         lastAiGenerationEventManager.onAiGenerationEvent({ ...event.response?.usage })
         break
 
@@ -85,9 +106,9 @@ export async function grokGenerate(
     }
   }
 
-  for (let i = itemOrder.length - 1; i >= 0; i--) {
-    const candidate = itemText.get(itemOrder[i]) ?? ""
-    if (candidate.length > 0) return candidate
-  }
-  return ""
+  // A stop ends the stream quietly too; the caller knows its own signal.
+  if (abortSignal?.aborted) return answer()
+  if (refusal) throw new Error(`Grok refused: ${refusal}`)
+  if (!completed) throw new Error(`Grok stream ended before the response completed (last event: ${lastEventType})`)
+  return answer()
 }
