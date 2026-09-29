@@ -12,6 +12,7 @@ import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-sett
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
 import { generateWithTelemetry } from "./generate-with-telemetry.js"
+import { parseFoundProblems } from "./parse-found-problems.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
 export async function findProblems(
@@ -78,7 +79,7 @@ export async function findProblems(
     iterationIndex: iteration,
     onEvent,
   })
-  return JSON.parse(aiResult) as FindProblemsResult
+  return parseFoundProblems(aiResult, node.title)
 }
 
 export async function fixProblems(
