@@ -2,13 +2,16 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { AGE_RATING_INFO, AGE_RATING_ORDER } from "../../../../shared/ai-engines.js"
 import type { ProjectTemplate, TemplateProjectPlanNode, WizardField } from "../../../../shared/project-template.js"
 import { replaceTemplates } from "../../../ai/replaceTemplates.js"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
 import { computeTemplateLayoutWithEntries } from "../../../lib/elk-template-layout.js"
 import { templateVariables } from "../../../plan/nodes/input-relevance.js"
-import { applyProjectTemplate, normalizeAndReplaceContent } from "../../../projects/apply-project-template.js"
+import {
+  applyProjectTemplate,
+  normalizeAndReplaceContent,
+  wizardSubstitutions,
+} from "../../../projects/apply-project-template.js"
 
 vi.mock("../../../settings/settings-repository.js", () => ({
   SettingsRepository: {
@@ -37,12 +40,6 @@ const INTERNAL_PLAN_NODE_TYPES = new Set<string>(["for-each-input", "for-each-ou
 // matches only the bracket form.
 const PLACEHOLDER_RE = /\{\{\[([^\]]+)\]\}\}/g
 const WIZARD_VAR_RE = /\$\{([^}]+?)\}/g
-
-/** What a prompt under an adult rating says about age, by the template's language. */
-const ADULT_AGE_STATEMENT: Record<string, string> = {
-  ru: "Всем героям не менее 21 года.",
-  en: "All characters are at least 21 years old.",
-}
 
 interface NodeWithCtx {
   node: TemplateProjectPlanNode
@@ -616,34 +613,50 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     })
   })
 
-  // ─── Adult ratings: every character is at least 21 ───────────────────────
+  // ─── Minimum character age ───────────────────────────────────────────────
   // Grok refuses adult content unless every character is 21 or older, and
-  // other engines likely follow. Under 18+ and NC-21 every prompt says so
-  // outright, in the template's language; under a lower rating it says
-  // nothing about age.
-  describe("an adult rating tells the model every character is at least 21", () => {
-    const ratingFields = (template.wizardPages ?? []).flatMap((page) =>
-      page.fields.filter((f) => f.type === "select-age-rating").map((f) => f.name),
-    )
-    if (ratingFields.length === 0) {
-      it.skip("template has no age-rating wizard field — rule N/A", () => {})
+  // other engines likely follow. A template lets the user say how old the
+  // characters are with a `minCharacterAge` select, and every LLM call
+  // carries the choice in the option's own words.
+  describe("every LLM call carries the minimum character age", () => {
+    const minAge = (template.wizardPages ?? []).flatMap((page) => page.fields).find((f) => f.name === "minCharacterAge")
+    if (!minAge) {
+      it.skip("template has no minCharacterAge wizard field — rule N/A", () => {})
       return
     }
-    const language = /\.(\w+)\.json$/.exec(file)?.[1] ?? ""
-    const statement = ADULT_AGE_STATEMENT[language]
     const llmCallTypes = new Set(["text", "split", "lore", "fix-problems"])
 
-    it("in every prompt, and only under 18+ and NC-21", () => {
-      expect(statement, `no adult age statement for the language "${language}"`).toBeDefined()
+    it("in every prompt, as the chosen option says it", () => {
+      expect(minAge.type).toBe("select")
+      if (minAge.type !== "select") return
       const failures: string[] = []
       for (const { node } of allNodes.filter(({ node }) => llmCallTypes.has(node.type))) {
         for (const { field, lines } of gatherPromptFields(node)) {
-          const ratingLines = lines.filter((line) => ratingFields.some((name) => line.includes(`\${${name}}`)))
-          for (const { label, minAge } of AGE_RATING_ORDER.map((code) => AGE_RATING_INFO[code])) {
-            const values = Object.fromEntries(ratingFields.map((name) => [name, label]))
-            const rendered = replaceTemplates<string>(normalizeAndReplaceContent(ratingLines, values), {})
-            if (rendered.includes(statement) !== minAge >= 18) failures.push(`${node.title}.${field} under ${label}`)
+          const ageLines = lines.filter((line) => line.includes("${minCharacterAge}"))
+          if (ageLines.length === 0) failures.push(`${node.title}.${field} does not mention it`)
+          for (const option of minAge.options) {
+            const values = wizardSubstitutions(template, { minCharacterAge: option.value })
+            const rendered = replaceTemplates<string>(normalizeAndReplaceContent(ageLines, values), {})
+            if (option.text && !rendered.includes(option.text))
+              failures.push(`${node.title}.${field} under ${option.label}`)
           }
+        }
+      }
+      expect(failures).toEqual([])
+    })
+  })
+
+  // ─── No branching on a wizard value at call time ─────────────────────────
+  // A wizard value is known once the template applies. A prompt that branches
+  // on it when the model is called leaves in the text the user reads a
+  // condition settled long ago — `(eq "18+" "18+")`. The choice belongs in a
+  // select option's text, which the apply substitutes.
+  describe("no prompt branches on a wizard value at call time", () => {
+    it("has no {{#if}} or {{#unless}} over a ${…} substitution", () => {
+      const failures: string[] = []
+      for (const { node } of allNodes) {
+        for (const { field, lines } of gatherPromptFields(node)) {
+          if (lines.some((line) => /\{\{#(?:if|unless)\b[^}]*\$\{/.test(line))) failures.push(`${node.title}.${field}`)
         }
       }
       expect(failures).toEqual([])

@@ -24,6 +24,8 @@
   "UpdateFromTemplateDialog.newEdgesHeader": "{{count}} edge(s) will be added",
   "UpdateFromTemplateDialog.newNodesHeader": "{{count}} node(s) will be added",
   "UpdateFromTemplateDialog.noChanges": "The template hasn't changed since it was applied. Nothing to do.",
+  "UpdateFromTemplateDialog.parametersDescription": "A changed parameter rewrites the prompts that use it, and the project keeps the new value.",
+  "UpdateFromTemplateDialog.parametersHeader": "Template parameters",
   "UpdateFromTemplateDialog.removeMissingEdgesDescription": "The update normally only adds. A dead input edge never reaches the prompt, but it still marks the node outdated every time its source changes. Edges wired by hand inside the project are left alone.",
   "UpdateFromTemplateDialog.removeMissingEdgesLabel": "Delete edges missing from the template",
   "UpdateFromTemplateDialog.removedEdgesHeader": "{{count}} edge(s) are no longer in the template",

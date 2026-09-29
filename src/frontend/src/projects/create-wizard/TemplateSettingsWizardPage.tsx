@@ -128,7 +128,8 @@ interface ControllableWizardFieldRendererProps<
   adviceContext: Record<string, string>
 }
 
-function ControllableWizardFieldRenderer<T extends FieldValues>({
+/** One wizard field as a form control: in the create wizard, and in the update-from-template dialog. */
+export function ControllableWizardFieldRenderer<T extends FieldValues>({
   field,
   fieldState,
   wizardField,
@@ -213,6 +214,20 @@ function ControllableWizardFieldRenderer<T extends FieldValues>({
                 </SelectItem>
               )
             })}
+          </SelectContent>
+        </Select>
+      )}
+      {wizardField.type === "select" && (
+        <Select value={field.value ?? ""} onValueChange={field.onChange}>
+          <SelectTrigger id={htmlId} className="w-full" onBlur={field.onBlur}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {wizardField.options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       )}

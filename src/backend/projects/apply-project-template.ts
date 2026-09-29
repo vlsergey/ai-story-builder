@@ -160,10 +160,36 @@ function translateFixProblemsSettingsToRuntime(
 }
 
 /**
+ * What each `${name}` of a template becomes, from the values a project holds
+ * for its wizard fields. A select's choice becomes its option's text. A field
+ * the project holds no value for — one the template gained after the project
+ * was made — takes the template's default, and so does a choice the template
+ * no longer offers.
+ */
+export function wizardSubstitutions(
+  template: ProjectTemplate,
+  wizardData: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...wizardData }
+  for (const field of template.wizardPages?.flatMap((page) => page.fields) ?? []) {
+    const held = out[field.name] ?? ("defaultValue" in field ? field.defaultValue : undefined)
+    if (field.type === "select") {
+      const option =
+        field.options.find((o) => o.value === held) ?? field.options.find((o) => o.value === field.defaultValue)
+      out[field.name] = option ? (option.text ?? option.value) : ""
+    } else if (held !== undefined) {
+      out[field.name] = held
+    }
+  }
+  return out
+}
+
+/**
  * Applies a parsed project template to the currently open project database:
  * creates plan nodes (with coordinates and sizes), edges and lore nodes.
  */
-export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateData: Record<string, any>): void {
+export function applyProjectTemplate(projectTemplate: ProjectTemplate, wizardData: Record<string, any>): void {
+  const templateData = wizardSubstitutions(projectTemplate, wizardData)
   const planRepo = new PlanNodeRepository()
   const nodeService = new PlanNodeService()
   const edgeRepo = new PlanEdgeRepository()

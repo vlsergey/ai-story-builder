@@ -24,6 +24,9 @@ export function buildFormSchema(wizardFields: WizardField[]): ZodObject<Record<s
           result = z.enum(labels as [string, ...string[]])
           break
         }
+        case "select":
+          result = z.enum(field.options.map((option) => option.value) as [string, ...string[]])
+          break
         case "integer":
           result = z.coerce.number().int().min(field.min).max(field.max)
           break

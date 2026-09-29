@@ -5,14 +5,16 @@ import type {
   ProjectTemplate,
   TemplateProjectPlanNode,
   TemplateProjectPlanNodeInput,
+  WizardField,
 } from "../../shared/project-template.js"
+import { buildFormSchema } from "../../shared/project-template-form.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { usesInput } from "../plan/nodes/input-relevance.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
-import { normalizeAndReplaceContent } from "./apply-project-template.js"
+import { normalizeAndReplaceContent, wizardSubstitutions } from "./apply-project-template.js"
 import { getTemplateFolders } from "./project-templates.js"
 
 /**
@@ -72,6 +74,37 @@ export interface TemplateUpdateAnalysis {
   retypedNodes: RetypedNode[]
   /** Type changes the project cannot follow, with the reason. */
   retypeBlocked: (RetypedNode & { reason: string })[]
+  /**
+   * The template's parameters an update may change — the wizard fields it
+   * marks `editableOnUpdate` — with the value this update uses for each.
+   */
+  parameters: TemplateParameter[]
+}
+
+export interface TemplateParameter {
+  field: WizardField
+  value: string
+}
+
+/**
+ * New values for some of the template's parameters, as the dialog sends them.
+ * Numbers come as numbers; the project keeps every value as a string.
+ */
+export type TemplateParameterChanges = Record<string, string | number>
+
+function editableFields(template: ProjectTemplate): WizardField[] {
+  return (template.wizardPages ?? [])
+    .flatMap((page) => page.fields)
+    .filter((field) => field.editableOnUpdate && field.type !== "advice")
+}
+
+/** The value a field has in the project, or the template's default where it has none. */
+function heldValue(field: WizardField, wizardData: Record<string, string>): string {
+  const held = wizardData[field.name]
+  const fallback = "defaultValue" in field && field.defaultValue !== undefined ? String(field.defaultValue) : ""
+  if (held === undefined) return fallback
+  if (field.type === "select" && !field.options.some((option) => option.value === held)) return fallback
+  return held
 }
 
 // Keys in node_type_settings that count as "instruction-shaped" for the
@@ -101,15 +134,33 @@ function locateTemplateFile(filename: string): string {
   )
 }
 
-function loadAppliedContext(): { template: ProjectTemplate; wizardData: Record<string, string>; filename: string } {
+interface AppliedContext {
+  template: ProjectTemplate
+  /** The values the project holds for the wizard fields, with the changes on top. */
+  wizardData: Record<string, string>
+  /** What each `${name}` becomes — see `wizardSubstitutions`. */
+  substitutions: Record<string, unknown>
+  filename: string
+}
+
+function loadAppliedContext(changes: TemplateParameterChanges = {}): AppliedContext {
   const filename = SettingsRepository.getAppliedTemplateFile()
   if (!filename) {
     throw makeErrorWithStatus("Project was not created from a template — no template to update from.", 400)
   }
   const filePath = locateTemplateFile(filename)
   const template = JSON.parse(fs.readFileSync(filePath, "utf8")) as ProjectTemplate
-  const wizardData = SettingsRepository.getAppliedTemplateWizardData() ?? {}
-  return { template, wizardData, filename }
+  const wizardData = { ...(SettingsRepository.getAppliedTemplateWizardData() ?? {}) }
+
+  const editable = editableFields(template)
+  for (const [name, value] of Object.entries(changes)) {
+    const field = editable.find((f) => f.name === name)
+    if (!field) throw makeErrorWithStatus(`«${name}» is not a parameter an update may change`, 400)
+    const checked = buildFormSchema([field]).safeParse({ [name]: value })
+    if (!checked.success) throw makeErrorWithStatus(`«${field.label}» cannot be ${JSON.stringify(value)}`, 400)
+    wizardData[name] = String(value)
+  }
+  return { template, wizardData, substitutions: wizardSubstitutions(template, wizardData), filename }
 }
 
 function walkTemplate(
@@ -133,14 +184,14 @@ function walkTemplate(
  */
 function buildTemplateInstructionSettings(
   node: TemplateProjectPlanNode,
-  wizardData: Record<string, string>,
+  substitutions: Record<string, unknown>,
 ): Record<string, unknown> {
   // Substitute `${var}` inside string values of nodeTypeSettings so template
   // authors can wire wizard fields straight into settings (e.g. SplitSettings
   // `expectedPartsCount: "${chunksCount}"`). Mirrors apply-project-template.
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node.nodeTypeSettings ?? {})) {
-    out[k] = typeof v === "string" ? normalizeAndReplaceContent([v], wizardData) : v
+    out[k] = typeof v === "string" ? normalizeAndReplaceContent([v], substitutions) : v
   }
 
   if (node.type === "fix-problems") {
@@ -152,7 +203,7 @@ function buildTemplateInstructionSettings(
     ] as const) {
       const v = out[k]
       if (Array.isArray(v)) {
-        out[k] = normalizeAndReplaceContent(v as string[], wizardData)
+        out[k] = normalizeAndReplaceContent(v as string[], substitutions)
       }
     }
     // sourceNodeTitleToFix → sourceNodeIdToFix is translated at apply time
@@ -163,7 +214,7 @@ function buildTemplateInstructionSettings(
   }
 
   if (node.aiUserInstructions) {
-    out.userPrompt = normalizeAndReplaceContent(node.aiUserInstructions, wizardData)
+    out.userPrompt = normalizeAndReplaceContent(node.aiUserInstructions, substitutions)
   }
 
   return out
@@ -262,8 +313,9 @@ function projectEdgeTriples(): EdgeTripleStore {
   return store
 }
 
-export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
-  const { template, wizardData, filename } = loadAppliedContext()
+/** What an update would do — with `changes` to the template's parameters, if any. */
+export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): TemplateUpdateAnalysis {
+  const { template, wizardData, substitutions, filename } = loadAppliedContext(changes)
 
   const templateNodes = walkTemplate(template.plan?.nodes)
   const projectNodes = new PlanNodeRepository().findAll()
@@ -295,7 +347,7 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
         }
       }
     }
-    const templateSettings = buildTemplateInstructionSettings(tNode, wizardData)
+    const templateSettings = buildTemplateInstructionSettings(tNode, substitutions)
     const projectSettings = parseProjectSettings(projectNode.node_type_settings)
     const templateAiSettingsJson = tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null
     const aiSettingsDiff = templateAiSettingsJson !== (projectNode.ai_settings ?? null)
@@ -340,6 +392,7 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
     removedEdges,
     retypedNodes,
     retypeBlocked,
+    parameters: editableFields(template).map((field) => ({ field, value: heldValue(field, wizardData) })),
   }
 }
 
@@ -364,13 +417,16 @@ export interface TemplateUpdateApplyOptions {
    * nothing.
    */
   removeMissingEdges?: boolean
+  /** New values for parameters the template marks `editableOnUpdate`; the project keeps them. */
+  parameters?: TemplateParameterChanges
 }
 
 export async function applyTemplateUpdate(
   options: TemplateUpdateApplyOptions = {},
 ): Promise<TemplateUpdateApplyResult> {
-  const { template, wizardData } = loadAppliedContext()
-  const analysis = analyzeTemplateUpdate()
+  const changes = options.parameters ?? {}
+  const { template, wizardData, substitutions } = loadAppliedContext(changes)
+  const analysis = analyzeTemplateUpdate(changes)
   const nodeRepo = new PlanNodeRepository()
   const edgeRepo = new PlanEdgeRepository()
   const nodeService = new PlanNodeService()
@@ -396,7 +452,7 @@ export async function applyTemplateUpdate(
     const tNode = templateByTitle.get(title)
     const pNode = projectMap.get(title)
     if (!tNode || !pNode) continue
-    const fresh = buildTemplateInstructionSettings(tNode, wizardData)
+    const fresh = buildTemplateInstructionSettings(tNode, substitutions)
     // Preserve any unrelated keys we don't manage.
     const current = parseProjectSettings(pNode.node_type_settings)
     const keys: readonly string[] =
@@ -433,7 +489,7 @@ export async function applyTemplateUpdate(
     const parentTitle = findParentTitle(tNode, template.plan?.nodes)
     const parentId = parentTitle ? (projectMap.get(parentTitle)?.id ?? null) : null
 
-    const initial = buildTemplateInstructionSettings(tNode, wizardData)
+    const initial = buildTemplateInstructionSettings(tNode, substitutions)
     nodeService.checkContainer(tNode.type as PlanNodeType, parentId)
     const id = nodeRepo.insert({
       title: tNode.title,
@@ -486,6 +542,9 @@ export async function applyTemplateUpdate(
       nodeService.demoteEverywhere(tgt.id)
     }
   }
+
+  // 5. Keep the new parameter values: the next update compares against them.
+  if (Object.keys(changes).length > 0) SettingsRepository.setAppliedTemplateWizardData(wizardData)
 
   return {
     appliedAt: new Date().toISOString(),

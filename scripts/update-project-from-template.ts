@@ -20,6 +20,9 @@
  *   # apply, and also drop edges the template no longer declares
  *   npx tsx scripts/update-project-from-template.ts --project "Гонец" --remove-missing-edges
  *
+ *   # apply with another value for a parameter the template marks editableOnUpdate
+ *   npx tsx scripts/update-project-from-template.ts --project "Гонец" --set minCharacterAge=21
+ *
  * Title-based diffing has a known gap: a renamed-in-template node looks like
  * 'deleted old + added new' to this tool — the old project node stays as an
  * orphan, the new one gets inserted. Handle that case manually.
@@ -33,6 +36,7 @@ interface CliArgs {
   project: string
   dryRun: boolean
   removeMissingEdges: boolean
+  set: string[]
 }
 
 function parseCli(): CliArgs {
@@ -46,12 +50,24 @@ function parseCli(): CliArgs {
       "Also delete edges the project has and the template no longer declares (off by default)",
       false,
     )
+    .option("--set <name=value...>", "New value for a parameter the template marks editableOnUpdate", [])
     .parse()
   return program.opts<CliArgs>()
 }
 
+function parseChanges(assignments: string[]): Record<string, string> {
+  return Object.fromEntries(
+    assignments.map((assignment) => {
+      const at = assignment.indexOf("=")
+      if (at <= 0) throw new Error(`--set expects name=value, got "${assignment}"`)
+      return [assignment.slice(0, at), assignment.slice(at + 1)]
+    }),
+  )
+}
+
 function printAnalysis(analysis: ReturnType<typeof analyzeTemplateUpdate>): void {
   console.info(`Template: ${analysis.templateFile}`)
+  for (const { field, value } of analysis.parameters) console.info(`Parameter ${field.name} = "${value}"`)
   console.info(`Unchanged nodes: ${analysis.unchangedCount}`)
   if (analysis.updatedNodes.length > 0) {
     console.info(`Updated nodes (${analysis.updatedNodes.length}) — instruction fields will be rewritten:`)
@@ -90,9 +106,10 @@ function printAnalysis(analysis: ReturnType<typeof analyzeTemplateUpdate>): void
 
 async function main(): Promise<void> {
   const args = parseCli()
+  const changes = parseChanges(args.set)
   console.info(`Opening project: ${openProject(args.project)}`)
 
-  const analysis = analyzeTemplateUpdate()
+  const analysis = analyzeTemplateUpdate(changes)
   printAnalysis(analysis)
 
   if (args.dryRun) {
@@ -107,7 +124,8 @@ async function main(): Promise<void> {
     analysis.retypedNodes.length === 0 &&
     analysis.newNodes.length === 0 &&
     analysis.newEdges.length === 0 &&
-    removableEdges === 0
+    removableEdges === 0 &&
+    Object.keys(changes).length === 0
   ) {
     console.info("\nProject is already in sync with the template — nothing to apply.")
     setCurrentDbPath(null)
@@ -115,7 +133,7 @@ async function main(): Promise<void> {
   }
 
   console.info("\nApplying…")
-  const result = await applyTemplateUpdate({ removeMissingEdges: args.removeMissingEdges })
+  const result = await applyTemplateUpdate({ removeMissingEdges: args.removeMissingEdges, parameters: changes })
   console.info(
     `Applied at ${result.appliedAt}: ${result.retypedNodeCount} change(s) of kind, ` +
       `${result.updatedNodeCount} instruction rewrite(s), ` +

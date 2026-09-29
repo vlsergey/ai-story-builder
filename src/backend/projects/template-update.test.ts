@@ -430,3 +430,89 @@ describe("template-update", () => {
     expect(stateAt(child.id)?.content, "content is not touched").toBe("written against the old inputs")
   })
 })
+
+describe("template-update — the parameters an update may change", () => {
+  let mod: typeof import("./template-update.js")
+
+  beforeEach(async () => {
+    setUpTestDb()
+    mod = await import("./template-update.js")
+  })
+
+  afterEach(() => {
+    tearDownTestDb()
+  })
+
+  function withParameters(): ProjectTemplate {
+    const template = baseTemplate()
+    template.wizardPages = [
+      {
+        id: "p",
+        title: "p",
+        fields: [
+          { name: "synopsis", type: "textarea", label: "Synopsis" },
+          {
+            name: "minAge",
+            type: "select",
+            label: "Minimum age",
+            editableOnUpdate: true,
+            defaultValue: "none",
+            options: [
+              { value: "none", label: "Not specified", text: "" },
+              { value: "21", label: "21+", text: "All characters are at least 21." },
+            ],
+          },
+          { name: "chunks", type: "integer", label: "Chunks", min: 1, max: 9, defaultValue: 4, editableOnUpdate: true },
+        ],
+      },
+    ]
+    // Concatenated to defuse biome's noTemplateCurlyInString.
+    template.plan!.nodes![0].aiUserInstructions = [`Rules: ${"$"}{minAge}`]
+    return template
+  }
+
+  function createProject(wizardData: Record<string, string>): void {
+    const template = withParameters()
+    writeTemplate("parameters.json", template)
+    applyProjectTemplate(template, wizardData)
+    SettingsRepository.setAppliedTemplateFile("parameters.json")
+    SettingsRepository.setAppliedTemplateWizardData(wizardData)
+  }
+
+  const promptOf = (title: string): string =>
+    JSON.parse(new PlanNodeRepository().findAll().find((n) => n.title === title)!.node_type_settings!).userPrompt
+
+  it("offers the fields the template marks editable, with the values the project holds", () => {
+    createProject({ synopsis: "S", minAge: "21" })
+
+    const offered = mod.analyzeTemplateUpdate().parameters.map(({ field, value }) => [field.name, value])
+
+    expect(offered, "the default where the project holds none").toEqual([
+      ["minAge", "21"],
+      ["chunks", "4"],
+    ])
+  })
+
+  it("rewrites the prompts a changed parameter reaches, and keeps the new value", async () => {
+    createProject({ synopsis: "S", minAge: "none" })
+    expect(promptOf("Root")).toBe("Rules: ")
+
+    expect(mod.analyzeTemplateUpdate({ minAge: "21" }).updatedNodes.map((n) => n.title)).toEqual(["Root"])
+    await mod.applyTemplateUpdate({ parameters: { minAge: "21" } })
+
+    expect(promptOf("Root")).toBe("Rules: All characters are at least 21.")
+    expect(SettingsRepository.getAppliedTemplateWizardData()).toEqual({ synopsis: "S", minAge: "21" })
+    expect(mod.analyzeTemplateUpdate().updatedNodes, "in step with the new value").toEqual([])
+  })
+
+  it("refuses to change what the template does not mark editable", () => {
+    createProject({ synopsis: "S", minAge: "none" })
+    expect(() => mod.analyzeTemplateUpdate({ synopsis: "Another" })).toThrow(/synopsis/)
+  })
+
+  it("refuses a value the field does not offer", () => {
+    createProject({ synopsis: "S", minAge: "none" })
+    expect(() => mod.analyzeTemplateUpdate({ minAge: "18" })).toThrow(/Minimum age/)
+    expect(() => mod.analyzeTemplateUpdate({ chunks: 12 })).toThrow(/Chunks/)
+  })
+})
