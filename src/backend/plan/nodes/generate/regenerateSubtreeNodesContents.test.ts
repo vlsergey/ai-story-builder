@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
-import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
-import { PlanNodeRepository } from "../plan-node-repository.js"
+import { seedEdge, seedNode } from "../plan-node-fixtures.js"
 import { PlanNodeService } from "../plan-node-service.js"
 import { regenerateSubtreeNodesContents } from "./regenerateTreeNodesContents.js"
 
@@ -22,6 +21,27 @@ import { regenerateSubtreeNodesContents } from "./regenerateTreeNodesContents.js
 // to GENERATED, and we track the order of calls.
 const regenerateOrder: number[] = []
 
+/** The scheduler's context for the top level, with the progress bookkeeping stubbed out. */
+function topLevelContext(): any {
+  const abortController = new AbortController()
+  const options = { regenerateManual: false, regenerateGenerated: false }
+  return {
+    abortSignal: abortController.signal,
+    options,
+    path: "",
+    onNodeSkip: () => {},
+    onNodeStart: async <T>(node: any, block: (ctx: any) => Promise<{ result: T; status: string }>) => {
+      await block({
+        nodeId: node.id,
+        path: node.path,
+        abortSignal: abortController.signal,
+        options,
+        onResponseStreamEvent: () => {},
+      })
+    },
+  }
+}
+
 describe("regenerateSubtreeNodesContents — re-checks live status after cascades", () => {
   beforeEach(() => {
     setUpTestDb()
@@ -33,47 +53,32 @@ describe("regenerateSubtreeNodesContents — re-checks live status after cascade
   })
 
   it("does NOT run downstream after a cascade demotes the upstream mid-flight", async () => {
-    const nodeRepo = new PlanNodeRepository()
-    const edgeRepo = new PlanEdgeRepository()
-
     // A → B → C linear chain at the top level.
     // A is OUTDATED — scheduler regenerates it. When A is patched, the
     // service fires markAsOutdatedAndNotifyDownstreamNodes(A) which demotes
     // B (and transitively C) to OUTDATED. B was GENERATED before A regen.
-    const a = nodeRepo.insert({ title: "A", type: "text", parent_id: null, status: "OUTDATED" })
-    const b = nodeRepo.insert({ title: "B", type: "text", parent_id: null, status: "GENERATED", content: "old-B" })
-    const c = nodeRepo.insert({ title: "C", type: "text", parent_id: null, status: "OUTDATED" })
-    edgeRepo.insert({ from_node_id: a, to_node_id: b, type: "text" })
-    edgeRepo.insert({ from_node_id: b, to_node_id: c, type: "text" })
     // hasRegenerationCriteria requires text/split/lore nodes to have a
     // non-blank userPrompt, and a consumer is demoted only by inputs its
     // prompt reads.
-    nodeRepo.patch(a, { node_type_settings: JSON.stringify({ userPrompt: "stub" }) })
-    nodeRepo.patch(b, { node_type_settings: JSON.stringify({ userPrompt: "{{[A]}}" }) })
-    nodeRepo.patch(c, { node_type_settings: JSON.stringify({ userPrompt: "{{[B]}}" }) })
+    const a = seedNode({ title: "A", settings: JSON.stringify({ userPrompt: "stub" }), at: { "": "OUTDATED" } })
+    const b = seedNode({
+      title: "B",
+      settings: JSON.stringify({ userPrompt: "{{[A]}}" }),
+      at: { "": { status: "GENERATED", content: "old-B" } },
+    })
+    const c = seedNode({ title: "C", settings: JSON.stringify({ userPrompt: "{{[B]}}" }), at: { "": "OUTDATED" } })
+    seedEdge(a, b)
+    seedEdge(b, c)
 
     // Stub PlanNodeService.regenerate so each call patches the node to
     // GENERATED and records its id.
     vi.spyOn(PlanNodeService.prototype, "regenerate").mockImplementation(async function (this: PlanNodeService, ctx) {
       regenerateOrder.push(ctx.nodeId)
       // Mimic real regenerate: patch via the service so downstream-notify fires.
-      return await this.patch(ctx.nodeId, false, { status: "GENERATED", content: `gen-${ctx.nodeId}` })
+      return await this.patch(ctx.nodeId, ctx.path, false, { status: "GENERATED", content: `gen-${ctx.nodeId}` })
     })
 
-    const abortController = new AbortController()
-    const containerContext: any = {
-      abortSignal: abortController.signal,
-      options: { regenerateManual: false, regenerateGenerated: false },
-      onNodeSkip: () => {},
-      onNodeStart: async <T>(_node: any, block: (ctx: any) => Promise<{ result: T; status: string }>) => {
-        await block({
-          nodeId: _node.id,
-          abortSignal: abortController.signal,
-          options: { regenerateManual: false, regenerateGenerated: false },
-          onResponseStreamEvent: () => {},
-        })
-      },
-    }
+    const containerContext = topLevelContext()
 
     await regenerateSubtreeNodesContents(containerContext, null)
 
@@ -101,50 +106,30 @@ describe("regenerateSubtreeNodesContents — re-checks live status after cascade
     //
     // Fix: only OUTDATED (and ERROR, debatably) counts as "source got demoted
     // by a cascade mid-flight". EMPTY post-regen is a valid terminal state.
-    const nodeRepo = new PlanNodeRepository()
-    const edgeRepo = new PlanEdgeRepository()
-
     // empty-source → emptyMerge → consumer.
     // emptyMerge will deterministically regen to EMPTY (no content).
     // consumer is OUTDATED and depends on emptyMerge — must run exactly once.
-    const src = nodeRepo.insert({
-      title: "Empty source",
-      type: "text",
-      parent_id: null,
-      status: "GENERATED",
-      content: "",
-    })
-    const merge = nodeRepo.insert({ title: "Empty merge", type: "merge", parent_id: null, status: "OUTDATED" })
-    const consumer = nodeRepo.insert({ title: "Consumer", type: "text", parent_id: null, status: "OUTDATED" })
-    edgeRepo.insert({ from_node_id: src, to_node_id: merge, type: "text" })
-    edgeRepo.insert({ from_node_id: merge, to_node_id: consumer, type: "text" })
     const stubSettings = JSON.stringify({ userPrompt: "stub" })
-    nodeRepo.patch(src, { node_type_settings: stubSettings })
-    nodeRepo.patch(consumer, { node_type_settings: stubSettings })
+    const src = seedNode({
+      title: "Empty source",
+      settings: stubSettings,
+      at: { "": { status: "GENERATED", content: "" } },
+    })
+    const merge = seedNode({ title: "Empty merge", type: "merge", at: { "": "OUTDATED" } })
+    const consumer = seedNode({ title: "Consumer", settings: stubSettings, at: { "": "OUTDATED" } })
+    seedEdge(src, merge)
+    seedEdge(merge, consumer)
 
     // Stub regenerate: merge returns EMPTY (no content), src/consumer return GENERATED with content.
     vi.spyOn(PlanNodeService.prototype, "regenerate").mockImplementation(async function (this: PlanNodeService, ctx) {
       regenerateOrder.push(ctx.nodeId)
-      const node = this.getById(ctx.nodeId)
+      const node = this.getRow(ctx.nodeId, ctx.path)
       const patch: { status: "GENERATED" | "EMPTY"; content: string } =
         node.type === "merge" ? { status: "EMPTY", content: "" } : { status: "GENERATED", content: `gen-${ctx.nodeId}` }
-      return await this.patch(ctx.nodeId, false, patch)
+      return await this.patch(ctx.nodeId, ctx.path, false, patch)
     })
 
-    const abortController = new AbortController()
-    const containerContext: any = {
-      abortSignal: abortController.signal,
-      options: { regenerateManual: false, regenerateGenerated: false },
-      onNodeSkip: () => {},
-      onNodeStart: async <T>(_node: any, block: (ctx: any) => Promise<{ result: T; status: string }>) => {
-        await block({
-          nodeId: _node.id,
-          abortSignal: abortController.signal,
-          options: { regenerateManual: false, regenerateGenerated: false },
-          onResponseStreamEvent: () => {},
-        })
-      },
-    }
+    const containerContext = topLevelContext()
 
     await regenerateSubtreeNodesContents(containerContext, null)
 
@@ -163,43 +148,23 @@ describe("regenerateSubtreeNodesContents — re-checks live status after cascade
     // so the run-time cascade has to carry the work instead. Here the merge
     // stops being empty because its own source finally produced something,
     // and the consumer must still be dragged back through regeneration.
-    const nodeRepo = new PlanNodeRepository()
-    const edgeRepo = new PlanEdgeRepository()
-
-    const src = nodeRepo.insert({ title: "Src", type: "text", parent_id: null, status: "OUTDATED" })
-    const merge = nodeRepo.insert({ title: "Agg", type: "merge", parent_id: null, status: "EMPTY", content: "" })
-    const consumer = nodeRepo.insert({
-      title: "Consumer",
-      type: "text",
-      parent_id: null,
-      status: "GENERATED",
-      content: "stale",
-    })
-    edgeRepo.insert({ from_node_id: src, to_node_id: merge, type: "text" })
-    edgeRepo.insert({ from_node_id: merge, to_node_id: consumer, type: "text" })
-    nodeRepo.patch(src, { node_type_settings: JSON.stringify({ userPrompt: "stub" }) })
+    const src = seedNode({ title: "Src", settings: JSON.stringify({ userPrompt: "stub" }), at: { "": "OUTDATED" } })
+    const merge = seedNode({ title: "Agg", type: "merge", at: { "": { status: "EMPTY", content: "" } } })
     // The consumer's prompt reads the aggregate, so the aggregate's change demotes it.
-    nodeRepo.patch(consumer, { node_type_settings: JSON.stringify({ userPrompt: "{{[Agg]}}" }) })
+    const consumer = seedNode({
+      title: "Consumer",
+      settings: JSON.stringify({ userPrompt: "{{[Agg]}}" }),
+      at: { "": { status: "GENERATED", content: "stale" } },
+    })
+    seedEdge(src, merge)
+    seedEdge(merge, consumer)
 
     vi.spyOn(PlanNodeService.prototype, "regenerate").mockImplementation(async function (this: PlanNodeService, ctx) {
       regenerateOrder.push(ctx.nodeId)
-      return await this.patch(ctx.nodeId, false, { status: "GENERATED", content: `gen-${ctx.nodeId}` })
+      return await this.patch(ctx.nodeId, ctx.path, false, { status: "GENERATED", content: `gen-${ctx.nodeId}` })
     })
 
-    const abortController = new AbortController()
-    const containerContext: any = {
-      abortSignal: abortController.signal,
-      options: { regenerateManual: false, regenerateGenerated: false },
-      onNodeSkip: () => {},
-      onNodeStart: async <T>(_node: any, block: (ctx: any) => Promise<{ result: T; status: string }>) => {
-        await block({
-          nodeId: _node.id,
-          abortSignal: abortController.signal,
-          options: { regenerateManual: false, regenerateGenerated: false },
-          onResponseStreamEvent: () => {},
-        })
-      },
-    }
+    const containerContext = topLevelContext()
 
     await regenerateSubtreeNodesContents(containerContext, null)
 

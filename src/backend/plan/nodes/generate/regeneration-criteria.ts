@@ -1,4 +1,4 @@
-import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
+import type { PlanNodeDefinition } from "../../../../shared/plan-graph.js"
 
 /**
  * Whether the scheduler can regenerate the node at all. LLM-calling node types
@@ -8,7 +8,7 @@ import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
  * generation, not a target. Such a node is skipped by the scheduler, and so is
  * never pending work for propagation either.
  */
-export function hasRegenerationCriteria(node: PlanNodeRow): boolean {
+export function hasRegenerationCriteria(node: Pick<PlanNodeDefinition, "type" | "node_type_settings">): boolean {
   if (node.type === "text" || node.type === "split" || node.type === "lore") {
     let userPrompt: unknown = null
     if (node.node_type_settings) {

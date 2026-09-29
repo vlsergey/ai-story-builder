@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { childPath } from "../../../shared/plan-node-path.js"
 import { generatePlanNodeTextContent } from "../../ai/generate-plan-node-text-content.js"
 import { generateSplitParts } from "../../ai/generate-split-parts.js"
 import { generateSummary } from "../../ai/generate-summary.js"
@@ -184,7 +185,7 @@ describe("PlanNodeService — full plan content generation", () => {
 
     // 7. Start regeneration of the whole plan
     // Debug check: ensure split node has input data
-    const splitInputs = service.findNodeInputs(splitNodeId)
+    const splitInputs = service.findNodeInputs(splitNodeId, "")
     console.log("Split inputs:", splitInputs)
     expect(splitInputs).toHaveLength(1)
     expect(splitInputs[0].input).toBe("First par.\n\nSecond par.")
@@ -193,86 +194,27 @@ describe("PlanNodeService — full plan content generation", () => {
     const { regenerateTreeNodesContents } = await import("./generate/regenerateTreeNodesContents.js")
     await regenerateTreeNodesContents()
 
-    // Debug output after regeneration
-    const updatedSplitNode = service.getById(splitNodeId)
-    console.log("Split node after regeneration:", {
-      id: updatedSplitNode?.id,
-      status: updatedSplitNode?.status,
-      content: updatedSplitNode?.content,
-    })
-
     // 8. Check split node was automatically regenerated
+    const updatedSplitNode = service.getRow(splitNodeId, "")
     expect(updatedSplitNode.content).toBeTruthy()
     const splitParts = JSON.parse(updatedSplitNode.content!)
     expect(splitParts).toHaveLength(2)
     expect(splitParts[0]).toBe("First par.")
     expect(splitParts[1]).toBe("Second par.")
 
-    // 10. Check statuses of all nodes after generation
-    const textNodeAfter = service.getById(textNodeId)
-    const splitNodeAfter = service.getById(splitNodeId)
-    const forEachNodeAfter = service.getById(forEachNodeId)
-    const innerTextNodeAfter = service.getById(innerTextNodeId)
-    const outputNodeAfter = service.getById(outputNodeId)
-    const mergeNodeAfter = service.getById(mergeNodeId)
-
-    console.log("Node statuses after regeneration:", {
-      text: textNodeAfter?.status,
-      split: splitNodeAfter?.status,
-      forEach: forEachNodeAfter?.status,
-      innerText: innerTextNodeAfter?.status,
-      output: outputNodeAfter?.status,
-      merge: mergeNodeAfter?.status,
-    })
-    console.log("Node contents after regeneration:", {
-      innerText: innerTextNodeAfter?.content,
-      output: outputNodeAfter?.content,
-    })
-
-    // Debug: call collectForEachNodeIterationContentFromChildren directly
-    const { PlanNodeRepository } = await import("./plan-node-repository.js")
-    const repo = new PlanNodeRepository()
-    const collected = repo.collectForEachNodeIterationContentFromChildren(forEachNodeId)
-    console.log("Collected overrides from repo:", JSON.stringify(collected, null, 2))
-
-    // Expected statuses:
-    // Text node should be MANUAL (has content, not regenerated because regenerateManual=false)
-    // Split node should be GENERATED (automatically regenerated)
-    // For-each node may remain OUTDATED (status not updated after regeneration, known behavior)
-    // Internal nodes should be GENERATED (after regeneration inside for-each)
-    // Merge node should be GENERATED (after regeneration)
-
-    // 11. Check for-each node content
-    expect(forEachNodeAfter).toBeDefined()
-    console.log("ForEach node content after regeneration:", forEachNodeAfter.content)
-    const forEachContent = JSON.parse(forEachNodeAfter.content || "{}")
-    console.log("Parsed forEachContent:", JSON.stringify(forEachContent, null, 2))
-    expect(forEachContent.length).toBe(2)
-    expect(forEachContent.overrides).toBeDefined()
-    expect(forEachContent.overrides).toHaveLength(2)
-
-    // Debug: list all child nodes of for-each node
-    const childNodes = service.findByParentId(forEachNodeId)
-    console.log(
-      "Child nodes of for-each node:",
-      childNodes.map((n) => ({ id: n.id, type: n.type, content: n.content })),
-    )
-
-    // Check that overrides have content for each iteration
+    // 9. The loop keeps only its length; each iteration has its own rows.
+    const forEachNodeAfter = service.getRow(forEachNodeId, "")
+    expect(JSON.parse(forEachNodeAfter.content || "{}")).toEqual({ length: 2 })
     for (let i = 0; i < 2; i++) {
-      const override = forEachContent.overrides[i]
-      console.log(`Override ${i}:`, override)
-      expect(override).toBeDefined()
-      // There should be a key with input node ID (4) and output node ID (5)
-      expect(override[inputNodeId]).toBeDefined()
-      // Output node may be undefined if internal nodes didn't generate
-      // For test purposes we can skip this check, but better to ensure it exists
-      if (override[outputNodeId] === undefined) {
-        console.warn(`Output node ${outputNodeId} is undefined in override ${i}`)
-      }
-      // Temporarily skip this assertion to see if the rest of the test passes
-      // expect(override[outputNodeId]).toBeDefined()
+      const path = childPath("", forEachNodeId, i)
+      expect(service.getRow(inputNodeId, path).content, `element of iteration ${i}`).toBe(splitParts[i])
+      expect(service.getRow(innerTextNodeId, path).status, `inner text of iteration ${i}`).toBe("GENERATED")
+      expect(service.getRow(outputNodeId, path).content, `output of iteration ${i}`).toBe(
+        "Сгенерированная часть для итерации",
+      )
     }
+
+    const mergeNodeAfter = service.getRow(mergeNodeId, "")
 
     // 12. Check specific strings in merge content
     const mergeContent = mergeNodeAfter?.content

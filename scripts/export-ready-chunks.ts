@@ -28,7 +28,7 @@ import path from "node:path"
 import process from "node:process"
 import Database from "better-sqlite3"
 import { Command } from "commander"
-import { resolveProjectPath } from "./lib/project-paths.js"
+import { migrateProject } from "./lib/project-paths.js"
 
 interface CliArgs {
   project: string
@@ -47,16 +47,6 @@ function parseCli(): CliArgs {
     .option("--output <path>", "Write to this file. If omitted, prints to stdout.")
     .parse()
     .opts<CliArgs>()
-}
-
-interface OverrideSlot {
-  status?: string
-  content?: string
-}
-interface ForEachContent {
-  currentIndex?: number
-  length?: number
-  overrides?: Array<Record<string, OverrideSlot>>
 }
 
 interface FixProblemsIteration {
@@ -91,36 +81,31 @@ function extractProse(raw: string): string {
 
 function main(): void {
   const args = parseCli()
-  const dbPath = resolveProjectPath(args.project)
+  const dbPath = migrateProject(args.project)
   const db = new Database(dbPath, { readonly: true })
   try {
-    const containerRow = db.prepare("SELECT id, content FROM plan_nodes WHERE title = ?").get(args.forEach) as
-      | { id: number; content: string | null }
-      | undefined
-    if (!containerRow) throw new Error(`for-each container '${args.forEach}' not found`)
-    const polishRow = db.prepare("SELECT id, status, content FROM plan_nodes WHERE title = ?").get(args.polishNode) as
-      | { id: number; status: string; content: string | null }
-      | undefined
-    if (!polishRow) throw new Error(`polish node '${args.polishNode}' not found`)
+    const nodeId = (title: string, what: string): number => {
+      const row = db.prepare("SELECT id FROM plan_nodes WHERE title = ?").get(title) as { id: number } | undefined
+      if (!row) throw new Error(`${what} '${title}' not found`)
+      return row.id
+    }
+    const containerId = nodeId(args.forEach, "for-each container")
+    const polishId = nodeId(args.polishNode, "polish node")
+    const stateAt = (id: number, statePath: string) =>
+      db.prepare("SELECT status, content FROM plan_node_states WHERE node_id = ? AND path = ?").get(id, statePath) as
+        | { status: string; content: string | null }
+        | undefined
 
-    const parsed = JSON.parse(containerRow.content || "{}") as ForEachContent
-    const total = parsed.length ?? parsed.overrides?.length ?? 0
-    const currentIndex = parsed.currentIndex ?? 0
+    // A top-level loop: its own row at '', its iterations at '<loop id>:<index>'.
+    const total = (JSON.parse(stateAt(containerId, "")?.content || "{}") as { length?: number }).length ?? 0
     if (total === 0) throw new Error("for-each has no iterations to export")
 
     const parts: string[] = []
     let readyCount = 0
     for (let i = 0; i < total; i++) {
-      let status: string
-      let content: string
-      if (i === currentIndex) {
-        status = polishRow.status
-        content = polishRow.content ?? ""
-      } else {
-        const slot = parsed.overrides?.[i]?.[String(polishRow.id)]
-        status = slot?.status ?? "EMPTY"
-        content = slot?.content ?? ""
-      }
+      const polish = stateAt(polishId, `${containerId}:${i}`)
+      const status = polish?.status ?? "not generated"
+      const content = polish?.content ?? ""
       if (status === "GENERATED" && content.trim().length > 0) {
         parts.push(extractProse(content).trim())
         readyCount++

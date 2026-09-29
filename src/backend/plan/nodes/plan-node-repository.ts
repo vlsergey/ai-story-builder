@@ -1,116 +1,47 @@
-import type { NodeOverride } from "../../../shared/for-each-plan-node.js"
-import type { PlanNodeCreate, PlanNodeRow, PlanNodeStatus, PlanNodeUpdate } from "../../../shared/plan-graph.js"
+import type {
+  PlanNodeDefinition,
+  PlanNodeDefinitionCreate,
+  PlanNodeDefinitionUpdate,
+} from "../../../shared/plan-graph.js"
 import type { PlanNodeType } from "../../../shared/plan-node-types.js"
 import { withDbRead, withDbWrite } from "../../db/connection.js"
 
 /**
- * Repository for plan_nodes table operations.
- * Encapsulates all SQL queries related to plan nodes.
- * Manages its own database connections.
+ * Node definitions — what a node is. What it produced lives in
+ * `plan_node_states`, per iteration of its loops; see PlanNodeStateRepository.
  */
 export class PlanNodeRepository {
-  applyForEachNodeIterationToChildren(forEachNodeId: number, overrides: Record<string, NodeOverride>) {
-    return withDbWrite((db) => {
-      // LEFT JOIN against json_each(overrides) so children of the for-each that
-      // are absent from the override map are still updated — reset to empty +
-      // OUTDATED — rather than left carrying the previous iteration's state.
-      db.prepare(`UPDATE plan_nodes
-        SET
-            content    = data.content,
-            summary    = data.summary,
-            word_count = data.word_count,
-            char_count = data.char_count,
-            byte_count = data.byte_count,
-            status     = data.status
-        FROM (
-            SELECT
-                pn.id AS target_id,
-                sub.value->>'content'                                  AS content,
-                sub.value->>'summary'                                  AS summary,
-                COALESCE(CAST(sub.value->>'word_count' AS INTEGER), 0) AS word_count,
-                COALESCE(CAST(sub.value->>'char_count' AS INTEGER), 0) AS char_count,
-                COALESCE(CAST(sub.value->>'byte_count' AS INTEGER), 0) AS byte_count,
-                COALESCE(
-                    sub.value->>'status',
-                    CASE WHEN sub.key IS NULL THEN 'OUTDATED' ELSE 'EMPTY' END
-                ) AS status
-            FROM plan_nodes AS pn
-            LEFT JOIN json_each(?) AS sub ON CAST(sub.key AS INTEGER) = pn.id
-            WHERE pn.parent_id = ?
-        ) AS data
-        WHERE plan_nodes.id = data.target_id`).run(JSON.stringify(overrides), forEachNodeId)
-    })
-  }
-
-  collectForEachNodeIterationContentFromChildren(forEachNodeId: number): Record<string, NodeOverride> {
-    return withDbRead((db) => {
-      const dbResult = db
-        .prepare<number, { overrides_map: string }>(`SELECT json_group_object(
-              id, 
-              json_object(
-                  'content', content,
-                  'summary', summary,
-                  'word_count', word_count,
-                  'char_count', char_count,
-                  'byte_count', byte_count,
-                  'status', status
-              )
-          ) AS overrides_map
-          FROM plan_nodes
-          WHERE parent_id = ?`)
-        .get(forEachNodeId)
-      return JSON.parse(dbResult?.overrides_map || "{}") as Record<string, NodeOverride>
-    })
-  }
-
-  /**
-   * Get all nodes (full rows) ordered by position, id.
-   */
-  findAll(): PlanNodeRow[] {
-    return withDbRead((db) => db.prepare("SELECT * FROM plan_nodes ORDER BY position, id").all() as PlanNodeRow[])
-  }
-
-  /**
-   * Get a single node by ID, or undefined if not found.
-   */
-  findById(id: number): PlanNodeRow | undefined {
-    return withDbRead((db) => db.prepare("SELECT * FROM plan_nodes WHERE id = ?").get(id) as PlanNodeRow | undefined)
-  }
-
-  findByIds(ids: number[]): (PlanNodeRow | undefined)[] {
-    return withDbRead((db) =>
-      ids.map((id) => db.prepare("SELECT * FROM plan_nodes WHERE id = ?").get(id) as PlanNodeRow | undefined),
+  /** All definitions, ordered by position, id. */
+  findAll(): PlanNodeDefinition[] {
+    return withDbRead(
+      (db) => db.prepare("SELECT * FROM plan_nodes ORDER BY position, id").all() as PlanNodeDefinition[],
     )
   }
 
-  /**
-   * Get nodes by parent ID (for tree building).
-   */
-  findByParentId(parentId: number | null): PlanNodeRow[] {
+  findById(id: number): PlanNodeDefinition | undefined {
+    return withDbRead(
+      (db) => db.prepare("SELECT * FROM plan_nodes WHERE id = ?").get(id) as PlanNodeDefinition | undefined,
+    )
+  }
+
+  findByParentId(parentId: number | null): PlanNodeDefinition[] {
     return withDbRead(
       (db) =>
         db
           .prepare("SELECT * FROM plan_nodes WHERE parent_id IS ? ORDER BY position, id")
-          .all(parentId) as PlanNodeRow[],
+          .all(parentId) as PlanNodeDefinition[],
     )
   }
 
-  /**
-   * Get nodes by parent ID (for tree building).
-   */
-  findByParentIdAndType(parentId: number | null, type: PlanNodeType): PlanNodeRow[] {
+  findByParentIdAndType(parentId: number | null, type: PlanNodeType): PlanNodeDefinition[] {
     return withDbRead(
       (db) =>
         db
           .prepare("SELECT * FROM plan_nodes WHERE parent_id IS ? AND type IS ? ORDER BY position, id")
-          .all(parentId, type) as PlanNodeRow[],
+          .all(parentId, type) as PlanNodeDefinition[],
     )
   }
 
-  /**
-   * Get the maximum position among children of a given parent.
-   * Internal helper that expects a database connection.
-   */
   private getMaxPosition(db: import("better-sqlite3").Database, parentId: number | null): number {
     const row = db
       .prepare("SELECT COALESCE(MAX(position), -1) AS max FROM plan_nodes WHERE parent_id IS ?")
@@ -118,152 +49,50 @@ export class PlanNodeRepository {
     return row?.max ?? -1
   }
 
-  /**
-   * Count total nodes.
-   */
   count(): number {
-    return withDbRead((db) => {
-      const row = db.prepare("SELECT COUNT(*) AS c FROM plan_nodes").get() as { c: number }
-      return row.c
-    })
+    return withDbRead((db) => (db.prepare("SELECT COUNT(*) AS c FROM plan_nodes").get() as { c: number }).c)
   }
 
-  // ─── Insert ──────────────────────────────────────────────────────────────────
-
-  /**
-   * Insert a new node with the given fields.
-   * Returns the inserted row's ID.
-   */
-  insert(data: PlanNodeCreate): number {
+  /** Inserts a definition; its state is written by the service. Returns the new id. */
+  insert(data: PlanNodeDefinitionCreate): number {
     return withDbWrite((db) => {
       const parentId = data.parent_id ?? null
-      const position = data.position ?? this.getMaxPosition(db, parentId) + 1
-      const type = data.type ?? "text"
-      const x = data.x ?? 0
-      const y = data.y ?? 0
-      const width = data.width ?? null
-      const height = data.height ?? null
-      const content = data.content ?? null
-      const summary = data.summary ?? null
-      const aiSyncInfo = data.ai_sync_info ?? null
-      const nodeTypeSettings = data.node_type_settings ?? null
-      const aiSettings = data.ai_settings ?? null
-      const wordCount = data.word_count ?? 0
-      const charCount = data.char_count ?? 0
-      const byteCount = data.byte_count ?? 0
-      const status = data.status ?? "EMPTY"
-      const inReview = data.in_review ?? 0
-      const reviewBaseContent = data.review_base_content ?? null
-      const aiImproveInstruction = data.ai_improve_instruction ?? null
-
-      const stmt = db.prepare(`
-        INSERT INTO plan_nodes (
-          parent_id, title, position, content,
-          type, x, y, width, height,
-          summary, ai_sync_info, node_type_settings, ai_settings,
-          word_count, char_count, byte_count, status,
-          in_review, review_base_content, ai_improve_instruction
-        ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      const info = db
+        .prepare(`
+          INSERT INTO plan_nodes (parent_id, title, position, type, x, y, width, height, node_type_settings, ai_settings)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        .run(
+          parentId,
+          data.title,
+          data.position ?? this.getMaxPosition(db, parentId) + 1,
+          data.type ?? "text",
+          data.x ?? 0,
+          data.y ?? 0,
+          data.width ?? null,
+          data.height ?? null,
+          data.node_type_settings ?? null,
+          data.ai_settings ?? null,
         )
-      `)
-      const info = stmt.run(
-        parentId,
-        data.title,
-        position,
-        content,
-        type,
-        x,
-        y,
-        width,
-        height,
-        summary,
-        aiSyncInfo,
-        nodeTypeSettings,
-        aiSettings,
-        wordCount,
-        charCount,
-        byteCount,
-        status,
-        inReview,
-        reviewBaseContent,
-        aiImproveInstruction,
-      )
       return Number(info.lastInsertRowid)
     })
   }
 
-  // ─── Update ──────────────────────────────────────────────────────────────────
-
-  /**
-   * Update multiple fields of a node.
-   * The fields object can contain any column of plan_nodes.
-   * Returns updated object.
-   */
-  patch(id: number, fields: PlanNodeUpdate): PlanNodeRow {
+  /** Updates definition fields; returns the updated definition. */
+  patch(id: number, fields: PlanNodeDefinitionUpdate): PlanNodeDefinition {
     return withDbWrite((db) => {
       const keys = Object.keys(fields) as (keyof typeof fields)[]
       if (keys.length === 0) throw Error("Need at least one updated field")
-
       const setClause = keys.map((k) => `${k} = ?`).join(", ")
       const values = keys.map((k) => fields[k])
-      const stmt = db.prepare(`UPDATE plan_nodes SET ${setClause} WHERE id = ? RETURNING *`)
-      return stmt.get(...values, id) as PlanNodeRow
+      return db
+        .prepare(`UPDATE plan_nodes SET ${setClause} WHERE id = ? RETURNING *`)
+        .get(...values, id) as PlanNodeDefinition
     })
   }
 
-  /**
-   * Delete a node by ID (cascades to edges via foreign key, children via parent_id).
-   */
+  /** Deletes a node; its children, edges and states go by foreign key. */
   delete(id: number): number {
     return withDbWrite((db) => db.prepare("DELETE FROM plan_nodes WHERE id = ?").run(id).changes)
-  }
-
-  updateForEachPrevOutputsStatusInsideForEachContent(forEachPlanNodeId: number): number {
-    return withDbWrite((db) => {
-      const stmt = db.prepare<[number, string, PlanNodeStatus, number]>(`
-        UPDATE plan_nodes
-        SET content = (
-            WITH
-            -- 1. Get the current index and parent content once
-            source AS (
-                SELECT id, content,
-                      CAST(json_extract(content, '$.currentIndex') AS INTEGER) as c_idx
-                FROM plan_nodes
-                WHERE id = ?
-            ),
-            -- 2. Pre-filter potential target IDs based on type and parent relationship
-            target_ids AS (
-                SELECT id FROM plan_nodes
-                WHERE parent_id = (SELECT id FROM source)
-                  AND type = ?
-            ),
-            -- 3. Iterate through overrides and apply changes to the status
-            new_overrides AS (
-                SELECT
-                    json(
-                        json_group_object(
-                            kv.key,
-                            CASE
-                                -- Check if array index > currentIndex AND node ID matches the type criteria
-                                WHEN CAST(arr.key AS INTEGER) > (SELECT c_idx FROM source)
-                                    AND kv.key IN (SELECT id FROM target_ids)
-                                THEN json_set(json(kv.value), '$.status', ?)
-                                ELSE json(kv.value)
-                            END
-                        )
-                    ) as obj
-                FROM source s,
-                    json_each(s.content, '$.overrides') as arr, -- arr.key is the index in the array [0, 1, 2...]
-                    json_each(arr.value) as kv                   -- kv.key is the node ID string ("123")
-                GROUP BY arr.id -- Regroup entries back into their respective objects
-            )
-            -- 4. Reassemble the final JSON with the modified overrides array
-            SELECT json_set(s.content, '$.overrides', json_group_array(json(no.obj)))
-            FROM source s, new_overrides no
-        )
-        WHERE id = ?`)
-      return stmt.run(forEachPlanNodeId, "for-each-prev-outputs", "OUTDATED", forEachPlanNodeId).changes
-    })
   }
 }

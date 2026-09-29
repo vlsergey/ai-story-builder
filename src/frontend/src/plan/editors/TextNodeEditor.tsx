@@ -62,6 +62,8 @@ export default function TextNodeEditor({
   status,
 }: TypedPlanNodeEditorProps) {
   const nodeId = initialValue.id
+  // The iteration this editor is bound to; every action acts there.
+  const path = initialValue.path
   const [statusOverride, setStatusOverride] = useState<StatusOverride>(null)
 
   const [editorMode, setEditorMode] = useState<EditorMode>(
@@ -80,17 +82,18 @@ export default function TextNodeEditor({
 
   const handleAcceptChanges = useCallback(async () => {
     await save(value)
-    const newValue = await acceptChangesMutation(nodeId)
+    const newValue = await acceptChangesMutation({ id: nodeId, path })
     onChange(newValue)
     setEditorMode((prevMode) => (prevMode === "review_after_generate" ? "generate" : "improve"))
-  }, [onChange, nodeId, save, value])
+  }, [onChange, nodeId, path, save, value])
 
   const aiThinkinPanelRef = useRef<AiThinkingPanelHandle>(null)
   const [tempContent, setTempContent] = useState<string | null>(null)
 
   trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
-    onData({ nodeId: eventNodeId, event }) {
-      if (eventNodeId !== nodeId) return
+    onData({ nodeId: eventNodeId, path: eventPath, event }) {
+      // Another iteration of the same node streams separately.
+      if (eventNodeId !== nodeId || eventPath !== path) return
       if (event.type === "response.output_text.delta") {
         setTempContent((content) => (content || "") + event.delta)
       }
@@ -102,7 +105,7 @@ export default function TextNodeEditor({
   const handleGenerate = useCallback(async () => {
     setStatusOverride("GENERATING")
     try {
-      const newNodeVersion = await generateForNode.mutateAsync(nodeId)
+      const newNodeVersion = await generateForNode.mutateAsync({ id: nodeId, path })
       aiThinkinPanelRef?.current?.onComplete()
       setTempContent(null)
       onExternalUpdate(newNodeVersion)
@@ -114,41 +117,44 @@ export default function TextNodeEditor({
       setTempContent(null)
       setEditorMode("generate")
     }
-  }, [nodeId, onExternalUpdate])
+  }, [nodeId, path, onExternalUpdate])
 
   const [improvingStarted, setImprovingStarted] = useState(false)
-  trpc.plan.nodes.aiImprove.useSubscription(nodeId, {
-    enabled: improvingStarted,
-    onData: (event) => {
-      switch (event.type) {
-        case "event": {
-          const streamEvent = event.event as ResponseStreamEvent
-          switch (streamEvent.type) {
-            case "response.output_text.delta":
-              setTempContent((content) => (content || "") + streamEvent.delta)
-              break
-            default:
-              console.log(JSON.stringify(event.event))
-              aiThinkinPanelRef?.current?.onEvent(streamEvent)
+  trpc.plan.nodes.aiImprove.useSubscription(
+    { id: nodeId, path },
+    {
+      enabled: improvingStarted,
+      onData: (event) => {
+        switch (event.type) {
+          case "event": {
+            const streamEvent = event.event as ResponseStreamEvent
+            switch (streamEvent.type) {
+              case "response.output_text.delta":
+                setTempContent((content) => (content || "") + streamEvent.delta)
+                break
+              default:
+                console.log(JSON.stringify(event.event))
+                aiThinkinPanelRef?.current?.onEvent(streamEvent)
+            }
+            break
           }
-          break
+          case "data":
+            onExternalUpdate(event.data)
+            break
+          case "completed":
+            aiThinkinPanelRef?.current?.onComplete()
+            setImprovingStarted(false)
+            setEditorMode("review_after_improve")
+            break
         }
-        case "data":
-          onExternalUpdate(event.data)
-          break
-        case "completed":
-          aiThinkinPanelRef?.current?.onComplete()
-          setImprovingStarted(false)
-          setEditorMode("review_after_improve")
-          break
-      }
+      },
+      onError: (err) => {
+        console.error(err)
+        aiThinkinPanelRef?.current?.onComplete()
+        setImprovingStarted(false)
+      },
     },
-    onError: (err) => {
-      console.error(err)
-      aiThinkinPanelRef?.current?.onComplete()
-      setImprovingStarted(false)
-    },
-  })
+  )
 
   const handleImprove = useCallback(() => {
     setStatusOverride("IMPROVING")

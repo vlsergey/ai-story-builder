@@ -2,6 +2,7 @@ import EventEmitter from "node:events"
 import type { Observable } from "@trpc/server/observable"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
 import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
+import { childPath, type NodePath, ROOT_PATH } from "../../../../shared/plan-node-path.js"
 import type {
   RegenerateStatusEvent,
   RegenerationStackItem,
@@ -13,7 +14,7 @@ import { finishRun, startRun } from "../../../lib/telemetry/telemetry.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
-import { PlanNodeService } from "../plan-node-service.js"
+import { hasState, PlanNodeService } from "../plan-node-service.js"
 import { computeLevelDependencies } from "./computeLevelDependencies.js"
 import { propagateStaleStatus } from "./propagateStaleStatus.js"
 import type {
@@ -25,8 +26,7 @@ import type {
 import { hasRegenerationCriteria } from "./regeneration-criteria.js"
 
 interface RegenerateEvents {
-  nodeUpdate: [node: PlanNodeRow]
-  responseStream: [nodeId: number, contentPath: (string | number)[], event: ResponseStreamEvent]
+  responseStream: [nodeId: number, path: NodePath, contentPath: (string | number)[], event: ResponseStreamEvent]
   status: [event: RegenerateStatusEvent]
 }
 
@@ -53,17 +53,16 @@ export function subscribeToStatusEvents(): Observable<RegenerateStatusEvent, unk
 
 interface ResponseStreamEventWrapper {
   nodeId: number
+  /** The iteration the streaming node runs in: two iterations of one node stream apart. */
+  path: NodePath
   contentPath: (string | number)[]
   event: ResponseStreamEvent
 }
 
-const eventEmitterTupleToEventMapper = ([nodeId, contentPath, event]: [
-  nodeId: number,
-  contentPath: (string | number)[],
-  event: ResponseStreamEvent,
-]) =>
+const eventEmitterTupleToEventMapper = ([nodeId, path, contentPath, event]: RegenerateEvents["responseStream"]) =>
   ({
     nodeId,
+    path,
     contentPath,
     event,
   }) satisfies ResponseStreamEventWrapper
@@ -127,11 +126,15 @@ function classifyResult(before: PlanNodeRow, after: PlanNodeRow): PlanNodeAiGene
 
 /**
  * Generate content for all nodes in topological order, respecting dependencies.
- * With `nodeId`, regenerates that node only and resolves to its row afterwards.
+ * With a target, regenerates that node at that path only and resolves to its
+ * row afterwards.
  */
 export async function regenerateTreeNodesContents(): Promise<undefined>
-export async function regenerateTreeNodesContents(nodeId: number): Promise<PlanNodeRow>
-export async function regenerateTreeNodesContents(nodeId?: number): Promise<PlanNodeRow | undefined> {
+export async function regenerateTreeNodesContents(target: { nodeId: number; path: NodePath }): Promise<PlanNodeRow>
+export async function regenerateTreeNodesContents(target?: {
+  nodeId: number
+  path: NodePath
+}): Promise<PlanNodeRow | undefined> {
   if (inProcess) throw makeErrorWithStatus("Some regeneration is already in process", 429)
   inProcess = true
   firstError = null
@@ -154,62 +157,67 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<Plan
   console.info("[regenerateTreeNodesContents] Starting regeneration")
   // Propagate stale status before the scheduler starts. Without this, a
   // GENERATED downstream node looks ready to run while an upstream (or a
-  // for-each container's descendant) still has OUTDATED/ERROR/EMPTY status.
-  const { markedNodeIds } = propagateStaleStatus({
+  // loop's child in some iteration) still has OUTDATED/ERROR/EMPTY status.
+  const { marked } = propagateStaleStatus({
     regenerateManual: options.regenerateManual,
     regenerateGenerated: options.regenerateGenerated,
   })
-  if (markedNodeIds.length > 0) {
-    console.info(`[regenerateTreeNodesContents] pre-marked OUTDATED via propagation: ${markedNodeIds.join(",")}`)
+  if (marked.length > 0) {
+    const list = marked.map(({ nodeId, path }) => (path ? `${nodeId}@${path}` : `${nodeId}`)).join(",")
+    console.info(`[regenerateTreeNodesContents] pre-marked OUTDATED via propagation: ${list}`)
   }
   startRun()
   let runSucceeded = true
   try {
-    const containerContext: RegenerationContainerContext = {
-      abortSignal: myAbortController.signal,
-      options,
-      onNodeSkip() {
-        skipped++
-        emitRegenerateStatusEvent()
-      },
-      async onNodeStart<T>(
-        node: PlanNodeRow,
-        block: (context: RegenerationNodeContext) => Promise<{ result: T; status: PlanNodeAiGenerationStatus }>,
-      ) {
-        if (myAbortController.signal.aborted) throw Error("Stop was required")
-        if (currentRegenerationStack.length > 0) {
-          const topStackItem = currentRegenerationStack[currentRegenerationStack.length - 1]
-          if (topStackItem.type === "node" && topStackItem.node.id !== node.parent_id) {
-            throw Error(
-              `Only child nodes can be pushed to regeneration processing stack (currentNodeStack).` +
-                `Current stack top is ${topStackItem.node.id}, parent of push node ${node.id} is ${node.parent_id}`,
-            )
-          }
-        }
-        return await withStackItem({ type: "node", node: node }, true, async () => {
-          try {
-            const blockResult = await block(nodeContext(node))
-            switch (blockResult.status) {
-              case "SAME":
-                generatedSame++
-                break
-              case "EMPTY":
-                generatedEmpty++
-                break
-              case "GENERATED":
-                generatedNew++
-                break
+    /** The context of one level: the top level, or one iteration of a loop. */
+    function containerContext(path: NodePath): RegenerationContainerContext {
+      return {
+        abortSignal: myAbortController.signal,
+        options,
+        path,
+        onNodeSkip() {
+          skipped++
+          emitRegenerateStatusEvent()
+        },
+        async onNodeStart<T>(
+          node: PlanNodeRow,
+          block: (context: RegenerationNodeContext) => Promise<{ result: T; status: PlanNodeAiGenerationStatus }>,
+        ) {
+          if (myAbortController.signal.aborted) throw Error("Stop was required")
+          if (currentRegenerationStack.length > 0) {
+            const topStackItem = currentRegenerationStack[currentRegenerationStack.length - 1]
+            if (topStackItem.type === "node" && topStackItem.node.id !== node.parent_id) {
+              throw Error(
+                `Only child nodes can be pushed to regeneration processing stack (currentNodeStack).` +
+                  `Current stack top is ${topStackItem.node.id}, parent of push node ${node.id} is ${node.parent_id}`,
+              )
             }
-            return blockResult.result
-          } catch (e) {
-            if (firstError == null) {
-              firstError = e
-            }
-            myAbortController.abort()
-            throw e
           }
-        })
-      },
+          return await withStackItem({ type: "node", node }, true, async () => {
+            try {
+              const blockResult = await block(nodeContext(node))
+              switch (blockResult.status) {
+                case "SAME":
+                  generatedSame++
+                  break
+                case "EMPTY":
+                  generatedEmpty++
+                  break
+                case "GENERATED":
+                  generatedNew++
+                  break
+              }
+              return blockResult.result
+            } catch (e) {
+              if (firstError == null) {
+                firstError = e
+              }
+              myAbortController.abort()
+              throw e
+            }
+          })
+        },
+      }
     }
 
     function cycleContext(totalIterations: number | undefined, container: PlanNodeRow): RegenerationCycleContext {
@@ -237,7 +245,9 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<Plan
             totalIterations,
             zeroBasedIterationIndex,
           }
-          return await withStackItem(stackItem, false, () => block(containerContext))
+          // The only place a child path is made: the scheduler and the path cannot disagree.
+          const path = childPath(container.path, container.id, zeroBasedIterationIndex)
+          return await withStackItem(stackItem, false, () => block(containerContext(path)))
         },
       }
     }
@@ -246,18 +256,11 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<Plan
       return {
         abortSignal: myAbortController.signal,
         nodeId: node.id,
+        path: node.path,
         options,
-        onNodeUpdated: (node: PlanNodeRow) => {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          eventEmitter.emit("nodeUpdate", node)
-        },
         onResponseStreamEvent: (contentPath: (string | number)[], event: ResponseStreamEvent) => {
           if (myAbortController.signal.aborted) throw Error("Stop was required")
-          eventEmitter.emit("responseStream", node.id, contentPath, event)
-        },
-        async asContainer<T>(block: (context: RegenerationContainerContext) => Promise<T>): Promise<T> {
-          if (myAbortController.signal.aborted) throw Error("Stop was required")
-          return await block(containerContext)
+          eventEmitter.emit("responseStream", node.id, node.path, contentPath, event)
         },
         async asCycle<T>(
           totalIterations: number | undefined,
@@ -269,20 +272,21 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<Plan
       }
     }
 
-    if (nodeId === undefined) {
-      await regenerateSubtreeNodesContents(containerContext, null)
+    if (target === undefined) {
+      await regenerateSubtreeNodesContents(containerContext(ROOT_PATH), null)
       return undefined
     }
 
     // A single node goes through onNodeStart like any other, so it is counted
     // and its failure becomes the run's first error.
     const service = new PlanNodeService()
-    const node = service.getById(nodeId)
-    await containerContext.onNodeStart(node, async (context) => {
+    service.checkPath(target.nodeId, target.path)
+    const node = service.getRow(target.nodeId, target.path)
+    await containerContext(target.path).onNodeStart(node, async (context) => {
       const result = await service.regenerate(context)
       return { result, status: classifyResult(node, result) }
     })
-    return service.getById(nodeId)
+    return service.getRow(target.nodeId, target.path)
   } catch (err) {
     runSucceeded = false
     if (firstError == null) {
@@ -298,13 +302,15 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<Plan
 }
 
 /**
- * Generate content for all nodes in topological order, respecting dependencies.
+ * Generate content for all nodes of one level in topological order, respecting
+ * dependencies: the children of `parentId`, in the iteration `context.path`.
  */
 export async function regenerateSubtreeNodesContents(
   context: RegenerationContainerContext,
   parentId: number | null,
 ): Promise<void> {
-  console.info(`[regenerateSubtreeNodesContents] Starting regeneration for parentId=${parentId}`)
+  const path = context.path
+  console.info(`[regenerateSubtreeNodesContents] Starting regeneration for parentId=${parentId} at "${path}"`)
 
   const planNodeService = new PlanNodeService()
   // Build the dependency graph for this level using a projection that maps
@@ -332,7 +338,10 @@ export async function regenerateSubtreeNodesContents(
     MANUAL: context.options.regenerateManual,
   }
 
-  const nodeRepo = new PlanNodeRepository()
+  /** The node's live state in this level's iteration; undefined once the node is deleted. */
+  const liveRow = (id: number): PlanNodeRow | undefined =>
+    planNodeService.repo.findById(id) ? planNodeService.getRow(id, path) : undefined
+
   // Guard against pathological loops caused by repeated cascade demotions.
   // Realistic ceiling: every node may be re-processed a small constant
   // number of times. 10× the node count is generous. Only re-runs count:
@@ -357,7 +366,7 @@ export async function regenerateSubtreeNodesContents(
     // have fired markAsOutdatedAndNotifyDownstreamNodes cascades that demoted
     // this node's status (e.g. for-each-prev-outputs regen → merge demoted →
     // scene demoted), and we must NOT decide based on a stale snapshot.
-    const node = nodeRepo.findById(nodeId)
+    const node = liveRow(nodeId)
     if (!node) continue
 
     // Sources may also have been demoted by intervening cascades. If a source
@@ -376,7 +385,7 @@ export async function regenerateSubtreeNodesContents(
     let anySourceDemoted = false
     for (const srcId of sources) {
       if (!checked.has(srcId)) continue
-      const liveSrc = nodeRepo.findById(srcId)
+      const liveSrc = liveRow(srcId)
       if (liveSrc && liveSrc.status === "OUTDATED" && hasRegenerationCriteria(liveSrc)) {
         console.log(
           `[regenerateSubtreeNodesContents] source ${srcId} demoted to OUTDATED since it was processed; re-queueing it before ${nodeId}`,
@@ -420,15 +429,21 @@ export async function regenerateSubtreeNodesContents(
       // Its prompt or an input changed while it was being written, so its
       // result was dropped: write it again before anything reads it. Nothing
       // else would — a node without readers is never re-queued as a source.
-      if (nodeRepo.findById(nodeId)?.status === "OUTDATED" && !context.abortSignal.aborted) {
+      if (liveRow(nodeId)?.status === "OUTDATED" && !context.abortSignal.aborted) {
         spendOnDemotion()
         queue.unshift(nodeId)
         continue
       }
     } else {
       console.log(
-        `[regenerateSubtreeNodesContents] skipping node ${nodeId} '${node.title}' of type ${node.type} with status '${node.status}'`,
+        `[regenerateSubtreeNodesContents] skipping node ${nodeId} '${node.title}' of type ${node.type} with status '${node.status}' at "${path}"`,
       )
+      // A node with nothing to generate from that has produced nothing in this
+      // iteration yet settles as EMPTY: a missing row is pending work, and
+      // nothing would ever resolve it.
+      if (!hasState(node) && !hasRegenerationCriteria(node)) {
+        await planNodeService.patchState(nodeId, path, false, { status: "EMPTY" })
+      }
       // Determine skip reason based on node status and regenerateManual
       let skipReason = ""
       if (node.status === "MANUAL" && !context.options.regenerateManual) {

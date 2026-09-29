@@ -14,6 +14,7 @@ import AiThinkingPanel, { type AiThinkingPanelHandle } from "../ai/AiThinkingPan
 import { Button } from "../ui-components/button"
 import { Card } from "../ui-components/card"
 import RegenerateOptionsForm from "./RegenerateOptionsForm"
+import { iterationLabel } from "./iteration-selection"
 import ResponseStreamWatcher from "./ResponseStreamWatcher"
 
 export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPanelApi }) {
@@ -86,8 +87,13 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
             const hasNext = arr.length > idx + 1
             const next = hasNext ? arr[idx + 1] : undefined
 
-            // Do not displya container processing in stack if next stack item is container iteration processing
-            if (stackItem.type === "node" && next?.type === "iteration" && next.container === stackItem.node) {
+            // A loop's own line is left out when the next line is one of its iterations.
+            if (
+              stackItem.type === "node" &&
+              next?.type === "iteration" &&
+              next.container.id === stackItem.node.id &&
+              next.container.path === stackItem.node.path
+            ) {
               return null
             }
 
@@ -216,7 +222,11 @@ function StackItemNode({ item }: { item: RegenerationStackItemNode }) {
   return (
     <span>
       <span className="text-xs font-medium truncate">{item.node.title}</span>
-      <span className="text-xs text-muted-foreground"> (ID: {item.node.id})</span>
+      <span className="text-xs text-muted-foreground">
+        {" "}
+        (ID: {item.node.id}
+        {item.node.path ? `, ${iterationLabel(item.node.path)}` : ""})
+      </span>
     </span>
   )
 }

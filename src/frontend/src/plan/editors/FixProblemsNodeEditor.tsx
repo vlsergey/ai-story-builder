@@ -38,7 +38,7 @@ export default function FixProblemsNodeEditor({
   const { resolvedTheme } = useTheme()
 
   const inputEdges = trpc.plan.edges.findByToNodeIdAndType.useQuery({ id: dbValue.id, type: "text" }).data
-  const inputNodes = trpc.plan.nodes.getByIds.useQuery((inputEdges || []).map((t) => t.from_node_id)).data
+  const inputNodes = trpc.plan.nodes.findInputs.useQuery({ id: dbValue.id, path: dbValue.path }).data
   const inputs = useMemo<InputNode[]>(() => {
     return (inputEdges || [])
       .map((edge) => {

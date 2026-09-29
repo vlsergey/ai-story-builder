@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ProjectTemplate } from "../../shared/project-template.js"
 import { setUpTestDb, tearDownTestDb } from "../db/test-db-utils.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
+import { propagateStaleStatus } from "../plan/nodes/generate/propagateStaleStatus.js"
+import { seedState, stateAt } from "../plan/nodes/plan-node-fixtures.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { applyProjectTemplate } from "./apply-project-template.js"
@@ -105,7 +107,7 @@ describe("template-update", () => {
     // Mark project's root node as GENERATED — the apply must demote to OUTDATED.
     const planRepo = new PlanNodeRepository()
     const root = planRepo.findAll().find((n) => n.title === "Root")!
-    planRepo.patch(root.id, { status: "GENERATED", content: "user's generated text" })
+    seedState(root.id, "", { status: "GENERATED", content: "user's generated text" })
 
     // Write a NEW version of the template — root instructions changed.
     const updated = baseTemplate()
@@ -120,8 +122,8 @@ describe("template-update", () => {
     expect(result.updatedNodeCount).toBe(1)
 
     const after = new PlanNodeRepository().findAll().find((n) => n.title === "Root")!
-    expect(after.status).toBe("OUTDATED")
-    expect(after.content, "content must NOT be touched on update").toBe("user's generated text")
+    expect(stateAt(after.id)?.status).toBe("OUTDATED")
+    expect(stateAt(after.id)?.content, "content must NOT be touched on update").toBe("user's generated text")
     const settings = JSON.parse(after.node_type_settings || "{}")
     expect(settings.userPrompt).toBe("BRAND NEW root instructions")
   })
@@ -142,10 +144,9 @@ describe("template-update", () => {
       y: 0,
       width: null,
       height: null,
-      content: "kept",
       node_type_settings: null,
-      status: "MANUAL",
     })
+    seedState(orphanId, "", { status: "MANUAL", content: "kept" })
     const rootId = planRepo.findAll().find((n) => n.title === "Root")!.id
     const edgeRepo = new PlanEdgeRepository()
     edgeRepo.insert({ from_node_id: rootId, to_node_id: orphanId, type: "text" })
@@ -171,15 +172,15 @@ describe("template-update", () => {
     const after = new PlanNodeRepository().findAll()
     const sibling = after.find((n) => n.title === "Sibling")
     expect(sibling).toBeTruthy()
-    expect(sibling?.status).toBe("EMPTY")
+    expect(stateAt(sibling!.id)?.status).toBe("EMPTY")
 
     // Project-only survives, edge to it survives.
-    expect(after.find((n) => n.title === "Project-only")?.content).toBe("kept")
+    expect(stateAt(orphanId)?.content).toBe("kept")
     const edges = new PlanEdgeRepository().findAll()
     expect(edges.some((e) => e.from_node_id === rootId && e.to_node_id === orphanId)).toBe(true)
   })
 
-  it("demotes a for-each child across ALL iterations and demotes the for-each itself", async () => {
+  it("demotes a for-each child in ALL iterations, and the loop runs again", async () => {
     // Template: for-each "Loop" with one user-defined child "Loop child".
     const initial: ProjectTemplate = {
       label: "loop",
@@ -214,24 +215,9 @@ describe("template-update", () => {
     const loop = all.find((n) => n.title === "Loop")!
     const child = all.find((n) => n.title === "Loop child")!
 
-    // Seed the for-each with 3 iterations. Iter 0 and iter 2 snapshots
-    // both have Child as GENERATED. Current iter is 1, also GENERATED.
-    const mkOverride = (s: string) => ({
-      [`${child.id}`]: {
-        status: "GENERATED",
-        content: s,
-        summary: null,
-        word_count: null,
-        char_count: null,
-        byte_count: null,
-      },
-    })
-    const overrides = [mkOverride("iter0"), mkOverride("iter1"), mkOverride("iter2")]
-    planRepo.patch(loop.id, {
-      content: JSON.stringify({ length: 3, currentIndex: 1, overrides }),
-      status: "GENERATED",
-    })
-    planRepo.patch(child.id, { status: "GENERATED", content: "iter1" })
+    // The loop ran 3 iterations; Child is GENERATED in each.
+    seedState(loop.id, "", { status: "GENERATED", content: JSON.stringify({ length: 3 }) })
+    for (let i = 0; i < 3; i++) seedState(child.id, `${loop.id}:${i}`, { status: "GENERATED", content: `iter${i}` })
 
     // Template changes Child's instructions.
     const updated = JSON.parse(JSON.stringify(initial)) as ProjectTemplate
@@ -243,18 +229,14 @@ describe("template-update", () => {
 
     await applyTemplateUpdate()
 
-    const afterAll = new PlanNodeRepository().findAll()
-    const afterChild = afterAll.find((n) => n.id === child.id)!
-    const afterLoop = afterAll.find((n) => n.id === loop.id)!
-
-    expect(afterChild.status, "child row OUTDATED").toBe("OUTDATED")
-    expect(afterLoop.status, "for-each itself OUTDATED").toBe("OUTDATED")
-    const loopContent = JSON.parse(afterLoop.content || "{}")
-    expect(loopContent.overrides).toHaveLength(3)
-    loopContent.overrides.forEach((ov: any, i: number) => {
-      const entry = ov[`${child.id}`]
-      expect(entry?.status, `iter ${i} override status`).toBe("OUTDATED")
-    })
+    for (let i = 0; i < 3; i++) {
+      const state = stateAt(child.id, `${loop.id}:${i}`)
+      expect(state?.status, `iteration ${i}`).toBe("OUTDATED")
+      expect(state?.content, `iteration ${i} keeps its text`).toBe(`iter${i}`)
+    }
+    // The next run enters the loop to redo them.
+    propagateStaleStatus()
+    expect(stateAt(loop.id)?.status).toBe("OUTDATED")
   })
 
   it("re-substitutes wizard variables when comparing", () => {
@@ -348,7 +330,7 @@ describe("template-update", () => {
 
     const planRepo = new PlanNodeRepository()
     const child = planRepo.findAll().find((n) => n.title === "Child")!
-    planRepo.patch(child.id, { status: "GENERATED", content: "written against the old inputs" })
+    seedState(child.id, "", { status: "GENERATED", content: "written against the old inputs" })
 
     const dropped = baseTemplate()
     dropped.plan!.nodes![1].inputs = []
@@ -356,8 +338,7 @@ describe("template-update", () => {
 
     await applyTemplateUpdate({ removeMissingEdges: true })
 
-    const after = new PlanNodeRepository().findAll().find((n) => n.title === "Child")!
-    expect(after.status).toBe("OUTDATED")
-    expect(after.content, "content is not touched").toBe("written against the old inputs")
+    expect(stateAt(child.id)?.status).toBe("OUTDATED")
+    expect(stateAt(child.id)?.content, "content is not touched").toBe("written against the old inputs")
   })
 })

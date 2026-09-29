@@ -1,8 +1,7 @@
 import { promises as fs } from "node:fs"
 import type { Observable } from "@trpc/server/observable"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import type { ForEachNodeContent } from "../../../shared/for-each-plan-node.js"
-import getDifference from "../../../shared/getDifference.js"
+import { loopLength } from "../../../shared/for-each-plan-node.js"
 import {
   type EdgeTypeToOutputTypeMap,
   getNodeTypeDefinition,
@@ -10,9 +9,31 @@ import {
   NODE_TYPES,
 } from "../../../shared/node-edge-dictionary.js"
 import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
-import type { PlanNodeCreate, PlanNodeRow, PlanNodeStatus, PlanNodeUpdate } from "../../../shared/plan-graph.js"
+import {
+  PLAN_NODE_DEFINITION_KEYS,
+  PLAN_NODE_STATE_KEYS,
+  type PlanNodeCreate,
+  type PlanNodeDefinition,
+  type PlanNodeDefinitionUpdate,
+  type PlanNodeRow,
+  type PlanNodeState,
+  type PlanNodeStateBrief,
+  type PlanNodeStateUpdate,
+  type PlanNodeStatus,
+  type PlanNodeUpdate,
+} from "../../../shared/plan-graph.js"
+import {
+  lastSegment,
+  type NodePath,
+  parentPath,
+  parsePath,
+  pathDepth,
+  ROOT_PATH,
+  truncatePath,
+} from "../../../shared/plan-node-path.js"
 import type { PlanNodeType } from "../../../shared/plan-node-types.js"
 import { generateSummary } from "../../ai/generate-summary.js"
+import { withDbTransaction } from "../../db/connection.js"
 import { type DataOrEventEvent, toObservable } from "../../lib/event-manager.js"
 import { makeErrorWithStatus } from "../../lib/make-errors.js"
 import { improvePlanNodeContent } from "../../routes/improve-plan-node-content.js"
@@ -37,11 +58,7 @@ import { usesInput } from "./input-relevance.js"
 import type { NodeInputs } from "./NodeInput.js"
 import { planNodeEventManager } from "./plan-node-event-manager.js"
 import { PlanNodeRepository } from "./plan-node-repository.js"
-
-export type NodeUpdateEvent = {
-  nodeId: number
-  updatedFields: Partial<PlanNodeRow>
-}
+import { type PlanNodeStateRecord, PlanNodeStateRepository } from "./plan-node-state-repository.js"
 
 export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   "fix-problems": new FixProblemsProcessor(),
@@ -58,14 +75,8 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   format: new FormatProcessor(),
 }
 
-/**
- * A patch reaches downstream nodes only when one of these actually changes:
- * consumers read content, and a move changes which iteration of a loop a node
- * belongs to. Rewriting a value unchanged — a deterministic node re-run, a
- * node starting to generate — must not demote anything, and neither may a new
- * summary: prompts read content, never summaries.
- */
-const CASCADING_KEYS = ["content", "parent_id"] as const
+/** Node types that hold iterations: their children have one state per iteration. */
+export const LOOP_TYPES: ReadonlySet<PlanNodeType> = new Set(["for-each"])
 
 /**
  * Statuses a changed input demotes. MANUAL is the user's own text; OUTDATED
@@ -73,6 +84,35 @@ const CASCADING_KEYS = ["content", "parent_id"] as const
  * it is computing from the old input does not land.
  */
 const DEMOTABLE_BY_INPUT_CHANGE: ReadonlySet<PlanNodeStatus> = new Set(["GENERATED", "GENERATING", "EMPTY"])
+
+/**
+ * Statuses a new prompt or settings demote, in every iteration. MANUAL stays
+ * the user's. A GENERATING row is demoted so that the result it is computing
+ * from the old prompt does not land.
+ */
+const DEMOTABLE_BY_DEFINITION_CHANGE: PlanNodeStatus[] = ["GENERATED", "GENERATING", "EMPTY", "ERROR"]
+
+/**
+ * The state of a node that has produced nothing in an iteration yet: pending
+ * work, shown as OUTDATED. An empty `rev` marks it as not stored.
+ */
+const PENDING_STATE: PlanNodeState = {
+  content: null,
+  summary: null,
+  status: "OUTDATED",
+  word_count: 0,
+  char_count: 0,
+  byte_count: 0,
+  in_review: 0,
+  review_base_content: null,
+  ai_improve_instruction: null,
+  rev: "",
+}
+
+/** Whether the row is stored, rather than the pending state of an iteration nothing ran in yet. */
+export function hasState(row: PlanNodeRow): boolean {
+  return row.rev !== ""
+}
 
 /**
  * The status a finished regeneration stores. A processor that reported ERROR
@@ -87,35 +127,40 @@ function outcomeStatus(reported: PlanNodeStatus | undefined, output: unknown): P
   return Array.isArray(output) || output ? "GENERATED" : "EMPTY"
 }
 
+function pick<T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> {
+  const out = {} as Pick<T, K>
+  for (const key of keys) if (source[key] !== undefined) out[key] = source[key]
+  return out
+}
+
+function compose(definition: PlanNodeDefinition, path: NodePath, state?: PlanNodeStateRecord): PlanNodeRow {
+  const stored = state ? pick(state, [...PLAN_NODE_STATE_KEYS, "rev"]) : {}
+  return { ...definition, ...PENDING_STATE, ...stored, path }
+}
+
 /**
  * Service for plan node operations.
- * Encapsulates business logic and emits events on changes.
+ * A node's definition is the same in every iteration of its loops; its state
+ * is per iteration, at a path. Most operations take the path they act at.
  */
 export class PlanNodeService {
   readonly repo: PlanNodeRepository = new PlanNodeRepository()
+  readonly states: PlanNodeStateRepository = new PlanNodeStateRepository()
+  private readonly loopsCache = new Map<number, number[]>()
 
-  getById(id: number): PlanNodeRow {
+  // ─── Definitions ─────────────────────────────────────────────────────────────
+
+  getDefinition(id: number): PlanNodeDefinition {
     const result = this.repo.findById(id)
-    if (!result) {
-      throw makeErrorWithStatus(`Plan node ${id} not found`, 404)
-    }
+    if (!result) throw makeErrorWithStatus(`Plan node ${id} not found`, 404)
     return result
   }
 
-  getByIds(ids: number[]): PlanNodeRow[] {
-    return this.repo.findByIds(ids).map((result) => {
-      if (!result) {
-        throw makeErrorWithStatus(`Plan node not found`, 404)
-      }
-      return result
-    })
-  }
-
-  findByParentId(parentId: number | null): PlanNodeRow[] {
+  findByParentId(parentId: number | null): PlanNodeDefinition[] {
     return this.repo.findByParentId(parentId)
   }
 
-  findByParentIdAndType(parentId: number | null, type: PlanNodeType): PlanNodeRow[] {
+  findByParentIdAndType(parentId: number | null, type: PlanNodeType): PlanNodeDefinition[] {
     return this.repo.findByParentIdAndType(parentId, type)
   }
 
@@ -127,402 +172,494 @@ export class PlanNodeService {
     return NODE_PROCESSORS[nodeType]
   }
 
-  getNodeSettings(node: PlanNodeRow): unknown {
+  getNodeSettings(node: PlanNodeDefinition): unknown {
     const processor = this.getProcessor(node.type)
-    if (!processor) {
-      // No processor, return empty object
-      return {}
-    }
-    // processor.defaultSettings is of type unknown, but we know it's a Record<string, any>
+    if (!processor) return {}
     return mergeNodeSettings(processor.defaultSettings as Record<string, any>, node.node_type_settings)
   }
 
-  findNodeInputs(nodeId: number): NodeInputs<unknown> {
-    const incomingEdges = new PlanEdgeRepository().findByToNodeId(nodeId)
-    const inputs = []
+  // ─── Loops and paths ─────────────────────────────────────────────────────────
 
-    for (const edge of incomingEdges) {
-      const sourceNode = this.getById(edge.from_node_id)
-      if (!sourceNode) continue
-      const processor = this.getProcessor(sourceNode.type)
-      if (!processor) continue
-      const input = processor.getOutput(this, sourceNode)
-      inputs.push({ edge, sourceNode, input })
+  /** The loops a node sits in, outermost first. */
+  loopsAround(nodeId: number): number[] {
+    const cached = this.loopsCache.get(nodeId)
+    if (cached) return cached
+    const loops: number[] = []
+    let parentId = this.repo.findById(nodeId)?.parent_id ?? null
+    while (parentId !== null) {
+      const parent = this.repo.findById(parentId)
+      if (!parent) break
+      if (LOOP_TYPES.has(parent.type)) loops.unshift(parent.id)
+      parentId = parent.parent_id
     }
-
-    return inputs.sort((a, b) => a.edge.position - b.edge.position)
+    this.loopsCache.set(nodeId, loops)
+    return loops
   }
 
-  findNodeInputsByType<T extends PlanEdgeType>(nodeId: number, type: T): NodeInputs<EdgeTypeToOutputTypeMap[T]> {
-    const incomingEdges = new PlanEdgeRepository().findByToNodeIdAndType(nodeId, type)
-    const inputs = []
-
-    for (const edge of incomingEdges) {
-      const sourceNode = this.getById(edge.from_node_id)
-      if (!sourceNode) continue
-      const processor = this.getProcessor(sourceNode.type)
-      if (!processor) continue
-      const input = processor.getOutput(this, sourceNode) as EdgeTypeToOutputTypeMap[T]
-      inputs.push({ edge, sourceNode, input })
-    }
-
-    return inputs.sort((a, b) => a.edge.position - b.edge.position)
-  }
-
-  getNodeOutput(nodeId: number): unknown {
-    const node = this.getById(nodeId)
-    if (!node) throw new Error(`Node ${nodeId} not found`)
-    const processor = this.getProcessor(node.type)
-    if (!processor) throw new Error(`No processor for node type ${node.type}`)
-    return processor.getOutput(this, node)
+  /** How many path segments a node's states have. */
+  depthOf(nodeId: number): number {
+    return this.loopsAround(nodeId).length
   }
 
   /**
-   * Demote a node to OUTDATED, recursively bubbling up through parent
-   * containers so each container can perform type-specific bookkeeping.
-   *
-   * For a plain `for-each` parent the container also has per-iteration
-   * snapshots in `content.overrides` that mirror children — flipping only
-   * the child's DB row would leave stale GENERATED snapshots that the user
-   * would see the moment they switch the for-each page. The container
-   * processor's `onChildDemoted` hook handles that mirror; this method
-   * orchestrates the walk: demote the row → ask parent processor to
-   * mirror → recurse on the parent.
-   *
-   * Idempotent: a row that isn't GENERATED is left alone, but we still
-   * bubble up because an ancestor's snapshots may yet need attention.
+   * Where a consumer running at `path` reads `sourceId`: the prefix of its
+   * path that names the loops the source is in. A source in a loop the
+   * consumer is not in has no iteration to read from, and is refused.
    */
-  async demoteToOutdated(nodeId: number): Promise<void> {
-    const node = this.getById(nodeId)
-    if (!node) return
-    if (node.status === "GENERATED") {
-      await this.patch(nodeId, false, { status: "OUTDATED" })
+  readPath(sourceId: number, consumerId: number, path: NodePath): NodePath {
+    this.checkEdge(sourceId, consumerId)
+    return truncatePath(path, this.depthOf(sourceId))
+  }
+
+  /**
+   * Refuses an edge the engine cannot resolve: one whose source sits in a loop
+   * its reader is not in — leaving a loop past its output, or crossing into a
+   * sibling loop. There is no single iteration such a reader could read.
+   */
+  checkEdge(sourceId: number, consumerId: number): void {
+    const sourceLoops = this.loopsAround(sourceId)
+    const consumerLoops = this.loopsAround(consumerId)
+    if (sourceLoops.some((loop, i) => consumerLoops[i] !== loop)) {
+      const source = this.repo.findById(sourceId)?.title
+      const consumer = this.repo.findById(consumerId)?.title
+      throw makeErrorWithStatus(
+        `«${consumer}» reads «${source}» from inside a loop it is not in; move the edge through the loop's output`,
+        400,
+      )
     }
-    if (node.parent_id !== null) {
-      const parent = this.getById(node.parent_id)
-      if (parent) {
-        const proc = this.getProcessor(parent.type)
-        await proc?.onChildDemoted?.(this, parent, nodeId)
-        await this.demoteToOutdated(parent.id)
+  }
+
+  /**
+   * Refuses a path that names no current iteration of the node: one whose
+   * loops are not the node's, or whose index is past what its loop has. An
+   * editor still open on an iteration that vanished must not write it back.
+   */
+  checkPath(nodeId: number, path: NodePath): void {
+    const loops = this.loopsAround(nodeId)
+    const segments = parsePath(path)
+    const current =
+      segments.length === loops.length &&
+      segments.every(
+        (segment, depth) =>
+          segment.containerId === loops[depth] &&
+          Number(segment.key) < loopLength(this.states.find(segment.containerId, truncatePath(path, depth))?.content),
+      )
+    if (!current) {
+      const title = this.repo.findById(nodeId)?.title
+      throw makeErrorWithStatus(`«${title}» has no iteration "${path}" any more`, 404)
+    }
+  }
+
+  // ─── Rows ────────────────────────────────────────────────────────────────────
+
+  /** The node as the iteration at `path` sees it; pending state if it has produced nothing there. */
+  getRow(id: number, path: NodePath): PlanNodeRow {
+    return compose(this.getDefinition(id), path, this.states.find(id, path))
+  }
+
+  /** What the graph shows of every node that has produced something at exactly `path`. */
+  findStatesAtPath(path: NodePath): PlanNodeStateBrief[] {
+    const loops = new Set(
+      this.repo
+        .findAll()
+        .filter((n) => LOOP_TYPES.has(n.type))
+        .map((n) => n.id),
+    )
+    return this.states.findAtPath(path).map((state) => ({
+      node_id: state.node_id,
+      path: state.path,
+      status: state.status,
+      summary: state.summary,
+      word_count: state.word_count,
+      char_count: state.char_count,
+      byte_count: state.byte_count,
+      in_review: state.in_review,
+      rev: state.rev,
+      ...(loops.has(state.node_id) ? { iterations: loopLength(state.content) } : {}),
+    }))
+  }
+
+  /** The nodes `nodeId` reads, each as the iteration at `path` reads it. */
+  findInputRows(nodeId: number, path: NodePath): PlanNodeRow[] {
+    return this.findNodeInputs(nodeId, path).map((input) => input.sourceNode)
+  }
+
+  // ─── Inputs ──────────────────────────────────────────────────────────────────
+
+  findNodeInputs(nodeId: number, path: NodePath): NodeInputs<unknown> {
+    return this.resolveInputs(nodeId, path, new PlanEdgeRepository().findByToNodeId(nodeId))
+  }
+
+  findNodeInputsByType<T extends PlanEdgeType>(
+    nodeId: number,
+    path: NodePath,
+    type: T,
+  ): NodeInputs<EdgeTypeToOutputTypeMap[T]> {
+    return this.resolveInputs(nodeId, path, new PlanEdgeRepository().findByToNodeIdAndType(nodeId, type)) as NodeInputs<
+      EdgeTypeToOutputTypeMap[T]
+    >
+  }
+
+  private resolveInputs(
+    nodeId: number,
+    path: NodePath,
+    edges: ReturnType<PlanEdgeRepository["findAll"]>,
+  ): NodeInputs<unknown> {
+    const inputs: NodeInputs<unknown> = []
+    for (const edge of edges) {
+      const source = this.repo.findById(edge.from_node_id)
+      if (!source) continue
+      const processor = this.getProcessor(source.type)
+      if (!processor) continue
+      const sourceNode = this.getRow(source.id, this.readPath(source.id, nodeId, path))
+      inputs.push({ edge, sourceNode, input: processor.getOutput(this, sourceNode) })
+    }
+    return inputs.sort((a, b) => a.edge.position - b.edge.position)
+  }
+
+  // ─── Writes ──────────────────────────────────────────────────────────────────
+
+  /**
+   * An edit as the editor sends it: definition fields apply to the node in
+   * every iteration, state fields to the iteration at `path`. With
+   * `expectedRev`, the state fields land only if nothing wrote that iteration
+   * since the editor read it; otherwise the edit fails with 409 and the
+   * editor decides.
+   */
+  async patch(
+    nodeId: number,
+    path: NodePath,
+    manual: boolean,
+    data: PlanNodeUpdate,
+    expectedRev?: string,
+  ): Promise<PlanNodeRow> {
+    const definition = pick(data, PLAN_NODE_DEFINITION_KEYS)
+    const state = pick(data, PLAN_NODE_STATE_KEYS)
+    if (Object.keys(state).length > 0) this.checkPath(nodeId, path)
+    if (Object.keys(definition).length > 0) await this.patchDefinition(nodeId, definition)
+    if (Object.keys(state).length > 0 && !(await this.patchState(nodeId, path, manual, state, expectedRev))) {
+      throw makeErrorWithStatus("The node changed since the editor read it", 409)
+    }
+    return this.getRow(nodeId, path)
+  }
+
+  /** Changes what the node is. A new prompt or settings demote it in every iteration. */
+  async patchDefinition(nodeId: number, data: PlanNodeDefinitionUpdate): Promise<PlanNodeDefinition> {
+    const before = this.getDefinition(nodeId)
+    if (data.parent_id !== undefined && data.parent_id !== before.parent_id) this.checkMove(before, data.parent_id)
+
+    let after: PlanNodeDefinition
+    try {
+      // A move and what it does to the subtree's state land together, or not at all.
+      after = withDbTransaction(() => {
+        const patched = Object.keys(data).length > 0 ? this.repo.patch(nodeId, data) : before
+        this.loopsCache.clear()
+        if (patched.parent_id !== before.parent_id) this.relocated(nodeId, before)
+        return patched
+      })
+    } finally {
+      this.loopsCache.clear()
+    }
+    planNodeEventManager.emitUpdate(nodeId, `patched keys: ${Object.keys(data).join(", ")}`)
+
+    if (after.node_type_settings !== before.node_type_settings) this.demoteEverywhere(nodeId)
+    return after
+  }
+
+  /**
+   * Changes what the node produced in the iteration at `path`. With
+   * `expectedRev`, only if nothing wrote it since that revision was read;
+   * returns null when something did. A change of content reaches everything
+   * that reads it.
+   */
+  async patchState(
+    nodeId: number,
+    path: NodePath,
+    manual: boolean,
+    data: PlanNodeStateUpdate,
+    expectedRev?: string,
+  ): Promise<PlanNodeRow | null> {
+    const before = this.getRow(nodeId, path)
+    let update: PlanNodeStateUpdate = { ...data }
+    if (update.status === undefined && update.content !== undefined) {
+      update.status = !update.content ? "EMPTY" : manual ? "MANUAL" : "GENERATED"
+    }
+    if (update.content !== undefined) update = { ...update, ...this.countsOf({ ...before, ...update }) }
+
+    const record =
+      expectedRev === undefined
+        ? this.states.upsert(nodeId, path, update)
+        : this.states.updateIfUnchanged(nodeId, path, update, expectedRev)
+    if (!record) return null
+    const after = compose(before, path, record)
+    planNodeEventManager.emitUpdate(nodeId, `state at "${path}": ${Object.keys(data).join(", ")}`)
+
+    if (after.content !== before.content) await this.markAsOutdatedAndNotifyDownstreamNodes(nodeId, path)
+    return after
+  }
+
+  /**
+   * Patches several nodes' definitions, one after another, as a drag of several
+   * nodes in the graph does. Each patch is awaited, so the call returns once
+   * all are stored and a failure reaches the caller.
+   */
+  async batchPatch(items: { id: number; data: PlanNodeDefinitionUpdate }[]): Promise<void> {
+    for (const { id, data } of items) {
+      await this.patchDefinition(id, pick(data, PLAN_NODE_DEFINITION_KEYS))
+    }
+  }
+
+  /** A new prompt, new settings, a new template: every iteration's result is stale. */
+  demoteEverywhere(nodeId: number): void {
+    const demoted = this.states.setStatusForNode(nodeId, DEMOTABLE_BY_DEFINITION_CHANGE, "OUTDATED")
+    if (demoted.length > 0) planNodeEventManager.emitUpdate(nodeId, `demoted in ${demoted.length} iteration(s)`)
+  }
+
+  private checkMove(node: PlanNodeDefinition, newParentId: number | null): void {
+    if (getNodeTypeDefinition(node.type)?.confined) {
+      throw makeErrorWithStatus(`Node type ${node.type} cannot be moved`, 403)
+    }
+    if (newParentId === node.id) throw makeErrorWithStatus("cannot set parent to itself", 400)
+    if (newParentId !== null && !this.repo.findById(newParentId)) {
+      throw makeErrorWithStatus("target parent does not exist", 400)
+    }
+    this.checkContainer(node.type, newParentId)
+    for (let cur: number | null = newParentId; cur !== null; cur = this.repo.findById(cur)?.parent_id ?? null) {
+      if (cur === node.id) throw makeErrorWithStatus("cannot move node into its own descendant", 400)
+    }
+  }
+
+  /** Refuses a node type in a container its definition does not allow it in. */
+  private checkContainer(type: PlanNodeType, parentId: number | null): void {
+    const allowed = getNodeTypeDefinition(type)?.allowedContainers
+    if (!allowed) return
+    const container = parentId === null ? "root" : this.repo.findById(parentId)?.type
+    if (!allowed.some((c) => c === container)) {
+      throw makeErrorWithStatus(`A ${type} node cannot be placed in ${container ?? "a missing node"}`, 400)
+    }
+  }
+
+  /**
+   * A node moved. If it moved into or out of a loop, its paths — and its
+   * subtree's — mean nothing any more: their state goes, and it is produced
+   * again where the node now is.
+   */
+  private relocated(nodeId: number, before: PlanNodeDefinition): void {
+    const oldLoops = this.loopsAroundParent(before.parent_id)
+    const newLoops = this.loopsAround(nodeId)
+    if (oldLoops.length === newLoops.length && oldLoops.every((loop, i) => newLoops[i] === loop)) return
+    const subtree = this.subtreeIds(nodeId)
+    // An edge that was fine where the node stood may now leave a loop past its output.
+    const edges = new PlanEdgeRepository()
+    for (const id of subtree) {
+      for (const edge of [...edges.findByToNodeId(id), ...edges.findByFromNodeId(id)]) {
+        this.checkEdge(edge.from_node_id, edge.to_node_id)
       }
     }
+    this.states.deleteAtOrBelow(ROOT_PATH, subtree)
+    if (newLoops.length === 0) {
+      for (const id of subtree) if (this.depthOf(id) === 0) this.states.upsert(id, ROOT_PATH, { status: "OUTDATED" })
+    }
   }
 
+  private loopsAroundParent(parentId: number | null): number[] {
+    if (parentId === null) return []
+    const parent = this.repo.findById(parentId)
+    if (!parent) return []
+    return [...this.loopsAround(parent.id), ...(LOOP_TYPES.has(parent.type) ? [parent.id] : [])]
+  }
+
+  private subtreeIds(nodeId: number): number[] {
+    const ids = [nodeId]
+    for (let i = 0; i < ids.length; i++) for (const child of this.repo.findByParentId(ids[i])) ids.push(child.id)
+    return ids
+  }
+
+  // ─── Cascade ─────────────────────────────────────────────────────────────────
+
   /**
-   * Notify all downstream nodes that a node's content has changed.
-   * This calls each downstream node's onInputContentChange method (if defined).
-   * If the processor returns updated PlanNodeRow, the node will be updated (if content changed)
-   * and downstream notifications will propagate further.
+   * The content of `changedId` at `path` changed. Its readers are demoted in
+   * the iterations that read that path: a sibling at the same path; a node
+   * inside a loop the changed node is outside of, in every one of its
+   * iterations. A loop's output leaving through the loop reaches the loop's
+   * readers; in a sequential loop it also reaches the later iterations.
    */
-  async markAsOutdatedAndNotifyDownstreamNodes(changedNodeId: number): Promise<void> {
-    const changedNode = this.repo.findById(changedNodeId)
-    if (!changedNode) return
-    const outgoingEdges = new PlanEdgeRepository().findByFromNodeId(changedNodeId)
-    for (const edge of outgoingEdges) {
-      const downstreamNode = this.repo.findById(edge.to_node_id)
-      if (!downstreamNode) continue
+  async markAsOutdatedAndNotifyDownstreamNodes(changedId: number, path: NodePath): Promise<void> {
+    const changed = this.repo.findById(changedId)
+    if (!changed) return
+    for (const edge of new PlanEdgeRepository().findByFromNodeId(changedId)) {
+      const consumer = this.repo.findById(edge.to_node_id)
+      if (!consumer) continue
       // A consumer that does not read this input cannot go stale from it.
-      if (!usesInput(downstreamNode, changedNode)) continue
-
-      let downstreamUpdate: PlanNodeUpdate = DEMOTABLE_BY_INPUT_CHANGE.has(downstreamNode.status)
-        ? { status: "OUTDATED" }
-        : {}
-      let toBeAfterUpdate: PlanNodeRow = { ...downstreamNode, ...downstreamUpdate }
-
-      const processor = this.getProcessor(downstreamNode.type)
-      if (processor?.onInputContentChange) {
-        console.log(
-          `Notifying downstream node ${downstreamNode.id} (${downstreamNode.type}) of changes in node ${changedNodeId}`,
-        )
-        const settings = this.getNodeSettings(downstreamNode)
-
-        downstreamUpdate = {
-          ...downstreamUpdate,
-          ...(await processor.onInputContentChange(this, toBeAfterUpdate, changedNodeId, settings)),
-        }
-        toBeAfterUpdate = { ...downstreamNode, ...downstreamUpdate }
+      if (!usesInput(consumer, changed)) continue
+      for (const consumerPath of this.pathsReading(consumer.id, path)) {
+        await this.notifyConsumer(consumer, consumerPath, changedId)
       }
+    }
+    await this.loopOutputChanged(changed, path)
+  }
 
-      if (Object.keys(getDifference(downstreamNode, toBeAfterUpdate)).length !== 0) {
-        console.log(
-          `[PlanNodeService] Updating downstream node ${downstreamNode.id} (${downstreamNode.type}) ` +
-            `because of changes in node ${changedNodeId}: ${Object.keys(downstreamUpdate)}`,
-        )
-        await this.patch(downstreamNode.id, false, downstreamUpdate)
+  /** The paths at which `consumerId` reads a node at `sourcePath`. */
+  private pathsReading(consumerId: number, sourcePath: NodePath): NodePath[] {
+    const depth = this.depthOf(consumerId)
+    if (depth <= pathDepth(sourcePath)) return [truncatePath(sourcePath, depth)]
+    // Deeper than its source: it reads it from every iteration it has below that path.
+    return this.states
+      .findAtOrBelow(sourcePath, [consumerId])
+      .map((state) => state.path)
+      .filter((path) => pathDepth(path) === depth)
+  }
+
+  private async notifyConsumer(consumer: PlanNodeDefinition, path: NodePath, changedId: number): Promise<void> {
+    const row = this.getRow(consumer.id, path)
+    let update: PlanNodeStateUpdate =
+      hasState(row) && DEMOTABLE_BY_INPUT_CHANGE.has(row.status) ? { status: "OUTDATED" } : {}
+    const processor = this.getProcessor(consumer.type)
+    if (processor?.onInputContentChange) {
+      const settings = this.getNodeSettings(consumer)
+      update = {
+        ...update,
+        ...(await processor.onInputContentChange(this, { ...row, ...update }, changedId, settings)),
+      }
+    }
+    const changes = Object.keys(update).filter(
+      (key) => update[key as keyof PlanNodeStateUpdate] !== row[key as keyof PlanNodeStateUpdate],
+    )
+    // A pending iteration has nothing to demote: it will run anyway.
+    if (changes.length === 0 || (!hasState(row) && changes.every((key) => key === "status"))) return
+    console.log(`[PlanNodeService] ${consumer.id} at "${path}" follows a change in ${changedId}: ${changes}`)
+    await this.patchState(consumer.id, path, false, update)
+  }
+
+  /** A loop's output child changed in one iteration: the loop's own output changed. */
+  private async loopOutputChanged(changed: PlanNodeDefinition, path: NodePath): Promise<void> {
+    if (changed.type !== "for-each-output" || changed.parent_id === null) return
+    const loop = this.repo.findById(changed.parent_id)
+    if (!loop || !LOOP_TYPES.has(loop.type)) return
+    const loopPath = parentPath(path)
+    const iteration = Number(lastSegment(path)?.key)
+
+    await this.markAsOutdatedAndNotifyDownstreamNodes(loop.id, loopPath)
+
+    // A sequential loop's later iterations read the earlier outputs.
+    for (const previous of this.repo.findByParentIdAndType(loop.id, "for-each-prev-outputs")) {
+      for (const state of this.states.findAtOrBelow(loopPath, [previous.id])) {
+        if (pathDepth(state.path) !== pathDepth(path)) continue
+        if (Number(lastSegment(state.path)?.key) <= iteration) continue
+        if (!DEMOTABLE_BY_INPUT_CHANGE.has(state.status)) continue
+        await this.patchState(previous.id, state.path, false, { status: "OUTDATED" })
       }
     }
   }
 
-  // ─── Create ──────────────────────────────────────────────────────────────────
+  // ─── Create and delete ───────────────────────────────────────────────────────
 
   create(data: PlanNodeCreate): { id: number } {
     if (!data.title) throw makeErrorWithStatus("title required", 400)
-    // Validate type if provided
     if (data.type !== undefined && !isValidNodeType(data.type)) {
       const valid = NODE_TYPES.map((nt) => nt.id).join(", ")
       throw makeErrorWithStatus(`Invalid node type "${data.type}". Valid types: ${valid}`, 400)
     }
     const type = data.type
-
-    // Check if node type can be created manually
     const nodeDef = NODE_TYPES.find((nt) => nt.id === type)
     if (nodeDef && nodeDef.canCreate === false) {
       throw makeErrorWithStatus(`Node type "${type}" cannot be created manually.`, 400)
     }
 
-    // Determine status based on content
-    let status: PlanNodeStatus = "EMPTY"
-    let wordCount = 0,
-      charCount = 0,
-      byteCount = 0
-    if (data.content && data.content.trim() !== "") {
-      status = "MANUAL"
-      wordCount = this.countWords(data.content)
-      charCount = this.countChars(data.content)
-      byteCount = this.countBytes(data.content)
-    }
+    this.checkContainer(type ?? "text", data.parent_id ?? null)
 
-    const id = this.repo.insert({
-      ...data,
-      status,
-      word_count: wordCount,
-      char_count: charCount,
-      byte_count: byteCount,
+    const id = withDbTransaction(() => {
+      const id = this.repo.insert({ ...pick(data, PLAN_NODE_DEFINITION_KEYS), title: data.title, type })
+      if (type === "for-each") this.createForEachInternalNodes(id, data.x ?? 0, data.y ?? 0)
+      this.writeInitialState(id, data.content ?? null, data.summary ?? null)
+      return id
     })
     console.info(`Created node ${id} of type ${type}`)
-
-    // If this is a for-each node, automatically create its internal input/output nodes
-    if (type === "for-each") {
-      this.createForEachInternalNodes(id, data.x ?? 0, data.y ?? 0)
-    }
-
     planNodeEventManager.emitUpdate(id)
     return { id }
   }
 
   /**
-   * Create internal input and output nodes for a for-each node.
-   * These nodes are placed inside the for-each node (as children) and cannot be deleted.
+   * The state a new node starts with. Outside loops a node has its one row
+   * from the start: its content if it has any — then it is the user's —
+   * otherwise EMPTY. Inside a loop rows appear as the loop's iterations run,
+   * and content has no iteration to go to.
    */
+  writeInitialState(nodeId: number, content: string | null, summary: string | null = null): void {
+    const hasContent = !!content && content.trim() !== ""
+    if (this.depthOf(nodeId) > 0) {
+      if (hasContent) {
+        const title = this.repo.findById(nodeId)?.title
+        throw makeErrorWithStatus(`«${title}» is inside a loop: its content belongs to an iteration`, 400)
+      }
+      return
+    }
+    this.states.upsert(nodeId, ROOT_PATH, {
+      content,
+      summary,
+      status: hasContent ? "MANUAL" : "EMPTY",
+      ...this.countsOf({ ...this.getRow(nodeId, ROOT_PATH), content }),
+    })
+  }
+
+  /** The internal input and output nodes of a loop; they cannot be deleted. */
   private createForEachInternalNodes(parentId: number, parentX: number, parentY: number): void {
-    // Create for-each-input node
     const inputId = this.repo.insert({
       type: "for-each-input",
       title: "Input",
       parent_id: parentId,
       x: parentX - 50,
       y: parentY + 50,
-      content: null,
-      summary: null,
-      ai_sync_info: null,
       node_type_settings: JSON.stringify({}),
-      ai_settings: null,
-      status: "EMPTY",
-      in_review: 0,
-      review_base_content: null,
-      word_count: 0,
-      char_count: 0,
-      byte_count: 0,
     })
-    // Create for-each-output node
     const outputId = this.repo.insert({
       type: "for-each-output",
       title: "Output",
       parent_id: parentId,
       x: parentX + 50,
       y: parentY + 50,
-      content: null,
-      summary: null,
-      ai_sync_info: null,
       node_type_settings: JSON.stringify({}),
-      ai_settings: null,
-      status: "EMPTY",
-      in_review: 0,
-      review_base_content: null,
-      word_count: 0,
-      char_count: 0,
-      byte_count: 0,
     })
     console.info(`Created internal nodes for for-each ${parentId}: input ${inputId}, output ${outputId}`)
   }
 
-  // ─── Update ──────────────────────────────────────────────────────────────────
-
-  /**
-   * Start a review for a node, optionally updating content and setting the improve instruction.
-   * If content is provided, it will replace the current content.
-   * Sets changes_status = 'review' and stores review_base_content if not already in review.
-   */
-  async startReview(id: number, patch?: PlanNodeUpdate): Promise<PlanNodeRow> {
-    const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
-
-    const updateFields: PlanNodeUpdate = {
-      ...patch,
-      in_review: 1,
-    }
-
-    return await this.patch(id, true, updateFields)
+  delete(id: number) {
+    console.log(`Deleting node with id ${id}`)
+    if (!this.repo.findById(id)) throw makeErrorWithStatus("node not found", 404)
+    const subtree = this.subtreeIds(id)
+    for (const nodeId of subtree) new PlanEdgeRepository().deleteByNodeId(nodeId)
+    this.states.deleteAtOrBelow(ROOT_PATH, subtree)
+    this.repo.delete(id)
+    this.loopsCache.clear()
+    planNodeEventManager.emitUpdate(id)
   }
 
-  /**
-   * Accept the current review, clearing review state.
-   */
-  async acceptReview(id: number): Promise<PlanNodeRow> {
-    const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
-
-    return await this.patch(id, true, {
-      in_review: 0,
-      review_base_content: null,
-    })
-  }
-
-  /**
-   * Update multiple fields of a node (generic patch).
-   * Handles merge node regeneration if needed.
-   */
-  async patch(nodeId: number, manual: boolean, data: PlanNodeUpdate): Promise<PlanNodeRow> {
-    const oldNode = this.repo.findById(nodeId)
-    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
-
-    // Validate parent_id if present
-    if (data.parent_id !== undefined) {
-      const newParentId = data.parent_id
-
-      // Check if node type is confined (cannot be moved)
-      const nodeDef = getNodeTypeDefinition(oldNode.type)
-      if (nodeDef?.confined && data.parent_id !== oldNode.parent_id) {
-        throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
-      }
-
-      // Cannot set parent to itself
-      if (newParentId === nodeId) {
-        throw makeErrorWithStatus("cannot set parent to itself", 400)
-      }
-
-      // If parent is not null, ensure it exists and check for cycles
-      if (newParentId !== null) {
-        const target = this.repo.findById(newParentId)
-        if (!target) throw makeErrorWithStatus("target parent does not exist", 400)
-
-        // Check for cycles
-        let cur: number | null = newParentId
-        while (cur !== null) {
-          if (cur === nodeId) throw makeErrorWithStatus("cannot move node into its own descendant", 400)
-          const parent = this.repo.findById(cur)
-          cur = parent?.parent_id ?? null
-        }
-      }
-    }
-
-    let update: PlanNodeUpdate = { ...data }
-
-    if (data.status !== undefined) {
-      console.log(`In patch there is a requirement to change status to ${data.status}`)
-    } else {
-      if (update.content !== undefined) {
-        if (!update.content) {
-          console.log("Status will be changed to EMPTY because content is empty")
-          update.status = "EMPTY"
-        } else {
-          if (manual) {
-            console.log("Status will be changed to MANUAL because content is not empty and manual is true")
-            update.status = "MANUAL"
-          } else {
-            console.log("Status will be changed to GENERATED because content is not empty and manual is false")
-            update.status = "GENERATED"
-          }
-        }
-      }
-      if (update.status === undefined && update.node_type_settings !== undefined) {
-        update.status = "OUTDATED"
-      }
-    }
-
-    update = {
-      ...update,
-      ...(await this.mayBeInvokeOnUpdate(nodeId, oldNode, { ...oldNode, ...update })),
-    }
-    if (update.content !== undefined) {
-      update = { ...update, ...this.countsOf({ ...oldNode, ...update }) }
-    }
-
-    const updated = Object.keys(update).length !== 0 ? this.repo.patch(nodeId, update) : oldNode
-    if (!updated) throw makeErrorWithStatus("node not found", 404)
-
-    // Emit event to frontend
-    planNodeEventManager.emitUpdate(nodeId, `patched keys: ${Object.keys(data).join(", ")}`)
-
-    if (CASCADING_KEYS.some((key) => updated[key] !== oldNode[key])) {
-      await this.markAsOutdatedAndNotifyDownstreamNodes(nodeId)
-    }
-
-    return updated
-  }
-
-  /**
-   * Patches several nodes, one after another, as a drag of several nodes in
-   * the graph does. Each patch is awaited, so the call returns once all are
-   * stored and a failure reaches the caller instead of becoming an unhandled
-   * rejection.
-   */
-  async batchPatch(items: { id: number; data: PlanNodeUpdate }[]): Promise<void> {
-    for (const { id, data } of items) {
-      await this.patch(id, false, data)
-    }
-  }
-
-  private async mayBeInvokeOnUpdate<
-    N extends PlanNodeRow | null = PlanNodeRow,
-    T extends Record<string, any> = Record<string, any>,
-  >(nodeId: number, oldNode: PlanNodeRow | null, newNode: N): Promise<PlanNodeUpdate | null> {
-    const type = oldNode?.type ?? newNode?.type
-    if (!type) return null
-
-    const nodeProcessor = this.getProcessor(type) as NodeProcessor<T>
-
-    const settings = newNode?.node_type_settings
-      ? mergeNodeSettings(nodeProcessor.defaultSettings, newNode.node_type_settings)
-      : nodeProcessor.defaultSettings
-
-    if (nodeProcessor.onUpdate) {
-      console.log(`Invoking onUpdate handler for node ${nodeId} of type ${type}`)
-      return await nodeProcessor.onUpdate(this, nodeId, oldNode, newNode, settings)
-    }
-    return null
-  }
+  // ─── Regeneration ────────────────────────────────────────────────────────────
 
   async regenerate<T extends Record<string, any> = Record<string, any>>(
     context: RegenerationNodeContext,
   ): Promise<PlanNodeRow> {
-    const nodeId = context.nodeId
-    const node = await this.patch(nodeId, false, { status: "GENERATING" })
+    const { nodeId, path } = context
+    const node = (await this.patchState(nodeId, path, false, { status: "GENERATING" })) as PlanNodeRow
 
     try {
       const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
 
-      let patch: PlanNodeUpdate = {}
+      let patch: PlanNodeStateUpdate = {}
       if (nodeProcessor.regenerate) {
-        console.debug("[PlanNodeService]", "regenerate", "node.node_type_settings", node.node_type_settings)
         const settings =
           node.node_type_settings !== null
             ? mergeNodeSettings(nodeProcessor.defaultSettings, node.node_type_settings)
             : nodeProcessor.defaultSettings
-        console.debug("[PlanNodeService]", "regenerate", "settings", settings)
-
-        patch = (await nodeProcessor.regenerate(this, context, node, settings)) || {}
+        patch = pick((await nodeProcessor.regenerate(this, context, node, settings)) || {}, PLAN_NODE_STATE_KEYS)
       }
 
       if (context.abortSignal.aborted) {
-        console.warn("[PlanNodeService]", "regenerate", `Stop node ${context.nodeId} regeneration due to abort signal`)
-        return await this.landRegeneration(nodeId, { status: "OUTDATED" })
+        console.warn("[PlanNodeService]", "regenerate", `Stop node ${nodeId} regeneration due to abort signal`)
+        return await this.landRegeneration(node, { status: "OUTDATED" })
       }
 
-      const output = nodeProcessor.getOutput(this, {
-        ...node,
-        ...patch,
-      })
+      const output = nodeProcessor.getOutput(this, { ...node, ...patch })
       const status = outcomeStatus(patch.status, output)
 
       if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
@@ -534,158 +671,133 @@ export class PlanNodeService {
             }
           } catch (e) {
             console.error(e)
-            patch = {
-              ...patch,
-              summary: `(error): ${e}`,
-            }
+            patch = { ...patch, summary: `(error): ${e}` }
           }
         } else {
-          patch = {
-            ...patch,
-            summary: null,
-          }
+          patch = { ...patch, summary: null }
         }
       } else {
-        patch = {
-          ...patch,
-          summary: patch.summary || null,
-        }
+        patch = { ...patch, summary: patch.summary || null }
       }
       // Counted from the output: a loop's element or a node reading earlier
       // iterations produces text without writing content.
       patch = { ...patch, status, ...this.countsOfOutput(output) }
 
       if (context.abortSignal.aborted) {
-        console.warn("[PlanNodeService]", "regenerate", `Stop node ${context.nodeId} regeneration due to abort signal`)
-        return await this.landRegeneration(nodeId, { status: "OUTDATED" })
+        console.warn("[PlanNodeService]", "regenerate", `Stop node ${nodeId} regeneration due to abort signal`)
+        return await this.landRegeneration(node, { status: "OUTDATED" })
       }
 
-      return await this.landRegeneration(nodeId, patch)
+      return await this.landRegeneration(node, patch)
     } catch (e) {
-      console.error(`Unable to regenerate node ${nodeId}`, e)
+      console.error(`Unable to regenerate node ${nodeId} at "${path}"`, e)
       // A stopped node is left to be redone, not marked broken.
-      await this.landRegeneration(nodeId, { status: context.abortSignal.aborted ? "OUTDATED" : "ERROR" })
+      await this.landRegeneration(node, { status: context.abortSignal.aborted ? "OUTDATED" : "ERROR" })
       throw e
     }
   }
 
   /**
    * Writes what a regeneration produced — unless the row changed while it ran.
-   * A demotion, a prompt edit or the user's own text all move the row off
-   * GENERATING; the result was built on what the row used to be, so it is
+   * A demotion, a prompt edit or the user's own text all give the row a new
+   * revision; the result was built on what the row used to be, so it is
    * dropped and the row keeps the newer write.
    */
-  private async landRegeneration(nodeId: number, outcome: PlanNodeUpdate): Promise<PlanNodeRow> {
-    const current = this.repo.findById(nodeId)
-    if (!current) throw makeErrorWithStatus(`Plan node ${nodeId} was deleted while it was being regenerated`, 404)
-    if (current.status !== "GENERATING") {
-      console.warn(
-        `[PlanNodeService] node ${nodeId} changed while it was regenerated (now ${current.status}); result dropped`,
-      )
-      return current
+  private async landRegeneration(started: PlanNodeRow, outcome: PlanNodeStateUpdate): Promise<PlanNodeRow> {
+    const landed = await this.patchState(started.id, started.path, false, outcome, started.rev)
+    if (landed) return landed
+    console.warn(
+      `[PlanNodeService] node ${started.id} at "${started.path}" changed while it was regenerated; result dropped`,
+    )
+    if (!this.repo.findById(started.id)) {
+      throw makeErrorWithStatus(`Plan node ${started.id} was deleted while it was being regenerated`, 404)
     }
-    return await this.patch(nodeId, false, outcome)
+    return this.getRow(started.id, started.path)
   }
 
-  // ─── Delete ──────────────────────────────────────────────────────────────────
+  // ─── Editor actions ──────────────────────────────────────────────────────────
 
-  delete(id: number) {
-    console.log(`Deleting node with id ${id}`)
-
-    const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
-
-    // Delete connected edges first
-    new PlanEdgeRepository().deleteByNodeId(id)
-
-    // Delete connected edges first (should be handled by foreign key, but we do it explicitly)
-    // This is done by the repository's delete method.
-    this.repo.delete(id)
-
-    planNodeEventManager.emitUpdate(id)
+  /** Starts a review of the node's text at `path`, optionally replacing it. */
+  async startReview(id: number, path: NodePath, patch?: PlanNodeStateUpdate): Promise<PlanNodeRow> {
+    this.checkPath(id, path)
+    return (await this.patchState(id, path, true, { ...pick(patch ?? {}, PLAN_NODE_STATE_KEYS), in_review: 1 }))!
   }
 
-  async move(id: number, parentId: number | null) {
-    const oldNode = this.repo.findById(id)
-    if (!oldNode) throw makeErrorWithStatus("node not found", 404)
+  /** Accepts the review at `path`, clearing its state. */
+  async acceptReview(id: number, path: NodePath): Promise<PlanNodeRow> {
+    this.checkPath(id, path)
+    return (await this.patchState(id, path, true, { in_review: 0, review_base_content: null }))!
+  }
 
-    // Check if node type is confined (cannot be moved)
-    const nodeDef = getNodeTypeDefinition(oldNode.type)
-    if (nodeDef?.confined) {
-      throw makeErrorWithStatus(`Node type ${oldNode.type} cannot be moved`, 403)
-    }
+  /** Regenerates the node at `path` and opens a review of the change. */
+  async regenerateForReview(
+    id: number,
+    path: NodePath,
+    regenerate: (target: { nodeId: number; path: NodePath }) => Promise<PlanNodeRow>,
+  ): Promise<PlanNodeRow> {
+    this.checkPath(id, path)
+    const before = this.getRow(id, path)
+    const regenerated = await regenerate({ nodeId: id, path })
+    return (await this.patchState(id, path, false, {
+      in_review: (regenerated.content?.trim()?.length || 0) > 0 ? 1 : 0,
+      review_base_content: before.content,
+    }))!
+  }
 
-    if (oldNode.parent_id === null) throw makeErrorWithStatus("root node cannot be moved", 403)
-    if (parentId === id) throw makeErrorWithStatus("cannot move node to itself", 400)
+  async aiGenerateSummary(nodeId: number, path: NodePath): Promise<PlanNodeRow> {
+    this.checkPath(nodeId, path)
+    const node = this.getRow(nodeId, path)
+    const output = this.getProcessor(node.type).getOutput(this, node)
+    return (await this.patchState(nodeId, path, false, {
+      summary: output
+        ? await generateSummary(new AbortController().signal, ["plan-node-summary", `${nodeId}`], output)
+        : "",
+    }))!
+  }
 
-    if (parentId !== null) {
-      const target = this.repo.findById(parentId)
-      if (!target) throw makeErrorWithStatus("target parent does not exist", 400)
-
-      // Check for cycles
-      let cur: number | null = parentId
-      while (cur !== null) {
-        if (cur === id) throw makeErrorWithStatus("cannot move node into its own descendant", 400)
-        const parent = this.repo.findById(cur)
-        cur = parent?.parent_id ?? null
+  aiImprove(nodeId: number, path: NodePath): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
+    this.checkPath(nodeId, path)
+    const node = this.getRow(nodeId, path)
+    return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
+      const newContent = await improvePlanNodeContent(new AbortController().signal, node, (event) => {
+        emit.next({ type: "event", event })
+      })
+      // The improvement rewrites the text it was given; if that text changed
+      // meanwhile, writing it back would throw the newer text away.
+      const newNode =
+        node.status === "GENERATING"
+          ? null
+          : await this.patchState(
+              nodeId,
+              path,
+              true,
+              {
+                status: "MANUAL",
+                content: newContent,
+                in_review: (node.content?.trim?.()?.length || 0) > 0 ? 1 : 0,
+                review_base_content: node.content,
+              },
+              node.rev,
+            )
+      if (!newNode) {
+        throw makeErrorWithStatus("The node changed while it was being improved; the improvement was discarded", 409)
       }
-    }
-
-    this.patch(id, true, { parent_id: parentId })
-  }
-
-  async reorderChildren(childIds: number[]) {
-    if (!Array.isArray(childIds)) throw makeErrorWithStatus("child_ids must be an array", 400)
-
-    childIds.forEach((id, index) => {
-      this.patch(id, true, { position: index })
+      emit.next({ type: "data", data: newNode })
+      emit.next({ type: "completed" })
     })
   }
 
-  changeForEachNodePage(nodeId: number, page: number): PlanNodeRow {
-    const repo = this.repo
-    const node = this.getById(nodeId)
-    if (node.type !== "for-each") {
-      throw makeErrorWithStatus(`Node ${nodeId} is not a for-each node, but '${node.type}'`, 400)
-    }
-    const parsedContent = (JSON.parse(node.content || "{}") || {}) as ForEachNodeContent
-
-    console.log(
-      `[changeForEachNodePage] node ${nodeId}, currentIndex=${parsedContent.currentIndex}, page=${page}, overrides before save:`,
-      parsedContent.overrides,
-    )
-    // save current page
-    parsedContent.overrides = [...(parsedContent.overrides || [])]
-    const collected = repo.collectForEachNodeIterationContentFromChildren(nodeId)
-    console.log(`[changeForEachNodePage] collected overrides:`, collected)
-    console.log(`[changeForEachNodePage] collected keys:`, Object.keys(collected))
-    parsedContent.overrides[parsedContent.currentIndex || 0] = collected
-
-    console.log(`[changeForEachNodePage] overrides after save:`, parsedContent.overrides)
-    console.log(
-      `[changeForEachNodePage] overrides[${parsedContent.currentIndex || 0}] keys:`,
-      Object.keys(parsedContent.overrides[parsedContent.currentIndex || 0] || {}),
-    )
-    repo.applyForEachNodeIterationToChildren(nodeId, parsedContent.overrides[page] || {})
-
-    parsedContent.currentIndex = page
-    const result = repo.patch(nodeId, { content: JSON.stringify(parsedContent) })
-    console.log(`[changeForEachNodePage] saved content:`, JSON.stringify(parsedContent))
-
-    // Emit events to frontend
-    planNodeEventManager.emitUpdate(nodeId, `changed page in ${nodeId}`)
-    repo.findByParentId(nodeId).forEach((child) => {
-      planNodeEventManager.emitUpdate(child.id, `changed page in ${nodeId}`)
-    })
-
-    return result
+  async saveContentToFile(nodeId: number, path: NodePath, filePath: string): Promise<void> {
+    await fs.writeFile(filePath, this.getRow(nodeId, path).content || "", "utf8")
   }
+
+  // ─── Counts ──────────────────────────────────────────────────────────────────
 
   /**
    * Counts of what a node outputs. For split, fix-problems and loops the
    * content is JSON, and counting it would measure the envelope.
    */
-  private countsOf(node: PlanNodeRow): Pick<PlanNodeRow, "word_count" | "char_count" | "byte_count"> {
+  private countsOf(node: PlanNodeRow): Pick<PlanNodeState, "word_count" | "char_count" | "byte_count"> {
     try {
       return this.countsOfOutput(this.getProcessor(node.type).getOutput(this, node))
     } catch {
@@ -694,79 +806,18 @@ export class PlanNodeService {
     }
   }
 
-  private countsOfOutput(output: unknown): Pick<PlanNodeRow, "word_count" | "char_count" | "byte_count"> {
+  private countsOfOutput(output: unknown): Pick<PlanNodeState, "word_count" | "char_count" | "byte_count"> {
     const text =
       typeof output === "string"
         ? output
         : Array.isArray(output)
           ? output.filter((part) => typeof part === "string").join("\n\n")
           : ""
-    return { word_count: this.countWords(text), char_count: this.countChars(text), byte_count: this.countBytes(text) }
+    const trimmed = text.trim()
+    return {
+      word_count: trimmed === "" ? 0 : trimmed.split(/\s+/).length,
+      char_count: [...text].length,
+      byte_count: Buffer.byteLength(text, "utf8"),
+    }
   }
-
-  private countWords(text: string): number {
-    const t = text.trim()
-    return t === "" ? 0 : t.split(/\s+/).length
-  }
-
-  private countChars(text: string): number {
-    return [...text].length
-  }
-
-  private countBytes(text: string): number {
-    return Buffer.byteLength(text, "utf8")
-  }
-
-  async aiGenerateSummary(nodeId: number): Promise<PlanNodeRow> {
-    const node = this.getById(nodeId)
-    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404)
-
-    const nodeProcessor = this.getProcessor(node.type) as NodeProcessor
-    const nodeContent = nodeProcessor.getOutput(this, node)
-
-    return await this.patch(nodeId, false, {
-      summary: nodeContent
-        ? await generateSummary(new AbortController().signal, ["plan-node-summary", `${nodeId}`], nodeContent)
-        : "",
-    })
-  }
-
-  aiImprove(nodeId: number): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
-    const node = this.getById(nodeId)
-    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404)
-
-    return toObservable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>>(async (emit) => {
-      const { oldNode, newContent } = await improvePlanNodeContent(new AbortController().signal, nodeId, (event) => {
-        emit.next({ type: "event", event })
-      })
-
-      // The improvement rewrites the text it was given; if that text changed
-      // meanwhile, writing it back would throw the newer text away.
-      const current = this.getById(nodeId)
-      if (current.content !== oldNode.content || current.status === "GENERATING") {
-        throw makeErrorWithStatus("The node changed while it was being improved; the improvement was discarded", 409)
-      }
-
-      const newNode = await this.patch(nodeId, true, {
-        status: "MANUAL",
-        content: newContent,
-        in_review: (oldNode.content?.trim?.()?.length || 0) > 0 ? 1 : 0,
-        review_base_content: oldNode.content,
-      })
-
-      emit.next({ type: "data", data: newNode })
-      emit.next({ type: "completed" })
-    })
-  }
-
-  async saveContentToFile(nodeId: number, filePath: string): Promise<void> {
-    const node = this.getById(nodeId)
-    if (!node) throw makeErrorWithStatus(`node ${nodeId} not found`, 404)
-
-    await fs.writeFile(filePath, node.content || "", "utf8")
-  }
-}
-
-export interface PlanNodeSubscriptionEvent {
-  event: ResponseStreamEvent
 }

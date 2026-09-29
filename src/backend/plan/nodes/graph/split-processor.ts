@@ -1,5 +1,5 @@
 import type { SplitSettings } from "@shared/node-settings.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import { generateSplitParts } from "../../../ai/generate-split-parts.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { PlanNodeService } from "../plan-node-service.js"
@@ -16,10 +16,10 @@ import type { NodeProcessor } from "./node-processor.js"
 export class SplitProcessor implements NodeProcessor<SplitSettings> {
   readonly defaultSettings: SplitSettings = {}
 
-  getOutput(_service: PlanNodeService, node: PlanNodeRow): string[] {
-    if (!node.content) return []
+  getOutput(_service: PlanNodeService, row: PlanNodeRow): string[] {
+    if (!row.content) return []
     try {
-      const parsed = JSON.parse(node.content)
+      const parsed = JSON.parse(row.content)
       if (Array.isArray(parsed) && parsed.every((p) => typeof p === "string")) {
         return parsed
       }
@@ -32,19 +32,19 @@ export class SplitProcessor implements NodeProcessor<SplitSettings> {
   async regenerate(
     service: PlanNodeService,
     context: RegenerationNodeContext,
-    node: PlanNodeRow,
+    row: PlanNodeRow,
     _settings: SplitSettings,
-  ): Promise<PlanNodeUpdate | null> {
-    const inputs = service.findNodeInputsByType(node.id, "text")
+  ): Promise<PlanNodeStateUpdate | null> {
+    const inputs = service.findNodeInputsByType(row.id, row.path, "text")
     if (inputs.length === 0) {
       return { content: JSON.stringify([]) }
     }
 
-    const parts = await generateSplitParts(context.abortSignal, node, (event) =>
+    const parts = await generateSplitParts(context.abortSignal, row, inputs, (event) =>
       context.onResponseStreamEvent(["content"], event),
     )
 
-    const result: PlanNodeUpdate = { content: JSON.stringify(parts) }
+    const result: PlanNodeStateUpdate = { content: JSON.stringify(parts) }
     if (inputs.length === 1) {
       result.summary = inputs[0].sourceNode.summary
     }

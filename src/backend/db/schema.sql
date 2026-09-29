@@ -97,27 +97,33 @@ CREATE TABLE "plan_edges" (
   template TEXT
 );
 
+CREATE TABLE plan_node_states (
+  node_id INTEGER NOT NULL REFERENCES plan_nodes (id) ON DELETE CASCADE,
+  path TEXT NOT NULL,
+  content TEXT,
+  summary TEXT,
+  status TEXT NOT NULL DEFAULT 'EMPTY',
+  word_count INTEGER NOT NULL DEFAULT 0,
+  char_count INTEGER NOT NULL DEFAULT 0,
+  byte_count INTEGER NOT NULL DEFAULT 0,
+  in_review INTEGER NOT NULL DEFAULT 0,
+  review_base_content TEXT,
+  ai_improve_instruction TEXT,
+  rev TEXT NOT NULL DEFAULT (lower(hex(randomblob(8)))),
+  PRIMARY KEY (node_id, path)
+);
+
 CREATE TABLE plan_nodes (
   id INTEGER PRIMARY KEY,
   parent_id INTEGER NULL REFERENCES plan_nodes (id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  content TEXT,
   position INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   type TEXT NOT NULL DEFAULT 'text',
   x REAL DEFAULT 0,
   y REAL DEFAULT 0,
-  summary TEXT,
-  ai_sync_info TEXT,
-  word_count INTEGER NOT NULL DEFAULT 0,
-  char_count INTEGER NOT NULL DEFAULT 0,
-  byte_count INTEGER NOT NULL DEFAULT 0,
-  review_base_content TEXT NULL,
-  ai_improve_instruction TEXT NULL,
   node_type_settings TEXT NULL,
-  status TEXT NOT NULL DEFAULT 'EMPTY',
   ai_settings TEXT,
-  in_review INTEGER NOT NULL DEFAULT 0,
   width INTEGER NULL,
   height INTEGER NULL
 );
@@ -139,3 +145,5 @@ CREATE TABLE story_parts (
 CREATE INDEX idx_ai_call_stats_lookup ON ai_call_stats (node_type, purpose, engine_id, model);
 
 CREATE INDEX idx_ai_call_stats_run ON ai_call_stats (run_id);
+
+CREATE INDEX idx_plan_node_states_path ON plan_node_states (path);

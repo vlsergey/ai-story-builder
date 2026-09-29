@@ -1,10 +1,11 @@
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { PlanNodeService } from "../plan-node-service.js"
 
 /**
  * Processor for a specific node type.
- * Knows how to compute outputs, react to changes, and regenerate content.
+ * Knows how to compute outputs, react to changes, and regenerate content —
+ * always for one iteration: the row it gets is the node at a path.
  */
 export interface NodeProcessor<S = unknown> {
   /**
@@ -14,59 +15,32 @@ export interface NodeProcessor<S = unknown> {
   readonly defaultSettings: S
 
   /**
-   * Get output for the given node.
-   * Returns the current content of the node without updating or recomputing it.
+   * The node's output at `row.path`, without recomputing it.
    * The output must match the type expected by the edge (e.g., string for 'text', string[] for 'textArray').
-   * The edge type is determined by getOutputEdgeType().
    */
-  getOutput(context: PlanNodeService, planNodeRow: PlanNodeRow): unknown
-
-  onUpdate?(
-    service: PlanNodeService,
-    nodeId: number,
-    oldNode: PlanNodeRow | null,
-    newNode: PlanNodeRow | null,
-    settings: S,
-  ): Promise<PlanNodeUpdate | null>
+  getOutput(service: PlanNodeService, row: PlanNodeRow): unknown
 
   /**
-   * Called when an input node's content changes.
-   * The processor may decide to update its own content (e.g., re‑merge, re‑split) if auto‑update is enabled.
-   * Returns a PlanNodeRow object with updated fields (e.g., content) if the node should be updated,
-   * or null if no changes are needed.
+   * Called when an input node's content changed; `row` is this node at a path
+   * that reads it. Returns the change to this node's state there, or null.
    * @param changedInputNodeId The ID of the input node whose content changed.
    * @param settings The full settings for this node (merged from node_type_settings and defaults).
    */
   onInputContentChange?(
-    context: PlanNodeService,
-    node: PlanNodeRow,
+    service: PlanNodeService,
+    row: PlanNodeRow,
     changedInputNodeId: number,
     settings: S,
-  ): Promise<PlanNodeUpdate | null>
+  ): Promise<PlanNodeStateUpdate | null>
 
   /**
-   * Regenerate the node's content (e.g., AI generation, re‑split, re‑merge).
-   * This method is also saves new content of the node.
-   * Will return old planNodeRow if regeneration not required.
+   * Regenerates the node at `row.path` (e.g. AI generation, re-split, re-merge)
+   * and returns its new state; the service stores it.
    */
   regenerate?(
     service: PlanNodeService,
     context: RegenerationNodeContext,
-    node: PlanNodeRow,
+    row: PlanNodeRow,
     settings: S,
-  ): Promise<PlanNodeUpdate | null>
-
-  /**
-   * Called when one of this node's direct children was just demoted to
-   * OUTDATED via `PlanNodeService.demoteToOutdated`. The container processor
-   * is responsible for any container-local bookkeeping that mirrors the
-   * child's status — e.g. for-each must flip GENERATED → OUTDATED in every
-   * iteration's snapshot in `overrides`, because those snapshots are the
-   * authority for non-current iterations and would otherwise restore stale
-   * GENERATED content when the user switches pages.
-   *
-   * The demoteToOutdated caller bubbles up afterwards on its own — this hook
-   * should NOT recurse to grandparents.
-   */
-  onChildDemoted?(service: PlanNodeService, parentNode: PlanNodeRow, childId: number): Promise<void>
+  ): Promise<PlanNodeStateUpdate | null>
 }

@@ -8,16 +8,17 @@ import {
   ContextMenuGroup,
   ContextMenuSubContent,
 } from "@/ui-components/context-menu"
-import type { PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeDefinition } from "@shared/plan-graph"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import { useTranslation } from "react-i18next"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { ExternalLink, TrashIcon, SaveIcon } from "lucide-react"
 import { trpc } from "@/ipcClient"
+import { useIterationSelection } from "../iteration-selection"
 
 interface NodeContextMenuContentProps {
   contextMenuNodeId: number
-  serverNodes: PlanNodeRow[] | undefined
+  serverNodes: PlanNodeDefinition[] | undefined
   aiGenerateSummary: (nodeId: number) => void
   deleteNode: (nodeId: number) => void
   moveNode: (nodeId: number, parentId: number | null) => void
@@ -40,13 +41,15 @@ export default function NodeContextMenuContent({
   const nodeType = contextMenuNode?.type
   const nodeDef = nodeType ? getNodeTypeDefinition(nodeType) : null
   const regenerateNode = trpc.plan.nodes.aiGenerate.startForNode.useMutation().mutate
+  const { displayPath } = useIterationSelection()
 
   return (
     <UIContextMenuContent>
       {nodeDef?.canRegenerate && (
         <ContextMenuItem
           onSelect={() => {
-            regenerateNode(contextMenuNodeId)
+            // In the iteration the graph shows.
+            regenerateNode({ nodeId: contextMenuNodeId, path: displayPath(contextMenuNodeId) })
           }}
         >
           {t("planGraph.nodeContextMenu.regenerate")}

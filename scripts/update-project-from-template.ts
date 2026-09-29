@@ -27,7 +27,7 @@
 import { Command } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { analyzeTemplateUpdate, applyTemplateUpdate } from "../src/backend/projects/template-update.js"
-import { resolveProjectPath } from "./lib/project-paths.js"
+import { openProject } from "./lib/project-paths.js"
 
 interface CliArgs {
   project: string
@@ -83,9 +83,7 @@ function printAnalysis(analysis: ReturnType<typeof analyzeTemplateUpdate>): void
 
 async function main(): Promise<void> {
   const args = parseCli()
-  const dbPath = resolveProjectPath(args.project)
-  console.info(`Opening project: ${dbPath}`)
-  setCurrentDbPath(dbPath)
+  console.info(`Opening project: ${openProject(args.project)}`)
 
   const analysis = analyzeTemplateUpdate()
   printAnalysis(analysis)

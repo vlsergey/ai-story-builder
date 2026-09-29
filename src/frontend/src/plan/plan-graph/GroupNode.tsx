@@ -9,9 +9,11 @@ import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import ForEachPlanNodeFooter from "./ForEachPlanNodeFooter"
 import CreateNodeButtonGroup from "./CreateNodeButtonGroup"
 import type { PlanContainerNodeType } from "@shared/plan-node-types"
+import { useNodeDisplayState } from "../iteration-selection"
 
 export default function GroupNode({ data }: NodeProps<NodeImpl>) {
   const nodeType = useMemo(() => getNodeTypeDefinition(data.type), [data.type])
+  const { path, state } = useNodeDisplayState(data.id)
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
     data.onDelete(data.id)
@@ -29,7 +31,7 @@ export default function GroupNode({ data }: NodeProps<NodeImpl>) {
           <RepeatIcon className="shrink-0 w-4 h-4 text-muted-foreground/70" />
           <span className="text-sm font-medium leading-tight truncate flex-1">{data.title}</span>
           <div className="flex items-center gap-1">
-            <PlanNodeStatusIcon status={data.status} />
+            <PlanNodeStatusIcon status={state?.status ?? "EMPTY"} />
             <DeleteNodeButton onDelete={handleDelete} />
           </div>
         </div>
@@ -37,7 +39,7 @@ export default function GroupNode({ data }: NodeProps<NodeImpl>) {
         <div className="flex-1" />
         {nodeType?.id === "for-each" && (
           <div className="shrink-0">
-            <ForEachPlanNodeFooter node={data} />
+            <ForEachPlanNodeFooter loopId={data.id} path={path} iterations={state?.iterations ?? 0} />
           </div>
         )}
       </div>

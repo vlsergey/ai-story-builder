@@ -11,6 +11,8 @@ interface ResponseStreamWatcherProps {
 
 interface LastNodeAndContentPath {
   nodeId: number
+  /** The iteration the node streams in: two iterations of one node are two streams. */
+  path: string
   contentPath: (number | string)[]
   content: string
 }
@@ -20,22 +22,24 @@ export default function ResponseStreamWatcher({ className }: ResponseStreamWatch
   const ref = useRef<HTMLTextAreaElement>(null)
   const [state, setState] = useState<LastNodeAndContentPath>({
     nodeId: 0,
+    path: "",
     contentPath: [],
     content: "",
   })
 
   trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
-    onData({ nodeId, contentPath, event }) {
-      const needReset = state.nodeId !== nodeId || !areArraysEqual(state.contentPath, contentPath)
+    onData({ nodeId, path, contentPath, event }) {
+      const needReset =
+        state.nodeId !== nodeId || state.path !== path || !areArraysEqual(state.contentPath, contentPath)
       if (event.type === "response.output_text.delta") {
         if (needReset) {
-          setState({ nodeId, contentPath, content: event.delta })
+          setState({ nodeId, path, contentPath, content: event.delta })
         } else {
           setState((state) => ({ ...state, content: state.content + event.delta }))
         }
       } else {
         if (needReset) {
-          setState({ nodeId, contentPath, content: "" })
+          setState({ nodeId, path, contentPath, content: "" })
         }
       }
     },

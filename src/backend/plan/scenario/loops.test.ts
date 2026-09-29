@@ -5,13 +5,6 @@ import { PlanScenario } from "./plan-scenario.js"
 
 vi.mock("../../ai/ai-engine-adapter.js", async () => (await import("./fake-engine.js")).fakeEngineAdapterModule)
 
-/**
- * `it.fails` marks a bug of today's loops that only the iteration-state rework
- * fixes (per-iteration state instead of snapshots mounted onto shared rows).
- * The scenario states the right behaviour; when the rework lands and it
- * passes, vitest reports it, and `it.fails` becomes `it`.
- */
-
 /** A character loop: each character gets a profile, written in the project's style. */
 function characters(names: string[], options: { autoSummary?: boolean } = {}): PlanScenario {
   const s = PlanScenario.build((g) => {
@@ -162,12 +155,15 @@ function nestedParts(): PlanScenario {
   return s
 }
 
-describe("a loop, bugs fixed by the iteration-state rework", () => {
+/**
+ * Each iteration keeps its own state. Until the iteration-state rework the
+ * iteration on display was mounted onto shared rows and the others kept as
+ * snapshots in the loop; each scenario below failed then.
+ */
+describe("a loop, iteration by iteration", () => {
   afterEach(() => tearDownTestDb())
 
-  // The loop re-runs the element on display too: propagation's top-down rule
-  // demotes the mounted input row whenever the loop is stale.
-  it.fails("re-writes only the element that changed", async () => {
+  it("re-writes only the element that changed", async () => {
     const s = characters(["Аня", "Боря"])
     await s.run()
 
@@ -179,7 +175,7 @@ describe("a loop, bugs fixed by the iteration-state rework", () => {
     expect(calls[0].userPrompt).toContain("Вера")
   })
 
-  it.fails("re-writes every element's profile when a node outside the loop changes", async () => {
+  it("re-writes every element's profile when a node outside the loop changes", async () => {
     const s = characters(["Аня", "Боря"])
     await s.run()
 
@@ -189,7 +185,7 @@ describe("a loop, bugs fixed by the iteration-state rework", () => {
     expect(profileCalls(s)).toHaveLength(2)
   })
 
-  it.fails("re-writes a node for every element when its prompt is edited", async () => {
+  it("re-writes a node for every element when its prompt is edited", async () => {
     const s = characters(["Аня", "Боря"])
     await s.run()
 
@@ -199,7 +195,7 @@ describe("a loop, bugs fixed by the iteration-state rework", () => {
     expect(profileCalls(s)).toHaveLength(2)
   })
 
-  it.fails("hands on exactly the remaining elements after its list got shorter", async () => {
+  it("hands on exactly the remaining elements after its list got shorter", async () => {
     const s = characters(["Аня", "Боря", "Вера"])
     await s.run()
     s.show("Цикл по персонажам", 2)
@@ -210,7 +206,7 @@ describe("a loop, bugs fixed by the iteration-state rework", () => {
     expect(s.loopResults("Цикл по персонажам")).toHaveLength(2)
   })
 
-  it.fails("over an empty list hands on nothing", async () => {
+  it("over an empty list hands on nothing", async () => {
     const s = characters([])
 
     await s.run()
@@ -218,7 +214,7 @@ describe("a loop, bugs fixed by the iteration-state rework", () => {
     expect(s.loopResults("Цикл по персонажам")).toEqual([])
   })
 
-  it.fails("does not summarize unchanged elements again when one element changes", async () => {
+  it("does not summarize unchanged elements again when one element changes", async () => {
     const s = characters(["Аня", "Боря"], { autoSummary: true })
     await s.run()
 
@@ -229,7 +225,7 @@ describe("a loop, bugs fixed by the iteration-state rework", () => {
     expect(elementSummaries).toHaveLength(1)
   })
 
-  it.fails("keeps a review with the element it was started on", async () => {
+  it("keeps a review with the element it was started on", async () => {
     const s = characters(["Аня", "Боря"])
     await s.run()
     s.show("Цикл по персонажам", 1)
@@ -240,9 +236,7 @@ describe("a loop, bugs fixed by the iteration-state rework", () => {
     expect(s.inReview("Профиль", 0)).toBe(false)
   })
 
-  // Only direct children are snapshotted: the inner loop's rows are shared by
-  // every part and hold whichever part ran last.
-  it.fails("nested in another loop, shows the scenes of the part on display", async () => {
+  it("nested in another loop, shows the scenes of the part on display", async () => {
     const s = nestedParts()
 
     await s.run()

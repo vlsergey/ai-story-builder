@@ -5,7 +5,8 @@ import type { NodeProcessor } from "./node-processor.js"
 export class ForEachInputProcessor implements NodeProcessor<unknown> {
   readonly defaultSettings = {}
 
-  getOutput(context: PlanNodeService, node: PlanNodeRow): string {
-    return node.content ?? ""
+  /** The element of the iteration at the row's path; the loop writes it when it expands its list. */
+  getOutput(_service: PlanNodeService, row: PlanNodeRow): string {
+    return row.content ?? ""
   }
 }

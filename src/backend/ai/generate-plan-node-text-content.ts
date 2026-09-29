@@ -3,44 +3,29 @@ import type { AiGenerationSettings } from "../../shared/ai-generation-settings.j
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { getNodePrompts } from "../plan/nodes/graph/settings-helper.js"
-import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
+import type { NodeInputs } from "../plan/nodes/NodeInput.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
 import { generateWithTelemetry } from "./generate-with-telemetry.js"
 import { nodeInputsToReplacements, replaceTemplates } from "./replaceTemplates.js"
 
+/**
+ * Writes a text node from its prompts, with `inputs` already resolved by the
+ * caller at the node's path: this function never looks a node up itself, so
+ * it cannot read another iteration by accident.
+ */
 export async function generatePlanNodeTextContent(
   abortSignal: AbortSignal,
   node: PlanNodeRow,
+  inputs: NodeInputs<string>,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string> {
-  const planNodeService = new PlanNodeService()
   const { userPrompt: aiUserPrompt, systemPrompt: aiSystemPrompt } = getNodePrompts(node.node_type_settings)
   const nodeAiSettings = node.ai_settings
 
-  const inputs = planNodeService.findNodeInputsByType(node.id, "text")
   const finalUserPrompt = replaceTemplates(aiUserPrompt, nodeInputsToReplacements(inputs))
   const finalSystemPrompt = replaceTemplates(aiSystemPrompt, nodeInputsToReplacements(inputs))
-
-  const engineFileIds: string[] = []
-  // try {
-  // if (includeExistingLore && engine) {
-  //   const loreRepo = new LoreNodeRepository()
-  //   const nodes = loreRepo.getAllWithAiSyncInfo()
-  //   for (const node of nodes) {
-  //     try {
-  //       const info = JSON.parse(node.ai_sync_info!) as Record<string, { file_id?: string }>
-  //       const fileId = info[engine]?.file_id
-  //       if (fileId) engineFileIds.push(fileId)
-  //     } catch { /* ignore */ }
-  //   }
-  // }
-  // if (!textLanguage) throw makeError('text_language is not configured', 400)
-  // } catch (e: any) {
-  //   if (e.status) throw e
-  //   throw makeError("failed to read project settings: " + String(e), 500)
-  // }
 
   const engineId = SettingsRepository.getCurrentBackend()
   if (!engineId) throw makeErrorWithStatus("no AI engine configured", 400)
@@ -66,7 +51,7 @@ export async function generatePlanNodeTextContent(
       includeExistingLore: false,
       aiGenerationSettings: actualAiSettings,
       promptCacheKeys: ["generate-plan-node-text-content", String(node.id)],
-      engineFileIds,
+      engineFileIds: [],
     },
     instructionsTemplateChars: (aiUserPrompt ?? "").length + (aiSystemPrompt ?? "").length,
     node: { title: node.title, type: node.type },

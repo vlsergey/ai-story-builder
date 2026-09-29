@@ -3,7 +3,7 @@ import { initTRPC } from "@trpc/server"
 import { z } from "zod"
 import type { AiEngineConfig } from "../shared/ai-engine-config.js"
 import { PLAN_EDGE_TYPE_VALUES } from "../shared/plan-edge-types.js"
-import type { PlanNodeUpdate } from "../shared/plan-graph.js"
+import type { PlanNodeDefinitionUpdate, PlanNodeUpdate } from "../shared/plan-graph.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
 import {
@@ -34,6 +34,9 @@ import { testEngineConnection } from "./routes/ai-config.js"
 import { syncLore } from "./routes/ai-sync.js"
 import { type GenerateAdviceInput, generateAdvice } from "./routes/generate-advice.js"
 import { settingsRoutes } from "./settings/settings-routes.js"
+
+/** A node in one iteration of its loops. */
+const nodeAtPath = z.object({ id: z.int(), path: z.string() })
 
 const t = initTRPC.create({
   // transformer: superjson,
@@ -100,37 +103,47 @@ export const appRouter = t.router({
   }),
 
   plan: t.router({
+    // A node's definition is the same in every iteration of its loops; what it
+    // produced is per iteration, so every call about state names the `path`.
     nodes: t.router({
-      acceptReview: t.procedure.input(z.int()).mutation(({ input }) => new PlanNodeService().acceptReview(input)),
+      acceptReview: t.procedure
+        .input(nodeAtPath)
+        .mutation(({ input }) => new PlanNodeService().acceptReview(input.id, input.path)),
       aiGenerate: buildPlanRegenerateRoutes(t),
-      aiGenerateAndReview: t.procedure.input(z.int()).mutation(({ input }) => aiGenerateAndReview(input)),
+      aiGenerateAndReview: t.procedure
+        .input(nodeAtPath)
+        .mutation(({ input }) => aiGenerateAndReview(input.id, input.path)),
       aiGenerateSummary: t.procedure
-        .input(z.int())
-        .mutation(({ input }) => new PlanNodeService().aiGenerateSummary(input)),
-      aiImprove: t.procedure.input(z.int()).subscription(({ input }) => new PlanNodeService().aiImprove(input)),
+        .input(nodeAtPath)
+        .mutation(({ input }) => new PlanNodeService().aiGenerateSummary(input.id, input.path)),
+      aiImprove: t.procedure
+        .input(nodeAtPath)
+        .subscription(({ input }) => new PlanNodeService().aiImprove(input.id, input.path)),
       batchPatch: t.procedure
-        .input((v) => v as { id: number; data: PlanNodeUpdate }[])
+        .input((v) => v as { id: number; data: PlanNodeDefinitionUpdate }[])
         .mutation(({ input }) => new PlanNodeService().batchPatch(input)),
       create: t.procedure.input(z.any()).mutation(({ input }) => new PlanNodeService().create(input)),
       delete: t.procedure.input(z.number()).mutation(({ input }) => new PlanNodeService().delete(input)),
       findAll: t.procedure.query(() => new PlanNodeRepository().findAll()),
-      getById: t.procedure.input(z.int()).query(({ input }) => new PlanNodeService().getById(input)),
-      getByIds: t.procedure.input(z.array(z.int())).query(({ input }) => new PlanNodeService().getByIds(input)),
+      findInputs: t.procedure
+        .input(nodeAtPath)
+        .query(({ input }) => new PlanNodeService().findInputRows(input.id, input.path)),
+      findStatesAtPath: t.procedure
+        .input(z.string())
+        .query(({ input }) => new PlanNodeService().findStatesAtPath(input)),
+      getById: t.procedure.input(nodeAtPath).query(({ input }) => new PlanNodeService().getRow(input.id, input.path)),
       patch: t.procedure
-        .input((v) => v as { id: number; manual: boolean; data: PlanNodeUpdate })
-        .mutation(({ input }) => new PlanNodeService().patch(input.id, input.manual, input.data)),
+        .input((v) => v as { id: number; path: string; manual: boolean; data: PlanNodeUpdate; rev?: string })
+        .mutation(({ input }) =>
+          new PlanNodeService().patch(input.id, input.path, input.manual, input.data, input.rev),
+        ),
       saveContentToFile: t.procedure
-        .input(z.object({ nodeId: z.int(), filePath: z.string() }))
-        .mutation(({ input }) => new PlanNodeService().saveContentToFile(input.nodeId, input.filePath)),
+        .input(z.object({ nodeId: z.int(), path: z.string(), filePath: z.string() }))
+        .mutation(({ input }) => new PlanNodeService().saveContentToFile(input.nodeId, input.path, input.filePath)),
       startReview: t.procedure
-        .input(z.object({ id: z.number(), options: z.any().optional() }))
-        .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.options)),
+        .input(z.object({ id: z.number(), path: z.string(), options: z.any().optional() }))
+        .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.path, input.options)),
       subscribe: t.procedure.subscription(() => planNodeEventManager.asSubscription()),
-      forEachNodes: t.router({
-        changePage: t.procedure
-          .input(z.object({ nodeId: z.int(), page: z.int32() }))
-          .mutation(({ input: { nodeId, page } }) => new PlanNodeService().changeForEachNodePage(nodeId, page)),
-      }),
     }),
     edges: t.router({
       create: t.procedure.input(z.any()).mutation(({ input }) => createGraphEdge(input)),

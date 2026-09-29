@@ -3,7 +3,7 @@ import type {
   FixProblemsPlanNodeContent,
   FixProblemsPlanNodeSettings,
 } from "../../../../shared/fix-problems-plan-node.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import { findProblems, fixProblems } from "../../../ai/generate-fix-problems.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { PlanNodeService } from "../plan-node-service.js"
@@ -34,14 +34,14 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
     context: RegenerationNodeContext,
     node: PlanNodeRow,
     settings: FixProblemsPlanNodeSettings,
-  ): Promise<PlanNodeUpdate | null> {
+  ): Promise<PlanNodeStateUpdate | null> {
     console.debug("[FixProblemsProcessor]", "regenerate", "node", node)
     console.debug("[FixProblemsProcessor]", "regenerate", "settings", settings)
     const maxIterations = settings.maxIterations ?? this.defaultSettings.maxIterations
     const minSeverityToFix = settings.minSeverityToFix ?? this.defaultSettings.minSeverityToFix
     const foundProblemsTemplate = settings.foundProblemsTemplate ?? this.defaultSettings.foundProblemsTemplate
 
-    const inputs = service.findNodeInputsByType(node.id, "text")
+    const inputs = service.findNodeInputsByType(node.id, node.path, "text")
     let inputToFix: (typeof inputs)[number]
     if (inputs.length === 0) {
       // nothing to fix
@@ -83,9 +83,16 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
 
         await cycleContext.asNode(iteration, async (nodeContext) => {
           const findIteration = iteration
-          const findProblemsResult = await findProblems(context.abortSignal, node, input, findIteration, (event) => {
-            nodeContext.onResponseStreamEvent([iteration, "findProblemsResult"], event)
-          })
+          const findProblemsResult = await findProblems(
+            context.abortSignal,
+            node,
+            inputs,
+            input,
+            findIteration,
+            (event) => {
+              nodeContext.onResponseStreamEvent([iteration, "findProblemsResult"], event)
+            },
+          )
           iterationResult.findProblemsResult = findProblemsResult
           iteration++
           maxSeverity =
@@ -98,6 +105,7 @@ export class FixProblemsProcessor implements NodeProcessor<FixProblemsPlanNodeSe
             const fixProblemsResult = await fixProblems(
               context.abortSignal,
               node,
+              inputs,
               input,
               foundProblemsTemplate,
               findProblemsResult,

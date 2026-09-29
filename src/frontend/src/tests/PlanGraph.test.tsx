@@ -58,6 +58,10 @@ vi.mock("../ipcClient", () => ({
   },
 }))
 
+vi.mock("../plan/iteration-selection", () => ({
+  useIterationSelection: () => ({ displayPath: () => "", selected: () => 0, select: vi.fn() }),
+}))
+
 vi.mock("../plan/plan-graph/PlanTextNode", () => ({ default: () => null }))
 vi.mock("../plan/plan-graph/PlanLoreNode", () => ({ default: () => null }))
 vi.mock("../plan/plan-graph/PlanEdge", () => ({ default: () => null }))

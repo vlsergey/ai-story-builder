@@ -4,7 +4,7 @@ import type { SplitSettings } from "../../shared/node-settings.js"
 import type { PlanNodeRow } from "../../shared/plan-graph.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { getNodePrompts } from "../plan/nodes/graph/settings-helper.js"
-import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
+import type { NodeInputs } from "../plan/nodes/NodeInput.js"
 import { getCurrentEngineDefaultAiGenerationSettings } from "../settings/ai-settings.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
 import { getEngineAdapter } from "./ai-engine-adapter.js"
@@ -64,13 +64,12 @@ const MAX_ATTEMPTS = 3
 export async function generateSplitParts(
   abortSignal: AbortSignal,
   node: PlanNodeRow,
+  inputs: NodeInputs<string>,
   onEvent?: (event: OpenAI.Responses.ResponseStreamEvent) => void,
 ): Promise<string[]> {
-  const planNodeService = new PlanNodeService()
   const { userPrompt: aiUserPrompt, systemPrompt: aiSystemPrompt } = getNodePrompts(node.node_type_settings)
   const nodeAiSettings = node.ai_settings
 
-  const inputs = planNodeService.findNodeInputsByType(node.id, "text")
   if (inputs.length === 0) {
     return []
   }

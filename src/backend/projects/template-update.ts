@@ -368,10 +368,8 @@ export async function applyTemplateUpdate(
       node_type_settings: JSON.stringify(merged),
       ai_settings: aiSettingsForPatch,
     })
-    // Demote via the service so each container parent (e.g. for-each) gets
-    // a chance to mirror the demotion into its per-iteration snapshots and
-    // recursively bubble OUTDATED up to its own ancestors.
-    await nodeService.demoteToOutdated(pNode.id)
+    // New instructions: what the node produced in every iteration is stale.
+    nodeService.demoteEverywhere(pNode.id)
   }
 
   // 2. Insert new nodes. Parent is resolved by parent's title (if the new
@@ -393,7 +391,7 @@ export async function applyTemplateUpdate(
     const parentId = parentTitle ? (projectMap.get(parentTitle)?.id ?? null) : null
 
     const initial = buildTemplateInstructionSettings(tNode, wizardData)
-    nodeRepo.insert({
+    const id = nodeRepo.insert({
       title: tNode.title,
       type: tNode.type as any,
       parent_id: parentId,
@@ -401,11 +399,10 @@ export async function applyTemplateUpdate(
       y: tNode.y ?? 0,
       width: tNode.width ?? null,
       height: tNode.height ?? null,
-      content: null,
       node_type_settings: Object.keys(initial).length > 0 ? JSON.stringify(initial) : null,
       ai_settings: tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null,
-      status: "EMPTY",
     })
+    nodeService.writeInitialState(id, null)
   }
   projectMap = projectByTitleNow()
 
@@ -417,6 +414,7 @@ export async function applyTemplateUpdate(
     const src = projectMap.get(e.sourceTitle)
     const tgt = projectMap.get(e.targetTitle)
     if (!src || !tgt) continue
+    nodeService.checkEdge(src.id, tgt.id)
     edgeRepo.insert({
       from_node_id: src.id,
       to_node_id: tgt.id,
@@ -439,7 +437,7 @@ export async function applyTemplateUpdate(
         edgeRepo.delete(row.id)
         removedEdgeCount += 1
       }
-      await nodeService.demoteToOutdated(tgt.id)
+      nodeService.demoteEverywhere(tgt.id)
     }
   }
 

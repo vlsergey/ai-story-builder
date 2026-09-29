@@ -1,9 +1,10 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import type { ForEachNodeContent } from "../../../shared/for-each-plan-node.js"
+import { loopLength } from "../../../shared/for-each-plan-node.js"
 import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
-import type { PlanNodeRow, PlanNodeStatus } from "../../../shared/plan-graph.js"
+import type { PlanNodeDefinition, PlanNodeRow, PlanNodeStatus } from "../../../shared/plan-graph.js"
+import { childPath, lastSegment, type NodePath, parentPath, ROOT_PATH } from "../../../shared/plan-node-path.js"
 import type { PlanNodeType } from "../../../shared/plan-node-types.js"
 import type { ProjectTemplate } from "../../../shared/project-template.js"
 import type { RegenerateStatusEvent } from "../../../shared/RegenerateEvent.js"
@@ -18,7 +19,7 @@ import {
 } from "../nodes/generate/regenerateTreeNodesContents.js"
 import { ForEachProcessor } from "../nodes/graph/for-each-processor.js"
 import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
-import { PlanNodeService } from "../nodes/plan-node-service.js"
+import { LOOP_TYPES, PlanNodeService } from "../nodes/plan-node-service.js"
 import { type FakeCall, type FakeCallKind, fakeEngine } from "./fake-engine.js"
 
 /**
@@ -26,7 +27,9 @@ import { type FakeCall, type FakeCallKind, fakeEngine } from "./fake-engine.js"
  * edit something, run again — and observe what a user would: which nodes the
  * model was asked to write, what they now say, their statuses. They never read
  * how state is stored; the one place that knows is `stateAt` below, so a change
- * of storage rewrites this driver, not the scenarios.
+ * of storage rewrites this driver, not the scenarios. Like the user, the driver
+ * looks at a loop's children in the iteration on display — the first one until
+ * `show` pages it.
  *
  * Every scenario test file installs the fake engine:
  *   vi.mock("../../ai/ai-engine-adapter.js", async () => (await import("./fake-engine.js")).fakeEngineAdapterModule)
@@ -158,7 +161,7 @@ export class LoopBuilder extends GraphBuilder {
   }
 }
 
-function rowByTitle(title: string): PlanNodeRow {
+function rowByTitle(title: string): PlanNodeDefinition {
   const matches = new PlanNodeRepository().findAll().filter((n) => n.title === title)
   if (matches.length !== 1) throw new Error(`expected one node titled «${title}», found ${matches.length}`)
   return matches[0]
@@ -178,6 +181,8 @@ export class PlanScenario {
   /** Every status event of the last run, as the progress panel receives them. */
   statusEvents: RegenerateStatusEvent[] = []
   private since = 0
+  /** The iteration on display, per loop; the first one until the user pages. */
+  private readonly displayed = new Map<number, number>()
 
   private constructor() {}
 
@@ -229,7 +234,8 @@ export class PlanScenario {
 
   /** Regenerates one node from its editor. */
   async regenerate(title: string): Promise<PlanNodeRow> {
-    return await this.observe(() => regenerateTreeNodesContents(nodeId(title)))
+    const id = nodeId(title)
+    return await this.observe(() => regenerateTreeNodesContents({ nodeId: id, path: this.displayPath(id) }))
   }
 
   /** The Stop button. */
@@ -239,14 +245,15 @@ export class PlanScenario {
 
   /** The user types `content` into the node. */
   async type(title: string, content: string): Promise<void> {
-    await new PlanNodeService().patch(nodeId(title), true, { content })
+    const id = nodeId(title)
+    await new PlanNodeService().patch(id, this.displayPath(id), true, { content })
   }
 
   /** The user rewrites the node's prompt. */
   async setPrompt(title: string, prompt: string): Promise<void> {
     const row = rowByTitle(title)
     const settings = JSON.parse(row.node_type_settings || "{}") as Record<string, unknown>
-    await new PlanNodeService().patch(row.id, true, {
+    await new PlanNodeService().patch(row.id, this.displayPath(row.id), true, {
       node_type_settings: JSON.stringify({ ...settings, userPrompt: prompt }),
     })
   }
@@ -254,10 +261,11 @@ export class PlanScenario {
   /** Asks the model to improve the node's text; resolves with the error, if any. */
   async improve(title: string, instruction: string): Promise<{ error?: unknown }> {
     const id = nodeId(title)
-    await new PlanNodeService().patch(id, true, { ai_improve_instruction: instruction })
+    const path = this.displayPath(id)
+    await new PlanNodeService().patch(id, path, true, { ai_improve_instruction: instruction })
     this.since = this.engine.calls.length
     return await new Promise((resolve) => {
-      new PlanNodeService().aiImprove(id).subscribe({
+      new PlanNodeService().aiImprove(id, path).subscribe({
         next: () => {},
         error: (error) => resolve({ error }),
         complete: () => resolve({}),
@@ -268,17 +276,19 @@ export class PlanScenario {
   /** The editor's "Generate summary" button. */
   async summarize(title: string): Promise<void> {
     this.since = this.engine.calls.length
-    await new PlanNodeService().aiGenerateSummary(nodeId(title))
+    const id = nodeId(title)
+    await new PlanNodeService().aiGenerateSummary(id, this.displayPath(id))
   }
 
   /** Starts a review of the node, as the editor's review mode does. */
   async startReview(title: string): Promise<void> {
-    await new PlanNodeService().startReview(nodeId(title))
+    const id = nodeId(title)
+    await new PlanNodeService().startReview(id, this.displayPath(id))
   }
 
   /** The user pages a loop to `iteration`. */
   show(loop: string, iteration: number): void {
-    new PlanNodeService().changeForEachNodePage(nodeId(loop), iteration)
+    this.displayed.set(nodeId(loop), iteration)
   }
 
   /** The regeneration switches of the Regenerate panel. */
@@ -323,15 +333,31 @@ export class PlanScenario {
     return this.stateAt(title, iteration).in_review === 1
   }
 
-  /** Every node's status; a loop's child once per iteration, titled `Title #i`. */
+  /**
+   * Every node's status; a loop's child once per iteration its loop has,
+   * titled `Title #i`, or `Title #i/#j` inside a nested loop.
+   */
   nodes(): { title: string; status: PlanNodeStatus }[] {
-    const all = new PlanNodeRepository().findAll()
-    return all.flatMap((node) => {
-      const parent = all.find((p) => p.id === node.parent_id)
-      if (parent?.type !== "for-each") return [{ title: node.title, status: node.status }]
-      const length = (JSON.parse(parent.content || "{}") as ForEachNodeContent).length ?? 0
-      return Array.from({ length }, (_, i) => ({ title: `${node.title} #${i}`, status: this.status(node.title, i) }))
-    })
+    const service = new PlanNodeService()
+    const result: { title: string; status: PlanNodeStatus }[] = []
+    const visit = (parentId: number | null, paths: NodePath[]) => {
+      for (const node of service.findByParentId(parentId)) {
+        for (const path of paths) {
+          const iterations = path === ROOT_PATH ? "" : ` #${path.replace(/\d+:/g, "").split("/").join("/#")}`
+          result.push({ title: `${node.title}${iterations}`, status: service.getRow(node.id, path).status })
+        }
+        const inner = LOOP_TYPES.has(node.type)
+          ? paths.flatMap((path) =>
+              Array.from({ length: loopLength(service.getRow(node.id, path).content) }, (_, i) =>
+                childPath(path, node.id, i),
+              ),
+            )
+          : paths
+        visit(node.id, inner)
+      }
+    }
+    visit(null, [ROOT_PATH])
+    return result
   }
 
   /**
@@ -367,35 +393,37 @@ export class PlanScenario {
     return new Set([...seen].map((id) => byId.get(id)?.title ?? `#${id}`))
   }
 
-  /** What the loop hands to the nodes after it: one output per element. */
+  /** What the loop, in the iteration on display, hands to the nodes after it: one output per element. */
   loopResults(loop: string): string[] {
-    return new ForEachProcessor().getOutput(new PlanNodeService(), rowByTitle(loop))
+    const id = nodeId(loop)
+    const service = new PlanNodeService()
+    return new ForEachProcessor().getOutput(service, service.getRow(id, this.displayPath(id)))
+  }
+
+  /** Where the user looks at the node: in every loop around it, the iteration on display. */
+  private displayPath(id: number): NodePath {
+    let path = ROOT_PATH
+    for (const loop of new PlanNodeService().loopsAround(id))
+      path = childPath(path, loop, this.displayed.get(loop) ?? 0)
+    return path
   }
 
   /**
-   * The node's state in one iteration of its loop. The only place that knows
-   * how iterations are stored: the iteration on display lives in the rows, the
-   * others in the loop's snapshots.
+   * The node's state in one iteration of its loop, or in the one on display.
+   * The only place that knows how iterations are stored: each has its own row.
    */
   private stateAt(
     title: string,
     iteration?: number,
   ): { content: string | null; status: PlanNodeStatus; in_review: number; word_count: number } {
-    const row = rowByTitle(title)
-    if (iteration === undefined) return row
-    const loop = row.parent_id === null ? undefined : new PlanNodeRepository().findById(row.parent_id)
-    if (loop?.type !== "for-each") throw new Error(`«${title}» is not inside a loop`)
-    const parsed = JSON.parse(loop.content || "{}") as ForEachNodeContent
-    if (iteration === (parsed.currentIndex ?? 0)) return row
-    const entry = parsed.overrides?.[iteration]?.[`${row.id}`]
-    if (!entry) return { content: null, status: "OUTDATED", in_review: 0, word_count: 0 }
-    return {
-      content: entry.content ?? null,
-      status: (entry.status ?? "EMPTY") as PlanNodeStatus,
-      // Review fields are not snapshotted: the row's are the only ones there are.
-      in_review: row.in_review,
-      word_count: entry.word_count ?? 0,
+    const id = nodeId(title)
+    let path = this.displayPath(id)
+    if (iteration !== undefined) {
+      const loop = lastSegment(path)?.containerId
+      if (loop === undefined) throw new Error(`«${title}» is not inside a loop`)
+      path = childPath(parentPath(path), loop, iteration)
     }
+    return new PlanNodeService().getRow(id, path)
   }
 
   /** The last status event of the last run: counters, first error. */

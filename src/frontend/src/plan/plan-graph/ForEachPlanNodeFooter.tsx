@@ -1,31 +1,33 @@
-import { trpc } from "@/ipcClient"
 import PaginationWrapper from "@/lib/PaginationWrapper"
-import type { ForEachNodeContent } from "@shared/for-each-plan-node"
-import type { PlanNodeRow } from "@shared/plan-graph"
-import { useCallback, useMemo } from "react"
+import type { NodePath } from "@shared/plan-node-path"
+import { useCallback } from "react"
+import { useIterationSelection } from "../iteration-selection"
 
 interface ForEachPlanNodeFooterProps {
-  node: PlanNodeRow
+  loopId: number
+  /** The loop's own path: where it runs, in the iterations of the loops around it. */
+  path: NodePath
+  iterations: number
 }
 
-export default function ForEachPlanNodeFooter({ node }: ForEachPlanNodeFooterProps) {
-  const parsedContent = useMemo(() => JSON.parse(node.content || "{}") as ForEachNodeContent, [node.content])
-
-  const changePage = trpc.plan.nodes.forEachNodes.changePage.useMutation()
+/**
+ * Pages through a loop's iterations. Choosing one only changes what the graph
+ * shows — nothing is written, and it works while the loop is generating.
+ */
+export default function ForEachPlanNodeFooter({ loopId, path, iterations }: ForEachPlanNodeFooterProps) {
+  const { selected, select } = useIterationSelection()
   const handlePageChange = useCallback(
-    ({ target: { value } }: { target: { value: number } }) => {
-      changePage.mutateAsync({ nodeId: node.id, page: value })
-    },
-    [node.id],
+    ({ target: { value } }: { target: { value: number } }) => select(loopId, path, value),
+    [loopId, path, select],
   )
 
   return (
     <div className="for-each-plan-node-footer">
       <PaginationWrapper
-        disabled={changePage.isPending || node.status === "GENERATING"}
-        page={parsedContent.currentIndex || 0}
+        disabled={false}
+        page={Math.min(selected(loopId, path), Math.max(iterations - 1, 0))}
         onPageChange={handlePageChange}
-        totalPages={parsedContent.length || 0}
+        totalPages={iterations}
       />
     </div>
   )

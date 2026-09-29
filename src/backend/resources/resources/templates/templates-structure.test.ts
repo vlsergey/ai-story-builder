@@ -670,13 +670,18 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
       applyProjectTemplate(template, wizardData)
 
       const { PlanNodeRepository } = await import("../../../plan/nodes/plan-node-repository.js")
-      const nodes = new PlanNodeRepository().findAll()
+      const { PlanNodeStateRepository } = await import("../../../plan/nodes/plan-node-state-repository.js")
+      const idByTitle = new Map(new PlanNodeRepository().findAll().map((n) => [n.title, n.id]))
+      const states = new PlanNodeStateRepository()
       const failures: string[] = []
-      for (const node of nodes) {
-        const hasNonBlankContent = node.content != null && node.content.trim().length > 0
-        if (hasNonBlankContent && node.status === "EMPTY") {
-          failures.push(`${node.title} (id=${node.id}): non-blank content but status=EMPTY`)
-        }
+      // Every node the template gives content must hold it, as the user's text.
+      for (const { node } of walkPlanNodes(template.plan?.nodes)) {
+        if (!node.content || node.content.length === 0) continue
+        const id = idByTitle.get(node.title)
+        const state = id === undefined ? undefined : states.find(id, "")
+        if (!state?.content?.trim()) failures.push(`${node.title}: its content did not land`)
+        else if (state.status !== "MANUAL")
+          failures.push(`${node.title} (id=${id}): content but status=${state.status}`)
       }
       expect(failures).toEqual([])
     })

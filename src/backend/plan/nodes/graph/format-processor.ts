@@ -1,5 +1,5 @@
 import type { FormatSettings } from "../../../../shared/node-settings.js"
-import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
 import { renderFormatTemplate } from "../../../ai/replaceTemplates.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
@@ -29,11 +29,11 @@ export class FormatProcessor implements NodeProcessor<FormatSettings> {
     _context: RegenerationNodeContext | undefined,
     node: PlanNodeRow,
     settings: FormatSettings,
-  ): Promise<PlanNodeUpdate> {
+  ): Promise<PlanNodeStateUpdate> {
     const template = settings.template ?? ""
     if (template.trim().length === 0) return { content: "", status: "EMPTY" }
 
-    const context = buildFormatContext(service.findNodeInputs(node.id), SettingsRepository.getProjectTitle())
+    const context = buildFormatContext(service.findNodeInputs(node.id, node.path), SettingsRepository.getProjectTitle())
     context.title = node.title
 
     try {

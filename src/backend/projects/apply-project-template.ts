@@ -6,6 +6,7 @@ import type {
 import { LoreNodeRepository } from "../lore/lore-node-repository.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
+import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 
 const PLAIN_IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/
 
@@ -164,6 +165,7 @@ function translateFixProblemsSettingsToRuntime(
  */
 export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateData: Record<string, any>): void {
   const planRepo = new PlanNodeRepository()
+  const nodeService = new PlanNodeService()
   const edgeRepo = new PlanEdgeRepository()
   const loreRepo = new LoreNodeRepository()
 
@@ -250,11 +252,6 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
       }
 
       const finalContent = content ? normalizeAndReplaceContent(content, templateData) : null
-      // Non-blank content from wizard substitution makes the node ready-to-use,
-      // not pending regeneration. Status defaults to EMPTY otherwise — matching
-      // PlanNodeService.create's branch.
-      const hasContent = finalContent != null && finalContent.trim().length > 0
-      const status = hasContent ? "MANUAL" : "EMPTY"
 
       const insertedId = planRepo.insert({
         title,
@@ -265,11 +262,12 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
         y: y ?? 0,
         width: width ?? null,
         height: height ?? null,
-        content: finalContent,
         node_type_settings: initialSettings ? JSON.stringify(initialSettings) : null,
         ai_settings: aiSettings ? JSON.stringify(aiSettings) : null,
-        status,
       })
+      // Non-blank content from wizard substitution makes the node ready-to-use,
+      // not pending regeneration — the same rule as creating a node by hand.
+      nodeService.writeInitialState(insertedId, finalContent)
 
       recordTitle(parentNewId, title, type, insertedId)
 
@@ -311,6 +309,7 @@ export function applyProjectTemplate(projectTemplate: ProjectTemplate, templateD
         `Template is invalid: node "${edge.targetTitle}" references missing node "${edge.sourceNodeTitle}" in inputs.`,
       )
     }
+    nodeService.checkEdge(sourceId, edge.targetNewId)
     edgeRepo.insert({
       from_node_id: sourceId,
       to_node_id: edge.targetNewId,

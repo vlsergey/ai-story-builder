@@ -1,7 +1,7 @@
 import { sortByHierarchy } from "@/lib/sortByHierarchy"
 import { ContextMenu, ContextMenuTrigger } from "@/ui-components/context-menu"
 import { EDGE_TYPES_DEFS, canCreateEdge, getNodeTypeDefinition } from "@shared/node-edge-dictionary"
-import type { PlanEdgeRow, PlanNodeRow, PlanNodeUpdate } from "@shared/plan-graph"
+import type { PlanEdgeRow, PlanNodeDefinition, PlanNodeDefinitionUpdate } from "@shared/plan-graph"
 import type { PlanEdgeType } from "@shared/plan-edge-types"
 import type { PlanNodeType } from "@shared/plan-node-types"
 import {
@@ -37,6 +37,7 @@ import Toolbar from "./Toolbar"
 import type { EdgeImpl, NodeImpl } from "./Types"
 import useConfirm from "@/native/useConfirm"
 import useAlert from "@/native/useAlert"
+import { useIterationSelection } from "../iteration-selection"
 
 const nodeTypes: Record<"simple" | "group", React.FC<NodeProps<NodeImpl>>> = {
   simple: SimpleNode,
@@ -48,7 +49,7 @@ const edgeTypes: Record<PlanEdgeType, React.FC<EdgeProps<EdgeImpl> & { data: Pla
   textArray: PlanEdgeComponent,
 }
 
-function toReactFlowNodes(graphNodes: PlanNodeRow[], onDelete: (id: number) => void): NodeImpl[] {
+function toReactFlowNodes(graphNodes: PlanNodeDefinition[], onDelete: (id: number) => void): NodeImpl[] {
   const sortedByHierarchy = sortByHierarchy(
     graphNodes,
     (n) => n.id,
@@ -114,6 +115,8 @@ export default function PlanGraph() {
   const showSaveDialogMutation = trpc.native.showSaveDialog.useMutation().mutateAsync
   const alert = useAlert()
   const confirm = useConfirm()
+  // Actions on a node act on it in the iteration the graph shows.
+  const { displayPath } = useIterationSelection()
 
   const deleteNode = useCallback(
     async (nodeId: number) => {
@@ -147,7 +150,7 @@ export default function PlanGraph() {
         return
       }
       try {
-        await saveToFileMutation({ nodeId, filePath: saveDialogResult.filePath })
+        await saveToFileMutation({ nodeId, path: displayPath(nodeId), filePath: saveDialogResult.filePath })
       } catch (error) {
         await alert(
           t(`planGraph.saveToFile.error.message`, {
@@ -156,7 +159,7 @@ export default function PlanGraph() {
         )
       }
     },
-    [findAllNodes.data, alert, t],
+    [findAllNodes.data, alert, t, displayPath],
   )
 
   // replace local cache with server data
@@ -172,7 +175,7 @@ export default function PlanGraph() {
   const debouncedSaveNodes = useDebouncedCallback(() => {
     const toPatch = nodes
       .map((n) => {
-        const data: PlanNodeUpdate = excludeDuplicates(
+        const data: PlanNodeDefinitionUpdate = excludeDuplicates(
           {
             x: n.position.x,
             y: n.position.y,
@@ -224,7 +227,11 @@ export default function PlanGraph() {
     }
   }, [nodes])
 
-  const patchNode = trpc.plan.nodes.patch.useMutation().mutateAsync
+  // A move changes what the node is, in every iteration.
+  const moveNode = useCallback(
+    (nodeId: number, parentId: number | null) => patchNodes([{ id: nodeId, data: { parent_id: parentId } }]),
+    [],
+  )
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -252,10 +259,10 @@ export default function PlanGraph() {
 
       // Prepare update data
       if (newParentId !== currentParentId && !getNodeTypeDefinition(node.data.type as PlanNodeType)?.confined) {
-        return patchNode({ id: Number(node.id), manual: true, data: { parent_id: newParentId } })
+        moveNode(Number(node.id), newParentId)
       }
     },
-    [autoLayout],
+    [autoLayout, moveNode],
   )
 
   const contextMenuTriggerRef = useRef<HTMLSpanElement>(null)
@@ -332,8 +339,8 @@ export default function PlanGraph() {
 
   const [edgeContextMenuData, setEdgeContextMenuData] = useState<{
     edge: PlanEdgeRow
-    source: PlanNodeRow
-    target: PlanNodeRow
+    source: PlanNodeDefinition
+    target: PlanNodeDefinition
   } | null>(null)
   const edgeContextMenuTrigger = useRef<HTMLDivElement>(null)
 
@@ -471,11 +478,9 @@ export default function PlanGraph() {
           <ContextMenuContent
             contextMenuNodeId={contextMenuNodeId}
             serverNodes={findAllNodes.data || []}
-            aiGenerateSummary={aiGenerateSummary}
+            aiGenerateSummary={(nodeId) => aiGenerateSummary({ id: nodeId, path: displayPath(nodeId) })}
             deleteNode={deleteNode}
-            moveNode={(nodeId, newParentId) =>
-              patchNode({ id: nodeId, manual: true, data: { parent_id: newParentId } })
-            }
+            moveNode={moveNode}
             saveToFile={saveToFile}
           />
         )}

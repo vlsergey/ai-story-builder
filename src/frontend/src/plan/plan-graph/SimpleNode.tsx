@@ -7,9 +7,12 @@ import type { NodeImpl } from "./Types"
 import { getNodeTypeDefinition } from "@shared/node-edge-dictionary"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { NodeTypeEditors } from "../editors/NodeTypeEditors"
+import { useNodeDisplayState } from "../iteration-selection"
 
 export default function SimpleNode({ data }: NodeProps<NodeImpl>) {
   const nodeType = useMemo(() => getNodeTypeDefinition(data.type), [data.type])
+  // A node inside a loop shows the iteration on display; one that has not run there yet shows as empty.
+  const { path, state } = useNodeDisplayState(data.id)
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
     data.onDelete(data.id)
@@ -22,10 +25,10 @@ export default function SimpleNode({ data }: NodeProps<NodeImpl>) {
     (e) => {
       if (NodeTypeEditors[data.type]) {
         e.stopPropagation()
-        dispatchOpenPlanNodeEditor(data)
+        dispatchOpenPlanNodeEditor(data, path)
       }
     },
-    [data],
+    [data, path],
   )
 
   return (
@@ -40,15 +43,15 @@ export default function SimpleNode({ data }: NodeProps<NodeImpl>) {
           {React.createElement(NodeTypeIcons[data.type], { className: "shrink-0 w-4 h-4 text-muted-foreground/70" })}
           <span className="text-sm font-medium leading-tight truncate flex-1">{data.title}</span>
           <div className="flex items-center gap-1">
-            <PlanNodeStatusIcon status={data.status} />
+            <PlanNodeStatusIcon status={state?.status ?? "EMPTY"} />
             <DeleteNodeButton onDelete={handleDelete} />
           </div>
         </div>
         <div className="flex-1 text-[11px] text-muted-foreground overflow-hidden">
-          {data.word_count > 0 ? `${data.word_count}w` : null}
-          {data.summary && (
-            <div className="mt-0.5" title={data.summary}>
-              {data.summary}
+          {state && state.word_count > 0 ? `${state.word_count}w` : null}
+          {state?.summary && (
+            <div className="mt-0.5" title={state.summary}>
+              {state.summary}
             </div>
           )}
         </div>

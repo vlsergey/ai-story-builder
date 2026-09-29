@@ -16,6 +16,10 @@
  *     --project "Письмо" \
  *     --node-title "Проза чанка"
  *
+ *   # a node inside a loop, in one iteration (zero-based; a nested loop's
+ *   # iteration needs the full path, e.g. --path "21:0/40:2"):
+ *   npx tsx scripts/regenerate-node.ts --project "Письмо" --node-title "Проза чанка" --iteration 2
+ *
  *   # entire project (every node in topological order; OUTDATED gets re-run,
  *   # GENERATED is skipped unless --regenerate-generated is set):
  *   npx tsx scripts/regenerate-node.ts --project "Письмо" --all
@@ -24,6 +28,8 @@
  *   # source isn't ready (status not in {MANUAL, EMPTY, GENERATED}).
  *   npx tsx scripts/regenerate-node.ts ... --check-prereqs
  *
+ * The project is migrated to the current schema first, as the app would.
+ *
  * NOTE: in single-node mode, regenerateTreeNodesContents propagates stale
  * status across the graph before running, so transitively-stale upstream
  * nodes get DB-flagged OUTDATED (no LLM calls — just a status write). The
@@ -31,20 +37,28 @@
  */
 import process from "node:process"
 import { Command, InvalidArgumentError } from "commander"
-import { setCurrentDbPath } from "../src/backend/db/state.js"
-import { PlanEdgeRepository } from "../src/backend/plan/edges/plan-edge-repository.js"
 import { regenerateTreeNodesContents } from "../src/backend/plan/nodes/generate/regenerateTreeNodesContents.js"
 import { PlanNodeRepository } from "../src/backend/plan/nodes/plan-node-repository.js"
 import { PlanNodeService } from "../src/backend/plan/nodes/plan-node-service.js"
-import { resolveProjectPath } from "./lib/project-paths.js"
+import type { PlanNodeStateRecord } from "../src/backend/plan/nodes/plan-node-state-repository.js"
+import { childPath, type NodePath, ROOT_PATH } from "../src/shared/plan-node-path.js"
+import { openProject } from "./lib/project-paths.js"
 
 interface CliArgs {
   project: string
   nodeId?: number
   nodeTitle?: string
+  path?: NodePath
+  iteration?: number
   all: boolean
   checkPrereqs: boolean
   printContent: boolean
+}
+
+function parseNonNegativeInt(value: string, name: string): number {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 0) throw new InvalidArgumentError(`${name} must be a non-negative integer`)
+  return n
 }
 
 function parsePositiveInt(value: string, name: string): number {
@@ -60,6 +74,10 @@ function parseCli(): CliArgs {
     .requiredOption("--project <name-or-path>", "Project name (looked up in projects folder) or full path to .sqlite")
     .option("--node-id <id>", "Node ID (positive integer)", (v) => parsePositiveInt(v, "--node-id"))
     .option("--node-title <title>", "Node title (must be unique; use --node-id to disambiguate)")
+    .option("--iteration <index>", "Zero-based iteration of the loop the node is in", (v) =>
+      parseNonNegativeInt(v, "--iteration"),
+    )
+    .option("--path <path>", "The iteration as a full path, for nested loops: '21:0/40:2'")
     .option(
       "--all",
       "Regenerate every node in the project (topological order). Excludes --node-id/--node-title.",
@@ -76,6 +94,8 @@ function parseCli(): CliArgs {
     project: string
     nodeId?: number
     nodeTitle?: string
+    path?: string
+    iteration?: number
     all: boolean
     checkPrereqs: boolean
     printContent: boolean
@@ -87,11 +107,14 @@ function parseCli(): CliArgs {
   } else {
     if (!opts.nodeId && !opts.nodeTitle) program.error("Pass --node-id, --node-title, or --all.")
     if (opts.nodeId && opts.nodeTitle) program.error("Pass either --node-id or --node-title, not both.")
+    if (opts.path !== undefined && opts.iteration !== undefined) program.error("Pass either --path or --iteration.")
   }
   return {
     project: opts.project,
     nodeId: opts.nodeId,
     nodeTitle: opts.nodeTitle,
+    path: opts.path,
+    iteration: opts.iteration,
     all: opts.all,
     checkPrereqs: opts.checkPrereqs,
     printContent: opts.printContent,
@@ -115,15 +138,26 @@ function resolveNodeId(service: PlanNodeService, args: CliArgs): number {
   return matches[0].id
 }
 
+/** Where to run the node: the given path, or the given iteration of the loop it is in. */
+function resolvePath(service: PlanNodeService, nodeId: number, args: CliArgs): NodePath {
+  const loops = service.loopsAround(nodeId)
+  if (args.path !== undefined) return args.path
+  if (loops.length === 0) {
+    if (args.iteration !== undefined) throw new Error(`Node #${nodeId} is not inside a loop; drop --iteration`)
+    return ROOT_PATH
+  }
+  if (loops.length > 1) throw new Error(`Node #${nodeId} is in nested loops; pass its iteration as --path`)
+  if (args.iteration === undefined) throw new Error(`Node #${nodeId} is inside a loop; pass --iteration or --path`)
+  return childPath(ROOT_PATH, loops[0], args.iteration)
+}
+
 const READY_STATUSES = new Set(["MANUAL", "EMPTY", "GENERATED"])
 
-function assertPrerequisites(service: PlanNodeService, nodeId: number): void {
-  const incoming = new PlanEdgeRepository().findByToNodeId(nodeId)
+function assertPrerequisites(service: PlanNodeService, nodeId: number, path: NodePath): void {
   const bad: string[] = []
-  for (const edge of incoming) {
-    const src = service.getById(edge.from_node_id)
+  for (const src of service.findInputRows(nodeId, path)) {
     if (!READY_STATUSES.has(src.status)) {
-      bad.push(`  - source #${src.id} '${src.title}' (${src.type}) status=${src.status}`)
+      bad.push(`  - source #${src.id} '${src.title}' (${src.type}) at "${src.path}" status=${src.status}`)
     }
   }
   if (bad.length > 0) {
@@ -135,50 +169,48 @@ function assertPrerequisites(service: PlanNodeService, nodeId: number): void {
   }
 }
 
+/** Status counts over every node in every iteration it has run in. */
+function countStatuses(states: PlanNodeStateRecord[]): string {
+  const byStatus: Record<string, number> = {}
+  for (const s of states) byStatus[s.status] = (byStatus[s.status] ?? 0) + 1
+  return Object.entries(byStatus)
+    .map(([s, n]) => `${s}=${n}`)
+    .join(", ")
+}
+
 async function main(): Promise<void> {
   const args = parseCli()
-  const dbPath = resolveProjectPath(args.project)
-  console.info(`Opening project: ${dbPath}`)
-  setCurrentDbPath(dbPath)
+  console.info(`Opening project: ${openProject(args.project)}`)
 
   if (args.all) {
-    const allBefore = new PlanNodeRepository().findAll()
-    const byStatus: Record<string, number> = {}
-    for (const n of allBefore) byStatus[n.status] = (byStatus[n.status] ?? 0) + 1
+    const service = new PlanNodeService()
+    const nodeCount = new PlanNodeRepository().count()
     console.info(
-      `Whole-project regeneration: ${allBefore.length} nodes total — ${Object.entries(byStatus)
-        .map(([s, n]) => `${s}=${n}`)
-        .join(", ")}`,
+      `Whole-project regeneration: ${nodeCount} nodes — ${countStatuses(service.states.findAll())} across iterations`,
     )
     await regenerateTreeNodesContents()
-    const allAfter = new PlanNodeRepository().findAll()
-    const byStatusAfter: Record<string, number> = {}
-    for (const n of allAfter) byStatusAfter[n.status] = (byStatusAfter[n.status] ?? 0) + 1
-    console.info(
-      `Done. Final status counts: ${Object.entries(byStatusAfter)
-        .map(([s, n]) => `${s}=${n}`)
-        .join(", ")}`,
-    )
+    console.info(`Done. Final status counts: ${countStatuses(service.states.findAll())}`)
     return
   }
 
   const service = new PlanNodeService()
   const nodeId = resolveNodeId(service, args)
-  const before = service.getById(nodeId)
+  const path = resolvePath(service, nodeId, args)
+  const before = service.getRow(nodeId, path)
   console.info(
-    `Target node: #${nodeId} '${before.title}' (${before.type}, status=${before.status}, ` +
-      `content=${(before.content ?? "").length} chars)`,
+    `Target node: #${nodeId} '${before.title}' (${before.type}) at "${path}", status=${before.status}, ` +
+      `content=${(before.content ?? "").length} chars`,
   )
 
   if (args.checkPrereqs) {
-    assertPrerequisites(service, nodeId)
+    assertPrerequisites(service, nodeId, path)
     console.info("Prerequisites OK.")
   }
 
   console.info("Regenerating…")
-  await regenerateTreeNodesContents(nodeId)
+  await regenerateTreeNodesContents({ nodeId, path })
 
-  const after = service.getById(nodeId)
+  const after = service.getRow(nodeId, path)
   console.info(
     `Done. status=${after.status}, content=${(after.content ?? "").length} chars` +
       (after.summary ? `, summary=${after.summary.slice(0, 80)}…` : ""),

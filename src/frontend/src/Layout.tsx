@@ -1,5 +1,6 @@
 import type { LoreNodeRow } from "@shared/lore-node"
-import type { PlanNodeRow } from "@shared/plan-graph"
+import type { PlanNodeDefinition } from "@shared/plan-graph"
+import type { NodePath } from "@shared/plan-node-path"
 import {
   DockviewDefaultTab,
   DockviewReact,
@@ -15,6 +16,7 @@ import { OPEN_PLAN_NODE_EDITOR_EVENT, type OpenPlanNodeEditorDetail } from "./li
 import LoreEditor from "./lore/LoreEditor"
 import LoreSection from "./lore/LoreSection"
 import PlanNodeEditor from "./plan/editors/PlanNodeEditor"
+import { IterationSelectionProvider, iterationLabel } from "./plan/iteration-selection"
 import PlanGraph from "./plan/plan-graph/PlanGraph"
 import RegenerationPanel from "./plan/RegenerationPanel"
 import ExportProjectAsTemplateDialog from "./projects/ExportProjectAsTemplateDialog"
@@ -99,11 +101,14 @@ export default function Layout() {
     })
   }
 
-  /** Opens (or activates) a plan-node-editor tab for the given node. */
-  const openPlanNodeEditor = useCallback((node: PlanNodeRow) => {
+  /**
+   * Opens (or activates) a plan-node-editor tab for the node in one iteration:
+   * each iteration of a loop's child has its own tab.
+   */
+  const openPlanNodeEditor = useCallback((node: Pick<PlanNodeDefinition, "id" | "title">, path: NodePath) => {
     const api = dockviewRef.current
     if (!api) return
-    const panelId = `plan-node-editor-${node.id}`
+    const panelId = `plan-node-editor-${node.id}@${path}`
     const existing = api.getPanel(panelId)
     if (existing) {
       existing.api.setActive()
@@ -114,8 +119,8 @@ export default function Layout() {
       id: panelId,
       component: "plan-node-editor",
       tabComponent: "editorTab",
-      title: node.title,
-      params: { nodeId: node.id },
+      title: path ? `${node.title} ${iterationLabel(path)}` : node.title,
+      params: { nodeId: node.id, path },
       ...(editorGroup ? { position: { referenceGroup: editorGroup } } : {}),
     })
   }, [])
@@ -136,7 +141,7 @@ export default function Layout() {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<OpenPlanNodeEditorDetail>).detail
-      openPlanNodeEditor(detail.node)
+      openPlanNodeEditor(detail.node, detail.path)
     }
     window.addEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
     return () => window.removeEventListener(OPEN_PLAN_NODE_EDITOR_EVENT, handler)
@@ -372,8 +377,10 @@ export default function Layout() {
       <LoreEditor nodeId={props.params?.nodeId} panelApi={props.api} />
     ),
     "plan-graph": () => <PlanGraph />,
-    "plan-node-editor": (props: { api: DockviewPanelApi; params: { nodeId: number } }) => (
-      <PlanNodeEditor nodeId={props.params?.nodeId} panelApi={props.api} />
+    // A layout saved before iterations had their own tabs has no path: the
+    // editor then opens at the iteration on display.
+    "plan-node-editor": (props: { api: DockviewPanelApi; params: { nodeId: number; path?: NodePath } }) => (
+      <PlanNodeEditor nodeId={props.params?.nodeId} path={props.params?.path} panelApi={props.api} />
     ),
     settings: () => <SettingsPanel />,
     billing: () => <AiBillingPanel />,
@@ -414,25 +421,27 @@ export default function Layout() {
   return (
     <LoreSettingsProvider>
       <EditorSettingsProvider>
-        <div className="flex flex-col h-full">
-          <div className="flex-1 min-h-0 bg-background overflow-hidden">
-            <DockviewReact
-              components={components}
-              tabComponents={tabComponents}
-              watermarkComponent={WelcomeWatermark}
-              onReady={onReady}
-              onWillDrop={handleWillDrop}
-              disableFloatingGroups={false}
-              disableDnd={false}
-              className="dockview-theme"
-            />
+        <IterationSelectionProvider>
+          <div className="flex flex-col h-full">
+            <div className="flex-1 min-h-0 bg-background overflow-hidden">
+              <DockviewReact
+                components={components}
+                tabComponents={tabComponents}
+                watermarkComponent={WelcomeWatermark}
+                onReady={onReady}
+                onWillDrop={handleWillDrop}
+                disableFloatingGroups={false}
+                disableDnd={false}
+                className="dockview-theme"
+              />
+            </div>
+            <div className="flex h-12 border-t border-border p-2 items-center bg-background justify-center">
+              <p className="text-muted-foreground text-sm">Project open</p>
+            </div>
           </div>
-          <div className="flex h-12 border-t border-border p-2 items-center bg-background justify-center">
-            <p className="text-muted-foreground text-sm">Project open</p>
-          </div>
-        </div>
-        <ExportProjectAsTemplateDialog />
-        <UpdateFromTemplateDialog />
+          <ExportProjectAsTemplateDialog />
+          <UpdateFromTemplateDialog />
+        </IterationSelectionProvider>
       </EditorSettingsProvider>
     </LoreSettingsProvider>
   )

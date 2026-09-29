@@ -13,11 +13,11 @@
  *     --projects "Письмо,Гонец,Тень,В баре" \
  *     --node-title "План сцен"
  *
- *   # a single iteration of a for-each-internal node (reads from the
- *   # container's overrides[i] if i is not currently mounted, otherwise from
- *   # the live node content). --all-iterations walks every iteration.
+ *   # a node inside a loop, in one iteration; without --iteration, in every
+ *   # iteration the loop has (--path names an iteration of nested loops)
  *   npx tsx scripts/dump-node.ts --project "В баре" --node-title "Проза чанка" --iteration 0
- *   npx tsx scripts/dump-node.ts --project "В баре" --node-title "Профиль персонажа" --all-iterations
+ *   npx tsx scripts/dump-node.ts --project "В баре" --node-title "Профиль персонажа"
+ *   npx tsx scripts/dump-node.ts --project "В баре" --node-title "Текст сцены" --path "21:0/40:2"
  *
  *   # one-line summary (chars + words + status) — handy across many projects
  *   npx tsx scripts/dump-node.ts \
@@ -39,8 +39,11 @@ import process from "node:process"
 import { Command, InvalidArgumentError } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { PlanNodeRepository } from "../src/backend/plan/nodes/plan-node-repository.js"
-import type { PlanNodeRow } from "../src/shared/plan-graph.js"
-import { resolveProjectPath } from "./lib/project-paths.js"
+import { PlanNodeService } from "../src/backend/plan/nodes/plan-node-service.js"
+import { loopLength } from "../src/shared/for-each-plan-node.js"
+import type { PlanNodeDefinition, PlanNodeRow } from "../src/shared/plan-graph.js"
+import { childPath, type NodePath, ROOT_PATH } from "../src/shared/plan-node-path.js"
+import { openProject } from "./lib/project-paths.js"
 
 type Format = "raw" | "fix-problems"
 
@@ -49,20 +52,10 @@ interface CliArgs {
   nodeId?: number
   nodeTitle?: string
   iteration?: number
-  allIterations: boolean
+  path?: NodePath
   format: Format
   summary: boolean
   quiet: boolean
-}
-
-interface ForEachOverrideSlot {
-  content?: string | null
-  status?: string | null
-}
-interface ForEachContent {
-  overrides?: Array<Record<string, ForEachOverrideSlot>>
-  length?: number
-  currentIndex?: number
 }
 
 interface FoundProblem {
@@ -106,10 +99,10 @@ function parseCli(): CliArgs {
     .option("--projects <a,b,c>", "Comma-separated list of project names (alternative to repeating --project)")
     .option("--node-id <id>", "Node ID (positive integer)", (v) => parsePositiveInt(v, "--node-id"))
     .option("--node-title <title>", "Node title (must be unique; use --node-id to disambiguate)")
-    .option("--iteration <index>", "Zero-based iteration index of a for-each-internal node", (v) =>
+    .option("--iteration <index>", "Zero-based iteration of the loop the node is in (default: every one)", (v) =>
       parseNonNegativeInt(v, "--iteration"),
     )
-    .option("--all-iterations", "Walk every iteration of a for-each-internal node", false)
+    .option("--path <path>", "One iteration as a full path, for nested loops: '21:0/40:2'")
     .option("--format <kind>", "Output rendering: raw | fix-problems", parseFormat, "raw" as Format)
     .option("--summary", "Print a one-line size + status summary instead of the full content", false)
     .option("--quiet", "Suppress the project/node header (useful when piping to a file)", false)
@@ -120,7 +113,7 @@ function parseCli(): CliArgs {
     nodeId?: number
     nodeTitle?: string
     iteration?: number
-    allIterations: boolean
+    path?: string
     format: Format
     summary: boolean
     quiet: boolean
@@ -136,29 +129,20 @@ function parseCli(): CliArgs {
   if (projects.length === 0) program.error("Pass --project (one or more) or --projects <a,b,c>")
   if (!opts.nodeId && !opts.nodeTitle) program.error("Pass --node-id or --node-title")
   if (opts.nodeId && opts.nodeTitle) program.error("Pass either --node-id or --node-title, not both.")
+  if (opts.path !== undefined && opts.iteration !== undefined) program.error("Pass either --path or --iteration.")
   return {
     projects,
     nodeId: opts.nodeId,
     nodeTitle: opts.nodeTitle,
     iteration: opts.iteration,
-    allIterations: opts.allIterations,
+    path: opts.path,
     format: opts.format,
     summary: opts.summary,
     quiet: opts.quiet,
   }
 }
 
-function findContainerForChild(allNodes: PlanNodeRow[], child: PlanNodeRow): PlanNodeRow | null {
-  let cur: PlanNodeRow | null = child
-  while (cur != null) {
-    if (cur.type === "for-each") return cur
-    if (cur.parent_id == null) return null
-    cur = allNodes.find((n) => n.id === cur!.parent_id) ?? null
-  }
-  return null
-}
-
-function resolveNode(args: CliArgs): PlanNodeRow {
+function resolveNode(args: CliArgs): PlanNodeDefinition {
   const repo = new PlanNodeRepository()
   const all = repo.findAll()
   if (args.nodeId != null) {
@@ -175,11 +159,20 @@ function resolveNode(args: CliArgs): PlanNodeRow {
   return matches[0]
 }
 
-function getIterationContent(node: PlanNodeRow, container: PlanNodeRow, iteration: number): string {
-  const parsed = JSON.parse(container.content || "{}") as ForEachContent
-  const currentIndex = parsed.currentIndex ?? 0
-  if (iteration === currentIndex) return node.content ?? ""
-  return parsed.overrides?.[iteration]?.[String(node.id)]?.content ?? ""
+/** The paths to dump the node at: the one asked for, or every iteration its loops have. */
+function pathsOf(service: PlanNodeService, node: PlanNodeDefinition, args: CliArgs): NodePath[] {
+  if (args.path !== undefined) return [args.path]
+  let paths: NodePath[] = [ROOT_PATH]
+  const loops = service.loopsAround(node.id)
+  loops.forEach((loop, depth) => {
+    const innermost = depth === loops.length - 1
+    paths = paths.flatMap((p) =>
+      innermost && args.iteration !== undefined
+        ? [childPath(p, loop, args.iteration)]
+        : Array.from({ length: loopLength(service.getRow(loop, p).content) }, (_, i) => childPath(p, loop, i)),
+    )
+  })
+  return paths
 }
 
 function reportSummary(label: string, status: string, type: string, content: string): void {
@@ -228,41 +221,17 @@ function reportRaw(label: string, content: string, quiet: boolean): void {
 }
 
 function dumpForProject(args: CliArgs, projectName: string): void {
-  setCurrentDbPath(resolveProjectPath(projectName))
+  openProject(projectName)
   try {
     const node = resolveNode(args)
-    const all = new PlanNodeRepository().findAll()
-    const container = findContainerForChild(all, node)
-
-    // Build the list of (label, content) pairs to render.
-    interface Slot {
-      iterLabel: string
-      content: string
-    }
-    const slots: Slot[] = []
-    if (container == null) {
-      // Top-level node — iteration flags are ignored.
-      slots.push({ iterLabel: "", content: node.content ?? "" })
-    } else if (args.iteration != null) {
-      slots.push({
-        iterLabel: ` / iter ${args.iteration}`,
-        content: getIterationContent(node, container, args.iteration),
-      })
-    } else if (args.allIterations) {
-      const parsed = JSON.parse(container.content || "{}") as ForEachContent
-      const total = parsed.length ?? parsed.overrides?.length ?? 0
-      for (let i = 0; i < total; i++) {
-        slots.push({ iterLabel: ` / iter ${i}`, content: getIterationContent(node, container, i) })
-      }
-    } else {
-      // Default for for-each-internal node: dump currently-mounted iteration.
-      slots.push({ iterLabel: "", content: node.content ?? "" })
-    }
-
-    for (const { iterLabel, content } of slots) {
-      const label = `${projectName} / #${node.id} '${node.title}' (${node.type}) / ${node.status}${iterLabel}`
+    const service = new PlanNodeService()
+    for (const path of pathsOf(service, node, args)) {
+      const row: PlanNodeRow = service.getRow(node.id, path)
+      const content = row.content ?? ""
+      const iterLabel = path === ROOT_PATH ? "" : ` / at ${path}`
+      const label = `${projectName} / #${node.id} '${node.title}' (${node.type}) / ${row.status}${iterLabel}`
       if (args.summary) {
-        reportSummary(`${projectName}${iterLabel}`, node.status, node.type, content)
+        reportSummary(`${projectName}${iterLabel}`, row.status, node.type, content)
       } else if (args.format === "fix-problems") {
         reportFixProblems(label, content)
       } else {
