@@ -1,8 +1,8 @@
 # Iteration state — rework proposal
 
-*2026-09-29. Status: phase 0 done on `master`; **phase 1 landed** on branch
-`iteration-state` ([plan.md](plan.md)), its implementation review under way;
-phases 2–3 next. Re-verify pointers before relying on them.*
+*2026-09-29. Status: phase 0 done on `master`; **phases 1–3 landed** on branch
+`iteration-state` ([plan.md](plan.md)); phase 1 reviewed and fixed, the review
+of the parallel loop under way. Re-verify pointers before relying on them.*
 
 ## In short
 
@@ -78,7 +78,9 @@ By the project owner, 2026-09-29:
 
 1. ~~`ai_improve_instruction`: state or definition?~~ State, per iteration
    (decided; 033 moves it with the rest).
-2. Phase 3: teach the template updater to change a node's type, or move existing
+2. ~~Phase 3: retyping or a one-off migration?~~ Decided: the template updater
+   retypes a sequential loop to parallel, keeping its iterations. Was: teach the
+   template updater to change a node's type, or move existing
    projects' character loops with a one-off migration?
 3. Is 6 hex characters the right minimum key length?
 4. Add `fast-check` as a dev dependency for property tests?

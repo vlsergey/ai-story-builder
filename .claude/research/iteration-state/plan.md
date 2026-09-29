@@ -112,21 +112,36 @@ review on the running app — switching iterations during a run, editing a child
 iteration 2 while iteration 0 is displayed elsewhere, editing a prompt while its
 node generates, a failing iteration named in the progress panel.
 
-## Phase 2 — `parallel-for-each`
+## Phase 1 reviews — done
 
-Container processor with hash keys, dedup and growth renames; per-node and
-run-wide concurrency caps, engine-aware; the dictionary entry forbidding
-`for-each-prev-outputs` and `for-each-index`; progress showing several active
-iterations; container display aggregate; icon, editor, i18n. Review gates as in
-phase 1.
+Backend review: 1 high, 4 medium, 7 low; UI review: 5 high, 5 medium. All fixed
+in `ab10a6b`, backend ones test-first. The ones that changed the design:
+results land over status-neutral writes (`landOver`); a loop records its
+iteration list when it starts running it (`writeWhileRunning`), not when it
+ends; a leftover GENERATING is pending; an EMPTY generative loop child makes the
+loop need a visit; a move into or out of a loop asks first.
 
-## Phase 3 — the character loop goes parallel
+## Phase 2 — `parallel` (done, `92fe833`, `ab10a6b`)
 
-The fiction-arc character loop has neither `for-each-prev-outputs` nor
-`for-each-index`, so its body moves as is. New projects get it from the
-template. Existing ones need a type change the template updater cannot express
-today; the choice between teaching it retyping and a one-off migration is left to
-the architecture review.
+Named `parallel`, not `parallel-for-each`. Keys, dedup and growth renames in
+`src/shared/parallel-plan-node.ts`; `renameIteration` / `deleteIterationsWhere`
+in the state repository; `asContainers(keys, concurrency)` in the scheduler, a
+worker pool that lets running branches finish after a failure; the progress
+"stack" is a set of running entries with paths. Concurrency: every model call
+waits for a slot of its engine (`engine-slots.ts`, setting
+`max_concurrent_calls`: Ollama 1, Yandex and Grok 10); a loop's own
+`concurrency` caps its branches, the engine's limit by default. Deferred: the
+container display aggregate (`iterationStatuses`); the pager does not mark
+running iterations. Implementation review under way.
+
+## Phase 3 — the character loop goes parallel (done, `7270652`)
+
+Both fiction-arc templates make the character loop `parallel`. Existing projects
+follow through "Update from template": the updater lists type changes, and
+`PlanNodeService.retypeToParallel` moves each iteration's rows from its index
+to its element's key in one transaction (first of identical elements kept).
+Loops holding prev-outputs or index nodes are listed as not applicable. Dry run
+on copies of the eight local projects with a character loop: outputs identical.
 
 ## Size and risk
 
