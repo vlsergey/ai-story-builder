@@ -75,7 +75,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Что нужно сделать",
           "",
@@ -121,7 +121,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что нужно сделать",
             "",
@@ -154,7 +154,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что нужно сделать",
             "",
@@ -201,7 +201,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что искать",
             "",
@@ -228,7 +228,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что нужно сделать",
             "",
@@ -280,7 +280,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Что нужно сделать",
           "",
@@ -314,7 +314,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения (задан пользователем)",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Что нужно сделать",
           "",
@@ -346,7 +346,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Что нужно сделать",
           "",
@@ -394,7 +394,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что нужно сделать",
             "",
@@ -448,7 +448,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что нужно сделать",
             "",
@@ -514,7 +514,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Тема",
           "```",
@@ -553,7 +553,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Жанр и регистр",
           "```",
@@ -623,7 +623,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Что нужно сделать",
           "",
@@ -687,7 +687,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Что нужно сделать",
           "",
@@ -787,7 +787,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Что нужно сделать",
           "",
@@ -839,7 +839,7 @@
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
               "",
               "## Что нужно сделать",
               "",
@@ -960,7 +960,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Возрастной рейтинг произведения",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
                 "",
                 "## Что искать",
                 "",
@@ -1002,7 +1002,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Возрастной рейтинг произведения",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
                 "",
                 "## Что нужно сделать",
                 "",
@@ -1098,7 +1098,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## Синопсис",
           "```",
@@ -1212,7 +1212,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## План сцен (проверить)",
             "```",
@@ -1234,7 +1234,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## План сцен",
             "```",
@@ -1270,7 +1270,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## План сцен (структурно проверенный)",
           "```",
@@ -1330,7 +1330,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## План сцен (структурно проверенный)",
           "```",
@@ -1408,7 +1408,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Реестр сетапов и пэйоффов",
             "```",
@@ -1461,7 +1461,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Реестр сетапов и пэйоффов",
             "```",
@@ -1523,7 +1523,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что искать",
             "",
@@ -1573,7 +1573,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Возрастной рейтинг произведения",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
             "",
             "## Что нужно сделать",
             "",
@@ -1655,7 +1655,7 @@
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
           "",
           "## План сцен (вход — единственный источник истины)",
           "```",
@@ -1783,7 +1783,7 @@
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
               "",
               "## Контекст повести",
               "",
@@ -1881,7 +1881,7 @@
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
               "",
               "## Что нужно сделать",
               "",
@@ -1949,7 +1949,7 @@
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
               "",
               "## Стиль (для справки)",
               "```",
@@ -2043,7 +2043,7 @@
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
               "",
               "## Стиль",
               "```",
@@ -2204,7 +2204,7 @@
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
               "",
               "## Стиль",
               "```",
@@ -2294,7 +2294,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Возрастной рейтинг произведения",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
                 "",
                 "## Реестр сетапов и пэйоффов",
                 "```",
@@ -2343,7 +2343,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Возрастной рейтинг произведения",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
                 "",
                 "## Что нужно сделать",
                 "",
@@ -2414,7 +2414,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Возрастной рейтинг произведения",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
                 "",
                 "## Стиль",
                 "```",
@@ -2455,7 +2455,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Возрастной рейтинг произведения",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 21 года.{{/if}}",
                 "",
                 "## Что нужно сделать",
                 "",

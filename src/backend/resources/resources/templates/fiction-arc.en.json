@@ -75,7 +75,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## What to do",
           "",
@@ -121,7 +121,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to do",
             "",
@@ -154,7 +154,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to do",
             "",
@@ -201,7 +201,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to look for",
             "",
@@ -228,7 +228,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to do",
             "",
@@ -280,7 +280,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## What to do",
           "",
@@ -314,7 +314,7 @@
         "aiUserInstructions": [
           "## Age rating (user-set)",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## What to do",
           "",
@@ -346,7 +346,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## What to do",
           "",
@@ -394,7 +394,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to do",
             "",
@@ -448,7 +448,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to do",
             "",
@@ -514,7 +514,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## Theme",
           "```",
@@ -553,7 +553,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## Genre and register",
           "```",
@@ -623,7 +623,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## What to do",
           "",
@@ -687,7 +687,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## What to do",
           "",
@@ -787,7 +787,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## What to do",
           "",
@@ -839,7 +839,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
               "",
               "## What to do",
               "",
@@ -960,7 +960,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Age rating",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
                 "",
                 "## What to look for",
                 "",
@@ -1002,7 +1002,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Age rating",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
                 "",
                 "## What to do",
                 "",
@@ -1098,7 +1098,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## Synopsis",
           "```",
@@ -1212,7 +1212,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## Scene plan (to check)",
             "```",
@@ -1234,7 +1234,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## Scene plan",
             "```",
@@ -1270,7 +1270,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## Scene plan (structurally checked)",
           "```",
@@ -1330,7 +1330,7 @@
         "aiUserInstructions": [
           "## Age rating of the work",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## Scene plan (structurally reviewed)",
           "```",
@@ -1408,7 +1408,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## Setup/payoff registry",
             "```",
@@ -1461,7 +1461,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## Setup/payoff registry",
             "```",
@@ -1523,7 +1523,7 @@
           "aiUserInstructionsToFindProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to look for",
             "",
@@ -1573,7 +1573,7 @@
           "aiUserInstructionsToFixProblems": [
             "## Age rating of the work",
             "",
-            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 18 years old.{{/if}}",
+            "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
             "",
             "## What to do",
             "",
@@ -1655,7 +1655,7 @@
         "aiUserInstructions": [
           "## Age rating",
           "",
-          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+          "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
           "",
           "## Scene plan (input — single source of truth)",
           "```",
@@ -1783,7 +1783,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
               "",
               "## Novella context",
               "",
@@ -1881,7 +1881,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
               "",
               "## What to do",
               "",
@@ -1949,7 +1949,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
               "",
               "## Style (for reference)",
               "```",
@@ -2043,7 +2043,7 @@
             "aiUserInstructions": [
               "## Age rating",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
               "",
               "## Style",
               "```",
@@ -2204,7 +2204,7 @@
             "aiUserInstructions": [
               "## Age rating of the work",
               "",
-              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+              "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
               "",
               "## Style",
               "```",
@@ -2294,7 +2294,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
                 "",
                 "## Setup/payoff registry",
                 "```",
@@ -2343,7 +2343,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
                 "",
                 "## What to do",
                 "",
@@ -2414,7 +2414,7 @@
               "aiUserInstructionsToFindProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
                 "",
                 "## Style",
                 "```",
@@ -2455,7 +2455,7 @@
               "aiUserInstructionsToFixProblems": [
                 "## Age rating of the work",
                 "",
-                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
+                "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are at least 21 years old.{{/if}}",
                 "",
                 "## What to do",
                 "",

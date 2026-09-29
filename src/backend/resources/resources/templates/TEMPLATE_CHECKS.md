@@ -176,6 +176,12 @@ For per-iteration nodes inside a for-each — the ones that emit ONE element of 
 
    This rule is enforced by [`templates-structure.test.ts`](./templates-structure.test.ts) — see "LLM-call nodes reference the age-rating wizard var". The reverse is not enforced: templates without an age-rating field skip the check.
 
+12.2. **Under 18+ and NC-21 every prompt states that all characters are at least 21**: «Всем героям не менее 21 года.» in a Russian template, "All characters are at least 21 years old." in an English one. Under a lower rating the prompt says nothing about age. Grok refuses adult content unless every character is 21 or older, and other engines are likely to follow. The usual form keeps the sentence on the rating's line and gates it at call time:
+
+   `${ageRating}.{{#if (or (eq "${ageRating}" "18+") (eq "${ageRating}" "NC-21"))}} Всем героям не менее 21 года.{{/if}}`
+
+   Enforced by [`templates-structure.test.ts`](./templates-structure.test.ts) — see "an adult rating tells the model every character is at least 21".
+
 ---
 
 ## 13. Severity bands for fix-problems
