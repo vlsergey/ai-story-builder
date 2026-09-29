@@ -14,11 +14,10 @@ import { Button } from "../ui-components/button"
 import AiGenerationSettingsForm from "../ai/AiGenerationSettingsForm"
 import { Textarea } from "../ui-components/textarea.tsx"
 import { Input } from "@/ui-components/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui-components/tabs"
+import { Tabs, TabsContent, TabsList } from "@/ui-components/tabs"
 import AiThinkingPanel, { type AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
+import InstructionsTabTrigger from "@/ai/InstructionsTabTrigger"
 import useConfirm from "@/native/useConfirm"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui-components/tooltip"
-import { CircleQuestionMarkIcon } from "lucide-react"
 
 export interface NodeSavedPayload {
   nodeId: number
@@ -207,24 +206,8 @@ export default function NodeEditor<N extends Node>({
         className={editorMode === "generate" ? "flex-1 w-full flex flex-col" : "flex-1 w-full flex flex-col hidden"}
       >
         <TabsList className="shrink-0">
-          <TabsTrigger value="system">
-            <Tooltip>
-              <TooltipTrigger className="flex items-center gap-1">
-                {t("ai.systemInstructions")}
-                <CircleQuestionMarkIcon />
-              </TooltipTrigger>
-              <TooltipContent>{t("ai.systemInstructions.description")}</TooltipContent>
-            </Tooltip>
-          </TabsTrigger>
-          <TabsTrigger value="user">
-            <Tooltip>
-              <TooltipTrigger className="flex items-center gap-1">
-                {t("ai.userInstructions")}
-                <CircleQuestionMarkIcon />
-              </TooltipTrigger>
-              <TooltipContent>{t("ai.userInstructions.description")}</TooltipContent>
-            </Tooltip>
-          </TabsTrigger>
+          <InstructionsTabTrigger kind="system" />
+          <InstructionsTabTrigger kind="user" />
         </TabsList>
         <TabsContent className="flex-1 flex flex-col" value="system">
           <Textarea
