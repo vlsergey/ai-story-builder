@@ -62,7 +62,7 @@
         "title": "Synopsis",
         "type": "text",
         "x": 40,
-        "y": 998,
+        "y": 922,
         "content": ["${synopsis}"],
         "width": 200,
         "height": 80
@@ -71,7 +71,7 @@
         "title": "World draft",
         "type": "text",
         "x": 320,
-        "y": 1052,
+        "y": 1118,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -112,7 +112,7 @@
         "title": "World review: physics",
         "type": "fix-problems",
         "x": 600,
-        "y": 1052,
+        "y": 1118,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "World draft",
           "maxIterations": 2,
@@ -192,7 +192,7 @@
         "title": "World",
         "type": "fix-problems",
         "x": 880,
-        "y": 1052,
+        "y": 1118,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "World review: physics",
           "maxIterations": 2,
@@ -276,7 +276,7 @@
         "title": "Theme",
         "type": "text",
         "x": 600,
-        "y": 589,
+        "y": 773,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -310,7 +310,7 @@
         "title": "Genre and register",
         "type": "text",
         "x": 600,
-        "y": 951,
+        "y": 191,
         "aiUserInstructions": [
           "## Age rating (user-set)",
           "",
@@ -342,7 +342,7 @@
         "title": "Setting draft",
         "type": "text",
         "x": 1160,
-        "y": 1175,
+        "y": 1209,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -385,7 +385,7 @@
         "title": "Setting",
         "type": "fix-problems",
         "x": 3205,
-        "y": 1205,
+        "y": 1209,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Setting draft",
           "maxIterations": 3,
@@ -510,7 +510,7 @@
         "title": "Style",
         "type": "text",
         "x": 880,
-        "y": 640,
+        "y": 204,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -549,7 +549,7 @@
         "title": "Character anchor sheet",
         "type": "text",
         "x": 1160,
-        "y": 871,
+        "y": 760,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -619,7 +619,7 @@
         "title": "Characters (list)",
         "type": "text",
         "x": 1440,
-        "y": 190,
+        "y": 536,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -683,7 +683,7 @@
         "title": "Character voices",
         "type": "text",
         "x": 1720,
-        "y": 770,
+        "y": 637,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -780,7 +780,7 @@
         "title": "Split character list",
         "type": "split",
         "x": 1720,
-        "y": 177,
+        "y": 523,
         "nodeTypeSettings": {
           "partDescription": "One character block: a `# Name` heading on the first line, then `- Field: value` lines for each anchor-sheet field, then an empty line and one sentence about the narrative role and key internal trait."
         },
@@ -813,9 +813,9 @@
         "title": "Per-character loop",
         "type": "for-each",
         "x": 2005,
-        "y": 291,
+        "y": 311,
         "width": 1120,
-        "height": 394,
+        "height": 385,
         "inputs": [
           {
             "sourceNodeTitle": "Split character list",
@@ -835,7 +835,7 @@
             "title": "Character profile",
             "type": "text",
             "x": 320,
-            "y": 232,
+            "y": 212,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -951,7 +951,7 @@
             "title": "Character review",
             "type": "fix-problems",
             "x": 600,
-            "y": 189,
+            "y": 169,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Character profile",
               "maxIterations": 3,
@@ -1059,7 +1059,7 @@
             "title": "Character output",
             "type": "for-each-output",
             "x": 880,
-            "y": 189,
+            "y": 169,
             "inputs": [
               {
                 "sourceNodeTitle": "Character review",
@@ -1075,7 +1075,7 @@
         "title": "Cast summary",
         "type": "merge",
         "x": 3205,
-        "y": 351,
+        "y": 371,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -1094,7 +1094,7 @@
         "title": "Scene plan",
         "type": "text",
         "x": 3485,
-        "y": 1035,
+        "y": 1108,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -1203,7 +1203,7 @@
         "title": "Scene plan review: structure",
         "type": "fix-problems",
         "x": 3765,
-        "y": 1035,
+        "y": 1108,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan",
           "maxIterations": 2,
@@ -1266,7 +1266,7 @@
         "title": "Setup/payoff registry",
         "type": "text",
         "x": 4045,
-        "y": 770,
+        "y": 1094,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -1326,7 +1326,7 @@
         "title": "Tension score",
         "type": "text",
         "x": 4045,
-        "y": 1015,
+        "y": 872,
         "aiUserInstructions": [
           "## Age rating of the work",
           "",
@@ -1399,7 +1399,7 @@
         "title": "Scene plan review: quality",
         "type": "fix-problems",
         "x": 4325,
-        "y": 1052,
+        "y": 1044,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan review: structure",
           "maxIterations": 3,
@@ -1514,7 +1514,7 @@
         "title": "Scene plan review: motive and perception",
         "type": "fix-problems",
         "x": 4605,
-        "y": 706,
+        "y": 930,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan review: quality",
           "maxIterations": 3,
@@ -1647,7 +1647,7 @@
         "title": "Chunk distribution",
         "type": "split",
         "x": 4885,
-        "y": 706,
+        "y": 943,
         "nodeTypeSettings": {
           "partDescription": "Description of one technical prose chunk. First line — `**Mode:** full | fragment | packed`. Then for each scene that falls into this chunk, a block.\n\nFor **full** (one whole scene):\n`**Scene N** (portion: full), «<Title VERBATIM from the plan>»`\n`Goal / Conflict / Disaster: <VERBATIM from the plan>`\n`Emotional shift: <VERBATIM from the plan>`\n\nFor **packed** — several such full-blocks in a row, each scene with portion=full.\n\nFor **fragment** one scene is split across two chunks. Block contents are **asymmetric**: first has no Disaster, last has no Goal — this structurally forbids downstream LLM-generation nodes from pulling material from the other half. At the boundary stands a «Closing beat / Resume after» marker — its text is identical character-by-character in both chunks.\n\nfragment first:\n`**Scene N** (portion: first), «<Title VERBATIM from the plan>»`\n`Goal: <VERBATIM from the plan's «Goal»>`\n`Conflict (up to the cut point): <part of the Conflict from the plan that gets played out in this half>`\n`Closing beat (chunk ENDS on this event): <one phrase, a concrete physical gesture / line / sound / object movement>`\n`Emotional shift of this chunk: <from the state at the scene's start — to the state at the Closing beat>`\n\nfragment last:\n`**Scene N** (portion: last), «<Title VERBATIM from the plan>»`\n`Resume after (the previous chunk ended on this event — it is ALREADY PLAYED OUT, do not rewrite it as a scene): <IDENTICAL to the previous chunk's Closing beat, character-by-character>`\n`Conflict (after the cut point): <part of the Conflict from the plan that remains after the Closing beat>`\n`Disaster: <VERBATIM from the plan's «Disaster»>`\n`Emotional shift of this chunk: <from the state at Resume after — to the scene's final state>`",
           "expectedPartsCount": "${chunksCount}"
@@ -1721,10 +1721,10 @@
       {
         "title": "Per-chunk loop",
         "type": "for-each",
-        "x": 5230,
-        "y": 623,
+        "x": 5200,
+        "y": 100,
         "width": 2520,
-        "height": 733,
+        "height": 870,
         "inputs": [
           {
             "sourceNodeTitle": "Chunk distribution",
@@ -1736,7 +1736,7 @@
             "title": "Chunk",
             "type": "for-each-input",
             "x": 40,
-            "y": 372,
+            "y": 586,
             "width": 200,
             "height": 80
           },
@@ -1744,7 +1744,7 @@
             "title": "Chunk index",
             "type": "for-each-index",
             "x": 880,
-            "y": 309,
+            "y": 523,
             "width": 200,
             "height": 80
           },
@@ -1752,7 +1752,7 @@
             "title": "Previous chunks",
             "type": "for-each-prev-outputs",
             "x": 320,
-            "y": 208,
+            "y": 155,
             "width": 200,
             "height": 80
           },
@@ -1760,7 +1760,7 @@
             "title": "Previous chunks merged",
             "type": "merge",
             "x": 600,
-            "y": 208,
+            "y": 155,
             "nodeTypeSettings": {
               "includeNodeTitle": false,
               "includeInputTitles": false,
@@ -1779,7 +1779,7 @@
             "title": "Chunk plan",
             "type": "text",
             "x": 320,
-            "y": 437,
+            "y": 309,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1877,7 +1877,7 @@
             "title": "Scene details",
             "type": "text",
             "x": 600,
-            "y": 538,
+            "y": 664,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1945,7 +1945,7 @@
             "title": "Chunk director notes",
             "type": "text",
             "x": 880,
-            "y": 481,
+            "y": 343,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -2035,7 +2035,7 @@
             "title": "Chunk prose",
             "type": "text",
             "x": 1160,
-            "y": 355,
+            "y": 293,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -2196,7 +2196,7 @@
             "title": "Prose expansion",
             "type": "text",
             "x": 1440,
-            "y": 451,
+            "y": 298,
             "aiUserInstructions": [
               "## Age rating of the work",
               "",
@@ -2281,7 +2281,7 @@
             "title": "Polish: structure & continuity",
             "type": "fix-problems",
             "x": 1720,
-            "y": 258,
+            "y": 363,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Prose expansion",
               "maxIterations": 2,
@@ -2397,7 +2397,7 @@
             "title": "Polish: voice & style",
             "type": "fix-problems",
             "x": 2000,
-            "y": 176,
+            "y": 112,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Polish: structure & continuity",
               "maxIterations": 1,
@@ -2503,7 +2503,7 @@
             "title": "Chunk output",
             "type": "for-each-output",
             "x": 2280,
-            "y": 176,
+            "y": 112,
             "inputs": [
               {
                 "sourceNodeTitle": "Polish: voice & style",
@@ -2518,8 +2518,8 @@
       {
         "title": "Draft assembly",
         "type": "merge",
-        "x": 7830,
-        "y": 1255,
+        "x": 7800,
+        "y": 211,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -2535,10 +2535,63 @@
         "height": 80
       },
       {
+        "title": "Plan layout",
+        "type": "format",
+        "x": 4885,
+        "y": 378,
+        "nodeTypeSettings": {
+          "template": "<!doctype html>\n<html lang=\"en\"><head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{{projectName}} — plan</title>\n<style>\n:root{--bg:#fbfaf8;--ink:#1e1c1a;--dim:#6c6560;--rule:#ddd6cc;--accent:#8a6b4f;--card:#f4f1ea}\n@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76;--card:#1e1d24}}\n:root[data-theme=dark]{--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76;--card:#1e1d24}\n*{box-sizing:border-box}\nbody{margin:0;padding:3rem 1.25rem 5rem;background:var(--bg);color:var(--ink);font-family:Charter,Georgia,\"Times New Roman\",serif;font-size:1rem;line-height:1.65}\nmain{max-width:44rem;margin:0 auto}\nh1{font-size:1.9rem;line-height:1.2;font-weight:600;margin:0 0 .4rem;text-align:center}\n.sub{color:var(--dim);font-size:.82rem;text-align:center;font-style:italic;margin:0 0 2.4rem}\nnav.toc{margin:0 0 3rem;padding:1.1rem 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}\nnav.toc ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.2rem .8rem}\nnav.toc a{display:block;color:var(--ink);text-decoration:none;font-size:.86rem;padding:.2rem .4rem;border-radius:.25rem}\nnav.toc a:hover{color:var(--accent)}\nh2{font-size:.76rem;font-weight:600;letter-spacing:.17em;text-transform:uppercase;color:var(--dim);margin:3rem 0 1.2rem;scroll-margin-top:1.5rem}\nh2::before{content:\"\";display:block;width:2.2rem;height:1px;background:var(--accent);margin:0 0 1rem}\nsection:first-of-type h2{margin-top:0}\nh3{font-size:.95rem;font-weight:600;margin:1.6rem 0 .5rem}\n.body{white-space:pre-wrap}\n.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.84rem;line-height:1.55;background:var(--card);padding:.9rem 1rem;border-radius:.4rem;overflow-x:auto;white-space:pre-wrap}\ndetails{margin:.6rem 0;border:1px solid var(--rule);border-radius:.4rem;padding:.5rem .9rem}\ndetails[open]{padding-bottom:1rem}\nsummary{cursor:pointer;font-size:.88rem;color:var(--dim)}\nsummary:hover{color:var(--accent)}\nfooter{max-width:44rem;margin:3rem auto 0;padding-top:1.4rem;border-top:1px solid var(--rule);color:var(--dim);font-size:.78rem;text-align:center;font-style:italic}\n@media (max-width:30rem){body{padding:2rem 1rem 3rem}h1{font-size:1.5rem}}\n</style></head>\n<body><main>\n<h1 id=\"top\">{{projectName}}</h1>\n<p class=\"sub\">plan · ${ageRating}</p>\n<nav class=\"toc\"><ol>\n<li><a href=\"#idea\">Intent</a></li>\n<li><a href=\"#plan\">Scene plan</a></li>\n<li><a href=\"#score\">Tension</a></li>\n<li><a href=\"#registry\">Setups</a></li>\n<li><a href=\"#cast\">Cast</a></li>\n<li><a href=\"#bible\">Bible</a></li>\n</ol></nav>\n<section id=\"idea\"><h2>Intent</h2>\n<h3>Synopsis</h3><div class=\"body\">{{[Synopsis]}}</div>\n<h3>Theme</h3><div class=\"body\">{{[Theme]}}</div>\n<h3>Genre and register</h3><div class=\"body\">{{[Genre and register]}}</div>\n</section>\n<section id=\"plan\"><h2>Scene plan</h2>\n<div class=\"body\">{{[Scene plan review: motive and perception]}}</div>\n</section>\n<section id=\"score\"><h2>Tension score</h2>\n<div class=\"mono\">{{[Tension score]}}</div>\n</section>\n<section id=\"registry\"><h2>Setup/payoff registry</h2>\n<div class=\"mono\">{{[Setup/payoff registry]}}</div>\n</section>\n<section id=\"cast\"><h2>Cast</h2>\n<div class=\"body\">{{[Cast summary]}}</div>\n</section>\n<section id=\"bible\"><h2>Bible</h2>\n<details><summary>World — {{words [World]}} words</summary><div class=\"body\">{{[World]}}</div></details>\n<details><summary>Setting — {{words [Setting]}} words</summary><div class=\"body\">{{[Setting]}}</div></details>\n<details><summary>Style — {{words [Style]}} words</summary><div class=\"body\">{{[Style]}}</div></details>\n</section>\n</main>\n<footer>plan · words in the plan: {{words [Scene plan review: motive and perception]}}</footer>\n</body></html>"
+        },
+        "inputs": [
+          {
+            "sourceNodeTitle": "Synopsis",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Theme",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Genre and register",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Scene plan review: motive and perception",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Tension score",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Setup/payoff registry",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Cast summary",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "World",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Setting",
+            "type": "text"
+          },
+          {
+            "sourceNodeTitle": "Style",
+            "type": "text"
+          }
+        ],
+        "width": 200,
+        "height": 80
+      },
+      {
         "title": "HTML layout",
         "type": "format",
-        "x": 8110,
-        "y": 1242,
+        "x": 8080,
+        "y": 173,
         "nodeTypeSettings": {
           "template": "<!doctype html>\n<html lang=\"en\"><head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{{projectName}}</title>\n<style>\n:root{--bg:#fbfaf8;--ink:#1e1c1a;--dim:#6c6560;--rule:#ddd6cc;--accent:#8a6b4f}\n@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76}}\n:root[data-theme=dark]{--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76}\n*{box-sizing:border-box}\nbody{margin:0;padding:4rem 1.25rem 6rem;background:var(--bg);color:var(--ink);font-family:Charter,Georgia,\"Times New Roman\",serif;font-size:1.0625rem;line-height:1.72}\nmain{max-width:34rem;margin:0 auto}\nh1{font-size:2.1rem;line-height:1.15;font-weight:600;margin:0 0 .6rem;text-align:center;scroll-margin-top:2rem}\n.sub{color:var(--dim);font-size:.86rem;text-align:center;font-style:italic;margin:0 0 2.6rem}\nnav.toc{margin:0 0 3.6rem;padding:1.4rem 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}\nnav.toc h2{font-size:.72rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0 0 1rem;text-align:center}\nnav.toc ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));gap:.25rem .8rem}\nnav.toc a{display:block;color:var(--ink);text-decoration:none;font-size:.9rem;padding:.25rem .45rem;border-radius:.25rem}\nnav.toc a:hover{color:var(--accent)}\nh2.part{font-size:.78rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);text-align:center;margin:3.6rem 0 1.7rem;scroll-margin-top:1.5rem}\nh2.part::before{content:\"\";display:block;width:2.5rem;height:1px;background:var(--accent);margin:0 auto 1.2rem}\nsection:first-of-type h2.part{margin-top:0}\nsection:first-of-type h2.part::before{display:none}\n.part-body{white-space:pre-wrap}\n.top{display:block;text-align:center;margin-top:3.2rem;color:var(--dim);font-size:.75rem;text-decoration:none}\nfooter{max-width:34rem;margin:3rem auto 0;padding-top:1.5rem;border-top:1px solid var(--rule);color:var(--dim);font-size:.8rem;text-align:center;font-style:italic}\n@media (max-width:30rem){body{padding:2.5rem 1rem 4rem}h1{font-size:1.7rem}}\n</style></head>\n<body><main>\n<h1 id=\"top\">{{projectName}}</h1>\n<p class=\"sub\">${ageRating}</p>\n<nav class=\"toc\"><h2>Contents</h2><ol>\n{{#each [Per-chunk loop]}}<li><a href=\"#ch{{@index}}\">Part {{add @index 1}}</a></li>\n{{/each}}</ol></nav>\n{{#each [Per-chunk loop]}}<section id=\"ch{{@index}}\">\n<h2 class=\"part\">Part {{add @index 1}}</h2>\n<div class=\"part-body\">{{stripHeading this}}</div>\n</section>\n{{/each}}\n<a class=\"top\" href=\"#top\">↑ top</a>\n</main>\n<footer>{{words [Draft assembly]}} words</footer>\n</body></html>"
         },
