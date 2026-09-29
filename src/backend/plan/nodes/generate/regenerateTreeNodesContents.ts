@@ -35,7 +35,8 @@ function emitRegenerateStatusEvent() {
   const event: RegenerateStatusEvent = {
     inProcess,
     stopping: abortController == null ? true : abortController.signal.aborted,
-    currentRegenerationStack: currentRegenerationStack,
+    // A copy: subscribers may hold the event after the stack has moved on.
+    currentRegenerationStack: [...currentRegenerationStack],
     firstError,
     generatedNew,
     generatedSame,
@@ -89,9 +90,47 @@ export function stop(): void {
 }
 
 /**
- * Generate content for all nodes in topological order, respecting dependencies.
+ * Pops `item` off the progress stack and says whether it was on top. Never
+ * throws: it runs while an error may be in flight, and must not replace it.
  */
-export async function regenerateTreeNodesContents(nodeId?: number): Promise<void> {
+function popStackItem(item: RegenerationStackItem): boolean {
+  const popped = currentRegenerationStack.pop()
+  if (popped === item) return true
+  console.error("Stack item mismatch", popped, item)
+  return false
+}
+
+/** Runs `block` with `item` on the progress stack. */
+async function withStackItem<T>(item: RegenerationStackItem, emit: boolean, block: () => Promise<T>): Promise<T> {
+  currentRegenerationStack.push(item)
+  if (emit) emitRegenerateStatusEvent()
+  let result: T
+  try {
+    result = await block()
+  } catch (e) {
+    popStackItem(item)
+    if (emit) emitRegenerateStatusEvent()
+    throw e
+  }
+  const onTop = popStackItem(item)
+  if (emit) emitRegenerateStatusEvent()
+  if (!onTop) throw Error("Stack item mismatch")
+  return result
+}
+
+/** How a finished regeneration is counted in the run's totals. */
+function classifyResult(before: PlanNodeRow, after: PlanNodeRow): PlanNodeAiGenerationStatus {
+  if ((after.content?.length || 0) === 0) return "EMPTY"
+  return after.content === before.content ? "SAME" : "GENERATED"
+}
+
+/**
+ * Generate content for all nodes in topological order, respecting dependencies.
+ * With `nodeId`, regenerates that node only and resolves to its row afterwards.
+ */
+export async function regenerateTreeNodesContents(): Promise<undefined>
+export async function regenerateTreeNodesContents(nodeId: number): Promise<PlanNodeRow>
+export async function regenerateTreeNodesContents(nodeId?: number): Promise<PlanNodeRow | undefined> {
   if (inProcess) throw makeErrorWithStatus("Some regeneration is already in process", 429)
   inProcess = true
   firstError = null
@@ -146,32 +185,29 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
             )
           }
         }
-        currentRegenerationStack.push({ type: "node", node: node })
-        emitRegenerateStatusEvent()
-        try {
-          const blockResult = await block(nodeContext(node))
-          switch (blockResult.status) {
-            case "SAME":
-              generatedSame++
-              break
-            case "EMPTY":
-              generatedEmpty++
-              break
-            case "GENERATED":
-              generatedNew++
-              break
+        return await withStackItem({ type: "node", node: node }, true, async () => {
+          try {
+            const blockResult = await block(nodeContext(node))
+            switch (blockResult.status) {
+              case "SAME":
+                generatedSame++
+                break
+              case "EMPTY":
+                generatedEmpty++
+                break
+              case "GENERATED":
+                generatedNew++
+                break
+            }
+            return blockResult.result
+          } catch (e) {
+            if (firstError == null) {
+              firstError = e
+            }
+            myAbortController.abort()
+            throw e
           }
-          return blockResult.result
-        } catch (e) {
-          if (firstError == null) {
-            firstError = e
-          }
-          myAbortController.abort()
-          throw e
-        } finally {
-          currentRegenerationStack.pop()
-          emitRegenerateStatusEvent()
-        }
+        })
       },
     }
 
@@ -187,43 +223,20 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
             totalIterations,
             zeroBasedIterationIndex,
           }
-          currentRegenerationStack.push(stackItem)
-          emitRegenerateStatusEvent()
-          try {
-            return await block(nodeContext(container))
-          } finally {
-            const popped = currentRegenerationStack.pop()
-            if (popped !== stackItem) {
-              console.error("Stack item mismatch", popped, stackItem)
-              // biome-ignore lint/correctness/noUnsafeFinally: that panic error anyway
-              throw Error("Stack item mismatch")
-            }
-            emitRegenerateStatusEvent()
-          }
+          return await withStackItem(stackItem, true, () => block(nodeContext(container)))
         },
         asContainer: async <T>(
           zeroBasedIterationIndex: number,
           block: (context: RegenerationContainerContext) => Promise<T>,
         ) => {
           if (myAbortController.signal.aborted) throw Error("Stop was required")
-
           const stackItem: RegenerationStackItemIteration = {
             type: "iteration",
             container,
             totalIterations,
             zeroBasedIterationIndex,
           }
-          currentRegenerationStack.push(stackItem)
-          try {
-            return await block(containerContext)
-          } finally {
-            const popped = currentRegenerationStack.pop()
-            if (popped !== stackItem) {
-              console.error("Stack item mismatch", popped, stackItem)
-              // biome-ignore lint/correctness/noUnsafeFinally: that panic error anyway
-              throw Error("Stack item mismatch")
-            }
-          }
+          return await withStackItem(stackItem, false, () => block(containerContext))
         },
       }
     }
@@ -257,26 +270,23 @@ export async function regenerateTreeNodesContents(nodeId?: number): Promise<void
 
     if (nodeId === undefined) {
       await regenerateSubtreeNodesContents(containerContext, null)
-    } else {
-      const service = new PlanNodeService()
-      const node = service.getById(nodeId)
-      const stackItem: RegenerationStackItem = { type: "node", node: node }
-      currentRegenerationStack.push(stackItem)
-      emitRegenerateStatusEvent()
-
-      try {
-        await new PlanNodeService().regenerate(nodeContext(node))
-      } finally {
-        const popped = currentRegenerationStack.pop()
-        if (popped !== stackItem) {
-          console.error("Stack item mismatch", popped, stackItem)
-          // biome-ignore lint/correctness/noUnsafeFinally: that panic error anyway
-          throw Error("Stack item mismatch")
-        }
-      }
+      return undefined
     }
+
+    // A single node goes through onNodeStart like any other, so it is counted
+    // and its failure becomes the run's first error.
+    const service = new PlanNodeService()
+    const node = service.getById(nodeId)
+    await containerContext.onNodeStart(node, async (context) => {
+      const result = await service.regenerate(context)
+      return { result, status: classifyResult(node, result) }
+    })
+    return service.getById(nodeId)
   } catch (err) {
     runSucceeded = false
+    if (firstError == null) {
+      firstError = err
+    }
     throw err
   } finally {
     finishRun({ success: runSucceeded })
@@ -335,7 +345,7 @@ export async function regenerateSubtreeNodesContents(
     ERROR: true,
     EMPTY: true,
     GENERATING: true,
-    GENERATED: context.options.regenerateManual,
+    GENERATED: context.options.regenerateGenerated,
     OUTDATED: true,
     MANUAL: context.options.regenerateManual,
   }
@@ -348,10 +358,8 @@ export async function regenerateSubtreeNodesContents(
 
   while (queue.length > 0 && !context.abortSignal.aborted) {
     if (safetyCounter-- <= 0) {
-      console.error(
-        `[regenerateSubtreeNodesContents] safety counter exhausted at parentId=${parentId}, queue=${queue.join(",")}`,
-      )
-      break
+      // Breaking out here would report a half-done run as a success.
+      throw Error(`Regeneration did not converge at parentId=${parentId}: nodes ${queue.join(",")} kept being demoted`)
     }
     const nodeId = queue.shift()!
     // Refetch the live row — sibling regenerations earlier in this loop may
@@ -412,9 +420,7 @@ export async function regenerateSubtreeNodesContents(
     if (willRegenerate) {
       await context.onNodeStart(node, async (childContext) => {
         const result = await planNodeService.regenerate(childContext)
-        const status =
-          (result.content?.length || 0) === 0 ? "EMPTY" : result.content === node.content ? "SAME" : "GENERATED"
-        return { result, status }
+        return { result, status: classifyResult(node, result) }
       })
     } else {
       console.log(
