@@ -109,7 +109,10 @@ export default function Layout() {
     const api = dockviewRef.current
     if (!api) return
     const panelId = `plan-node-editor-${node.id}@${path}`
-    const existing = api.getPanel(panelId)
+    // A tab from before editors had paths keeps its old id; it already shows
+    // this node once it has settled on the same iteration.
+    const legacy = api.getPanel(`plan-node-editor-${node.id}`)
+    const existing = api.getPanel(panelId) ?? (legacy?.params?.path === path ? legacy : undefined)
     if (existing) {
       existing.api.setActive()
       return

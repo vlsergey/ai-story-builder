@@ -82,8 +82,13 @@ export interface PlanNodeStateBrief
   extends Pick<PlanNodeState, "status" | "summary" | "word_count" | "char_count" | "byte_count" | "in_review" | "rev"> {
   node_id: number
   path: NodePath
-  /** For a loop: how many iterations it has at this path. */
-  iterations?: number
+  /** For a loop: its iterations at this path, as the keys its children's paths use. */
+  iterationKeys?: string[]
+}
+
+/** A node in one iteration, as an editor opens it; `current` is false once that iteration is gone. */
+export interface PlanNodeInIteration extends PlanNodeRow {
+  current: boolean
 }
 
 export interface PlanEdgeRow {

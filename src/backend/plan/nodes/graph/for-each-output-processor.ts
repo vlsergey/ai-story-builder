@@ -28,7 +28,9 @@ export class ForEachOutputProcessor implements NodeProcessor<ForEachOutputSettin
     _settings: ForEachOutputSettings,
   ): Promise<PlanNodeStateUpdate | null> {
     const { content, summary } = joinInputs(service, row)
-    return row.content !== content ? { content, summary: summary || row.summary } : null
+    // The output is its input's text: it carries that text's summary, never a
+    // summary of its own — nor a new one when nothing changed.
+    return row.content !== content ? { content, summary: summary || row.summary } : { summary: row.summary }
   }
 }
 

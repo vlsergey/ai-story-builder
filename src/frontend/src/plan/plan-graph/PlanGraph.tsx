@@ -37,7 +37,8 @@ import Toolbar from "./Toolbar"
 import type { EdgeImpl, NodeImpl } from "./Types"
 import useConfirm from "@/native/useConfirm"
 import useAlert from "@/native/useAlert"
-import { useIterationSelection } from "../iteration-selection"
+import { LOOP_TYPES, useIterationSelection } from "../iteration-selection"
+import { loopsAround } from "@shared/loop-iterations"
 
 const nodeTypes: Record<"simple" | "group", React.FC<NodeProps<NodeImpl>>> = {
   simple: SimpleNode,
@@ -227,10 +228,32 @@ export default function PlanGraph() {
     }
   }, [nodes])
 
-  // A move changes what the node is, in every iteration.
+  /**
+   * A move changes what the node is, in every iteration. Into or out of a
+   * loop, the paths of what it produced mean nothing any more and the server
+   * discards it — the user confirms that first.
+   */
   const moveNode = useCallback(
-    (nodeId: number, parentId: number | null) => patchNodes([{ id: nodeId, data: { parent_id: parentId } }]),
-    [],
+    async (nodeId: number, parentId: number | null) => {
+      const byId = new Map((findAllNodes.data ?? []).map((n) => [n.id, n]))
+      const nodeOf = (id: number) => byId.get(id)
+      const before = loopsAround(nodeId, nodeOf)
+      const parent = parentId === null ? undefined : byId.get(parentId)
+      const after = parent
+        ? [...loopsAround(parent.id, nodeOf), ...(LOOP_TYPES.has(parent.type) ? [parent.id] : [])]
+        : []
+      const sameLoops = before.length === after.length && before.every((loop, i) => after[i] === loop)
+      if (
+        !sameLoops &&
+        !(await confirm("planGraph.moveDropsIterationState", { title: byId.get(nodeId)?.title ?? "" }))
+      ) {
+        return
+      }
+      patchNodes([{ id: nodeId, data: { parent_id: parentId } }], {
+        onError: (error) => alert(t("planGraph.nodeContextMenu.failed", { error: error.message })),
+      })
+    },
+    [alert, confirm, findAllNodes.data, t],
   )
 
   const onNodeDragStop = useCallback(
@@ -478,7 +501,12 @@ export default function PlanGraph() {
           <ContextMenuContent
             contextMenuNodeId={contextMenuNodeId}
             serverNodes={findAllNodes.data || []}
-            aiGenerateSummary={(nodeId) => aiGenerateSummary({ id: nodeId, path: displayPath(nodeId) })}
+            aiGenerateSummary={(nodeId) =>
+              aiGenerateSummary(
+                { id: nodeId, path: displayPath(nodeId) },
+                { onError: (error) => alert(t("planGraph.nodeContextMenu.failed", { error: error.message })) },
+              )
+            }
             deleteNode={deleteNode}
             moveNode={moveNode}
             saveToFile={saveToFile}

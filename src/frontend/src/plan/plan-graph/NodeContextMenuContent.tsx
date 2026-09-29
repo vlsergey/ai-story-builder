@@ -14,7 +14,8 @@ import { useTranslation } from "react-i18next"
 import NodeTypeIcons from "./NodeTypeIcons"
 import { ExternalLink, TrashIcon, SaveIcon } from "lucide-react"
 import { trpc } from "@/ipcClient"
-import { useIterationSelection } from "../iteration-selection"
+import useAlert from "@/native/useAlert"
+import { LOOP_TYPES, useIterationSelection } from "../iteration-selection"
 
 interface NodeContextMenuContentProps {
   contextMenuNodeId: number
@@ -40,7 +41,10 @@ export default function NodeContextMenuContent({
   )
   const nodeType = contextMenuNode?.type
   const nodeDef = nodeType ? getNodeTypeDefinition(nodeType) : null
-  const regenerateNode = trpc.plan.nodes.aiGenerate.startForNode.useMutation().mutate
+  const alert = useAlert()
+  const regenerateNode = trpc.plan.nodes.aiGenerate.startForNode.useMutation({
+    onError: (error) => alert(t("planGraph.nodeContextMenu.failed", { error: error.message })),
+  }).mutate
   const { displayPath } = useIterationSelection()
 
   return (
@@ -93,7 +97,7 @@ export default function NodeContextMenuContent({
               )}
               {serverNodes
                 ?.filter((n) => n.id !== contextMenuNodeId)
-                ?.filter((n) => n.type === "for-each")
+                ?.filter((n) => LOOP_TYPES.has(n.type))
                 ?.filter((n) => n.id !== contextMenuNode?.parent_id)
                 .map((n) => (
                   <ContextMenuItem

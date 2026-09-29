@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { loopLength } from "../../../shared/for-each-plan-node.js"
+import { iterationKeys, LOOP_TYPES } from "../../../shared/loop-iterations.js"
 import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
 import type { PlanNodeDefinition, PlanNodeRow, PlanNodeStatus } from "../../../shared/plan-graph.js"
 import {
@@ -24,9 +24,8 @@ import {
   stop,
   subscribeToStatusEvents,
 } from "../nodes/generate/regenerateTreeNodesContents.js"
-import { ForEachProcessor } from "../nodes/graph/for-each-processor.js"
 import { PlanNodeRepository } from "../nodes/plan-node-repository.js"
-import { LOOP_TYPES, PlanNodeService } from "../nodes/plan-node-service.js"
+import { PlanNodeService } from "../nodes/plan-node-service.js"
 import { type FakeCall, type FakeCallKind, fakeEngine } from "./fake-engine.js"
 
 /**
@@ -118,6 +117,38 @@ export class GraphBuilder {
     repo.patch(repo.findByParentIdAndType(id, "for-each-output")[0].id, { title: spec.result })
     this.edge(spec.over, title, "textArray")
     body(new LoopBuilder(id, spec.result))
+  }
+
+  /**
+   * A loop over the list `over` whose elements run side by side, each once:
+   * `element` holds an element, whatever is wired into `result` is its output.
+   * `concurrency` caps how many run at once, below what the engine takes.
+   */
+  parallel(
+    title: string,
+    spec: { over: string; element: string; result: string; concurrency?: number },
+    body: (b: LoopBuilder) => void,
+  ): void {
+    const service = new PlanNodeService()
+    const repo = new PlanNodeRepository()
+    const settings = spec.concurrency === undefined ? {} : { concurrency: spec.concurrency }
+    const { id } = service.create({
+      title,
+      type: "parallel",
+      parent_id: this.parentId,
+      node_type_settings: JSON.stringify(settings),
+    })
+    repo.patch(repo.findByParentIdAndType(id, "for-each-input")[0].id, { title: spec.element })
+    repo.patch(repo.findByParentIdAndType(id, "for-each-output")[0].id, { title: spec.result })
+    this.edge(spec.over, title, "textArray")
+    body(new LoopBuilder(id, spec.result))
+  }
+
+  /** Adds to a loop that already exists. */
+  inside(loop: string): LoopBuilder {
+    const id = nodeId(loop)
+    const output = new PlanNodeRepository().findByParentIdAndType(id, "for-each-output")[0]
+    return new LoopBuilder(id, output.title)
   }
 
   protected add(title: string, type: PlanNodeType, settings: Record<string, unknown>): void {
@@ -265,6 +296,22 @@ export class PlanScenario {
     })
   }
 
+  /** The user types an instruction for improving the node, without running it yet. */
+  async noteImprovement(title: string, instruction: string): Promise<void> {
+    const id = nodeId(title)
+    await new PlanNodeService().patch(id, this.displayPath(id), true, { ai_improve_instruction: instruction })
+  }
+
+  /** The user deletes the node. */
+  remove(title: string): void {
+    new PlanNodeService().delete(nodeId(title))
+  }
+
+  /** The user moves the node into `parent`, or out to the top level. */
+  async move(title: string, parent: string | null): Promise<void> {
+    await new PlanNodeService().patchDefinition(nodeId(title), { parent_id: parent === null ? null : nodeId(parent) })
+  }
+
   /** Asks the model to improve the node's text; resolves with the error, if any. */
   async improve(title: string, instruction: string): Promise<{ error?: unknown }> {
     const id = nodeId(title)
@@ -283,8 +330,17 @@ export class PlanScenario {
   /** The editor's "Generate summary" button. */
   async summarize(title: string): Promise<void> {
     this.since = this.engine.calls.length
+    await this.summarizeMeanwhile(title)
+  }
+
+  /** The summary button, pressed while something else runs: the call log stays that run's. */
+  async summarizeMeanwhile(title: string): Promise<void> {
     const id = nodeId(title)
     await new PlanNodeService().aiGenerateSummary(id, this.displayPath(id))
+  }
+
+  summary(title: string, iteration?: number): string | null {
+    return this.stateAt(title, iteration).summary
   }
 
   /** Starts a review of the node, as the editor's review mode does. */
@@ -296,6 +352,12 @@ export class PlanScenario {
   /** The user pages a loop to `iteration`. */
   show(loop: string, iteration: number): void {
     this.displayed.set(nodeId(loop), iteration)
+  }
+
+  /** How many calls the engine takes at once, as set in its settings. */
+  setEngineConcurrency(calls: number): void {
+    const config = SettingsRepository.getAllAiEnginesConfig()
+    SettingsRepository.setAllAiEnginesConfig({ ...config, grok: { ...config.grok, max_concurrent_calls: calls } })
   }
 
   /** The regeneration switches of the Regenerate panel. */
@@ -355,8 +417,8 @@ export class PlanScenario {
         }
         const inner = LOOP_TYPES.has(node.type)
           ? paths.flatMap((path) =>
-              Array.from({ length: loopLength(service.getRow(node.id, path).content) }, (_, i) =>
-                childPath(path, node.id, i),
+              iterationKeys(node.type, service.getRow(node.id, path).content).map((key) =>
+                childPath(path, node.id, key),
               ),
             )
           : paths
@@ -404,15 +466,26 @@ export class PlanScenario {
   loopResults(loop: string): string[] {
     const id = nodeId(loop)
     const service = new PlanNodeService()
-    return new ForEachProcessor().getOutput(service, service.getRow(id, this.displayPath(id)))
+    const row = service.getRow(id, this.displayPath(id))
+    return service.getProcessor(row.type).getOutput(service, row) as string[]
   }
 
   /** Where the user looks at the node: in every loop around it, the iteration on display. */
   private displayPath(id: number): NodePath {
+    const service = new PlanNodeService()
     let path = ROOT_PATH
-    for (const loop of new PlanNodeService().loopsAround(id))
-      path = childPath(path, loop, this.displayed.get(loop) ?? 0)
+    for (const loop of service.loopsAround(id)) path = this.iterationPath(loop, path, this.displayed.get(loop) ?? 0)
     return path
+  }
+
+  /**
+   * The path of the loop's iteration at `position`, the way the user counts
+   * them: a for-each's index, a parallel loop's n-th distinct element.
+   */
+  private iterationPath(loop: number, loopPath: NodePath, position: number): NodePath {
+    const row = new PlanNodeService().getRow(loop, loopPath)
+    const keys = iterationKeys(row.type, row.content)
+    return childPath(loopPath, loop, keys[position] ?? String(position))
   }
 
   /**
@@ -422,13 +495,13 @@ export class PlanScenario {
   private stateAt(
     title: string,
     iteration?: number,
-  ): { content: string | null; status: PlanNodeStatus; in_review: number; word_count: number } {
+  ): { content: string | null; summary: string | null; status: PlanNodeStatus; in_review: number; word_count: number } {
     const id = nodeId(title)
     let path = this.displayPath(id)
     if (iteration !== undefined) {
       const loop = lastSegment(path)?.containerId
       if (loop === undefined) throw new Error(`«${title}» is not inside a loop`)
-      path = childPath(parentPath(path), loop, iteration)
+      path = this.iterationPath(loop, parentPath(path), iteration)
     }
     return new PlanNodeService().getRow(id, path)
   }

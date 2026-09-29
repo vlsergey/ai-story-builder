@@ -456,6 +456,29 @@ describe("migration 033: per-iteration state", () => {
     expect(state(db, 1)?.word_count).toBe(3)
   })
 
+  it("does not hang on nodes that are each other's parent", () => {
+    const db = at32()
+    insert(db, { id: 1, content: "root", status: "MANUAL" })
+    insert(db, { id: 2, parent_id: 3, content: "a" })
+    insert(db, { id: 3, parent_id: 2, content: "b" })
+
+    migration033(db)
+
+    expect(state(db, 1)?.content).toBe("root")
+    expect(warnings().some((w) => w.includes("node 2") && w.includes("no state"))).toBe(true)
+  })
+
+  it("says nothing about a loop that never ran", () => {
+    const db = at32()
+    insert(db, { id: 1, type: "for-each", status: "EMPTY", content: null })
+    insert(db, { id: 2, parent_id: 1, type: "for-each-input" })
+    insert(db, { id: 3, parent_id: 1, type: "for-each-output" })
+
+    migration033(db)
+
+    expect(warnings()).toEqual([])
+  })
+
   it("warns about an edge that leaves a loop past its output", () => {
     const db = at32()
     insert(db, { id: 1, type: "for-each", content: loopContent({ length: 1 }) })

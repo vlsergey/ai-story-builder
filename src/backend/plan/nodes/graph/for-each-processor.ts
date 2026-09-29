@@ -5,6 +5,7 @@ import { childPath } from "../../../../shared/plan-node-path.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import { regenerateSubtreeNodesContents } from "../generate/regenerateTreeNodesContents.js"
 import type { PlanNodeService } from "../plan-node-service.js"
+import { loopChild, loopElements } from "./loop-input.js"
 import type { NodeProcessor } from "./node-processor.js"
 
 /**
@@ -19,7 +20,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
   getOutput(service: PlanNodeService, row: PlanNodeRow): string[] {
     const length = loopLength(row.content)
     if (length === 0) return []
-    const output = onlyChild(service, row.id, "for-each-output")
+    const output = loopChild(service, row.id, "for-each-output")
     return Array.from(
       { length },
       (_, index) => service.states.find(output.id, childPath(row.path, row.id, index))?.content ?? "",
@@ -35,8 +36,16 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
     row: PlanNodeRow,
     _settings: ForEachSettings,
   ): Promise<PlanNodeStateUpdate | null> {
-    const elements = expandedInputs(service, row)
-    const input = onlyChild(service, row.id, "for-each-input")
+    const elements = loopElements(service, row)
+    const input = loopChild(service, row.id, "for-each-input")
+
+    // The iterations are recorded before they run, so that an editor, the
+    // graph and a run stopped half-way all see the list the loop works on.
+    const content = JSON.stringify({ length: elements.length } satisfies ForEachNodeContent)
+    if (!(await service.writeWhileRunning(row, { content }))) return null
+    // Iterations whose element vanished go, with everything nested in them.
+    const current = new Set(elements.map((_, index) => String(index)))
+    service.states.deleteIterationsWhere(row.id, row.path, (key) => !current.has(key))
 
     // An element that is new or changed gets its iteration's input written;
     // the cascade demotes what reads it in that iteration and nowhere else.
@@ -48,8 +57,6 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
         await service.patchState(input.id, path, false, { content: elements[index], status: "OUTDATED" })
       }
     }
-    // Iterations whose element vanished go, with everything nested in them.
-    service.states.deleteIterationsFrom(row.id, row.path, elements.length)
 
     console.log(`[ForEachProcessor] node ${row.id} at "${row.path}": ${elements.length} iteration(s)`)
     await context.asCycle(elements.length, async (cycle) => {
@@ -58,30 +65,7 @@ export class ForEachProcessor implements NodeProcessor<ForEachSettings> {
       }
     })
 
-    const content: ForEachNodeContent = { length: elements.length }
-    return { content: JSON.stringify(content) }
+    // A loop's text is its iterations' outputs: they have their own summaries.
+    return { content, summary: row.summary }
   }
-}
-
-function onlyChild(service: PlanNodeService, loopId: number, type: "for-each-input" | "for-each-output") {
-  const children = service.findByParentIdAndType(loopId, type)
-  if (children.length !== 1)
-    throw Error(`for-each node ${loopId} must have exactly one ${type}, has ${children.length}`)
-  return children[0]
-}
-
-/** The loop's list at its path: each text input one element, each list input its parts. */
-function expandedInputs(service: PlanNodeService, row: PlanNodeRow): string[] {
-  const elements: string[] = []
-  for (const nodeInput of service.findNodeInputs(row.id, row.path)) {
-    switch (nodeInput.edge.type) {
-      case "text":
-        elements.push(nodeInput.input as string)
-        break
-      case "textArray":
-        elements.push(...(nodeInput.input as string[]))
-        break
-    }
-  }
-  return elements
 }

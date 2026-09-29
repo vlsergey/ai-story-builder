@@ -14,6 +14,7 @@ import AiThinkingPanel, { type AiThinkingPanelHandle } from "../ai/AiThinkingPan
 import { Button } from "../ui-components/button"
 import { Card } from "../ui-components/card"
 import RegenerateOptionsForm from "./RegenerateOptionsForm"
+import { dispatchOpenPlanNodeEditor } from "../lib/plan-graph-events"
 import { iterationLabel } from "./iteration-selection"
 import ResponseStreamWatcher from "./ResponseStreamWatcher"
 
@@ -121,7 +122,16 @@ export default function RegenerationPanel({ panelApi }: { panelApi: DockviewPane
       <Card className="mt-4 p-3 bg-destructive/10 border-destructive/30">
         <div className="text-xs font-semibold text-destructive mb-1">
           {t("regeneration.error")}
-          {at && ` «${at.title}»${at.path ? ` ${iterationLabel(at.path)}` : ""}`}
+          {at && (
+            // Opens the node in the iteration that failed.
+            <button
+              type="button"
+              className="ml-1 underline"
+              onClick={() => dispatchOpenPlanNodeEditor({ id: at.nodeId, title: at.title }, at.path)}
+            >
+              «{at.title}»{at.path ? ` ${iterationLabel(at.path)}` : ""}
+            </button>
+          )}
         </div>
         <pre className="text-xs text-destructive whitespace-pre-wrap break-words">{errorString}</pre>
       </Card>

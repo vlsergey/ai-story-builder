@@ -110,8 +110,18 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
     canRegenerate: true,
   },
   {
+    // A loop whose iterations run side by side, one per distinct element.
+    id: "parallel",
+    allowedOutgoingEdgeTypes: ["textArray"],
+    allowedIncomingEdgeTypes: ["textArray"],
+    canCreate: true,
+    canDelete: true,
+    isGroup: true,
+    canRegenerate: true,
+  },
+  {
     id: "for-each-input",
-    allowedContainers: ["for-each"],
+    allowedContainers: ["for-each", "parallel"],
     allowedIncomingEdgeTypes: [],
     allowedOutgoingEdgeTypes: ["text"],
     canCreate: false,
@@ -121,7 +131,7 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
   },
   {
     id: "for-each-output",
-    allowedContainers: ["for-each"],
+    allowedContainers: ["for-each", "parallel"],
     allowedOutgoingEdgeTypes: [],
     allowedIncomingEdgeTypes: ["text"],
     canCreate: false,

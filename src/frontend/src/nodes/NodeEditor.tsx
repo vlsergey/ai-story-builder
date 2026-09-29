@@ -51,6 +51,8 @@ interface NodeEditorProps<N extends Node> {
   onChange: (node: N) => void
   onGenerate: () => void
   onImprove: () => void
+  /** The text cannot be edited: the model is writing it, or it cannot be saved. */
+  readOnly?: boolean
   status: NodeEditorState
   value: N
 }
@@ -68,6 +70,7 @@ export default function NodeEditor<N extends Node>({
   onEditorModeChange,
   onGenerate,
   onImprove,
+  readOnly = false,
 }: NodeEditorProps<N>) {
   const { resolvedTheme } = useTheme()
   const { wordWrap } = useEditorSettings()
@@ -365,6 +368,7 @@ export default function NodeEditor<N extends Node>({
             extensions={[markdown(), ...(wordWrap ? [EditorView.lineWrapping] : [])]}
             theme={resolvedTheme === "obsidian" ? "dark" : "light"}
             onChange={onContentChange}
+            readOnly={readOnly}
             className="h-full w-full"
             basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: true }}
           />

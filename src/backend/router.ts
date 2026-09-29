@@ -3,7 +3,7 @@ import { initTRPC } from "@trpc/server"
 import { z } from "zod"
 import type { AiEngineConfig } from "../shared/ai-engine-config.js"
 import { PLAN_EDGE_TYPE_VALUES } from "../shared/plan-edge-types.js"
-import type { PlanNodeDefinitionUpdate, PlanNodeUpdate } from "../shared/plan-graph.js"
+import type { PlanNodeDefinitionUpdate, PlanNodeInIteration, PlanNodeUpdate } from "../shared/plan-graph.js"
 import lastAiGenerationEventManager from "./ai/last-ai-generation-event-manager.js"
 import { loreEventManager } from "./lore/lore-event-manager.js"
 import {
@@ -131,9 +131,20 @@ export const appRouter = t.router({
       findStatesAtPath: t.procedure
         .input(z.string())
         .query(({ input }) => new PlanNodeService().findStatesAtPath(input)),
-      getById: t.procedure.input(nodeAtPath).query(({ input }) => new PlanNodeService().getRow(input.id, input.path)),
+      getById: t.procedure.input(nodeAtPath).query(({ input }): PlanNodeInIteration => {
+        const service = new PlanNodeService()
+        return { ...service.getRow(input.id, input.path), current: service.isCurrentPath(input.id, input.path) }
+      }),
       patch: t.procedure
-        .input((v) => v as { id: number; path: string; manual: boolean; data: PlanNodeUpdate; rev?: string })
+        .input(
+          z.object({
+            id: z.int(),
+            path: z.string(),
+            manual: z.boolean(),
+            data: z.record(z.string(), z.unknown()).transform((data) => data as PlanNodeUpdate),
+            rev: z.string().optional(),
+          }),
+        )
         .mutation(({ input }) =>
           new PlanNodeService().patch(input.id, input.path, input.manual, input.data, input.rev),
         ),

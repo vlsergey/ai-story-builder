@@ -14,12 +14,13 @@ export class LoreProcessor implements NodeProcessor<LoreSettings> {
     return row.content ?? ""
   }
 
+  /** Lore is written by the user: a run leaves its text, and its summary, as they are. */
   async regenerate(
     _service: PlanNodeService,
     _context: RegenerationNodeContext,
-    _row: PlanNodeRow,
+    row: PlanNodeRow,
     _settings: LoreSettings,
   ): Promise<PlanNodeStateUpdate | null> {
-    return null
+    return { summary: row.summary }
   }
 }

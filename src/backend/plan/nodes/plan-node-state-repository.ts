@@ -12,6 +12,19 @@ export interface PlanNodeStateRecord extends PlanNodeState {
 const newRev = () => randomUUID().slice(0, 13)
 
 /**
+ * The columns and values of a new row. A row created without a status is
+ * pending — OUTDATED — not the table's EMPTY: a note written into an iteration
+ * that never ran must not make it look answered.
+ */
+function insertion(nodeId: number, path: NodePath, fields: PlanNodeStateUpdate) {
+  const keys = Object.keys(fields) as (keyof PlanNodeStateUpdate)[]
+  const status = fields.status === undefined ? [["status", "OUTDATED"] as const] : []
+  const columns = ["node_id", "path", ...keys, ...status.map(([k]) => k), "rev"]
+  const values = [nodeId, path, ...keys.map((k) => fields[k]), ...status.map(([, v]) => v), newRev()]
+  return { keys, columns: columns.join(", "), placeholders: columns.map(() => "?").join(", "), values }
+}
+
+/**
  * `plan_node_states`: one row per node and iteration. A missing row means the
  * node has not produced anything there yet — pending work, not an empty answer.
  */
@@ -63,16 +76,15 @@ export class PlanNodeStateRepository {
   /** Writes `fields` at (node, path), creating the row if needed. The row gets a fresh `rev`. */
   upsert(nodeId: number, path: NodePath, fields: PlanNodeStateUpdate): PlanNodeStateRecord {
     return withDbWrite((db) => {
-      const keys = Object.keys(fields) as (keyof PlanNodeStateUpdate)[]
-      const columns = ["node_id", "path", ...keys, "rev"]
+      const { keys, columns, placeholders, values } = insertion(nodeId, path, fields)
       const updates = [...keys, "rev"].map((k) => `${k} = excluded.${k}`).join(", ")
       return db
         .prepare(`
-          INSERT INTO plan_node_states (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})
+          INSERT INTO plan_node_states (${columns}) VALUES (${placeholders})
           ON CONFLICT (node_id, path) DO UPDATE SET ${updates}
           RETURNING *
         `)
-        .get(nodeId, path, ...keys.map((k) => fields[k]), newRev()) as PlanNodeStateRecord
+        .get(...values) as PlanNodeStateRecord
     })
   }
 
@@ -91,13 +103,13 @@ export class PlanNodeStateRepository {
     return withDbWrite((db) => {
       const keys = Object.keys(fields) as (keyof PlanNodeStateUpdate)[]
       if (expectedRev === "") {
-        const columns = ["node_id", "path", ...keys, "rev"]
+        const { columns, placeholders, values } = insertion(nodeId, path, fields)
         const created = db
           .prepare(
-            `INSERT INTO plan_node_states (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})
+            `INSERT INTO plan_node_states (${columns}) VALUES (${placeholders})
              ON CONFLICT (node_id, path) DO NOTHING RETURNING *`,
           )
-          .get(nodeId, path, ...keys.map((k) => fields[k]), newRev()) as PlanNodeStateRecord | undefined
+          .get(...values) as PlanNodeStateRecord | undefined
         return created ?? null
       }
       const assignments = [...keys, "rev"].map((k) => `${k} = ?`).join(", ")
@@ -130,24 +142,38 @@ export class PlanNodeStateRepository {
   }
 
   /**
-   * Deletes the iterations of loop `containerId` at `containerPath` from index
-   * `from` on, with everything nested in them: the elements that vanished when
-   * its list got shorter.
+   * Deletes the iterations of loop `containerId` at `containerPath` whose key
+   * is `vanished`, with everything nested in them: the elements that are no
+   * longer in its list.
    */
-  deleteIterationsFrom(containerId: number, containerPath: NodePath, from: number): number {
+  deleteIterationsWhere(containerId: number, containerPath: NodePath, vanished: (key: string) => boolean): number {
     return withDbTransaction((db) => {
       const prefix = childPath(containerPath, containerId, "")
       const rows = db
         .prepare("SELECT DISTINCT path FROM plan_node_states WHERE path >= ? AND path < ?")
-        .all(prefix, `${prefix}￿`) as { path: string }[]
-      const vanished = new Set<string>()
-      for (const { path } of rows) {
-        const key = path.slice(prefix.length).split("/")[0]
-        if (Number(key) >= from) vanished.add(childPath(containerPath, containerId, key))
-      }
+        .all(prefix, `${prefix}\uffff`) as { path: string }[]
+      const keys = new Set(rows.map(({ path }) => path.slice(prefix.length).split("/")[0]))
       let deleted = 0
-      for (const iteration of vanished) deleted += this.deleteAtOrBelow(iteration)
+      for (const key of keys) {
+        if (vanished(key)) deleted += this.deleteAtOrBelow(childPath(containerPath, containerId, key))
+      }
       return deleted
+    })
+  }
+
+  /**
+   * Moves an iteration of loop `containerId` at `containerPath` from key `from`
+   * to key `to`, with everything nested in it, as a parallel loop does when its
+   * keys grow. Every moved row gets a new revision.
+   */
+  renameIteration(containerId: number, containerPath: NodePath, from: string, to: string): number {
+    return withDbWrite((db) => {
+      const oldPath = childPath(containerPath, containerId, from)
+      const newPath = childPath(containerPath, containerId, to)
+      const { sql, params } = atOrBelowSql("path", oldPath)
+      return db
+        .prepare(`UPDATE plan_node_states SET path = ? || substr(path, ?), rev = ? WHERE ${sql}`)
+        .run(newPath, oldPath.length + 1, newRev(), ...params).changes
     })
   }
 }

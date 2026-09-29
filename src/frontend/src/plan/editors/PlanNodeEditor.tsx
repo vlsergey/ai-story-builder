@@ -5,12 +5,12 @@ import getDifference from "@shared/getDifference.js"
 import type { PlanNodeRow } from "@shared/plan-graph"
 import type { NodePath } from "@shared/plan-node-path"
 import { CircleAlertIcon } from "lucide-react"
-import { type FC, useCallback, useEffect, useMemo, useState } from "react"
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { useTranslation } from "react-i18next"
 import { useDebouncedCallback } from "use-debounce"
 import { trpc } from "../../ipcClient"
-import { useIterationSelection } from "../iteration-selection"
+import { iterationLabel, useIterationSelection } from "../iteration-selection"
 import { NodeTypeEditors } from "./NodeTypeEditors"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 
@@ -18,22 +18,36 @@ export interface PlanNodeEditorProps {
   nodeId: number
   /** The iteration the editor is bound to; without one, the iteration on display when it opened. */
   path?: NodePath
-  panelApi: { setTitle: (title: string) => void }
+  panelApi: {
+    setTitle: (title: string) => void
+    updateParameters?: (params: Record<string, unknown>) => void
+  }
 }
 
 export default function PlanNodeEditor({ nodeId, path: boundPath, panelApi }: PlanNodeEditorProps) {
-  const { displayPath } = useIterationSelection()
-  const [path] = useState(() => boundPath ?? displayPath(nodeId))
-  const planNodeQuery = trpc.plan.nodes.getById.useQuery({ id: nodeId, path })
+  const { ready, displayPath } = useIterationSelection()
+  // A tab from a layout saved before editors had a path opens at the
+  // iteration on display, and remembers it from then on.
+  const [resolvedPath, setResolvedPath] = useState<NodePath | undefined>(boundPath)
+  useEffect(() => {
+    if (resolvedPath === undefined && ready) setResolvedPath(displayPath(nodeId))
+  }, [resolvedPath, ready, displayPath, nodeId])
+  const path = boundPath ?? resolvedPath
+  useEffect(() => {
+    if (boundPath === undefined && path !== undefined) panelApi.updateParameters?.({ nodeId, path })
+  }, [boundPath, path, nodeId, panelApi])
+
+  const planNodeQuery = trpc.plan.nodes.getById.useQuery(
+    { id: nodeId, path: path ?? "" },
+    { enabled: path !== undefined },
+  )
   const node = planNodeQuery.data
 
   useEffect(() => {
-    if (node?.title) {
-      panelApi.setTitle(node?.title || "")
-    }
-  }, [panelApi, node?.title])
+    if (node?.title) panelApi.setTitle(path ? `${node.title} ${iterationLabel(path)}` : node.title)
+  }, [panelApi, node?.title, path])
 
-  if (planNodeQuery.isLoading) {
+  if (path === undefined || planNodeQuery.isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <span className="text-muted-foreground text-sm">Loading...</span>
@@ -60,10 +74,28 @@ export default function PlanNodeEditor({ nodeId, path: boundPath, panelApi }: Pl
 
   return (
     <div className="h-full overflow-auto">
+      {!node.current && <IterationGone />}
       <ErrorBoundary FallbackComponent={ErrorFallback}>
-        <PlanNodeEditorWrapper Editor={NodeTypeEditor} initialValue={node} serverValue={node} />
+        <PlanNodeEditorWrapper
+          Editor={NodeTypeEditor}
+          initialValue={node}
+          serverValue={node}
+          iterationGone={!node.current}
+        />
       </ErrorBoundary>
     </div>
+  )
+}
+
+/** The loop no longer has the iteration this tab was opened on: nothing here can be saved. */
+function IterationGone() {
+  const { t } = useTranslation()
+  return (
+    <Alert variant="destructive">
+      <CircleAlertIcon />
+      <AlertTitle>{t("PlanNodeEditor.iterationGone.title")}</AlertTitle>
+      <AlertDescription>{t("PlanNodeEditor.iterationGone.message")}</AlertDescription>
+    </Alert>
   )
 }
 
@@ -73,11 +105,12 @@ interface PlanNodeEditorWrapperProps {
   initialValue: PlanNodeRow
   /** The row as the server has it now; adopted whenever the editor holds no unsaved edits. */
   serverValue: PlanNodeRow
+  iterationGone: boolean
   Editor: FC<TypedPlanNodeEditorProps>
 }
 
 /** Fields that belong to the iteration rather than to the node: a save of them is checked against the revision. */
-const STATE_FIELDS = new Set([
+const STATE_FIELDS = new Set<string>([
   "content",
   "summary",
   "status",
@@ -86,7 +119,7 @@ const STATE_FIELDS = new Set([
   "ai_improve_instruction",
 ])
 
-const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue }: PlanNodeEditorWrapperProps) => {
+const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue, iterationGone }: PlanNodeEditorWrapperProps) => {
   const nodeId = initialValue.id
   const path = initialValue.path
   const [firstInitialValue] = useState<PlanNodeRow>(initialValue)
@@ -100,16 +133,42 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue }: PlanNodeEd
 
   const patchMutation = trpc.plan.nodes.patch.useMutation().mutateAsync
 
-  // A regeneration, a demotion or another editor wrote the row: show it,
-  // unless the user is in the middle of an edit.
+  /** Records a row the server wrote, here and in the cache: the cache must not bring back an older row. */
+  const remember = useCallback(
+    (row: PlanNodeRow) => {
+      setLastSaved(row)
+      utils.plan.nodes.getById.setData({ id: nodeId, path }, (cached) => (cached ? { ...cached, ...row } : cached))
+    },
+    [nodeId, path, utils],
+  )
+  /** Shows a row the server wrote in place of what the editor holds. */
+  const adopt = useCallback(
+    (row: PlanNodeRow) => {
+      remember(row)
+      setValue(row)
+    },
+    [remember],
+  )
+
+  // A regeneration, a demotion or another editor wrote the row — its state or
+  // its definition: show it, unless the user is in the middle of an edit.
+  const seen = useRef(serverValue)
   useEffect(() => {
-    if (status !== "SAVED" || serverValue.rev === lastSaved.rev) return
-    setLastSaved(serverValue)
-    setValue(serverValue)
-  }, [serverValue, status, lastSaved.rev])
+    if (serverValue === seen.current) return
+    seen.current = serverValue
+    if (status !== "SAVED") return
+    const { current: _, ...server } = serverValue as PlanNodeRow & { current?: boolean }
+    if (Object.keys(getDifference(lastSaved, server)).length === 0) return
+    setLastSaved(server)
+    setValue(server)
+  }, [serverValue, status, lastSaved])
 
   const saveImpl = useCallback(
     async (manual: boolean, valueToSave: PlanNodeRow) => {
+      if (iterationGone) {
+        setStatus("ERROR")
+        return
+      }
       setStatus("SAVING")
 
       // What the user changed, relative to what the editor last had from the server.
@@ -119,15 +178,22 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue }: PlanNodeEd
         setStatus("SAVED")
         return
       }
-      const touchesState = Object.keys(diff).some((key) => STATE_FIELDS.has(key))
+      const stateKeys = Object.keys(diff).filter((key) => STATE_FIELDS.has(key)) as (keyof PlanNodeRow)[]
 
-      let rev: string | undefined = touchesState ? lastSaved.rev : undefined
+      let base = lastSaved
       for (let attempt = 0; ; attempt++) {
         try {
-          const newValue = await patchMutation({ id: nodeId, path, manual, data: diff, rev })
-          // Check on-backend changes (such as status and counts) and apply them to value
+          const newValue = await patchMutation({
+            id: nodeId,
+            path,
+            manual,
+            data: diff,
+            rev: stateKeys.length > 0 ? base.rev : undefined,
+          })
+          // Check on-backend changes (such as status and counts) and apply them
+          // to value, keeping whatever the user typed while this was saving.
           const diffBetweenLastSavedAndCurrent = getDifference(lastSaved, newValue)
-          setLastSaved(newValue)
+          remember(newValue)
           setValue((value) => ({ ...value, ...diffBetweenLastSavedAndCurrent }))
           setStatus("SAVED")
           return
@@ -138,20 +204,24 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue }: PlanNodeEd
             return
           }
         }
-        // Something wrote this iteration since the editor read it. If its text
-        // is still the one the editor saw, only statuses moved: save on top.
-        // Otherwise the user decides whose text stays.
-        const fresh = await utils.plan.nodes.getById.fetch({ id: nodeId, path })
-        if (fresh.content !== lastSaved.content && !(await confirm("PlanNodeEditor.conflict.message"))) {
-          setLastSaved(fresh)
-          setValue(fresh)
-          setStatus("SAVED")
-          return
+        // Something wrote this iteration since the editor read it. If it left
+        // alone what the user changed, only statuses moved: save on top.
+        // Otherwise the user decides whose version stays.
+        let fresh = await utils.plan.nodes.getById.fetch({ id: nodeId, path })
+        const collides = stateKeys.some((key) => fresh[key] !== base[key])
+        if (collides) {
+          if (!(await confirm("PlanNodeEditor.conflict.message"))) {
+            adopt(fresh)
+            setStatus("SAVED")
+            return
+          }
+          // The dialog took a while: save over what is there now.
+          fresh = await utils.plan.nodes.getById.fetch({ id: nodeId, path })
         }
-        rev = fresh.rev
+        base = fresh
       }
     },
-    [alert, confirm, lastSaved, nodeId, path, t, utils],
+    [adopt, alert, confirm, iterationGone, lastSaved, nodeId, path, remember, t, utils],
   )
 
   const debounceSave = useDebouncedCallback(saveImpl, 1000)
@@ -165,18 +235,13 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue }: PlanNodeEd
     [debounceSave],
   )
 
-  const handleExternalUpdate = useCallback((value: PlanNodeRow) => {
-    setLastSaved(value)
-    setValue(value)
-  }, [])
+  const handleExternalUpdate = useCallback((value: PlanNodeRow) => adopt(value), [adopt])
 
   const handleSave = useCallback(
     async (value: PlanNodeRow) => {
-      setStatus("SAVING")
       setValue(value)
       debounceSave.cancel()
       await saveImpl(true, value)
-      setStatus("SAVED")
     },
     [debounceSave, saveImpl],
   )
@@ -197,20 +262,18 @@ const PlanNodeEditorWrapper = ({ Editor, initialValue, serverValue }: PlanNodeEd
   const handleRegenerate = useCallback(async () => {
     try {
       await handleSave(value)
-      const result = await regenerateMutation.mutateAsync({ nodeId: value.id, path: value.path })
-      setLastSaved(result)
-      setValue(result)
+      adopt(await regenerateMutation.mutateAsync({ nodeId: value.id, path: value.path }))
     } catch (e) {
       console.error(e)
       alert(t("PlanNodeEditor.regenerationProblem.message", { error: `${e}` }))
     }
-  }, [alert, handleSave, t, value])
+  }, [adopt, alert, handleSave, t, value])
 
   return (
     <Editor
       dbValue={lastSaved}
       // While the iteration is being written, the text is the model's to write.
-      disabled={regenerateMutation.isPending || lastSaved.status === "GENERATING"}
+      disabled={iterationGone || regenerateMutation.isPending || lastSaved.status === "GENERATING"}
       initialValue={firstInitialValue}
       value={value}
       nodeTypeSettings={nodeTypeSettings}

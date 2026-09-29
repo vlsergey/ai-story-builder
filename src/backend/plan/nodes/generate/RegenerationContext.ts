@@ -37,5 +37,16 @@ export interface RegenerationCycleContext {
     zeroBasedIterationIndex: number,
     block: (context: RegenerationContainerContext) => Promise<T>,
   ): Promise<T>
+  /**
+   * Runs iterations of a loop's children side by side, at most `concurrency`
+   * at once, one per key. Resolves when every started iteration has settled;
+   * after the first failure no new iteration starts, and the failure is
+   * rethrown once the running ones are done.
+   */
+  asContainers<T>(
+    keys: string[],
+    concurrency: number,
+    block: (context: RegenerationContainerContext) => Promise<T>,
+  ): Promise<T[]>
   asNode<T>(zeroBasedIterationIndex: number, block: (context: RegenerationNodeContext) => Promise<T>): Promise<T>
 }

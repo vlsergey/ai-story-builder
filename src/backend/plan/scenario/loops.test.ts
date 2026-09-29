@@ -120,6 +120,65 @@ describe("a loop", () => {
     expect(s.status("Профиль", 1)).toBe("ERROR")
   })
 
+  it("lets the user type into an iteration it reached during its very first run", async () => {
+    const s = characters(["Аня", "Боря"])
+    s.engine.on(async (call) => {
+      if (call.node === "Профиль" && call.userPrompt.includes("Боря")) await s.type("Профиль", "Аня, от руки.")
+      return undefined
+    })
+
+    await s.run()
+
+    expect(s.content("Профиль", 0)).toBe("Аня, от руки.")
+    expect(s.status("Профиль", 0)).toBe("MANUAL")
+  })
+
+  it("stopped while its list got shorter, hands on only the remaining elements", async () => {
+    const s = characters(["Аня", "Боря", "Вера"])
+    await s.run()
+    s.engine.on((call) => {
+      if (call.node === "Профиль") s.stop()
+      return undefined
+    })
+
+    await recast(s, ["Вика", "Боря"])
+    await s.run().catch(() => {})
+
+    expect(s.loopResults("Цикл по персонажам")).toHaveLength(2)
+  })
+
+  it("tries again an element whose profile came back empty", async () => {
+    const s = characters(["Аня", "Боря"])
+    let empty = true
+    s.engine.on((call) => (empty && call.node === "Профиль" && call.userPrompt.includes("Боря") ? "" : undefined))
+    await s.run()
+    expect(s.status("Профиль", 1)).toBe("EMPTY")
+
+    empty = false
+    await s.run()
+
+    expect(profileCalls(s).map((c) => c.userPrompt.includes("Боря"))).toEqual([true])
+    expect(s.status("Профиль", 1)).toBe("GENERATED")
+    await s.run()
+    expect(s.calls()).toEqual([])
+  })
+
+  it("with summaries on, summarizes what its iterations wrote, not the loop or an output that did not change", async () => {
+    const s = characters(["Аня", "Боря"], { autoSummary: true })
+    await s.run()
+    expect(s.calls("summary").map((c) => c.node)).not.toContain("Цикл по персонажам")
+
+    await s.setPrompt("Профиль", "Профиль героя:\n{{[Персонаж]}}")
+    s.engine.on((call) => (call.node === "Профиль" ? "тот же профиль" : undefined))
+    await s.run()
+    await s.setPrompt("Профиль", "Профиль героини:\n{{[Персонаж]}}")
+    await s.run()
+
+    const summarized = s.calls("summary").map((c) => c.node)
+    expect(summarized).not.toContain("Цикл по персонажам")
+    expect(summarized, "the output's text did not change").not.toContain("Выход")
+  })
+
   it("counts the words of every element, not only the one on display", async () => {
     const s = characters(["Аня Иванова", "Боря"])
 

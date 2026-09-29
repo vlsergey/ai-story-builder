@@ -7,6 +7,7 @@ import type {
 } from "../../shared/project-template.js"
 import { makeErrorWithStatus } from "../lib/make-errors.js"
 import { PlanEdgeRepository } from "../plan/edges/plan-edge-repository.js"
+import { usesInput } from "../plan/nodes/input-relevance.js"
 import { PlanNodeRepository } from "../plan/nodes/plan-node-repository.js"
 import { PlanNodeService } from "../plan/nodes/plan-node-service.js"
 import { SettingsRepository } from "../settings/settings-repository.js"
@@ -420,6 +421,8 @@ export async function applyTemplateUpdate(
       to_node_id: tgt.id,
       type: e.type as any,
     })
+    // A new input the prompt reads: what the node produced did not have it.
+    if (usesInput(tgt, src)) nodeService.demoteEverywhere(tgt.id)
   }
 
   // 4. Optionally drop edges the template no longer declares. The target

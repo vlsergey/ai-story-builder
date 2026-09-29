@@ -54,15 +54,37 @@ describe("PlanNodeStateRepository", () => {
     expect(paths(states.findAtOrBelow(""))).toHaveLength(6)
   })
 
-  it("deletes the iterations of a loop from an index on, with everything nested in them", () => {
+  it("deletes the iterations of a loop that are gone, with everything nested in them", () => {
     const states = new PlanNodeStateRepository()
     const id = node("A")
     const all = ["", "27:0", "27:1", "27:1/40:3", "27:2", "27:10", "2:5", "3:0/27:4"]
     for (const path of all) states.upsert(id, path, {})
 
-    states.deleteIterationsFrom(27, "", 2)
+    states.deleteIterationsWhere(27, "", (key) => Number(key) >= 2)
 
     expect(paths(states.findAll())).toEqual(["", "27:0", "27:1", "27:1/40:3", "2:5", "3:0/27:4"])
+  })
+
+  it("moves an iteration to a new key, with everything nested in it, and leaves a longer key alone", () => {
+    const states = new PlanNodeStateRepository()
+    const id = node("A")
+    const before = states.upsert(id, "27:abc123/40:0", { content: "nested" })
+    for (const path of ["27:abc123", "27:abc1234", "27:def456"]) states.upsert(id, path, {})
+
+    states.renameIteration(27, "", "abc123", "abc123f")
+
+    expect(paths(states.findAll())).toEqual(["27:abc1234", "27:abc123f", "27:abc123f/40:0", "27:def456"])
+    const moved = states.find(id, "27:abc123f/40:0")
+    expect(moved?.content).toBe("nested")
+    expect(moved?.rev, "a moved row is a new row to anyone holding the old one").not.toBe(before.rev)
+  })
+
+  it("creates a row without a status as pending, not as answered", () => {
+    const states = new PlanNodeStateRepository()
+    const id = node("A")
+
+    expect(states.upsert(id, "5:0", { summary: "note" }).status).toBe("OUTDATED")
+    expect(states.updateIfUnchanged(id, "5:1", { summary: "note" }, "")?.status).toBe("OUTDATED")
   })
 
   it("demotes a node's rows in every iteration, only from the given statuses", () => {

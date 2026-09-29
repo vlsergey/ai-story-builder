@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs"
 import type { Observable } from "@trpc/server/observable"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import { loopLength } from "../../../shared/for-each-plan-node.js"
+import { iterationKeys, LOOP_TYPES, loopsAround as loopsAroundIn } from "../../../shared/loop-iterations.js"
 import {
   type EdgeTypeToOutputTypeMap,
   getNodeTypeDefinition,
@@ -50,6 +50,7 @@ import { FormatProcessor } from "./graph/format-processor.js"
 import { LoreProcessor } from "./graph/lore-processor.js"
 import { MergeProcessor } from "./graph/merge-processor.js"
 import type { NodeProcessor } from "./graph/node-processor.js"
+import { ParallelProcessor } from "./graph/parallel-processor.js"
 import { ScriptProcessor } from "./graph/script-processor.js"
 import { mergeNodeSettings } from "./graph/settings-helper.js"
 import { SplitProcessor } from "./graph/split-processor.js"
@@ -73,10 +74,8 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   merge: new MergeProcessor(),
   script: new ScriptProcessor(),
   format: new FormatProcessor(),
+  parallel: new ParallelProcessor(),
 }
-
-/** Node types that hold iterations: their children have one state per iteration. */
-export const LOOP_TYPES: ReadonlySet<PlanNodeType> = new Set(["for-each"])
 
 /**
  * Statuses a changed input demotes. MANUAL is the user's own text; OUTDATED
@@ -184,14 +183,7 @@ export class PlanNodeService {
   loopsAround(nodeId: number): number[] {
     const cached = this.loopsCache.get(nodeId)
     if (cached) return cached
-    const loops: number[] = []
-    let parentId = this.repo.findById(nodeId)?.parent_id ?? null
-    while (parentId !== null) {
-      const parent = this.repo.findById(parentId)
-      if (!parent) break
-      if (LOOP_TYPES.has(parent.type)) loops.unshift(parent.id)
-      parentId = parent.parent_id
-    }
+    const loops = loopsAroundIn(nodeId, (id) => this.repo.findById(id))
     this.loopsCache.set(nodeId, loops)
     return loops
   }
@@ -219,13 +211,17 @@ export class PlanNodeService {
   checkEdge(sourceId: number, consumerId: number): void {
     const sourceLoops = this.loopsAround(sourceId)
     const consumerLoops = this.loopsAround(consumerId)
+    const title = (id: number) => this.repo.findById(id)?.title
     if (sourceLoops.some((loop, i) => consumerLoops[i] !== loop)) {
-      const source = this.repo.findById(sourceId)?.title
-      const consumer = this.repo.findById(consumerId)?.title
       throw makeErrorWithStatus(
-        `«${consumer}» reads «${source}» from inside a loop it is not in; move the edge through the loop's output`,
+        `«${title(consumerId)}» reads «${title(sourceId)}» from inside a loop it is not in; move the edge through the loop's output`,
         400,
       )
+    }
+    // A loop hands on its output once all its iterations are done; an
+    // iteration cannot wait for that.
+    if (consumerLoops.includes(sourceId)) {
+      throw makeErrorWithStatus(`«${title(consumerId)}» is inside the loop «${title(sourceId)}» it reads`, 400)
     }
   }
 
@@ -235,19 +231,30 @@ export class PlanNodeService {
    * editor still open on an iteration that vanished must not write it back.
    */
   checkPath(nodeId: number, path: NodePath): void {
-    const loops = this.loopsAround(nodeId)
-    const segments = parsePath(path)
-    const current =
-      segments.length === loops.length &&
-      segments.every(
-        (segment, depth) =>
-          segment.containerId === loops[depth] &&
-          Number(segment.key) < loopLength(this.states.find(segment.containerId, truncatePath(path, depth))?.content),
-      )
-    if (!current) {
+    if (!this.isCurrentPath(nodeId, path)) {
       const title = this.repo.findById(nodeId)?.title
-      throw makeErrorWithStatus(`«${title}» has no iteration "${path}" any more`, 404)
+      throw makeErrorWithStatus(`«${title}» has no iteration "${path}"`, 404)
     }
+  }
+
+  /** Whether `path` names an iteration the node's loops have now, in the form they name it. */
+  isCurrentPath(nodeId: number, path: NodePath): boolean {
+    const loops = this.loopsAround(nodeId)
+    let segments: ReturnType<typeof parsePath>
+    try {
+      segments = parsePath(path)
+    } catch {
+      return false
+    }
+    return (
+      segments.length === loops.length &&
+      segments.every((segment, depth) => {
+        const loop = this.repo.findById(loops[depth])
+        if (!loop || segment.containerId !== loop.id) return false
+        const content = this.states.find(loop.id, truncatePath(path, depth))?.content
+        return iterationKeys(loop.type, content).includes(segment.key)
+      })
+    )
   }
 
   // ─── Rows ────────────────────────────────────────────────────────────────────
@@ -259,11 +266,11 @@ export class PlanNodeService {
 
   /** What the graph shows of every node that has produced something at exactly `path`. */
   findStatesAtPath(path: NodePath): PlanNodeStateBrief[] {
-    const loops = new Set(
+    const loops = new Map(
       this.repo
         .findAll()
         .filter((n) => LOOP_TYPES.has(n.type))
-        .map((n) => n.id),
+        .map((n) => [n.id, n.type]),
     )
     return this.states.findAtPath(path).map((state) => ({
       node_id: state.node_id,
@@ -275,7 +282,7 @@ export class PlanNodeService {
       byte_count: state.byte_count,
       in_review: state.in_review,
       rev: state.rev,
-      ...(loops.has(state.node_id) ? { iterations: loopLength(state.content) } : {}),
+      ...(loops.has(state.node_id) ? { iterationKeys: iterationKeys(loops.get(state.node_id)!, state.content) } : {}),
     }))
   }
 
@@ -335,11 +342,19 @@ export class PlanNodeService {
   ): Promise<PlanNodeRow> {
     const definition = pick(data, PLAN_NODE_DEFINITION_KEYS)
     const state = pick(data, PLAN_NODE_STATE_KEYS)
-    if (Object.keys(state).length > 0) this.checkPath(nodeId, path)
-    if (Object.keys(definition).length > 0) await this.patchDefinition(nodeId, definition)
-    if (Object.keys(state).length > 0 && !(await this.patchState(nodeId, path, manual, state, expectedRev))) {
-      throw makeErrorWithStatus("The node changed since the editor read it", 409)
+    if (Object.keys(state).length > 0) {
+      // After a move the path means nothing: the move deletes the node's state.
+      if (definition.parent_id !== undefined) {
+        throw makeErrorWithStatus("Move a node and edit what it produced in separate saves", 400)
+      }
+      this.checkPath(nodeId, path)
+      // The state goes first: a new prompt demotes the node, and must not make
+      // the text typed along with it look like a conflict.
+      if (!(await this.patchState(nodeId, path, manual, state, expectedRev))) {
+        throw makeErrorWithStatus("The node changed since the editor read it", 409)
+      }
     }
+    if (Object.keys(definition).length > 0) await this.patchDefinition(nodeId, definition)
     return this.getRow(nodeId, path)
   }
 
@@ -570,7 +585,7 @@ export class PlanNodeService {
 
     const id = withDbTransaction(() => {
       const id = this.repo.insert({ ...pick(data, PLAN_NODE_DEFINITION_KEYS), title: data.title, type })
-      if (type === "for-each") this.createForEachInternalNodes(id, data.x ?? 0, data.y ?? 0)
+      if (type && LOOP_TYPES.has(type)) this.createForEachInternalNodes(id, data.x ?? 0, data.y ?? 0)
       this.writeInitialState(id, data.content ?? null, data.summary ?? null)
       return id
     })
@@ -620,14 +635,24 @@ export class PlanNodeService {
       y: parentY + 50,
       node_type_settings: JSON.stringify({}),
     })
-    console.info(`Created internal nodes for for-each ${parentId}: input ${inputId}, output ${outputId}`)
+    console.info(`Created internal nodes for loop ${parentId}: input ${inputId}, output ${outputId}`)
   }
 
   delete(id: number) {
     console.log(`Deleting node with id ${id}`)
     if (!this.repo.findById(id)) throw makeErrorWithStatus("node not found", 404)
     const subtree = this.subtreeIds(id)
-    for (const nodeId of subtree) new PlanEdgeRepository().deleteByNodeId(nodeId)
+    // What read a deleted node was produced from an input it no longer has.
+    const inside = new Set(subtree)
+    const edges = new PlanEdgeRepository()
+    for (const nodeId of subtree) {
+      const source = this.repo.findById(nodeId)
+      for (const edge of edges.findByFromNodeId(nodeId)) {
+        const reader = inside.has(edge.to_node_id) ? undefined : this.repo.findById(edge.to_node_id)
+        if (source && reader && usesInput(reader, source)) this.demoteEverywhere(reader.id)
+      }
+    }
+    for (const nodeId of subtree) edges.deleteByNodeId(nodeId)
     this.states.deleteAtOrBelow(ROOT_PATH, subtree)
     this.repo.delete(id)
     this.loopsCache.clear()
@@ -704,7 +729,10 @@ export class PlanNodeService {
    * dropped and the row keeps the newer write.
    */
   private async landRegeneration(started: PlanNodeRow, outcome: PlanNodeStateUpdate): Promise<PlanNodeRow> {
-    const landed = await this.patchState(started.id, started.path, false, outcome, started.rev)
+    // A summary or a note written meanwhile leaves the row GENERATING: what the
+    // run computed still holds. Anything that changes what it would compute —
+    // a demotion, the user's text — moves the status too.
+    const landed = await this.landOver(started, outcome, (current) => current.status === "GENERATING")
     if (landed) return landed
     console.warn(
       `[PlanNodeService] node ${started.id} at "${started.path}" changed while it was regenerated; result dropped`,
@@ -713,6 +741,48 @@ export class PlanNodeService {
       throw makeErrorWithStatus(`Plan node ${started.id} was deleted while it was being regenerated`, 404)
     }
     return this.getRow(started.id, started.path)
+  }
+
+  /**
+   * Writes `update` over the row the caller read as `started`. If something
+   * wrote the row since, the update lands on the newer row only while
+   * `stillHolds(current)` says it is still valid there; returns null when it
+   * is not, or when the row is gone.
+   */
+  private async landOver(
+    started: PlanNodeRow,
+    update: PlanNodeStateUpdate,
+    stillHolds: (current: PlanNodeRow) => boolean,
+  ): Promise<PlanNodeRow | null> {
+    let rev = started.rev
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const landed = await this.patchState(started.id, started.path, false, update, rev)
+      if (landed) return landed
+      if (!this.repo.findById(started.id)) return null
+      const current = this.getRow(started.id, started.path)
+      if (!hasState(current) || !stillHolds(current)) return null
+      rev = current.rev
+    }
+    return null
+  }
+
+  /**
+   * A running node writes its own row before its run ends — a loop recording
+   * the iterations it is about to run. The write lands only if nothing else
+   * wrote the row since the run started, and the run's own result will then
+   * land over it. Returns false when the row changed: the run is moot.
+   */
+  async writeWhileRunning(running: PlanNodeRow, update: PlanNodeStateUpdate): Promise<boolean> {
+    const landed = await this.patchState(
+      running.id,
+      running.path,
+      false,
+      { ...update, status: "GENERATING" },
+      running.rev,
+    )
+    if (!landed) return false
+    Object.assign(running, landed)
+    return true
   }
 
   // ─── Editor actions ──────────────────────────────────────────────────────────
@@ -738,21 +808,24 @@ export class PlanNodeService {
     this.checkPath(id, path)
     const before = this.getRow(id, path)
     const regenerated = await regenerate({ nodeId: id, path })
-    return (await this.patchState(id, path, false, {
-      in_review: (regenerated.content?.trim()?.length || 0) > 0 ? 1 : 0,
-      review_base_content: before.content,
-    }))!
+    const reviewed = await this.landOver(
+      regenerated,
+      { in_review: (regenerated.content?.trim()?.length || 0) > 0 ? 1 : 0, review_base_content: before.content },
+      (current) => current.content === regenerated.content,
+    )
+    return reviewed ?? this.getRow(id, path)
   }
 
   async aiGenerateSummary(nodeId: number, path: NodePath): Promise<PlanNodeRow> {
     this.checkPath(nodeId, path)
     const node = this.getRow(nodeId, path)
     const output = this.getProcessor(node.type).getOutput(this, node)
-    return (await this.patchState(nodeId, path, false, {
-      summary: output
-        ? await generateSummary(new AbortController().signal, ["plan-node-summary", `${nodeId}`], output)
-        : "",
-    }))!
+    const summary = output
+      ? await generateSummary(new AbortController().signal, ["plan-node-summary", `${nodeId}`], output)
+      : ""
+    // A summary of a text that changed meanwhile describes the old text.
+    const landed = await this.landOver(node, { summary }, (current) => current.content === node.content)
+    return landed ?? this.getRow(nodeId, path)
   }
 
   aiImprove(nodeId: number, path: NodePath): Observable<DataOrEventEvent<PlanNodeRow, ResponseStreamEvent>, unknown> {
@@ -767,17 +840,15 @@ export class PlanNodeService {
       const newNode =
         node.status === "GENERATING"
           ? null
-          : await this.patchState(
-              nodeId,
-              path,
-              true,
+          : await this.landOver(
+              node,
               {
                 status: "MANUAL",
                 content: newContent,
                 in_review: (node.content?.trim?.()?.length || 0) > 0 ? 1 : 0,
                 review_base_content: node.content,
               },
-              node.rev,
+              (current) => current.content === node.content && current.status !== "GENERATING",
             )
       if (!newNode) {
         throw makeErrorWithStatus("The node changed while it was being improved; the improvement was discarded", 409)

@@ -1,8 +1,10 @@
 import type { AiThinkingPanelHandle } from "@/ai/AiThinkingPanel"
 import { trpc } from "@/ipcClient"
+import useAlert from "@/native/useAlert"
 import NodeEditor, { type EditorMode } from "@/nodes/NodeEditor"
 import type { PlanNodeRow } from "@shared/plan-graph"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import type TypedPlanNodeEditorProps from "./TypedPlanNodeEditorProps"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
 
@@ -54,6 +56,7 @@ function writePrompts(
 }
 
 export default function TextNodeEditor({
+  disabled,
   initialValue,
   value,
   onSave: save,
@@ -61,6 +64,8 @@ export default function TextNodeEditor({
   onExternalUpdate,
   status,
 }: TypedPlanNodeEditorProps) {
+  const { t } = useTranslation()
+  const alert = useAlert()
   const nodeId = initialValue.id
   // The iteration this editor is bound to; every action acts there.
   const path = initialValue.path
@@ -88,7 +93,11 @@ export default function TextNodeEditor({
   }, [onChange, nodeId, path, save, value])
 
   const aiThinkinPanelRef = useRef<AiThinkingPanelHandle>(null)
+  /** The text as the model streams it: shown in place of the content, never saved as it. */
   const [tempContent, setTempContent] = useState<string | null>(null)
+  // A new row landed — the streamed text is now the content, or was dropped.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on every new revision
+  useEffect(() => setTempContent(null), [value.rev])
 
   trpc.plan.nodes.aiGenerate.subscribeToResponseStreamEvents.useSubscription(undefined, {
     onData({ nodeId: eventNodeId, path: eventPath, event }) {
@@ -115,9 +124,11 @@ export default function TextNodeEditor({
       console.error(err)
       aiThinkinPanelRef?.current?.onComplete()
       setTempContent(null)
+      setStatusOverride(null)
       setEditorMode("generate")
+      alert(t("PlanNodeEditor.regenerationProblem.message", { error: `${(err as Error).message ?? err}` }))
     }
-  }, [nodeId, path, onExternalUpdate])
+  }, [alert, nodeId, path, onExternalUpdate, t])
 
   const [improvingStarted, setImprovingStarted] = useState(false)
   trpc.plan.nodes.aiImprove.useSubscription(
@@ -152,6 +163,9 @@ export default function TextNodeEditor({
         console.error(err)
         aiThinkinPanelRef?.current?.onComplete()
         setImprovingStarted(false)
+        setStatusOverride(null)
+        setTempContent(null)
+        alert(t("PlanNodeEditor.improveProblem.message", { error: err.message }))
       },
     },
   )
@@ -175,9 +189,11 @@ export default function TextNodeEditor({
     (edited: EditorValue) => {
       const { ai_user_prompt, ai_system_prompt, ...rest } = edited
       const nextSettings = writePrompts(rest.node_type_settings, ai_user_prompt, ai_system_prompt)
-      onChange({ ...(rest as PlanNodeRow), node_type_settings: nextSettings })
+      // What is on screen while the model streams is its draft, not the content.
+      const content = tempContent !== null ? value.content : rest.content
+      onChange({ ...(rest as PlanNodeRow), content, node_type_settings: nextSettings })
     },
-    [onChange],
+    [onChange, tempContent, value.content],
   )
 
   return (
@@ -190,6 +206,7 @@ export default function TextNodeEditor({
       onImprove={handleImprove}
       onAcceptChanges={handleAcceptChanges}
       onChange={handleEditorChange}
+      readOnly={disabled || tempContent !== null}
       status={statusOverride || status}
       value={editorValue}
     />

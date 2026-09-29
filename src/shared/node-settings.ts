@@ -70,6 +70,12 @@ export interface TextSettings extends LlmCallPrompts {}
 export interface LoreSettings extends LlmCallPrompts {}
 
 export type ForEachSettings = unknown
+
+/** A parallel loop's settings. */
+export interface ParallelSettings {
+  /** How many iterations run at once; the engine's own limit when unset. */
+  concurrency?: number
+}
 export type ForEachInputSettings = unknown
 export type ForEachOutputSettings = unknown
 
@@ -83,6 +89,7 @@ export type NodeTypeSettingsMap = {
   "for-each": ForEachSettings
   "for-each-input": ForEachInputSettings
   "for-each-output": ForEachOutputSettings
+  parallel: ParallelSettings
 }
 
 export type NodeTypeSettings<T extends keyof NodeTypeSettingsMap = keyof NodeTypeSettingsMap> = NodeTypeSettingsMap[T]
@@ -108,6 +115,7 @@ export type NodeTypeSettingsPartialMap = {
   "for-each": ForEachSettingsPartial
   "for-each-input": ForEachInputSettingsPartial
   "for-each-output": ForEachOutputSettingsPartial
+  parallel: Partial<ParallelSettings>
 }
 
 export type NodeTypeSettingsPartial<T extends keyof NodeTypeSettingsPartialMap = keyof NodeTypeSettingsPartialMap> =
@@ -133,6 +141,7 @@ export function getDefaultNodeTypeSettings<T extends keyof NodeTypeSettingsMap>(
     case "lore":
       return {} as NodeTypeSettingsMap[T]
     case "for-each":
+    case "parallel":
       return {} as NodeTypeSettingsMap[T]
     case "for-each-input":
     case "for-each-output":

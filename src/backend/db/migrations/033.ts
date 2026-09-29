@@ -273,7 +273,10 @@ export default function migration(db: Database): void {
       const outputContent = output ? asText(entries[`${output.id}`]?.content) : null
       if (outputContent) phantom = true
     }
-    if (view.live && loop.currentIndex >= loop.length && children.length > 0) {
+    // Children still showing an iteration past the length — a loop that never
+    // ran shows iteration 0 of none, with nothing in it, and is no anomaly.
+    const shownPastLength = children.some((c) => c.content !== null || c.status !== "EMPTY")
+    if (view.live && loop.currentIndex >= loop.length && shownPastLength) {
       warn(`${name(node)} at "${path}": its children show iteration ${loop.currentIndex}, past its length; dropped`)
       if (output?.content) phantom = true
     }
@@ -338,9 +341,13 @@ export default function migration(db: Database): void {
   }
 
   // Loops around each node, outermost first, to check what the new model assumes.
+  // A parent chain that loops back on itself is broken data; it must not hang
+  // the migration, which would keep the project from opening.
   const loopsAround = (id: number): number[] => {
     const loops: number[] = []
-    for (let p = byId.get(id)?.parent_id ?? null; p !== null; p = byId.get(p)?.parent_id ?? null) {
+    const seen = new Set<number>([id])
+    for (let p = byId.get(id)?.parent_id ?? null; p !== null && !seen.has(p); p = byId.get(p)?.parent_id ?? null) {
+      seen.add(p)
       const parent = byId.get(p)
       if (!parent) break
       if (parent.type === "for-each") loops.unshift(parent.id)
@@ -349,7 +356,9 @@ export default function migration(db: Database): void {
   }
   for (const node of nodes) {
     if (loopsAround(node.id).length > 0) continue
-    if (!states.has(key(node.id, ""))) warn(`${name(node)} is outside any loop but has no state; it will be generated`)
+    if (!states.has(key(node.id, ""))) {
+      warn(`${name(node)} has no state: it is outside any loop, or its own ancestor; it will be generated`)
+    }
   }
   // Edges the engine now refuses to resolve: out of a loop past its output, or
   // across sibling loops. They read whichever iteration was mounted.

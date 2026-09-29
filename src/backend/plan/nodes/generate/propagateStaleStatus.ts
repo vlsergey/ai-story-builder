@@ -1,4 +1,4 @@
-import { loopLength } from "../../../../shared/for-each-plan-node.js"
+import { iterationKeys, LOOP_TYPES, loopsAround as loopsAroundIn } from "../../../../shared/loop-iterations.js"
 import type { PlanNodeDefinition, PlanNodeStatus } from "../../../../shared/plan-graph.js"
 import {
   childPath,
@@ -13,7 +13,6 @@ import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
 import { usesInput } from "../input-relevance.js"
 import { planNodeEventManager } from "../plan-node-event-manager.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
-import { LOOP_TYPES } from "../plan-node-service.js"
 import { type PlanNodeStateRecord, PlanNodeStateRepository } from "../plan-node-state-repository.js"
 import { hasRegenerationCriteria } from "./regeneration-criteria.js"
 
@@ -28,6 +27,7 @@ const DETERMINISTIC_TYPES = new Set<PlanNodeDefinition["type"]>([
   "format",
   // A loop is EMPTY only when its list is: over the same list it stays empty.
   "for-each",
+  "parallel",
   "for-each-input",
   "for-each-output",
   "for-each-index",
@@ -71,8 +71,9 @@ const keyOf = (nodeId: number, path: NodePath) => `${nodeId}@${path}`
  *   - forward: ERROR, OUTDATED, pending, and EMPTY — but only a *contagious*
  *     EMPTY, see computeContagiousEmpty. A deterministic node fed by settled
  *     inputs re-runs to the same emptiness, so its EMPTY is an answer.
- *   - needs a visit: ERROR, OUTDATED, pending — not EMPTY: a merge of earlier
- *     iterations is legitimately empty in iteration 0.
+ *   - needs a visit: ERROR, OUTDATED, pending, a contagious EMPTY — not any
+ *     EMPTY: a merge of earlier iterations is legitimately empty in iteration 0.
+ *   - GENERATING, before a run starts, is a run that never finished: pending.
  *   - + MANUAL  when `regenerateManual` is on (user wants their edits redone)
  *   - + GENERATED when `regenerateGenerated` is on (user wants a full re-run)
  *
@@ -82,8 +83,8 @@ const keyOf = (nodeId: number, path: NodePath) => `${nodeId}@${path}`
 export function propagateStaleStatus(
   options: PropagateOptions = { regenerateManual: false, regenerateGenerated: false },
 ): { marked: { nodeId: number; path: NodePath }[] } {
-  const forwardStale = new Set<PlanNodeStatus>(["OUTDATED", "ERROR", "EMPTY"])
-  const visitStale = new Set<PlanNodeStatus>(["OUTDATED", "ERROR"])
+  const forwardStale = new Set<PlanNodeStatus>(["OUTDATED", "ERROR", "EMPTY", "GENERATING"])
+  const visitStale = new Set<PlanNodeStatus>(["OUTDATED", "ERROR", "GENERATING"])
   if (options.regenerateManual) {
     forwardStale.add("MANUAL")
     visitStale.add("MANUAL")
@@ -114,27 +115,27 @@ export function propagateStaleStatus(
   const loopsCache = new Map<number, number[]>()
   const loopsAround = (nodeId: number): number[] => {
     let loops = loopsCache.get(nodeId)
-    if (loops) return loops
-    loops = []
-    for (let p = byId.get(nodeId)?.parent_id ?? null; p !== null; p = byId.get(p)?.parent_id ?? null) {
-      const parent = byId.get(p)
-      if (!parent) break
-      if (LOOP_TYPES.has(parent.type)) loops.unshift(parent.id)
+    if (!loops) {
+      loops = loopsAroundIn(nodeId, (id) => byId.get(id))
+      loopsCache.set(nodeId, loops)
     }
-    loopsCache.set(nodeId, loops)
     return loops
   }
 
   /** The iterations of `loop` at `path` it currently has. */
   const iterationsOf = (loop: PlanNodeDefinition, path: NodePath): NodePath[] =>
-    Array.from({ length: loopLength(stateAt(loop.id, path)?.content) }, (_, i) => childPath(path, loop.id, i))
+    iterationKeys(loop.type, stateAt(loop.id, path)?.content).map((key) => childPath(path, loop.id, key))
 
   // Every instance that should exist: outside loops at '', inside a loop in
   // each of its current iterations. Rows left under vanished keys are not
-  // instances; the loop's next run deletes them.
+  // instances; the loop's next run deletes them. A parent chain that loops
+  // back on itself is broken data: its nodes are simply not reached.
   const instances: Instance[] = []
+  const visited = new Set<number>()
   const collect = (parentId: number | null, paths: NodePath[]) => {
     for (const node of childrenOf.get(parentId) ?? []) {
+      if (visited.has(node.id)) continue
+      visited.add(node.id)
       for (const path of paths) instances.push({ node, path, state: stateAt(node.id, path) })
       collect(node.id, LOOP_TYPES.has(node.type) ? paths.flatMap((p) => iterationsOf(node, p)) : paths)
     }
@@ -239,11 +240,20 @@ export function propagateStaleStatus(
     return contagious
   }
 
-  /** Whether a loop instance has a child, in one of its current iterations, still to run. */
-  const needsVisit = ({ node, path }: Instance): boolean => {
+  /**
+   * Whether a loop instance has a child, in one of its current iterations,
+   * still to run — or to try again: a generative child that came back empty is
+   * retried as it would be outside a loop.
+   */
+  const needsVisit = ({ node, path }: Instance, contagious: Set<string>): boolean => {
     if (!LOOP_TYPES.has(node.type)) return false
     const children = childrenOf.get(node.id) ?? []
-    return iterationsOf(node, path).some((p) => children.some((c) => pending(c, stateAt(c.id, p), visitStale)))
+    return iterationsOf(node, path).some((p) =>
+      children.some((c) => {
+        const state = stateAt(c.id, p)
+        return state?.status === "EMPTY" ? contagious.has(keyOf(c.id, p)) : pending(c, state, visitStale)
+      }),
+    )
   }
 
   const marked: Instance[] = []
@@ -253,7 +263,7 @@ export function propagateStaleStatus(
     const contagious = computeContagiousEmpty()
     for (const instance of instances) {
       if (instance.state?.status !== "GENERATED") continue
-      if (!inputStale(instance, contagious) && !needsVisit(instance)) continue
+      if (!inputStale(instance, contagious) && !needsVisit(instance, contagious)) continue
       const demoted: PlanNodeStateRecord = { ...instance.state, status: "OUTDATED" }
       instance.state = demoted
       states.set(keyOf(instance.node.id, instance.path), demoted)
