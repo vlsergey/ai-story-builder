@@ -1,6 +1,7 @@
+import fs from "node:fs"
 import Database from "better-sqlite3"
 import { createBackup } from "./backup.js"
-import { CURRENT_VERSION, migrateDatabase } from "./migrations.js"
+import { assertReadableVersion, CURRENT_VERSION, migrateDatabase } from "./migrations.js"
 
 /**
  * Opens a project database, creates a backup of any existing file, runs all
@@ -9,6 +10,17 @@ import { CURRENT_VERSION, migrateDatabase } from "./migrations.js"
  * @param dbPath - Absolute path to the .sqlite file
  */
 export function openProjectDatabase(dbPath: string): Database.Database {
+  // A file from a newer version is refused before it is backed up: each
+  // refused attempt would otherwise add a copy and rotate out an older backup
+  // — the very ones this version can still read.
+  if (fs.existsSync(dbPath)) {
+    const probe = new Database(dbPath, { readonly: true, fileMustExist: true })
+    try {
+      assertReadableVersion(probe)
+    } finally {
+      probe.close()
+    }
+  }
   createBackup(dbPath)
   const db = new Database(dbPath)
   try {

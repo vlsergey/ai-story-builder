@@ -135,16 +135,24 @@ function loadSchemaFromFile(db: Database): void {
  * @param enforceMigrations If true, when fromVersion === 0, apply migrations from 0 to CURRENT_VERSION
  *                          instead of loading schema.sql. Useful for generating schema.
  */
-export function migrateDatabase(db: Database, enforceMigrations = false): void {
-  const fromVersion = db.pragma("user_version", { simple: true }) as number
-  if (fromVersion > CURRENT_VERSION) {
-    // The loop below would simply not run, and the first query touching a
-    // changed table would fail somewhere far from here.
+/**
+ * Refuses a database saved by a newer version of the app. Migrating it would
+ * simply not run, and the first query touching a changed table would fail
+ * somewhere far from here.
+ */
+export function assertReadableVersion(db: Database): void {
+  const version = db.pragma("user_version", { simple: true }) as number
+  if (version > CURRENT_VERSION) {
     throw new Error(
-      `This project was saved by a newer version of the app (database version ${fromVersion}; ` +
+      `This project was saved by a newer version of the app (database version ${version}; ` +
         `this version reads up to ${CURRENT_VERSION}). Update the app to open it.`,
     )
   }
+}
+
+export function migrateDatabase(db: Database, enforceMigrations = false): void {
+  assertReadableVersion(db)
+  const fromVersion = db.pragma("user_version", { simple: true }) as number
 
   db.pragma("foreign_keys = OFF")
 
