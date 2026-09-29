@@ -129,13 +129,6 @@ function loadSchemaFromFile(db: Database): void {
 }
 
 /**
- * Runs all pending migrations on an open database connection.
- * foreign_keys is disabled during migration and re-enabled after.
- * Each migration step runs in a transaction that also updates user_version.
- * @param enforceMigrations If true, when fromVersion === 0, apply migrations from 0 to CURRENT_VERSION
- *                          instead of loading schema.sql. Useful for generating schema.
- */
-/**
  * Refuses a database saved by a newer version of the app. Migrating it would
  * simply not run, and the first query touching a changed table would fail
  * somewhere far from here.
@@ -150,14 +143,29 @@ export function assertReadableVersion(db: Database): void {
   }
 }
 
-export function migrateDatabase(db: Database, enforceMigrations = false): void {
+export interface MigrateOptions {
+  /** From version 0, run the chain instead of loading schema.sql — to generate or check the schema. */
+  enforceMigrations?: boolean
+  /** Stop at this version: a migration's test builds the version before it by running the chain. */
+  toVersion?: number
+}
+
+/**
+ * Runs all pending migrations on an open database connection.
+ * foreign_keys is disabled during migration and re-enabled after.
+ * Each migration step runs in a transaction that also updates user_version.
+ * A boolean argument is `enforceMigrations`, as it always was.
+ */
+export function migrateDatabase(db: Database, options: boolean | MigrateOptions = false): void {
+  const { enforceMigrations = false, toVersion = CURRENT_VERSION } =
+    typeof options === "boolean" ? { enforceMigrations: options } : options
   assertReadableVersion(db)
   const fromVersion = db.pragma("user_version", { simple: true }) as number
 
   db.pragma("foreign_keys = OFF")
 
   // Fresh database – load schema.sql and set version to CURRENT_VERSION
-  if (fromVersion === 0 && !enforceMigrations) {
+  if (fromVersion === 0 && !enforceMigrations && toVersion === CURRENT_VERSION) {
     console.log(`[db] creating fresh database from schema.sql (version ${CURRENT_VERSION})`)
     loadSchemaFromFile(db)
     db.pragma(`user_version = ${CURRENT_VERSION}`)
@@ -165,8 +173,8 @@ export function migrateDatabase(db: Database, enforceMigrations = false): void {
     return
   }
 
-  // If enforceMigrations is true and fromVersion === 0, we fall through to apply migrations.
-  for (let v = fromVersion; v < CURRENT_VERSION; v++) {
+  // From version 0 with enforceMigrations, or towards an older version, run the chain.
+  for (let v = fromVersion; v < toVersion; v++) {
     db.transaction(() => {
       MIGRATIONS[v](db)
       db.pragma(`user_version = ${v + 1}`)

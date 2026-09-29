@@ -44,6 +44,21 @@ describe("opening a project", () => {
     expect(fs.readdirSync(backups).sort()).toEqual(olderBackups)
   })
 
+  it("saved by an older version keeps a copy of that version before migrating it", () => {
+    const file = path.join(dir, "Балкон.sqlite")
+    openProjectDatabase(file).close()
+    const older = new Database(file)
+    older.pragma(`user_version = ${CURRENT_VERSION - 1}`)
+    older.close()
+
+    openProjectDatabase(file).close()
+
+    const pinned = path.join(dir, "backups", `Балкон.v${CURRENT_VERSION - 1}.sqlite`)
+    const copy = new Database(pinned, { readonly: true })
+    expect(copy.pragma("user_version", { simple: true })).toBe(CURRENT_VERSION - 1)
+    copy.close()
+  })
+
   it("saved by this version opens as usual", () => {
     const file = path.join(dir, "Балкон.sqlite")
     openProjectDatabase(file).close()
