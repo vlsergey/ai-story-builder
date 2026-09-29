@@ -34,6 +34,8 @@ export function buildProjectRoutes(t: RouteBuilder) {
     getTemplate: t.procedure.input(z.string()).query(({ input }) => getTemplate(input)),
     getTemplatesFolders: t.procedure.query(() => getTemplateFolders()),
     analyzeTemplateUpdate: t.procedure.query(() => analyzeTemplateUpdate()),
-    applyTemplateUpdate: t.procedure.mutation(() => applyTemplateUpdate()),
+    applyTemplateUpdate: t.procedure
+      .input(z.object({ removeMissingEdges: z.boolean().optional() }).optional())
+      .mutation(({ input }) => applyTemplateUpdate(input ?? {})),
   })
 }

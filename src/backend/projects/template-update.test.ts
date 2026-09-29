@@ -67,7 +67,9 @@ function baseTemplate(): ProjectTemplate {
 
 describe("template-update", () => {
   let analyzeTemplateUpdate: () => TemplateUpdateAnalysis
-  let applyTemplateUpdate: () => Promise<{ updatedNodeCount: number; newNodeCount: number; newEdgeCount: number }>
+  let applyTemplateUpdate: (options?: {
+    removeMissingEdges?: boolean
+  }) => Promise<{ updatedNodeCount: number; newNodeCount: number; newEdgeCount: number; removedEdgeCount: number }>
 
   beforeEach(async () => {
     setUpTestDb()
@@ -272,5 +274,90 @@ describe("template-update", () => {
     const analysis = analyzeTemplateUpdate()
     expect(analysis.updatedNodes).toEqual([])
     expect(analysis.unchangedCount).toBe(2)
+  })
+
+  it("reports an edge the template dropped, but only between nodes the template owns", () => {
+    const initial = baseTemplate()
+    applyProjectTemplate(initial, {})
+    SettingsRepository.setAppliedTemplateFile("dropped.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+
+    // A hand-wired edge inside the project. The template knows nothing about
+    // «Project-only», so this edge is the user's business, not the template's.
+    const planRepo = new PlanNodeRepository()
+    const edgeRepo = new PlanEdgeRepository()
+    const mine = planRepo.insert({ title: "Project-only", type: "text", parent_id: null, x: 0, y: 0 })
+    const root = planRepo.findAll().find((n) => n.title === "Root")!
+    edgeRepo.insert({ from_node_id: root.id, to_node_id: mine, type: "text" })
+
+    // New template version: Child no longer reads Root.
+    const dropped = baseTemplate()
+    dropped.plan!.nodes![1].inputs = []
+    writeTemplate("dropped.json", dropped)
+
+    const analysis = analyzeTemplateUpdate()
+    expect(analysis.removedEdges).toEqual([{ sourceTitle: "Root", targetTitle: "Child", type: "text" }])
+  })
+
+  it("keeps dropped edges by default — removal is opt-in", async () => {
+    const initial = baseTemplate()
+    applyProjectTemplate(initial, {})
+    SettingsRepository.setAppliedTemplateFile("keep.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+    const dropped = baseTemplate()
+    dropped.plan!.nodes![1].inputs = []
+    writeTemplate("keep.json", dropped)
+
+    const result = await applyTemplateUpdate()
+    expect(result.removedEdgeCount).toBe(0)
+    expect(new PlanEdgeRepository().findAll()).toHaveLength(1)
+  })
+
+  it("removes dropped edges when asked, leaving hand-wired ones alone", async () => {
+    const initial = baseTemplate()
+    applyProjectTemplate(initial, {})
+    SettingsRepository.setAppliedTemplateFile("remove.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+
+    const planRepo = new PlanNodeRepository()
+    const edgeRepo = new PlanEdgeRepository()
+    const mine = planRepo.insert({ title: "Project-only", type: "text", parent_id: null, x: 0, y: 0 })
+    const root = planRepo.findAll().find((n) => n.title === "Root")!
+    edgeRepo.insert({ from_node_id: root.id, to_node_id: mine, type: "text" })
+
+    const dropped = baseTemplate()
+    dropped.plan!.nodes![1].inputs = []
+    writeTemplate("remove.json", dropped)
+
+    const result = await applyTemplateUpdate({ removeMissingEdges: true })
+    expect(result.removedEdgeCount).toBe(1)
+
+    const nodes = new PlanNodeRepository().findAll()
+    const byId = new Map(nodes.map((n) => [n.id, n.title]))
+    const left = new PlanEdgeRepository()
+      .findAll()
+      .map((e) => `${byId.get(e.from_node_id)} → ${byId.get(e.to_node_id)}`)
+    expect(left, "hand-wired edge must survive").toEqual(["Root → Project-only"])
+  })
+
+  it("demotes the target of a removed edge — its inputs changed", async () => {
+    const initial = baseTemplate()
+    applyProjectTemplate(initial, {})
+    SettingsRepository.setAppliedTemplateFile("demote.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+
+    const planRepo = new PlanNodeRepository()
+    const child = planRepo.findAll().find((n) => n.title === "Child")!
+    planRepo.patch(child.id, { status: "GENERATED", content: "written against the old inputs" })
+
+    const dropped = baseTemplate()
+    dropped.plan!.nodes![1].inputs = []
+    writeTemplate("demote.json", dropped)
+
+    await applyTemplateUpdate({ removeMissingEdges: true })
+
+    const after = new PlanNodeRepository().findAll().find((n) => n.title === "Child")!
+    expect(after.status).toBe("OUTDATED")
+    expect(after.content, "content is not touched").toBe("written against the old inputs")
   })
 })

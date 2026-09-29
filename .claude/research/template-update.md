@@ -23,8 +23,16 @@ from a menu, with a preview dialog that counts the affected nodes/edges.
 4. For template nodes whose `content` array contains a wizard placeholder
    (`${var}`), skip them entirely on the content side — those are
    user-personalised values.
-5. Don't delete anything in the project that the template doesn't have. No
-   warning either — just leave it alone.
+5. Never delete nodes. Edges are opt-in (added 2026-09-29): those the project
+   wires and the template no longer declares come back as
+   `analysis.removedEdges` and go only when asked —
+   `applyTemplateUpdate({ removeMissingEdges: true })`, a switch in the
+   dialog, `--remove-missing-edges` in the script. They earned the exception
+   because a dead input edge is not inert: it never reaches the prompt, yet it
+   still demotes the node to OUTDATED whenever its source changes. Limited to
+   edges whose both endpoints are template-owned titles — hand-wired ones are
+   the user's. The target is demoted once, since it was written against a
+   different set of inputs.
 6. Add nodes and edges that exist in the template and don't exist in the
    project.
 

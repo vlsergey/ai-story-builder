@@ -17,6 +17,9 @@
  *   # apply
  *   npx tsx scripts/update-project-from-template.ts --project "Гонец"
  *
+ *   # apply, and also drop edges the template no longer declares
+ *   npx tsx scripts/update-project-from-template.ts --project "Гонец" --remove-missing-edges
+ *
  * Title-based diffing has a known gap: a renamed-in-template node looks like
  * 'deleted old + added new' to this tool — the old project node stays as an
  * orphan, the new one gets inserted. Handle that case manually.
@@ -29,6 +32,7 @@ import { resolveProjectPath } from "./lib/project-paths.js"
 interface CliArgs {
   project: string
   dryRun: boolean
+  removeMissingEdges: boolean
 }
 
 function parseCli(): CliArgs {
@@ -37,6 +41,11 @@ function parseCli(): CliArgs {
     .description("Update a project's plan graph from the template it was created from.")
     .requiredOption("--project <name-or-path>", "Project name (looked up in projects folder) or full path to .sqlite")
     .option("--dry-run", "Show what would change without modifying anything", false)
+    .option(
+      "--remove-missing-edges",
+      "Also delete edges the project has and the template no longer declares (off by default)",
+      false,
+    )
     .parse()
   return program.opts<CliArgs>()
 }
@@ -62,6 +71,14 @@ function printAnalysis(analysis: ReturnType<typeof analyzeTemplateUpdate>): void
   } else {
     console.info("New edges: 0")
   }
+  if (analysis.removedEdges.length > 0) {
+    console.info(
+      `Edges no longer in the template (${analysis.removedEdges.length}) — kept unless --remove-missing-edges:`,
+    )
+    for (const e of analysis.removedEdges) console.info(`  - ${e.sourceTitle} → ${e.targetTitle} [${e.type}]`)
+  } else {
+    console.info("Edges no longer in the template: 0")
+  }
 }
 
 async function main(): Promise<void> {
@@ -79,17 +96,24 @@ async function main(): Promise<void> {
     return
   }
 
-  if (analysis.updatedNodes.length === 0 && analysis.newNodes.length === 0 && analysis.newEdges.length === 0) {
+  const removableEdges = args.removeMissingEdges ? analysis.removedEdges.length : 0
+  if (
+    analysis.updatedNodes.length === 0 &&
+    analysis.newNodes.length === 0 &&
+    analysis.newEdges.length === 0 &&
+    removableEdges === 0
+  ) {
     console.info("\nProject is already in sync with the template — nothing to apply.")
     setCurrentDbPath(null)
     return
   }
 
   console.info("\nApplying…")
-  const result = await applyTemplateUpdate()
+  const result = await applyTemplateUpdate({ removeMissingEdges: args.removeMissingEdges })
   console.info(
     `Applied at ${result.appliedAt}: ${result.updatedNodeCount} instruction rewrite(s), ` +
-      `${result.newNodeCount} new node(s), ${result.newEdgeCount} new edge(s).`,
+      `${result.newNodeCount} new node(s), ${result.newEdgeCount} new edge(s), ` +
+      `${result.removedEdgeCount} edge(s) removed.`,
   )
   setCurrentDbPath(null)
 }

@@ -3,13 +3,18 @@ import useAlert from "@/native/useAlert"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui-components/accordion"
 import { Button } from "@/ui-components/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui-components/dialog"
-import { useCallback, useState } from "react"
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/ui-components/field"
+import { Switch } from "@/ui-components/switch"
+import { useCallback, useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 export default function UpdateFromTemplateDialog() {
   const { t } = useTranslation(["projects", "translation"])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isApplying, setIsApplying] = useState(false)
+  const [removeMissingEdges, setRemoveMissingEdges] = useState(false)
+  const removeEdgesFieldId = useId()
+  const removeEdgesDescriptionId = useId()
 
   const trpcUtils = trpc.useUtils()
   const analyzeQuery = trpc.project.analyzeTemplateUpdate.useQuery(undefined, { enabled: isDialogOpen, retry: false })
@@ -28,7 +33,7 @@ export default function UpdateFromTemplateDialog() {
   const handleApply = useCallback(async () => {
     setIsApplying(true)
     try {
-      await applyMutation()
+      await applyMutation({ removeMissingEdges })
       setIsDialogOpen(false)
       await trpcUtils.plan.invalidate()
       await trpcUtils.project.invalidate()
@@ -37,13 +42,17 @@ export default function UpdateFromTemplateDialog() {
     } finally {
       setIsApplying(false)
     }
-  }, [alert, trpcUtils])
+  }, [alert, trpcUtils, removeMissingEdges])
 
   const analysis = analyzeQuery.data
   const error = analyzeQuery.error
   const isLoading = analyzeQuery.isLoading
   const hasChanges =
-    !!analysis && (analysis.updatedNodes.length > 0 || analysis.newNodes.length > 0 || analysis.newEdges.length > 0)
+    !!analysis &&
+    (analysis.updatedNodes.length > 0 ||
+      analysis.newNodes.length > 0 ||
+      analysis.newEdges.length > 0 ||
+      analysis.removedEdges.length > 0)
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={(value) => setIsDialogOpen(value)}>
@@ -107,7 +116,41 @@ export default function UpdateFromTemplateDialog() {
                     </AccordionContent>
                   </AccordionItem>
                 )}
+                {analysis.removedEdges.length > 0 && (
+                  <AccordionItem value="removed-edges">
+                    <AccordionTrigger>
+                      {t("UpdateFromTemplateDialog.removedEdgesHeader", { count: analysis.removedEdges.length })}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="ml-4 list-disc">
+                        {analysis.removedEdges.map((e) => (
+                          <li key={`${e.sourceTitle}->${e.targetTitle}:${e.type}`}>
+                            {e.sourceTitle} → {e.targetTitle}
+                          </li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
               </Accordion>
+              {analysis.removedEdges.length > 0 && (
+                <Field orientation="responsive">
+                  <FieldContent>
+                    <FieldLabel htmlFor={removeEdgesFieldId}>
+                      {t("UpdateFromTemplateDialog.removeMissingEdgesLabel")}
+                    </FieldLabel>
+                    <FieldDescription id={removeEdgesDescriptionId}>
+                      {t("UpdateFromTemplateDialog.removeMissingEdgesDescription")}
+                    </FieldDescription>
+                  </FieldContent>
+                  <Switch
+                    aria-describedby={removeEdgesDescriptionId}
+                    id={removeEdgesFieldId}
+                    checked={removeMissingEdges}
+                    onCheckedChange={setRemoveMissingEdges}
+                  />
+                </Field>
+              )}
               <div className="text-muted-foreground">{t("UpdateFromTemplateDialog.disclaimer")}</div>
             </>
           )}

@@ -46,6 +46,15 @@ export interface TemplateUpdateAnalysis {
   updatedNodes: UpdatedNode[]
   newNodes: UpdatedNode[]
   newEdges: NewEdge[]
+  /**
+   * Edges the project has and the template no longer does.
+   *
+   * Restricted to edges whose BOTH endpoints are titles the template defines:
+   * an edge touching a node the user added by hand is the user's wiring, and
+   * the template has no opinion about it. Removal is opt-in — see
+   * `applyTemplateUpdate`.
+   */
+  removedEdges: NewEdge[]
 }
 
 // Keys in node_type_settings that count as "instruction-shaped" for the
@@ -272,8 +281,22 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
       newEdges.push(e)
     }
   }
-  // tEdges retained for symmetric API obviousness; unused in MVP.
-  void tEdges
+  // The reverse direction: what the project still wires and the template
+  // dropped. Only between nodes the template owns — anything touching a
+  // project-only node is not the template's business.
+  const templateTitles = new Set(templateNodes.map((n) => n.title))
+  const removedEdges: NewEdge[] = []
+  for (const [sourceTitle, byTarget] of pEdges) {
+    if (!templateTitles.has(sourceTitle)) continue
+    for (const [targetTitle, types] of byTarget) {
+      if (!templateTitles.has(targetTitle)) continue
+      for (const type of types) {
+        if (!hasEdgeTriple(tEdges, sourceTitle, targetTitle, type)) {
+          removedEdges.push({ sourceTitle, targetTitle, type })
+        }
+      }
+    }
+  }
 
   return {
     templateFile: filename,
@@ -281,6 +304,7 @@ export function analyzeTemplateUpdate(): TemplateUpdateAnalysis {
     updatedNodes,
     newNodes,
     newEdges,
+    removedEdges,
   }
 }
 
@@ -289,9 +313,26 @@ export interface TemplateUpdateApplyResult {
   updatedNodeCount: number
   newNodeCount: number
   newEdgeCount: number
+  removedEdgeCount: number
 }
 
-export async function applyTemplateUpdate(): Promise<TemplateUpdateApplyResult> {
+export interface TemplateUpdateApplyOptions {
+  /**
+   * Also delete the edges in `analysis.removedEdges`.
+   *
+   * Off by default: the reconciler's standing rule is that it never deletes
+   * anything the project has and the template does not. But a template that
+   * drops an input leaves the project wired to a source its prompt no longer
+   * mentions, and a dead input edge is not inert — it still demotes the node
+   * to OUTDATED every time that source changes, so the node regenerates for
+   * nothing.
+   */
+  removeMissingEdges?: boolean
+}
+
+export async function applyTemplateUpdate(
+  options: TemplateUpdateApplyOptions = {},
+): Promise<TemplateUpdateApplyResult> {
   const { template, wizardData } = loadAppliedContext()
   const analysis = analyzeTemplateUpdate()
   const nodeRepo = new PlanNodeRepository()
@@ -383,10 +424,30 @@ export async function applyTemplateUpdate(): Promise<TemplateUpdateApplyResult> 
     })
   }
 
+  // 4. Optionally drop edges the template no longer declares. The target
+  //    loses an input, so what it generated was written against a different
+  //    set of sources — demote it, but leave its content alone.
+  let removedEdgeCount = 0
+  if (options.removeMissingEdges) {
+    projectMap = projectByTitleNow()
+    for (const e of analysis.removedEdges) {
+      const src = projectMap.get(e.sourceTitle)
+      const tgt = projectMap.get(e.targetTitle)
+      if (!src || !tgt) continue
+      for (const row of edgeRepo.findByToNodeId(tgt.id)) {
+        if (row.from_node_id !== src.id || row.type !== e.type) continue
+        edgeRepo.delete(row.id)
+        removedEdgeCount += 1
+      }
+      await nodeService.demoteToOutdated(tgt.id)
+    }
+  }
+
   return {
     appliedAt: new Date().toISOString(),
     updatedNodeCount: analysis.updatedNodes.length,
     newNodeCount: analysis.newNodes.length,
     newEdgeCount: analysis.newEdges.length,
+    removedEdgeCount,
   }
 }
