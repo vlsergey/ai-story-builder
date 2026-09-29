@@ -23,6 +23,8 @@ interface IterationSelection {
   selected(loopId: number, loopPath: NodePath): string
   /** The user picks an iteration; picking the one being generated follows the run again. */
   select(loopId: number, loopPath: NodePath, key: string): void
+  /** The iterations of the loop being generated right now. */
+  running(loopId: number, loopPath: NodePath): readonly string[]
   /** The loop's iterations as its pager shows them; the display never names one it lacks. */
   showKeys(loopId: number, loopPath: NodePath, keys: string[]): void
   /** Where the node is shown: in every loop around it, the iteration on display. */
@@ -33,11 +35,14 @@ const IterationSelectionContext = createContext<IterationSelection | null>(null)
 
 const keyOf = (loopId: number, loopPath: NodePath) => `${loopId}@${loopPath}`
 
+const NOTHING: readonly string[] = []
+
 export function IterationSelectionProvider({ children }: { children: ReactNode }) {
   const definitions = trpc.plan.nodes.findAll.useQuery(undefined, { refetchOnWindowFocus: false }).data
   const [picked, setPicked] = useState<Record<string, string>>({})
   const [followed, setFollowed] = useState<Record<string, string>>({})
   const [known, setKnown] = useState<Record<string, string[]>>({})
+  const [runningKeys, setRunningKeys] = useState<Record<string, string[]>>({})
   const wasRunning = useRef(false)
 
   trpc.plan.nodes.aiGenerate.subscribeToStatusEvents.useSubscription(undefined, {
@@ -46,10 +51,15 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
       if (event.inProcess && !wasRunning.current) setPicked({})
       wasRunning.current = event.inProcess
       const running: Record<string, string> = {}
+      const allRunning: Record<string, string[]> = {}
       for (const item of event.currentRegenerationStack) {
-        if (item.type !== "iteration" || item.container.type !== "for-each") continue
-        running[keyOf(item.container.id, item.container.path)] = item.key ?? String(item.zeroBasedIterationIndex)
+        if (item.type !== "iteration") continue
+        const loop = keyOf(item.container.id, item.container.path)
+        const key = item.key ?? String(item.zeroBasedIterationIndex)
+        allRunning[loop] = [...(allRunning[loop] ?? []), key]
+        if (item.container.type === "for-each") running[loop] = key
       }
+      setRunningKeys((previous) => (JSON.stringify(previous) === JSON.stringify(allRunning) ? previous : allRunning))
       setFollowed((previous) =>
         Object.entries(running).every(([key, value]) => previous[key] === value)
           ? previous
@@ -106,9 +116,14 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
     [loopsOf, selected],
   )
 
+  const running = useCallback(
+    (loopId: number, loopPath: NodePath) => runningKeys[keyOf(loopId, loopPath)] ?? NOTHING,
+    [runningKeys],
+  )
+
   const value = useMemo(
-    () => ({ ready: definitions !== undefined, selected, select, showKeys, displayPath }),
-    [definitions, selected, select, showKeys, displayPath],
+    () => ({ ready: definitions !== undefined, selected, select, running, showKeys, displayPath }),
+    [definitions, selected, select, running, showKeys, displayPath],
   )
   return <IterationSelectionContext.Provider value={value}>{children}</IterationSelectionContext.Provider>
 }

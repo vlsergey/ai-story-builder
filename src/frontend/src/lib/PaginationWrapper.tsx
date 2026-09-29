@@ -26,6 +26,8 @@ export interface PropsType extends React.ComponentPropsWithRef<typeof Pagination
   showFirstLast?: boolean
   showPrevNext?: boolean
   totalPages?: number
+  /** Pages to set apart — say, the ones being worked on now. */
+  markedPages?: ReadonlySet<number>
   page: number
   onPageChange: (event: OnChangeEventType) => void
 }
@@ -49,6 +51,7 @@ const PaginationWrapper = ({
   readOnly,
   showPrevNext = defaultProps.showPrevNext,
   totalPages,
+  markedPages,
   page,
   onPageChange,
   ...etc
@@ -95,7 +98,9 @@ const PaginationWrapper = ({
         {linksToDisplay.map((p: number, index: number) =>
           p === zeroBasedValue ? (
             <PaginationItem key={p}>
-              <PaginationLink isActive>{p + 1}</PaginationLink>
+              <PaginationLink isActive className={markedPages?.has(p) ? MARKED : undefined}>
+                {p + 1}
+              </PaginationLink>
             </PaginationItem>
           ) : p === ELLIPSIS_MARK ? (
             <PaginationItem key={`_${index}`}>
@@ -103,10 +108,10 @@ const PaginationWrapper = ({
             </PaginationItem>
           ) : allDisabled ? (
             <PaginationItem key={p}>
-              <PaginationLink>{p + 1}</PaginationLink>
+              <PaginationLink className={markedPages?.has(p) ? MARKED : undefined}>{p + 1}</PaginationLink>
             </PaginationItem>
           ) : (
-            <PaginationItemWrapper key={p} onClick={handlePage} page={p} />
+            <PaginationItemWrapper key={p} onClick={handlePage} page={p} marked={markedPages?.has(p) ?? false} />
           ),
         )}
         {showPrevNext && ((totalPages !== undefined && zeroBasedValue >= totalPages - 1) || allDisabled) ? (
@@ -123,11 +128,23 @@ const PaginationWrapper = ({
   )
 }
 
-const PaginationItemWrapper = ({ page, onClick }: { onClick: (page: number) => unknown; page: number }) => {
+const MARKED = "underline decoration-dotted decoration-2 underline-offset-4 animate-pulse"
+
+const PaginationItemWrapper = ({
+  page,
+  marked,
+  onClick,
+}: {
+  onClick: (page: number) => unknown
+  page: number
+  marked: boolean
+}) => {
   const handleClick = useCallback(() => onClick(page), [onClick, page])
   return (
     <PaginationItem>
-      <PaginationLink onClick={handleClick}>{page + 1}</PaginationLink>
+      <PaginationLink onClick={handleClick} className={marked ? MARKED : undefined}>
+        {page + 1}
+      </PaginationLink>
     </PaginationItem>
   )
 }

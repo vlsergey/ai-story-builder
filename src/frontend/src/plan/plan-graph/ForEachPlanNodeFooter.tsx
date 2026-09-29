@@ -1,6 +1,6 @@
 import PaginationWrapper from "@/lib/PaginationWrapper"
 import type { NodePath } from "@shared/plan-node-path"
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { useIterationSelection } from "../iteration-selection"
 
 interface ForEachPlanNodeFooterProps {
@@ -16,7 +16,12 @@ interface ForEachPlanNodeFooterProps {
  * shows — nothing is written, and it works while the loop is generating.
  */
 export default function ForEachPlanNodeFooter({ loopId, path, iterationKeys }: ForEachPlanNodeFooterProps) {
-  const { selected, select, showKeys } = useIterationSelection()
+  const { selected, select, running, showKeys } = useIterationSelection()
+  const runningKeys = running(loopId, path)
+  const runningPages = useMemo(
+    () => new Set(runningKeys.map((key) => iterationKeys.indexOf(key)).filter((page) => page >= 0)),
+    [runningKeys, iterationKeys],
+  )
   useEffect(() => showKeys(loopId, path, iterationKeys), [loopId, path, iterationKeys, showKeys])
 
   const handlePageChange = useCallback(
@@ -34,6 +39,7 @@ export default function ForEachPlanNodeFooter({ loopId, path, iterationKeys }: F
         page={Math.max(0, iterationKeys.indexOf(selected(loopId, path)))}
         onPageChange={handlePageChange}
         totalPages={iterationKeys.length}
+        markedPages={runningPages}
       />
     </div>
   )
