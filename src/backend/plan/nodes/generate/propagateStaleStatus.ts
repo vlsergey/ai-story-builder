@@ -1,6 +1,8 @@
 import type { PlanNodeRow } from "../../../../shared/plan-graph.js"
 import { PlanEdgeRepository } from "../../edges/plan-edge-repository.js"
+import { usesInput } from "../input-relevance.js"
 import { PlanNodeRepository } from "../plan-node-repository.js"
+import { hasRegenerationCriteria } from "./regeneration-criteria.js"
 
 /**
  * Node types whose content is a pure function of their inputs — no model call,
@@ -11,6 +13,8 @@ const DETERMINISTIC_TYPES = new Set<PlanNodeRow["type"]>([
   "merge",
   "script",
   "format",
+  // A loop is EMPTY only when its list is: over the same list it stays empty.
+  "for-each",
   "for-each-input",
   "for-each-output",
   "for-each-index",
@@ -41,7 +45,7 @@ function computeContagiousEmpty(
 ): Set<number> {
   const contagious = new Set<number>()
   for (const n of allNodes) {
-    if (n.status === "EMPTY" && !DETERMINISTIC_TYPES.has(n.type)) contagious.add(n.id)
+    if (n.status === "EMPTY" && !DETERMINISTIC_TYPES.has(n.type) && hasRegenerationCriteria(n)) contagious.add(n.id)
   }
   let grew = true
   while (grew) {
@@ -51,7 +55,7 @@ function computeContagiousEmpty(
       const pendingSource = (incoming.get(n.id) ?? []).some((srcId) => {
         const src = byId.get(srcId)
         if (!src) return false
-        return src.status === "EMPTY" ? contagious.has(src.id) : forwardStale.has(src.status)
+        return src.status === "EMPTY" ? contagious.has(src.id) : pending(src, forwardStale)
       })
       if (pendingSource) {
         contagious.add(n.id)
@@ -60,6 +64,16 @@ function computeContagiousEmpty(
     }
   }
   return contagious
+}
+
+/**
+ * Whether a node in one of the `stale` statuses is work still to be done. A
+ * node with nothing to generate from — a synopsis the user typed — is never
+ * redone, whatever its status says, so its content is final: with «regenerate
+ * manual» on, it used to drag everything downstream of it through the model.
+ */
+function pending(node: PlanNodeRow, stale: Set<PlanNodeRow["status"]>): boolean {
+  return stale.has(node.status) && hasRegenerationCriteria(node)
 }
 
 export interface PropagateOptions {
@@ -74,8 +88,8 @@ export interface PropagateOptions {
  * upstream inputs still needs to regenerate.
  *
  * Three rules, applied repeatedly to fixpoint:
- *   1. Forward via input edges — if any upstream node has a stale status,
- *      mark this GENERATED node OUTDATED.
+ *   1. Forward via input edges — if any upstream node this node actually
+ *      reads (`usesInput`) has a stale status, mark this GENERATED node OUTDATED.
  *   2. Bottom-up via parent_id — if any descendant of a container is stale,
  *      mark the GENERATED container OUTDATED (so the scheduler enters it
  *      and its regenerate method handles the inner sub-tree).
@@ -146,6 +160,19 @@ export function propagateStaleStatus(
     }
   }
 
+  // The same relevance rule as the cascade: a stale input the prompt never
+  // reads cannot make the node stale. Settings do not change here, so memoize.
+  const relevance = new Map<string, boolean>()
+  const reads = (consumer: PlanNodeRow, source: PlanNodeRow): boolean => {
+    const key = `${consumer.id}:${source.id}`
+    let result = relevance.get(key)
+    if (result === undefined) {
+      result = usesInput(consumer, source)
+      relevance.set(key, result)
+    }
+    return result
+  }
+
   const marked: number[] = []
   let changed = true
   while (changed) {
@@ -156,17 +183,17 @@ export function propagateStaleStatus(
 
       const upstreamStale = (incoming.get(node.id) ?? []).some((fromId) => {
         const src = byId.get(fromId)
-        if (!src) return false
-        return src.status === "EMPTY" ? contagiousEmpty.has(src.id) : forwardStale.has(src.status)
+        if (!src || !reads(node, src)) return false
+        return src.status === "EMPTY" ? contagiousEmpty.has(src.id) : pending(src, forwardStale)
       })
 
-      const childStale = (childrenByParent.get(node.id) ?? []).some((c) => bottomUpStale.has(c.status))
+      const childStale = (childrenByParent.get(node.id) ?? []).some((c) => pending(c, bottomUpStale))
 
       const parentStale = (() => {
         if (node.type !== "for-each-input") return false
         if (node.parent_id == null) return false
         const parent = byId.get(node.parent_id)
-        return parent != null && topDownStale.has(parent.status)
+        return parent != null && pending(parent, topDownStale)
       })()
 
       if (upstreamStale || childStale || parentStale) {

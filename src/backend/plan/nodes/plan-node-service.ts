@@ -33,6 +33,7 @@ import { ScriptProcessor } from "./graph/script-processor.js"
 import { mergeNodeSettings } from "./graph/settings-helper.js"
 import { SplitProcessor } from "./graph/split-processor.js"
 import { TextProcessor } from "./graph/text-processor.js"
+import { usesInput } from "./input-relevance.js"
 import type { NodeInputs } from "./NodeInput.js"
 import { planNodeEventManager } from "./plan-node-event-manager.js"
 import { PlanNodeRepository } from "./plan-node-repository.js"
@@ -57,19 +58,32 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   format: new FormatProcessor(),
 }
 
-const DO_NOT_NOTIFY_DOWNSTREAMS_ON_CHANGES_IN: (keyof PlanNodeRow)[] = [
-  "x",
-  "y",
-  "width",
-  "height",
-  "word_count",
-  "char_count",
-  "byte_count",
-  "in_review",
-  "review_base_content",
-  "ai_improve_instruction",
-  "created_at",
-] as const
+/**
+ * A patch reaches downstream nodes only when one of these actually changes:
+ * consumers read content and summary, and a move changes which iteration of a
+ * loop a node belongs to. Rewriting a value unchanged — a deterministic node
+ * re-run, a node starting to generate — must not demote anything.
+ */
+const CASCADING_KEYS = ["content", "summary", "parent_id"] as const
+
+/**
+ * Statuses a changed input demotes. MANUAL is the user's own text; OUTDATED
+ * and ERROR will re-run anyway. A GENERATING node is demoted so that the result
+ * it is computing from the old input does not land.
+ */
+const DEMOTABLE_BY_INPUT_CHANGE: ReadonlySet<PlanNodeStatus> = new Set(["GENERATED", "GENERATING", "EMPTY"])
+
+/**
+ * The status a finished regeneration stores. A processor that reported ERROR
+ * (a script or template failure) or EMPTY is believed; otherwise the output
+ * decides, and an empty list is no output. Other reported statuses are not
+ * trusted: some processors return their whole row, GENERATING included.
+ */
+function outcomeStatus(reported: PlanNodeStatus | undefined, output: unknown): PlanNodeStatus {
+  if (reported === "ERROR" || reported === "EMPTY") return reported
+  const hasOutput = Array.isArray(output) ? output.length > 0 : !!output
+  return hasOutput ? "GENERATED" : "EMPTY"
+}
 
 /**
  * Service for plan node operations.
@@ -199,12 +213,18 @@ export class PlanNodeService {
    * and downstream notifications will propagate further.
    */
   async markAsOutdatedAndNotifyDownstreamNodes(changedNodeId: number): Promise<void> {
+    const changedNode = this.repo.findById(changedNodeId)
+    if (!changedNode) return
     const outgoingEdges = new PlanEdgeRepository().findByFromNodeId(changedNodeId)
     for (const edge of outgoingEdges) {
-      const downstreamNode = this.getById(edge.to_node_id)
+      const downstreamNode = this.repo.findById(edge.to_node_id)
       if (!downstreamNode) continue
+      // A consumer that does not read this input cannot go stale from it.
+      if (!usesInput(downstreamNode, changedNode)) continue
 
-      let downstreamUpdate: PlanNodeUpdate = { status: "OUTDATED" }
+      let downstreamUpdate: PlanNodeUpdate = DEMOTABLE_BY_INPUT_CHANGE.has(downstreamNode.status)
+        ? { status: "OUTDATED" }
+        : {}
       let toBeAfterUpdate: PlanNodeRow = { ...downstreamNode, ...downstreamUpdate }
 
       const processor = this.getProcessor(downstreamNode.type)
@@ -422,6 +442,9 @@ export class PlanNodeService {
       ...update,
       ...(await this.mayBeInvokeOnUpdate(nodeId, oldNode, { ...oldNode, ...update })),
     }
+    if (update.content !== undefined) {
+      update = { ...update, ...this.countsOf({ ...oldNode, ...update }) }
+    }
 
     const updated = Object.keys(update).length !== 0 ? this.repo.patch(nodeId, update) : oldNode
     if (!updated) throw makeErrorWithStatus("node not found", 404)
@@ -429,15 +452,23 @@ export class PlanNodeService {
     // Emit event to frontend
     planNodeEventManager.emitUpdate(nodeId, `patched keys: ${Object.keys(data).join(", ")}`)
 
-    // If important field is changed, notify downstream nodes
-    const needToNotify = (Object.keys(update) as (keyof PlanNodeUpdate)[]).every(
-      (key) => !DO_NOT_NOTIFY_DOWNSTREAMS_ON_CHANGES_IN.includes(key),
-    )
-    if (needToNotify) {
+    if (CASCADING_KEYS.some((key) => updated[key] !== oldNode[key])) {
       await this.markAsOutdatedAndNotifyDownstreamNodes(nodeId)
     }
 
     return updated
+  }
+
+  /**
+   * Patches several nodes, one after another, as a drag of several nodes in
+   * the graph does. Each patch is awaited, so the call returns once all are
+   * stored and a failure reaches the caller instead of becoming an unhandled
+   * rejection.
+   */
+  async batchPatch(items: { id: number; data: PlanNodeUpdate }[]): Promise<void> {
+    for (const { id, data } of items) {
+      await this.patch(id, false, data)
+    }
   }
 
   private async mayBeInvokeOnUpdate<
@@ -464,7 +495,7 @@ export class PlanNodeService {
     context: RegenerationNodeContext,
   ): Promise<PlanNodeRow> {
     const nodeId = context.nodeId
-    let node = await this.patch(nodeId, false, { status: "GENERATING" })
+    const node = await this.patch(nodeId, false, { status: "GENERATING" })
 
     try {
       const nodeProcessor = this.getProcessor(node.type) as NodeProcessor<T>
@@ -483,59 +514,73 @@ export class PlanNodeService {
 
       if (context.abortSignal.aborted) {
         console.warn("[PlanNodeService]", "regenerate", `Stop node ${context.nodeId} regeneration due to abort signal`)
-        node = await this.patch(nodeId, false, { status: "OUTDATED" })
-        return node
+        return await this.landRegeneration(nodeId, { status: "OUTDATED" })
       }
 
-      const patchedContent = nodeProcessor.getOutput(this, {
+      const output = nodeProcessor.getOutput(this, {
         ...node,
         ...patch,
       })
+      const status = outcomeStatus(patch.status, output)
 
       if (SettingsRepository.getAutoGenerateSummary() && patch.summary === undefined) {
-        if (patchedContent) {
+        if (status === "GENERATED") {
           try {
             patch = {
               ...patch,
-              summary:
-                (await generateSummary(context.abortSignal, ["plan-node-summary", `${nodeId}`], patchedContent)) || "",
-              status: "GENERATED",
+              summary: (await generateSummary(context.abortSignal, ["plan-node-summary", `${nodeId}`], output)) || "",
             }
           } catch (e) {
             console.error(e)
             patch = {
               ...patch,
               summary: `(error): ${e}`,
-              status: "GENERATED",
             }
           }
         } else {
           patch = {
             ...patch,
             summary: null,
-            status: "EMPTY",
           }
         }
       } else {
         patch = {
           ...patch,
           summary: patch.summary || null,
-          status: patchedContent ? "GENERATED" : "EMPTY",
         }
       }
+      patch = { ...patch, status }
 
       if (context.abortSignal.aborted) {
         console.warn("[PlanNodeService]", "regenerate", `Stop node ${context.nodeId} regeneration due to abort signal`)
-        node = await this.patch(nodeId, false, { status: "OUTDATED" })
-        return node
+        return await this.landRegeneration(nodeId, { status: "OUTDATED" })
       }
 
-      return await this.patch(nodeId, false, patch)
+      return await this.landRegeneration(nodeId, patch)
     } catch (e) {
       console.error(`Unable to regenerate node ${nodeId}`, e)
-      node = await this.patch(nodeId, false, { status: "ERROR" })
+      // A stopped node is left to be redone, not marked broken.
+      await this.landRegeneration(nodeId, { status: context.abortSignal.aborted ? "OUTDATED" : "ERROR" })
       throw e
     }
+  }
+
+  /**
+   * Writes what a regeneration produced — unless the row changed while it ran.
+   * A demotion, a prompt edit or the user's own text all move the row off
+   * GENERATING; the result was built on what the row used to be, so it is
+   * dropped and the row keeps the newer write.
+   */
+  private async landRegeneration(nodeId: number, outcome: PlanNodeUpdate): Promise<PlanNodeRow> {
+    const current = this.repo.findById(nodeId)
+    if (!current) throw makeErrorWithStatus(`Plan node ${nodeId} was deleted while it was being regenerated`, 404)
+    if (current.status !== "GENERATING") {
+      console.warn(
+        `[PlanNodeService] node ${nodeId} changed while it was regenerated (now ${current.status}); result dropped`,
+      )
+      return current
+    }
+    return await this.patch(nodeId, false, outcome)
   }
 
   // ─── Delete ──────────────────────────────────────────────────────────────────
@@ -632,6 +677,22 @@ export class PlanNodeService {
     return result
   }
 
+  /**
+   * Counts of what a node outputs. For split, fix-problems and loops the
+   * content is JSON, and counting it would measure the envelope.
+   */
+  private countsOf(node: PlanNodeRow): Pick<PlanNodeRow, "word_count" | "char_count" | "byte_count"> {
+    let text = node.content ?? ""
+    try {
+      const output = this.getProcessor(node.type).getOutput(this, node)
+      if (typeof output === "string") text = output
+      else if (Array.isArray(output)) text = output.filter((part) => typeof part === "string").join("\n\n")
+    } catch {
+      // No output yet (a loop before its children exist): count the raw content.
+    }
+    return { word_count: this.countWords(text), char_count: this.countChars(text), byte_count: this.countBytes(text) }
+  }
+
   private countWords(text: string): number {
     const t = text.trim()
     return t === "" ? 0 : t.split(/\s+/).length
@@ -667,6 +728,13 @@ export class PlanNodeService {
       const { oldNode, newContent } = await improvePlanNodeContent(new AbortController().signal, nodeId, (event) => {
         emit.next({ type: "event", event })
       })
+
+      // The improvement rewrites the text it was given; if that text changed
+      // meanwhile, writing it back would throw the newer text away.
+      const current = this.getById(nodeId)
+      if (current.content !== oldNode.content || current.status === "GENERATING") {
+        throw makeErrorWithStatus("The node changed while it was being improved; the improvement was discarded", 409)
+      }
 
       const newNode = await this.patch(nodeId, true, {
         status: "MANUAL",

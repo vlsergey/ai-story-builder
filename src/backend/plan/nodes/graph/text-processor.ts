@@ -1,5 +1,5 @@
 import type { TextSettings } from "../../../../shared/node-settings.js"
-import type { PlanNodeRow, PlanNodeStatus, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
+import type { PlanNodeRow, PlanNodeUpdate } from "../../../../shared/plan-graph.js"
 import { generatePlanNodeTextContent } from "../../../ai/generate-plan-node-text-content.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { PlanNodeService } from "../plan-node-service.js"
@@ -15,40 +15,8 @@ export class TextProcessor implements NodeProcessor<TextSettings> {
     return nodeData.content ?? ""
   }
 
-  async onInputContentChange(
-    service: PlanNodeService,
-    data: PlanNodeRow,
-    changedInputNodeId: number,
-    settings: TextSettings,
-  ): Promise<PlanNodeUpdate | null> {
-    const changedNode = service.getById(changedInputNodeId)
-    if (!changedNode) {
-      return null
-    }
-
-    const instructions = settings.userPrompt
-    if (!instructions) {
-      return null
-    }
-
-    // Determine if the changed node's title appears as a template placeholder
-    const placeholder = `{{${changedNode.title}}}`
-    if (!instructions.includes(placeholder)) {
-      // This input is not referenced, no need to mark outdated
-      return null
-    }
-
-    // If node status is GENERATED, mark it as OUTDATED
-    if (data.status === "GENERATED") {
-      console.log(`[TextProcessor] node ${data.id} depends on changed input ${changedInputNodeId}, marking OUTDATED`)
-      return {
-        status: "OUTDATED" as PlanNodeStatus,
-      }
-    }
-
-    // Otherwise, no change
-    return null
-  }
+  // Whether a changed input demotes a text node is decided by the cascade
+  // itself (`usesInput`), the same way propagation decides it.
 
   async regenerate(
     _service: PlanNodeService,
