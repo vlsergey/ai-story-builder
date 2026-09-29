@@ -62,7 +62,7 @@
         "title": "Synopsis",
         "type": "text",
         "x": 40,
-        "y": 100,
+        "y": 998,
         "content": ["${synopsis}"],
         "width": 200,
         "height": 80
@@ -70,8 +70,8 @@
       {
         "title": "World draft",
         "type": "text",
-        "x": 340,
-        "y": 882,
+        "x": 320,
+        "y": 1052,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -111,8 +111,8 @@
       {
         "title": "World review: physics",
         "type": "fix-problems",
-        "x": 620,
-        "y": 882,
+        "x": 600,
+        "y": 1052,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "World draft",
           "maxIterations": 2,
@@ -191,8 +191,8 @@
       {
         "title": "World",
         "type": "fix-problems",
-        "x": 900,
-        "y": 882,
+        "x": 880,
+        "y": 1052,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "World review: physics",
           "maxIterations": 2,
@@ -275,8 +275,8 @@
       {
         "title": "Theme",
         "type": "text",
-        "x": 620,
-        "y": 129,
+        "x": 600,
+        "y": 589,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -309,8 +309,8 @@
       {
         "title": "Genre and register",
         "type": "text",
-        "x": 620,
-        "y": 309,
+        "x": 600,
+        "y": 951,
         "aiUserInstructions": [
           "## Age rating (user-set)",
           "",
@@ -341,8 +341,8 @@
       {
         "title": "Setting draft",
         "type": "text",
-        "x": 1180,
-        "y": 979,
+        "x": 1160,
+        "y": 1175,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -384,8 +384,8 @@
       {
         "title": "Setting",
         "type": "fix-problems",
-        "x": 3225,
-        "y": 979,
+        "x": 3205,
+        "y": 1205,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Setting draft",
           "maxIterations": 3,
@@ -509,8 +509,8 @@
       {
         "title": "Style",
         "type": "text",
-        "x": 900,
-        "y": 272,
+        "x": 880,
+        "y": 640,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -548,8 +548,8 @@
       {
         "title": "Character anchor sheet",
         "type": "text",
-        "x": 1180,
-        "y": 541,
+        "x": 1160,
+        "y": 871,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -618,8 +618,8 @@
       {
         "title": "Characters (list)",
         "type": "text",
-        "x": 1460,
-        "y": 172,
+        "x": 1440,
+        "y": 190,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -682,8 +682,8 @@
       {
         "title": "Character voices",
         "type": "text",
-        "x": 1740,
-        "y": 496,
+        "x": 1720,
+        "y": 770,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -779,8 +779,8 @@
       {
         "title": "Split character list",
         "type": "split",
-        "x": 1740,
-        "y": 159,
+        "x": 1720,
+        "y": 177,
         "nodeTypeSettings": {
           "partDescription": "One character block: a `# Name` heading on the first line, then `- Field: value` lines for each anchor-sheet field, then an empty line and one sentence about the narrative role and key internal trait."
         },
@@ -812,8 +812,8 @@
       {
         "title": "Per-character loop",
         "type": "for-each",
-        "x": 2025,
-        "y": 314,
+        "x": 2005,
+        "y": 291,
         "width": 1120,
         "height": 394,
         "inputs": [
@@ -827,7 +827,7 @@
             "title": "Character",
             "type": "for-each-input",
             "x": 40,
-            "y": 243,
+            "y": 111,
             "width": 200,
             "height": 80
           },
@@ -835,7 +835,7 @@
             "title": "Character profile",
             "type": "text",
             "x": 320,
-            "y": 142,
+            "y": 232,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -951,7 +951,7 @@
             "title": "Character review",
             "type": "fix-problems",
             "x": 600,
-            "y": 150,
+            "y": 189,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Character profile",
               "maxIterations": 3,
@@ -1059,7 +1059,7 @@
             "title": "Character output",
             "type": "for-each-output",
             "x": 880,
-            "y": 150,
+            "y": 189,
             "inputs": [
               {
                 "sourceNodeTitle": "Character review",
@@ -1074,8 +1074,8 @@
       {
         "title": "Cast summary",
         "type": "merge",
-        "x": 3225,
-        "y": 374,
+        "x": 3205,
+        "y": 351,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -1093,8 +1093,8 @@
       {
         "title": "Scene plan",
         "type": "text",
-        "x": 3515,
-        "y": 836,
+        "x": 3485,
+        "y": 1035,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -1202,8 +1202,8 @@
       {
         "title": "Scene plan review: structure",
         "type": "fix-problems",
-        "x": 3795,
-        "y": 867,
+        "x": 3765,
+        "y": 1035,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan",
           "maxIterations": 2,
@@ -1265,8 +1265,8 @@
       {
         "title": "Setup/payoff registry",
         "type": "text",
-        "x": 4075,
-        "y": 448,
+        "x": 4045,
+        "y": 770,
         "aiUserInstructions": [
           "## Age rating",
           "",
@@ -1325,8 +1325,8 @@
       {
         "title": "Tension score",
         "type": "text",
-        "x": 4075,
-        "y": 729,
+        "x": 4045,
+        "y": 1015,
         "aiUserInstructions": [
           "## Age rating of the work",
           "",
@@ -1398,8 +1398,8 @@
       {
         "title": "Scene plan review: quality",
         "type": "fix-problems",
-        "x": 4355,
-        "y": 766,
+        "x": 4325,
+        "y": 1052,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan review: structure",
           "maxIterations": 3,
@@ -1513,8 +1513,8 @@
       {
         "title": "Scene plan review: motive and perception",
         "type": "fix-problems",
-        "x": 4635,
-        "y": 867,
+        "x": 4605,
+        "y": 706,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Scene plan review: quality",
           "maxIterations": 3,
@@ -1646,8 +1646,8 @@
       {
         "title": "Chunk distribution",
         "type": "split",
-        "x": 4915,
-        "y": 867,
+        "x": 4885,
+        "y": 706,
         "nodeTypeSettings": {
           "partDescription": "Description of one technical prose chunk. First line — `**Mode:** full | fragment | packed`. Then for each scene that falls into this chunk, a block.\n\nFor **full** (one whole scene):\n`**Scene N** (portion: full), «<Title VERBATIM from the plan>»`\n`Goal / Conflict / Disaster: <VERBATIM from the plan>`\n`Emotional shift: <VERBATIM from the plan>`\n\nFor **packed** — several such full-blocks in a row, each scene with portion=full.\n\nFor **fragment** one scene is split across two chunks. Block contents are **asymmetric**: first has no Disaster, last has no Goal — this structurally forbids downstream LLM-generation nodes from pulling material from the other half. At the boundary stands a «Closing beat / Resume after» marker — its text is identical character-by-character in both chunks.\n\nfragment first:\n`**Scene N** (portion: first), «<Title VERBATIM from the plan>»`\n`Goal: <VERBATIM from the plan's «Goal»>`\n`Conflict (up to the cut point): <part of the Conflict from the plan that gets played out in this half>`\n`Closing beat (chunk ENDS on this event): <one phrase, a concrete physical gesture / line / sound / object movement>`\n`Emotional shift of this chunk: <from the state at the scene's start — to the state at the Closing beat>`\n\nfragment last:\n`**Scene N** (portion: last), «<Title VERBATIM from the plan>»`\n`Resume after (the previous chunk ended on this event — it is ALREADY PLAYED OUT, do not rewrite it as a scene): <IDENTICAL to the previous chunk's Closing beat, character-by-character>`\n`Conflict (after the cut point): <part of the Conflict from the plan that remains after the Closing beat>`\n`Disaster: <VERBATIM from the plan's «Disaster»>`\n`Emotional shift of this chunk: <from the state at Resume after — to the scene's final state>`",
           "expectedPartsCount": "${chunksCount}"
@@ -1722,9 +1722,9 @@
         "title": "Per-chunk loop",
         "type": "for-each",
         "x": 5230,
-        "y": 218,
+        "y": 623,
         "width": 2520,
-        "height": 739,
+        "height": 733,
         "inputs": [
           {
             "sourceNodeTitle": "Chunk distribution",
@@ -1736,7 +1736,7 @@
             "title": "Chunk",
             "type": "for-each-input",
             "x": 40,
-            "y": 371,
+            "y": 372,
             "width": 200,
             "height": 80
           },
@@ -1744,7 +1744,7 @@
             "title": "Chunk index",
             "type": "for-each-index",
             "x": 880,
-            "y": 166,
+            "y": 309,
             "width": 200,
             "height": 80
           },
@@ -1752,7 +1752,7 @@
             "title": "Previous chunks",
             "type": "for-each-prev-outputs",
             "x": 320,
-            "y": 577,
+            "y": 208,
             "width": 200,
             "height": 80
           },
@@ -1760,7 +1760,7 @@
             "title": "Previous chunks merged",
             "type": "merge",
             "x": 600,
-            "y": 577,
+            "y": 208,
             "nodeTypeSettings": {
               "includeNodeTitle": false,
               "includeInputTitles": false,
@@ -1779,18 +1779,13 @@
             "title": "Chunk plan",
             "type": "text",
             "x": 320,
-            "y": 335,
+            "y": 437,
             "aiUserInstructions": [
               "## Age rating",
               "",
               "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} All characters are 18+ adults.{{/if}}",
               "",
               "## Novella context",
-              "",
-              "### Full scene plan",
-              "```",
-              "{{[Scene plan]}}",
-              "```",
               "",
               "### Setup/payoff registry",
               "```",
@@ -1824,7 +1819,7 @@
               "{{#if (contains [Chunk] \"**Mode:** full\")}}",
               "## What to plan (mode = full — a single scene as a whole)",
               "",
-              "Full Swain scene plan: Goal (what the lead character wants in the scene), Conflict (what's in the way), Disaster (how the scene ends — worse than it began). Per McKee — emotional charge at the start and at the end of the scene (charge shifts). **The plan content is limited to the title and G/C/D from the «Chunk (input)» section** — events and actions that the scene plan attributes to LATER scenes don't go into this plan: they get their own chunks via separate calls. The scene closes on its Disaster and that's it; no transition into the next scene.",
+              "Full Swain scene plan: Goal (what the lead character wants in the scene), Conflict (what's in the way), Disaster (how the scene ends — worse than it began). Per McKee — emotional charge at the start and at the end of the scene (charge shifts). **The plan content is limited to the title and G/C/D from the «Chunk (input)» section** — do not extrapolate past them: later scenes get their own chunks via separate calls. The scene closes on its Disaster and that's it; no transition into the next scene.",
               "{{else if (contains [Chunk] \"**Mode:** packed\")}}",
               "## What to plan (mode = packed — several short scenes in one chunk)",
               "",
@@ -1832,7 +1827,7 @@
               "{{else if (contains [Chunk] \"portion: first\")}}",
               "## What to plan (mode = fragment, portion = first — opening of a long scene)",
               "",
-              "Scene setup, entering the Goal, opening the Conflict-up-to-cut. End of the chunk — the event from the `Closing beat` line in the metadata. The Disaster and material after Closing beat do **not** go in here — they go to the parallel `portion: last` chunk. If the full scene plan in the context above shows events that happen AFTER Closing beat, don't plan them here.",
+              "Scene setup, entering the Goal, opening the Conflict-up-to-cut. End of the chunk — the event from the `Closing beat` line in the metadata. The Disaster and material after Closing beat do **not** go in here — they go to the parallel `portion: last` chunk.",
               "{{else if (contains [Chunk] \"portion: middle\")}}",
               "## What to plan (mode = fragment, portion = middle — middle of a long scene)",
               "",
@@ -1859,10 +1854,6 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Scene plan",
-                "type": "text"
-              },
-              {
                 "sourceNodeTitle": "Setup/payoff registry",
                 "type": "text"
               },
@@ -1886,7 +1877,7 @@
             "title": "Scene details",
             "type": "text",
             "x": 600,
-            "y": 454,
+            "y": 538,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -1894,7 +1885,7 @@
               "",
               "## What to do",
               "",
-              "From the `## Synopsis (full)` section below, extract **sensory, characterising, material details** that belong SPECIFICALLY to the current chunk. The chunk is described in `## Chunk (input)` and `## Chunk plan` at the end of the message; in `## Scene plan (full)` you have the full plan — used so you understand which scenes are AFTER the current chunk and DON'T pull details from them.",
+              "From the `## Synopsis (full)` section below, extract **sensory, characterising, material details** that belong SPECIFICALLY to the current chunk. The chunk is described in `## Chunk (input)` and `## Chunk plan` at the end of the message. Nothing beyond this chunk is given to you — and none is needed: the rest is revealed in its own chunks.",
               "",
               "## What to extract",
               "",
@@ -1907,10 +1898,10 @@
               "",
               "## What NOT to extract",
               "",
-              "- Events and details from scenes that come AFTER the current chunk in the Scene plan — they will be revealed in their own chunks, don't hint at or pull them in here.",
+              "- Events and details the synopsis places AFTER the current chunk in time — they will be revealed in their own chunks, don't hint at or pull them in here.",
               "- {{#if (contains [Chunk] \"portion: first\")}}Events and details from the SECOND half of the current scene (after the `Closing beat` line in the metadata). That half is played out in the parallel `portion: last` chunk; for the current chunk extract only what fits the first half — up to and including Closing beat.{{else if (contains [Chunk] \"portion: last\")}}Events and details from the FIRST half of the current scene (before the `Resume after` line in the metadata, except the Resume after itself). That half has already been played out in the previous `portion: first` chunk; for the current chunk extract only what fits the second half — from Resume after to the Disaster.{{else}}Details from other chunks — there are no other chunks for this scene, this is full or packed.{{/if}}",
               "- Intentions and decisions of characters that the synopsis reveals after the current chunk.",
-              "- General plot arcs, themes, conclusions — they are already accounted for in the Scene plan and Registry.",
+              "- General plot arcs, themes, conclusions — they are already accounted for at plan level.",
               "",
               "If the synopsis has few or no specifics for this chunk — output the short line «(no synopsis specifics for this chunk; rely on the Chunk plan and general Style rules)» and nothing else.",
               "",
@@ -1921,11 +1912,6 @@
               "## Synopsis (full)",
               "```",
               "{{[Synopsis]}}",
-              "```",
-              "",
-              "## Scene plan (full)",
-              "```",
-              "{{[Scene plan]}}",
               "```",
               "",
               "## Chunk (input)",
@@ -1944,10 +1930,6 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "Scene plan",
-                "type": "text"
-              },
-              {
                 "sourceNodeTitle": "Chunk",
                 "type": "text"
               },
@@ -1963,7 +1945,7 @@
             "title": "Chunk director notes",
             "type": "text",
             "x": 880,
-            "y": 404,
+            "y": 481,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -2053,7 +2035,7 @@
             "title": "Chunk prose",
             "type": "text",
             "x": 1160,
-            "y": 311,
+            "y": 355,
             "aiUserInstructions": [
               "## Age rating",
               "",
@@ -2214,7 +2196,7 @@
             "title": "Prose expansion",
             "type": "text",
             "x": 1440,
-            "y": 374,
+            "y": 451,
             "aiUserInstructions": [
               "## Age rating of the work",
               "",
@@ -2299,7 +2281,7 @@
             "title": "Polish: structure & continuity",
             "type": "fix-problems",
             "x": 1720,
-            "y": 374,
+            "y": 258,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Prose expansion",
               "maxIterations": 2,
@@ -2415,7 +2397,7 @@
             "title": "Polish: voice & style",
             "type": "fix-problems",
             "x": 2000,
-            "y": 366,
+            "y": 176,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Polish: structure & continuity",
               "maxIterations": 1,
@@ -2521,7 +2503,7 @@
             "title": "Chunk output",
             "type": "for-each-output",
             "x": 2280,
-            "y": 366,
+            "y": 176,
             "inputs": [
               {
                 "sourceNodeTitle": "Polish: voice & style",
@@ -2537,7 +2519,7 @@
         "title": "Draft assembly",
         "type": "merge",
         "x": 7830,
-        "y": 897,
+        "y": 1255,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -2556,7 +2538,7 @@
         "title": "HTML layout",
         "type": "format",
         "x": 8110,
-        "y": 859,
+        "y": 1242,
         "nodeTypeSettings": {
           "template": "<!doctype html>\n<html lang=\"en\"><head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{{projectName}}</title>\n<style>\n:root{--bg:#fbfaf8;--ink:#1e1c1a;--dim:#6c6560;--rule:#ddd6cc;--accent:#8a6b4f}\n@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76}}\n:root[data-theme=dark]{--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76}\n*{box-sizing:border-box}\nbody{margin:0;padding:4rem 1.25rem 6rem;background:var(--bg);color:var(--ink);font-family:Charter,Georgia,\"Times New Roman\",serif;font-size:1.0625rem;line-height:1.72}\nmain{max-width:34rem;margin:0 auto}\nh1{font-size:2.1rem;line-height:1.15;font-weight:600;margin:0 0 .6rem;text-align:center;scroll-margin-top:2rem}\n.sub{color:var(--dim);font-size:.86rem;text-align:center;font-style:italic;margin:0 0 2.6rem}\nnav.toc{margin:0 0 3.6rem;padding:1.4rem 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}\nnav.toc h2{font-size:.72rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0 0 1rem;text-align:center}\nnav.toc ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));gap:.25rem .8rem}\nnav.toc a{display:block;color:var(--ink);text-decoration:none;font-size:.9rem;padding:.25rem .45rem;border-radius:.25rem}\nnav.toc a:hover{color:var(--accent)}\nh2.part{font-size:.78rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);text-align:center;margin:3.6rem 0 1.7rem;scroll-margin-top:1.5rem}\nh2.part::before{content:\"\";display:block;width:2.5rem;height:1px;background:var(--accent);margin:0 auto 1.2rem}\nsection:first-of-type h2.part{margin-top:0}\nsection:first-of-type h2.part::before{display:none}\n.part-body{white-space:pre-wrap}\n.top{display:block;text-align:center;margin-top:3.2rem;color:var(--dim);font-size:.75rem;text-decoration:none}\nfooter{max-width:34rem;margin:3rem auto 0;padding-top:1.5rem;border-top:1px solid var(--rule);color:var(--dim);font-size:.8rem;text-align:center;font-style:italic}\n@media (max-width:30rem){body{padding:2.5rem 1rem 4rem}h1{font-size:1.7rem}}\n</style></head>\n<body><main>\n<h1 id=\"top\">{{projectName}}</h1>\n<p class=\"sub\">${ageRating}</p>\n<nav class=\"toc\"><h2>Contents</h2><ol>\n{{#each [Per-chunk loop]}}<li><a href=\"#ch{{@index}}\">Part {{add @index 1}}</a></li>\n{{/each}}</ol></nav>\n{{#each [Per-chunk loop]}}<section id=\"ch{{@index}}\">\n<h2 class=\"part\">Part {{add @index 1}}</h2>\n<div class=\"part-body\">{{stripHeading this}}</div>\n</section>\n{{/each}}\n<a class=\"top\" href=\"#top\">↑ top</a>\n</main>\n<footer>{{words [Draft assembly]}} words</footer>\n</body></html>"
         },

@@ -62,7 +62,7 @@
         "title": "Синопсис",
         "type": "text",
         "x": 40,
-        "y": 100,
+        "y": 998,
         "content": ["${synopsis}"],
         "width": 200,
         "height": 80
@@ -70,8 +70,8 @@
       {
         "title": "Черновик мира",
         "type": "text",
-        "x": 340,
-        "y": 882,
+        "x": 320,
+        "y": 1052,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -111,8 +111,8 @@
       {
         "title": "Ревью мира: физика",
         "type": "fix-problems",
-        "x": 620,
-        "y": 882,
+        "x": 600,
+        "y": 1052,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Черновик мира",
           "maxIterations": 2,
@@ -191,8 +191,8 @@
       {
         "title": "Мир",
         "type": "fix-problems",
-        "x": 900,
-        "y": 882,
+        "x": 880,
+        "y": 1052,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Ревью мира: физика",
           "maxIterations": 2,
@@ -275,8 +275,8 @@
       {
         "title": "Тема",
         "type": "text",
-        "x": 620,
-        "y": 129,
+        "x": 600,
+        "y": 589,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -309,8 +309,8 @@
       {
         "title": "Жанр и регистр",
         "type": "text",
-        "x": 620,
-        "y": 309,
+        "x": 600,
+        "y": 951,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения (задан пользователем)",
           "",
@@ -341,8 +341,8 @@
       {
         "title": "Черновик сеттинга",
         "type": "text",
-        "x": 1180,
-        "y": 979,
+        "x": 1160,
+        "y": 1175,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -384,8 +384,8 @@
       {
         "title": "Сеттинг",
         "type": "fix-problems",
-        "x": 3225,
-        "y": 979,
+        "x": 3205,
+        "y": 1205,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Черновик сеттинга",
           "maxIterations": 3,
@@ -509,8 +509,8 @@
       {
         "title": "Стиль",
         "type": "text",
-        "x": 900,
-        "y": 272,
+        "x": 880,
+        "y": 640,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -548,8 +548,8 @@
       {
         "title": "Анкета персонажа",
         "type": "text",
-        "x": 1180,
-        "y": 541,
+        "x": 1160,
+        "y": 871,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -618,8 +618,8 @@
       {
         "title": "Персонажи (список)",
         "type": "text",
-        "x": 1460,
-        "y": 172,
+        "x": 1440,
+        "y": 190,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -682,8 +682,8 @@
       {
         "title": "Голоса персонажей",
         "type": "text",
-        "x": 1740,
-        "y": 496,
+        "x": 1720,
+        "y": 770,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -779,8 +779,8 @@
       {
         "title": "Разбиение списка персонажей",
         "type": "split",
-        "x": 1740,
-        "y": 159,
+        "x": 1720,
+        "y": 177,
         "nodeTypeSettings": {
           "partDescription": "Один блок персонажа: заголовок `# Имя` первой строкой, под ним `- Поле: значение` строки для каждого anchor-поля анкеты, затем пустая строка и одна фраза о роли в сюжете и ключевой внутренней черте."
         },
@@ -812,8 +812,8 @@
       {
         "title": "Цикл по персонажам",
         "type": "for-each",
-        "x": 2025,
-        "y": 314,
+        "x": 2005,
+        "y": 291,
         "width": 1120,
         "height": 394,
         "inputs": [
@@ -827,7 +827,7 @@
             "title": "Персонаж",
             "type": "for-each-input",
             "x": 40,
-            "y": 243,
+            "y": 111,
             "width": 200,
             "height": 80
           },
@@ -835,7 +835,7 @@
             "title": "Профиль персонажа",
             "type": "text",
             "x": 320,
-            "y": 142,
+            "y": 232,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -951,7 +951,7 @@
             "title": "Ревью персонажа",
             "type": "fix-problems",
             "x": 600,
-            "y": 150,
+            "y": 189,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Профиль персонажа",
               "maxIterations": 3,
@@ -1059,7 +1059,7 @@
             "title": "Выход",
             "type": "for-each-output",
             "x": 880,
-            "y": 150,
+            "y": 189,
             "inputs": [
               {
                 "sourceNodeTitle": "Ревью персонажа",
@@ -1074,8 +1074,8 @@
       {
         "title": "Сводка по персонажам",
         "type": "merge",
-        "x": 3225,
-        "y": 374,
+        "x": 3205,
+        "y": 351,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -1093,8 +1093,8 @@
       {
         "title": "План сцен",
         "type": "text",
-        "x": 3515,
-        "y": 836,
+        "x": 3485,
+        "y": 1035,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -1202,8 +1202,8 @@
       {
         "title": "Ревью плана сцен: структура",
         "type": "fix-problems",
-        "x": 3795,
-        "y": 867,
+        "x": 3765,
+        "y": 1035,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "План сцен",
           "maxIterations": 2,
@@ -1265,8 +1265,8 @@
       {
         "title": "Реестр сетапов и пэйоффов",
         "type": "text",
-        "x": 4075,
-        "y": 448,
+        "x": 4045,
+        "y": 770,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -1325,8 +1325,8 @@
       {
         "title": "Партитура напряжения",
         "type": "text",
-        "x": 4075,
-        "y": 729,
+        "x": 4045,
+        "y": 1015,
         "aiUserInstructions": [
           "## Возрастной рейтинг произведения",
           "",
@@ -1398,8 +1398,8 @@
       {
         "title": "Ревью плана сцен: качество",
         "type": "fix-problems",
-        "x": 4355,
-        "y": 766,
+        "x": 4325,
+        "y": 1052,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Ревью плана сцен: структура",
           "maxIterations": 3,
@@ -1513,8 +1513,8 @@
       {
         "title": "Ревью плана сцен: мотив и восприятие",
         "type": "fix-problems",
-        "x": 4635,
-        "y": 867,
+        "x": 4605,
+        "y": 706,
         "nodeTypeSettings": {
           "sourceNodeTitleToFix": "Ревью плана сцен: качество",
           "maxIterations": 3,
@@ -1646,8 +1646,8 @@
       {
         "title": "Распределение по чанкам",
         "type": "split",
-        "x": 4915,
-        "y": 867,
+        "x": 4885,
+        "y": 706,
         "nodeTypeSettings": {
           "partDescription": "Описание одного технического чанка прозы. Первая строка — `**Режим:** full | fragment | packed`. Затем для каждой сцены, попавшей в чанк, блок.\n\nДля **full** (одна сцена целиком):\n`**Сцена N** (portion: full), «<Заголовок ДОСЛОВНО из плана>»`\n`Цель / Конфликт / Катастрофа: <ДОСЛОВНО из плана>`\n`Эмоциональный сдвиг: <ДОСЛОВНО из плана>`\n\nДля **packed** — несколько таких full-блоков подряд, каждая сцена с portion=full.\n\nДля **fragment** одна сцена расщеплена на два чанка. Содержимое блоков **асимметрично**: в first нет Катастрофы, в last нет Цели — это структурно запрещает LLM-генерации downstream-нод писать материал из чужой половины. На границе стоит метка «Closing beat / Resume after» — её текст в обоих чанках одинаков символ-в-символ.\n\nfragment first:\n`**Сцена N** (portion: first), «<Заголовок ДОСЛОВНО из плана>»`\n`Цель: <ДОСЛОВНО из «Цель» плана>`\n`Конфликт (до точки обрыва): <часть Конфликта из плана, которая успевает раскрыться в этой половине>`\n`Closing beat (чанк ЗАКАНЧИВАЕТСЯ на этом событии): <одна фраза, конкретный физический жест / реплика / звук / движение объекта>`\n`Эмоциональный сдвиг этого чанка: <от состояния в начале сцены — до состояния на Closing beat>`\n\nfragment last:\n`**Сцена N** (portion: last), «<Заголовок ДОСЛОВНО из плана>»`\n`Resume after (предыдущий чанк закончился на этом событии — оно УЖЕ ОТЫГРАНО, не переписывать как сцену): <ИДЕНТИЧНО Closing beat предыдущего чанка, символ-в-символ>`\n`Конфликт (после точки обрыва): <часть Конфликта из плана, оставшаяся после Closing beat>`\n`Катастрофа: <ДОСЛОВНО из «Катастрофа» плана>`\n`Эмоциональный сдвиг этого чанка: <от состояния на Resume after — до финала сцены>`",
           "expectedPartsCount": "${chunksCount}"
@@ -1722,9 +1722,9 @@
         "title": "Цикл по чанкам",
         "type": "for-each",
         "x": 5230,
-        "y": 218,
+        "y": 623,
         "width": 2520,
-        "height": 739,
+        "height": 733,
         "inputs": [
           {
             "sourceNodeTitle": "Распределение по чанкам",
@@ -1736,7 +1736,7 @@
             "title": "Чанк",
             "type": "for-each-input",
             "x": 40,
-            "y": 371,
+            "y": 372,
             "width": 200,
             "height": 80
           },
@@ -1744,7 +1744,7 @@
             "title": "Номер чанка",
             "type": "for-each-index",
             "x": 880,
-            "y": 166,
+            "y": 309,
             "width": 200,
             "height": 80
           },
@@ -1752,7 +1752,7 @@
             "title": "Предыдущие чанки",
             "type": "for-each-prev-outputs",
             "x": 320,
-            "y": 577,
+            "y": 208,
             "width": 200,
             "height": 80
           },
@@ -1760,7 +1760,7 @@
             "title": "Сборка предыдущих чанков",
             "type": "merge",
             "x": 600,
-            "y": 577,
+            "y": 208,
             "nodeTypeSettings": {
               "includeNodeTitle": false,
               "includeInputTitles": false,
@@ -1779,18 +1779,13 @@
             "title": "План чанка",
             "type": "text",
             "x": 320,
-            "y": 335,
+            "y": 437,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
               "${ageRating}.{{#if (or (eq \"${ageRating}\" \"18+\") (eq \"${ageRating}\" \"NC-21\"))}} Всем героям не менее 18 лет.{{/if}}",
               "",
               "## Контекст повести",
-              "",
-              "### Полный план сцен",
-              "```",
-              "{{[План сцен]}}",
-              "```",
               "",
               "### Реестр сетапов и пэйоффов",
               "```",
@@ -1824,7 +1819,7 @@
               "{{#if (contains [Чанк] \"**Режим:** full\")}}",
               "## Что планировать (mode = full — одна сцена целиком)",
               "",
-              "План полной сцены по Свейну: Цель (что хочет ведущий персонаж в сцене), Конфликт (что мешает), Катастрофа (с чем сцена кончается — лучше хуже, чем было). По МакКи — эмоциональный заряд в начале и в конце сцены (заряд меняется). **Содержание плана ограничено заголовком и G/C/D из секции «Чанк (вход)»** — события и действия, которые в плане сцен относятся к ПОСЛЕДУЮЩИМ сценам, в этот план не входят: они получат свои чанки отдельным вызовом. Сцена закрывается своей Катастрофой и на этом всё; перехода к следующей сцене не происходит.",
+              "План полной сцены по Свейну: Цель (что хочет ведущий персонаж в сцене), Конфликт (что мешает), Катастрофа (с чем сцена кончается — лучше хуже, чем было). По МакКи — эмоциональный заряд в начале и в конце сцены (заряд меняется). **Содержание плана ограничено заголовком и G/C/D из секции «Чанк (вход)»** — за их пределы не достраивай: последующие сцены получат свои чанки отдельным вызовом. Сцена закрывается своей Катастрофой и на этом всё; перехода к следующей сцене не происходит.",
               "{{else if (contains [Чанк] \"**Режим:** packed\")}}",
               "## Что планировать (mode = packed — несколько коротких сцен в одном чанке)",
               "",
@@ -1832,7 +1827,7 @@
               "{{else if (contains [Чанк] \"portion: first\")}}",
               "## Что планировать (mode = fragment, portion = first — начало длинной сцены)",
               "",
-              "Установка сцены, вход в Цель, открытие Конфликта-до-обрыва. Конец чанка — событие `Closing beat` из метаданных. Катастрофа и материал после Closing beat сюда **не входят** — они уйдут в parallel-чанк `portion: last`. Если в полном плане сцен из контекста выше видишь события, которые произойдут ПОСЛЕ Closing beat, — не планируй их здесь.",
+              "Установка сцены, вход в Цель, открытие Конфликта-до-обрыва. Конец чанка — событие `Closing beat` из метаданных. Катастрофа и материал после Closing beat сюда **не входят** — они уйдут в parallel-чанк `portion: last`.",
               "{{else if (contains [Чанк] \"portion: middle\")}}",
               "## Что планировать (mode = fragment, portion = middle — середина длинной сцены)",
               "",
@@ -1859,10 +1854,6 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "План сцен",
-                "type": "text"
-              },
-              {
                 "sourceNodeTitle": "Реестр сетапов и пэйоффов",
                 "type": "text"
               },
@@ -1886,7 +1877,7 @@
             "title": "Подробности сцены",
             "type": "text",
             "x": 600,
-            "y": 454,
+            "y": 538,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -1894,7 +1885,7 @@
               "",
               "## Что нужно сделать",
               "",
-              "Из секции `## Синопсис (полный)` ниже извлеки **сенсорные, характерные, материальные подробности**, относящиеся ИМЕННО к текущему чанку. Чанк описан в `## Чанк (вход)` и `## План этого чанка` в конце сообщения; в `## План сцен (полный)` подан полный план — он нужен для того, чтобы ты понимал, какие сцены ПОСЛЕ текущего чанка и НЕ извлекал из них детали.",
+              "Из секции `## Синопсис (полный)` ниже извлеки **сенсорные, характерные, материальные подробности**, относящиеся ИМЕННО к текущему чанку. Чанк описан в `## Чанк (вход)` и `## План этого чанка` в конце сообщения. Ничего за пределами этого чанка тебе не подано — и не нужно: остальное раскроется в своих чанках.",
               "",
               "## Что извлекать",
               "",
@@ -1907,10 +1898,10 @@
               "",
               "## Что НЕ извлекать",
               "",
-              "- События и подробности из сцен, которые в Плане сцен идут ПОСЛЕ текущего чанка — они будут раскрыты в своих чанках, не намекай и не вытаскивай их сюда.",
+              "- События и подробности, которые синопсис относит ко времени ПОСЛЕ текущего чанка — они будут раскрыты в своих чанках, не намекай и не вытаскивай их сюда.",
               "- {{#if (contains [Чанк] \"portion: first\")}}События и подробности из ВТОРОЙ половины текущей сцены (после строки `Closing beat` в метаданных). Эта половина отыгрывается в parallel-чанке `portion: last`; для текущего чанка извлекай только то, что укладывается в первую половину — до Closing beat включительно.{{else if (contains [Чанк] \"portion: last\")}}События и подробности из ПЕРВОЙ половины текущей сцены (до строки `Resume after` в метаданных, кроме самой точки Resume after). Эта половина уже отыграна в предыдущем чанке `portion: first`; для текущего чанка извлекай только то, что укладывается во вторую половину — от Resume after до Катастрофы.{{else}}Деталей из других чанков — нет других чанков для этой сцены, это full или packed.{{/if}}",
               "- Намерения и решения героев, которые в синопсисе раскрываются позже текущего чанка.",
-              "- Общие сюжетные арки, темы, выводы — они уже учтены в Плане сцен и Реестре.",
+              "- Общие сюжетные арки, темы, выводы — они уже учтены на уровне плана.",
               "",
               "Если в синопсисе для этого чанка подробностей мало или нет — выведи короткую строку «(в синопсисе нет специфики для этого чанка; опирайся на План чанка и общие правила Стиля)» и больше ничего.",
               "",
@@ -1921,11 +1912,6 @@
               "## Синопсис (полный)",
               "```",
               "{{[Синопсис]}}",
-              "```",
-              "",
-              "## План сцен (полный)",
-              "```",
-              "{{[План сцен]}}",
               "```",
               "",
               "## Чанк (вход)",
@@ -1944,10 +1930,6 @@
                 "type": "text"
               },
               {
-                "sourceNodeTitle": "План сцен",
-                "type": "text"
-              },
-              {
                 "sourceNodeTitle": "Чанк",
                 "type": "text"
               },
@@ -1963,7 +1945,7 @@
             "title": "Режиссёрские пометки чанка",
             "type": "text",
             "x": 880,
-            "y": 404,
+            "y": 481,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -2053,7 +2035,7 @@
             "title": "Проза чанка",
             "type": "text",
             "x": 1160,
-            "y": 311,
+            "y": 355,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -2214,7 +2196,7 @@
             "title": "Расширение прозы",
             "type": "text",
             "x": 1440,
-            "y": 374,
+            "y": 451,
             "aiUserInstructions": [
               "## Возрастной рейтинг произведения",
               "",
@@ -2299,7 +2281,7 @@
             "title": "Полировка: структура и continuity",
             "type": "fix-problems",
             "x": 1720,
-            "y": 374,
+            "y": 258,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Расширение прозы",
               "maxIterations": 2,
@@ -2415,7 +2397,7 @@
             "title": "Полировка: голос и стиль",
             "type": "fix-problems",
             "x": 2000,
-            "y": 366,
+            "y": 176,
             "nodeTypeSettings": {
               "sourceNodeTitleToFix": "Полировка: структура и continuity",
               "maxIterations": 1,
@@ -2521,7 +2503,7 @@
             "title": "Выход чанка",
             "type": "for-each-output",
             "x": 2280,
-            "y": 366,
+            "y": 176,
             "inputs": [
               {
                 "sourceNodeTitle": "Полировка: голос и стиль",
@@ -2537,7 +2519,7 @@
         "title": "Сборка драфта",
         "type": "merge",
         "x": 7830,
-        "y": 897,
+        "y": 1255,
         "nodeTypeSettings": {
           "includeNodeTitle": false,
           "includeInputTitles": false,
@@ -2556,7 +2538,7 @@
         "title": "Вёрстка HTML",
         "type": "format",
         "x": 8110,
-        "y": 859,
+        "y": 1242,
         "nodeTypeSettings": {
           "template": "<!doctype html>\n<html lang=\"ru\"><head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{{projectName}}</title>\n<style>\n:root{--bg:#fbfaf8;--ink:#1e1c1a;--dim:#6c6560;--rule:#ddd6cc;--accent:#8a6b4f}\n@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76}}\n:root[data-theme=dark]{--bg:#16151a;--ink:#e6e2dc;--dim:#9a938c;--rule:#33303a;--accent:#c39b76}\n*{box-sizing:border-box}\nbody{margin:0;padding:4rem 1.25rem 6rem;background:var(--bg);color:var(--ink);font-family:Charter,Georgia,\"Times New Roman\",serif;font-size:1.0625rem;line-height:1.72}\nmain{max-width:34rem;margin:0 auto}\nh1{font-size:2.1rem;line-height:1.15;font-weight:600;margin:0 0 .6rem;text-align:center;scroll-margin-top:2rem}\n.sub{color:var(--dim);font-size:.86rem;text-align:center;font-style:italic;margin:0 0 2.6rem}\nnav.toc{margin:0 0 3.6rem;padding:1.4rem 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}\nnav.toc h2{font-size:.72rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0 0 1rem;text-align:center}\nnav.toc ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));gap:.25rem .8rem}\nnav.toc a{display:block;color:var(--ink);text-decoration:none;font-size:.9rem;padding:.25rem .45rem;border-radius:.25rem}\nnav.toc a:hover{color:var(--accent)}\nh2.part{font-size:.78rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);text-align:center;margin:3.6rem 0 1.7rem;scroll-margin-top:1.5rem}\nh2.part::before{content:\"\";display:block;width:2.5rem;height:1px;background:var(--accent);margin:0 auto 1.2rem}\nsection:first-of-type h2.part{margin-top:0}\nsection:first-of-type h2.part::before{display:none}\n.part-body{white-space:pre-wrap}\n.top{display:block;text-align:center;margin-top:3.2rem;color:var(--dim);font-size:.75rem;text-decoration:none}\nfooter{max-width:34rem;margin:3rem auto 0;padding-top:1.5rem;border-top:1px solid var(--rule);color:var(--dim);font-size:.8rem;text-align:center;font-style:italic}\n@media (max-width:30rem){body{padding:2.5rem 1rem 4rem}h1{font-size:1.7rem}}\n</style></head>\n<body><main>\n<h1 id=\"top\">{{projectName}}</h1>\n<p class=\"sub\">${ageRating}</p>\n<nav class=\"toc\"><h2>Содержание</h2><ol>\n{{#each [Цикл по чанкам]}}<li><a href=\"#ch{{@index}}\">Часть {{add @index 1}}</a></li>\n{{/each}}</ol></nav>\n{{#each [Цикл по чанкам]}}<section id=\"ch{{@index}}\">\n<h2 class=\"part\">Часть {{add @index 1}}</h2>\n<div class=\"part-body\">{{stripHeading this}}</div>\n</section>\n{{/each}}\n<a class=\"top\" href=\"#top\">↑ наверх</a>\n</main>\n<footer>{{words [Сборка драфта]}} слов</footer>\n</body></html>"
         },
