@@ -40,7 +40,7 @@ import { Command, InvalidArgumentError } from "commander"
 import { setCurrentDbPath } from "../src/backend/db/state.js"
 import { PlanNodeRepository } from "../src/backend/plan/nodes/plan-node-repository.js"
 import { PlanNodeService } from "../src/backend/plan/nodes/plan-node-service.js"
-import { loopLength } from "../src/shared/for-each-plan-node.js"
+import { iterationKeys } from "../src/shared/loop-iterations.js"
 import type { PlanNodeDefinition, PlanNodeRow } from "../src/shared/plan-graph.js"
 import { childPath, type NodePath, ROOT_PATH } from "../src/shared/plan-node-path.js"
 import { openProject } from "./lib/project-paths.js"
@@ -168,8 +168,15 @@ function pathsOf(service: PlanNodeService, node: PlanNodeDefinition, args: CliAr
     const innermost = depth === loops.length - 1
     paths = paths.flatMap((p) =>
       innermost && args.iteration !== undefined
-        ? [childPath(p, loop, args.iteration)]
-        : Array.from({ length: loopLength(service.getRow(loop, p).content) }, (_, i) => childPath(p, loop, i)),
+        ? (() => {
+            const row = service.getRow(loop, p)
+            const key = iterationKeys(row.type, row.content)[args.iteration] ?? String(args.iteration)
+            return [childPath(p, loop, key)]
+          })()
+        : (() => {
+            const row = service.getRow(loop, p)
+            return iterationKeys(row.type, row.content).map((key) => childPath(p, loop, key))
+          })(),
     )
   })
   return paths

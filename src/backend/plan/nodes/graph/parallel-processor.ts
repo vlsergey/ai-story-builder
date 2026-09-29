@@ -12,7 +12,8 @@ import type { PlanNodeService } from "../plan-node-service.js"
 import { loopChild, loopElements } from "./loop-input.js"
 import type { NodeProcessor } from "./node-processor.js"
 
-const sha256 = (element: string) => createHash("sha256").update(element, "utf8").digest("hex")
+/** The full hash an element's iteration key is a prefix of. */
+export const elementHash = (element: string) => createHash("sha256").update(element, "utf8").digest("hex")
 
 /**
  * A loop whose iterations run side by side. An iteration is keyed by the
@@ -40,7 +41,7 @@ export class ParallelProcessor implements NodeProcessor<ParallelSettings> {
   ): Promise<PlanNodeStateUpdate | null> {
     const elements = loopElements(service, row)
     const input = loopChild(service, row.id, "for-each-input")
-    const expansion = expandParallel(parseParallelContent(row.content), elements, sha256)
+    const expansion = expandParallel(parseParallelContent(row.content), elements, elementHash)
 
     // The iterations are recorded before they run, as a for-each does.
     const content = JSON.stringify(expansion.content)

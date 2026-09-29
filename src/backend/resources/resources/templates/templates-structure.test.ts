@@ -73,7 +73,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   const allNodes = walkPlanNodes(template.plan?.nodes)
 
   // ── Shared classifiers used by the prompt-cache discipline tests below ───
-  // A node is "dynamic" iff it lives anywhere inside a for-each — its content
+  // A node is "dynamic" iff it lives anywhere inside a loop — its content
   // varies per iteration. "Growing" is a refinement: a merge node whose
   // direct input is a for-each-prev-outputs sibling — its content is the
   // prefix of the next iteration's content (append-only).
@@ -82,7 +82,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   function insideForEach(n: TemplateProjectPlanNode): boolean {
     let cur: TemplateProjectPlanNode | null = parentOf.get(n) ?? null
     while (cur != null) {
-      if (cur.type === "for-each") return true
+      if (cur.type === "for-each" || cur.type === "parallel") return true
       cur = parentOf.get(cur) ?? null
     }
     return false
@@ -333,8 +333,8 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     })
   })
 
-  describe("every for-each has a for-each-input child", () => {
-    const forEachNodes = allNodes.filter(({ node }) => node.type === "for-each")
+  describe("every loop has a for-each-input child", () => {
+    const forEachNodes = allNodes.filter(({ node }) => node.type === "for-each" || node.type === "parallel")
     if (forEachNodes.length === 0) {
       it.skip("no for-each nodes in this template", () => {})
     }

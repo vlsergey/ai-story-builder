@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { iterationKeys } from "../../../../shared/loop-iterations.js"
 import { childPath } from "../../../../shared/plan-node-path.js"
 import type { ProjectTemplate } from "../../../../shared/project-template.js"
 import { setUpTestDb, tearDownTestDb } from "../../../db/test-db-utils.js"
@@ -124,8 +125,8 @@ describe("fiction-arc end-to-end (stubbed LLM)", () => {
     expect(parts).toHaveLength(2)
 
     const cycle = byTitle.get("Цикл по персонажам")!
-    const cycleContent = JSON.parse(cycle.content || "{}") as { length?: number }
-    expect(cycleContent.length, `Цикл length should be 2, got ${cycleContent.length}`).toBe(2)
+    const keys = iterationKeys(cycle.type, cycle.content)
+    expect(keys, "one iteration per character").toHaveLength(2)
     expect(cycle.status).not.toBe("EMPTY")
 
     // Inspect children of the cast for-each
@@ -137,14 +138,11 @@ describe("fiction-arc end-to-end (stubbed LLM)", () => {
     expect(review, "Ревью персонажа child must exist").toBeTruthy()
     expect(output, "Выход child must exist").toBeTruthy()
 
-    // For-each output: each iteration's output child, in its own row
-    const outputs = Array.from(
-      { length: cycleContent.length ?? 0 },
-      (_, i) => service.getRow(output!.id, childPath("", cycle.id, i)).content ?? "",
-    )
+    // The loop's output: each iteration's output child, in its own row
+    const outputs = keys.map((key) => service.getRow(output!.id, childPath("", cycle.id, key)).content ?? "")
 
     console.log("--- DIAGNOSTIC OUTPUT ---")
-    console.log("Cycle content:", JSON.stringify(cycleContent, null, 2))
+    console.log("Cycle content:", cycle.content)
     console.log("Per-iteration outputs:", outputs)
     console.log("--- END DIAGNOSTIC ---")
 

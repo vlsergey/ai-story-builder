@@ -91,6 +91,11 @@ export class PlanNodeRepository {
     })
   }
 
+  /** Changes what kind of node it is — only ever done together with moving its state to the new kind's layout. */
+  setType(id: number, type: PlanNodeType): void {
+    withDbWrite((db) => db.prepare("UPDATE plan_nodes SET type = ? WHERE id = ?").run(type, id))
+  }
+
   /** Deletes a node; its children, edges and states go by foreign key. */
   delete(id: number): number {
     return withDbWrite((db) => db.prepare("DELETE FROM plan_nodes WHERE id = ?").run(id).changes)

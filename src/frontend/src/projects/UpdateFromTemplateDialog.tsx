@@ -50,6 +50,8 @@ export default function UpdateFromTemplateDialog() {
   const hasChanges =
     !!analysis &&
     (analysis.updatedNodes.length > 0 ||
+      analysis.retypedNodes.length > 0 ||
+      analysis.retypeBlocked.length > 0 ||
       analysis.newNodes.length > 0 ||
       analysis.newEdges.length > 0 ||
       analysis.removedEdges.length > 0)
@@ -81,6 +83,43 @@ export default function UpdateFromTemplateDialog() {
                       <ul className="ml-4 list-disc">
                         {analysis.updatedNodes.map((n) => (
                           <li key={n.title}>{n.title}</li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+                {analysis.retypedNodes.length > 0 && (
+                  <AccordionItem value="retyped">
+                    <AccordionTrigger>
+                      {t("UpdateFromTemplateDialog.retypedNodesHeader", { count: analysis.retypedNodes.length })}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="ml-4 list-disc">
+                        {analysis.retypedNodes.map((n) => (
+                          <li key={n.title}>
+                            {t("UpdateFromTemplateDialog.retypedNode", { title: n.title, from: n.from, to: n.to })}
+                          </li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+                {analysis.retypeBlocked.length > 0 && (
+                  <AccordionItem value="retype-blocked">
+                    <AccordionTrigger>
+                      {t("UpdateFromTemplateDialog.retypeBlockedHeader", { count: analysis.retypeBlocked.length })}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="ml-4 list-disc">
+                        {analysis.retypeBlocked.map((n) => (
+                          <li key={n.title}>
+                            {t("UpdateFromTemplateDialog.retypeBlockedNode", {
+                              title: n.title,
+                              from: n.from,
+                              to: n.to,
+                              reason: n.reason,
+                            })}
+                          </li>
                         ))}
                       </ul>
                     </AccordionContent>

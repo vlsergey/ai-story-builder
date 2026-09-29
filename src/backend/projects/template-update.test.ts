@@ -322,6 +322,94 @@ describe("template-update", () => {
     expect(left, "hand-wired edge must survive").toEqual(["Root → Project-only"])
   })
 
+  /** A project whose character loop ran sequentially, over Аня, Боря and Аня again. */
+  function sequentialCast(): { template: ProjectTemplate; loop: number; input: number; profile: number } {
+    const template = {
+      label: "cast",
+      description: "cast",
+      wizardPages: [],
+      plan: {
+        nodes: [
+          { title: "Cast", type: "split", aiUserInstructions: ["List the cast."], inputs: [] },
+          {
+            title: "Loop",
+            type: "for-each",
+            inputs: [{ sourceNodeTitle: "Cast", type: "textArray" }],
+            children: [
+              { title: "Character", type: "for-each-input" },
+              {
+                title: "Profile",
+                type: "text",
+                aiUserInstructions: ["Profile of {{[Character]}}"],
+                inputs: [{ sourceNodeTitle: "Character", type: "text" }],
+              },
+              { title: "Result", type: "for-each-output", inputs: [{ sourceNodeTitle: "Profile", type: "text" }] },
+            ],
+          },
+        ],
+      },
+    } as unknown as ProjectTemplate
+    applyProjectTemplate(template, {})
+    SettingsRepository.setAppliedTemplateFile("cast.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+    const all = new PlanNodeRepository().findAll()
+    const id = (title: string) => all.find((n) => n.title === title)!.id
+    const [loop, input, profile, result] = ["Loop", "Character", "Profile", "Result"].map(id)
+    seedState(id("Cast"), "", { status: "GENERATED", content: JSON.stringify(["Аня", "Боря", "Аня"]) })
+    seedState(loop, "", { status: "GENERATED", content: JSON.stringify({ length: 3 }) })
+    ;["Аня", "Боря", "Аня"].forEach((name, i) => {
+      seedState(input, `${loop}:${i}`, { status: "GENERATED", content: name })
+      seedState(profile, `${loop}:${i}`, {
+        status: i === 1 ? "MANUAL" : "GENERATED",
+        content: `profile of ${name} #${i}`,
+      })
+      seedState(result, `${loop}:${i}`, { status: "GENERATED", content: `profile of ${name} #${i}` })
+    })
+    return { template, loop, input, profile }
+  }
+
+  it("turns a loop the template made parallel into one, keeping what each element produced", async () => {
+    const { template, loop, profile } = sequentialCast()
+    const parallel = JSON.parse(JSON.stringify(template)) as ProjectTemplate
+    ;(parallel.plan as any).nodes[1].type = "parallel"
+    writeTemplate("cast.json", parallel)
+
+    expect(analyzeTemplateUpdate().retypedNodes).toEqual([{ title: "Loop", from: "for-each", to: "parallel" }])
+    await applyTemplateUpdate()
+
+    expect(new PlanNodeRepository().findById(loop)?.type).toBe("parallel")
+    const { createHash } = await import("node:crypto")
+    const key = (name: string) => createHash("sha256").update(name, "utf8").digest("hex").slice(0, 6)
+    expect(stateAt(profile, `${loop}:${key("Аня")}`)?.content, "the first of identical elements").toBe(
+      "profile of Аня #0",
+    )
+    expect(stateAt(profile, `${loop}:${key("Боря")}`)).toMatchObject({
+      content: "profile of Боря #1",
+      status: "MANUAL",
+    })
+    expect(stateAt(profile, `${loop}:0`), "no row stays under an index").toBeUndefined()
+    expect(stateAt(profile, `${loop}:2`)).toBeUndefined()
+    const content = JSON.parse(stateAt(loop)?.content ?? "{}")
+    expect(content.order).toEqual([key("Аня"), key("Боря"), key("Аня")])
+    // Nothing is stale: the next run has nothing to redo.
+    expect(propagateStaleStatus().marked).toEqual([])
+  })
+
+  it("leaves a sequential loop alone when it holds what a parallel loop cannot", async () => {
+    const { template, loop } = sequentialCast()
+    new PlanNodeRepository().insert({ title: "Earlier", type: "for-each-prev-outputs", parent_id: loop })
+    const parallel = JSON.parse(JSON.stringify(template)) as ProjectTemplate
+    ;(parallel.plan as any).nodes[1].type = "parallel"
+    writeTemplate("cast.json", parallel)
+
+    const analysis = analyzeTemplateUpdate()
+    expect(analysis.retypedNodes).toEqual([])
+    expect(analysis.retypeBlocked.map((n) => n.title)).toEqual(["Loop"])
+    await applyTemplateUpdate()
+
+    expect(new PlanNodeRepository().findById(loop)?.type).toBe("for-each")
+  })
+
   it("demotes the target of a removed edge — its inputs changed", async () => {
     const initial = baseTemplate()
     applyProjectTemplate(initial, {})
