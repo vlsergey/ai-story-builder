@@ -875,9 +875,13 @@ export class PlanNodeService {
 
   /** Marks a node whose regeneration threw — broken, or left to be redone after a stop — and rethrows. */
   private async failRegeneration(node: PlanNodeRow, context: RegenerationNodeContext, e: unknown): Promise<never> {
-    console.error(`Unable to regenerate node ${node.id} at "${node.path}"`, e)
-    // A stopped node is left to be redone, not marked broken.
-    await this.landRegeneration(node, { status: context.abortSignal.aborted ? "OUTDATED" : "ERROR" })
+    // A stopped node is left to be redone, not marked broken. What it threw
+    // comes of the answer the stop cut short, and says nothing about the node.
+    const stopped = context.abortSignal.aborted
+    if (stopped)
+      console.warn("[PlanNodeService]", "regenerate", `Stop node ${node.id} regeneration due to abort signal`)
+    else console.error(`Unable to regenerate node ${node.id} at "${node.path}"`, e)
+    await this.landRegeneration(node, { status: stopped ? "OUTDATED" : "ERROR" })
     throw e
   }
 

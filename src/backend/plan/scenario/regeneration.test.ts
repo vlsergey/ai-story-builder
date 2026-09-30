@@ -101,6 +101,27 @@ describe("a run", () => {
     expect(s.generated()).not.toContain("Проза")
   })
 
+  it("that is stopped does not report as failed the node whose answer the stop cut short", async () => {
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "История по главам.")
+      g.split("Главы", { prompt: "Главы:\n{{[Синопсис]}}" })
+    })
+    // What arrived before the stop is not the JSON a split reads.
+    s.engine.on(() => {
+      s.stop()
+      return '{"parts":["Глава'
+    })
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    await expect(s.run()).rejects.toThrow("Stop was required")
+
+    const reported = errors.mock.calls.map(([message]) => String(message))
+    errors.mockRestore()
+    expect(s.status("Главы")).toBe("OUTDATED")
+    expect(s.lastStatus?.firstError ?? null, "a stop is not a failure").toBeNull()
+    expect(reported.filter((message) => message.startsWith("Unable to regenerate"))).toEqual([])
+  })
+
   it("shows a broken layout template as ERROR, not as generated text", async () => {
     const s = story()
     s.extend((g) => g.format("Страница", "<h1>{{[Нет такого узла]}}</h1>", ["Проза"]))
