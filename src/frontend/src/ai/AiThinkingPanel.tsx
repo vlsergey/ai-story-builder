@@ -5,6 +5,7 @@ import { BrainCogIcon, GlobeIcon, WrenchIcon } from "lucide-react"
 import { useLocale } from "@/i18n/locale"
 import { useTranslation } from "react-i18next"
 import { SiX } from "@icons-pack/react-simple-icons"
+import { thinkingItems } from "./thinking-items"
 
 interface AiThinkingPanelProps {
   className?: string
@@ -23,45 +24,30 @@ const icons: Record<string, React.FC<{ className: string }>> = {
   "custom_tool_call.x_keyword_search": SiX,
 }
 
+/** The thinking of one call as it is fed events: for a view that follows a single call. */
 const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(({ className, itemClassName }, ref) => {
-  const { exists } = useLocale()
-  const { t } = useTranslation()
   const [items, setItems] = useState<ResponseOutputItem[]>([])
 
   useImperativeHandle(ref, () => ({
     onEvent: (event: ResponseStreamEvent) => {
-      switch (event.type) {
-        case "response.output_item.added":
-        case "response.output_item.done":
-          setItems((items) => {
-            const newItems = [...items]
-            newItems[event.output_index] = event.item
-            return newItems
-          })
-          break
-        case "response.reasoning_summary_text.delta":
-          // Grok and similar reasoning-capable models stream reasoning text
-          // chunk-by-chunk after the reasoning output_item arrives. Accumulate
-          // into the item's summary[summary_index].text so the panel can show
-          // the live "what the model is thinking" stream.
-          setItems((items) => {
-            const item = items[event.output_index]
-            if (!item || item.type !== "reasoning") return items
-            const summary = [...(item.summary ?? [])]
-            const existing = summary[event.summary_index]
-            const prevText = existing?.type === "summary_text" ? existing.text : ""
-            summary[event.summary_index] = { type: "summary_text", text: prevText + event.delta }
-            const newItems = [...items]
-            newItems[event.output_index] = { ...item, summary }
-            return newItems
-          })
-          break
-      }
+      setItems((items) => thinkingItems(items, event))
     },
     onComplete: () => {
       setItems([])
     },
   }))
+
+  return <AiThinkingItems items={items} className={className} itemClassName={itemClassName} />
+})
+
+/** What a model thinks and looks up: the last few steps, the running one pulsing. */
+export function AiThinkingItems({
+  items,
+  className,
+  itemClassName,
+}: AiThinkingPanelProps & { items: ResponseOutputItem[] }) {
+  const { exists } = useLocale()
+  const { t } = useTranslation()
 
   return (
     <div className={className ?? "text-muted-foreground"}>
@@ -105,7 +91,7 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
                       if (!joined) return null
                       const tail = joined.length > 160 ? `…${joined.slice(-160)}` : joined
                       return (
-                        <span className="ml-1 italic">
+                        <span className="italic">
                           {": "}
                           {tail}
                         </span>
@@ -147,6 +133,6 @@ const AiThinkingPanel = forwardRef<AiThinkingPanelHandle, AiThinkingPanelProps>(
         })}
     </div>
   )
-})
+}
 
 export default AiThinkingPanel
