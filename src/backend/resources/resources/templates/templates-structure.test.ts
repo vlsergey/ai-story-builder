@@ -663,6 +663,28 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     })
   })
 
+  // ─── No words of a character's speech to copy ────────────────────────────
+  // A sample of how a character speaks — a quoted label with a few words
+  // after it — is handed on as it is: the voice plan answers with such lists,
+  // the profile carries them, and the prose then builds every line of that
+  // character out of those words. A prompt names a manner of speech and
+  // gives no words of it.
+  describe("no prompt gives words of a character's speech to copy", () => {
+    it("has no quoted «label: word, word» sample", () => {
+      const failures: string[] = []
+      for (const { node } of allNodes) {
+        for (const { field, lines } of gatherPromptFields(node)) {
+          for (const [, quoted] of lines.join("\n").matchAll(/[«“]([^«»“”\n]*)[»”]/g)) {
+            if (/^[^\d:]{3,60}:\s*[^,:]+(?:,\s*[^,:]+)+$/.test(quoted.trim())) {
+              failures.push(`${node.title}.${field}: «${quoted}»`)
+            }
+          }
+        }
+      }
+      expect(failures).toEqual([])
+    })
+  })
+
   // ─── Apply-time check — the whole template applies into a fresh DB ───────
   // Catches things the pure-JSON checks above can't: cross-parent references
   // that don't resolve, fix-problems sourceNodeTitleToFix pointing nowhere,
