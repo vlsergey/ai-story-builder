@@ -149,7 +149,6 @@
   "planGraph.addNode.format": "Форматирование",
   "planGraph.addNode.lore": "Лор",
   "planGraph.addNode.merge": "Объединение",
-  "planGraph.addNode.parallel": "Параллельный цикл",
   "planGraph.addNode.script": "Скрипт",
   "planGraph.addNode.split": "Разделение",
   "planGraph.addNode.text": "Текст",

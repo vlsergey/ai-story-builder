@@ -173,20 +173,4 @@ export class PlanNodeStateRepository {
       return deleted
     })
   }
-
-  /**
-   * Moves an iteration of loop `containerId` at `containerPath` from key `from`
-   * to key `to`, with everything nested in it, as a parallel loop does when its
-   * keys grow. Every moved row gets a new revision.
-   */
-  renameIteration(containerId: number, containerPath: NodePath, from: string, to: string): number {
-    return withDbWrite((db) => {
-      const oldPath = childPath(containerPath, containerId, from)
-      const newPath = childPath(containerPath, containerId, to)
-      const { sql, params } = atOrBelowSql("path", oldPath)
-      return db
-        .prepare(`UPDATE plan_node_states SET path = ? || substr(path, ?), rev = ? WHERE ${sql}`)
-        .run(newPath, oldPath.length + 1, newRev(), ...params).changes
-    })
-  }
 }

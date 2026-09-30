@@ -53,7 +53,6 @@ function analysis(parameters: Record<string, string | number> = {}) {
     newNodes: [],
     newEdges: [],
     removedEdges: [],
-    retypedNodes: [],
     retypeBlocked: [],
     parameters: fields.map((field) => ({
       page: pageOf[field.name],

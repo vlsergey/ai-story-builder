@@ -17,7 +17,6 @@ const inReview = {
   ai_improve_instruction: null,
   rev: "r1",
   current: true,
-  movedTo: null,
 }
 /** The same node once the server has accepted the review: a new revision. */
 const accepted = { ...inReview, in_review: 0, review_base_content: null, rev: "r2" }

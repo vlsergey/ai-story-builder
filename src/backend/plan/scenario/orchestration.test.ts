@@ -181,6 +181,45 @@ describe("a run", () => {
     ])
   })
 
+  it("starts nothing new anywhere, however deep, once a node has failed", async () => {
+    // Two chapters side by side, six scenes each, at most two calls at once.
+    const s = PlanScenario.build((g) => {
+      g.source("Синопсис", "История.")
+      g.split("Главы", { prompt: "Главы:\n{{[Синопсис]}}" })
+      g.loop("Цикл по главам", { over: "Главы", element: "Глава", result: "Выход главы" }, (b) => {
+        b.split("Сцены", { prompt: "Сцены главы:\n{{[Глава]}}" })
+        b.loop("Цикл по сценам", { over: "Сцены", element: "Сцена", result: "Выход сцены" }, (c) => {
+          c.text("Текст сцены", { prompt: "Напиши сцену:\n{{[Сцена]}}" })
+          c.result("Текст сцены")
+        })
+        b.merge("Глава целиком", ["Цикл по сценам"])
+        b.result("Глава целиком")
+      })
+    })
+    s.engine.on((call) => {
+      if (call.node === "Главы") return JSON.stringify({ parts: ["Глава A", "Глава B"] })
+      if (call.node !== "Сцены") return undefined
+      const chapter = call.userPrompt.includes("Глава A") ? "A" : "B"
+      return JSON.stringify({ parts: Array.from({ length: 6 }, (_, i) => `${chapter} сцена ${i}`) })
+    })
+    s.setEngineConcurrency(2)
+    let failedAt = Number.POSITIVE_INFINITY
+    s.engine.on(async (call) => {
+      if (call.node !== "Текст сцены") return undefined
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      if (call.userPrompt.includes("A сцена 0")) {
+        failedAt = s.engine.calls.length
+        throw new Error("model is down")
+      }
+      return undefined
+    })
+
+    await expect(s.run()).rejects.toThrow("model is down")
+
+    const startedAfter = s.engine.calls.slice(failedAt).filter((c) => c.node === "Текст сцены")
+    expect(startedAfter).toEqual([])
+  })
+
   it("opens a loop again when something inside it goes stale after it closed", async () => {
     const s = PlanScenario.build((g) => {
       g.source("Синопсис", "История по главам.")

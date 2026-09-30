@@ -1,9 +1,9 @@
 /**
  * Where a node's state lives. `''` outside loops, then one `containerId:key`
  * segment per enclosing loop: `'27:2'` is iteration 2 of loop #27,
- * `'27:2/40:0'` one level deeper. A `for-each` keys its iterations by index;
- * a parallel loop will key them by a content hash, so a key is a string.
- * Only a loop builds its children's paths; nothing else concatenates them.
+ * `'27:2/40:0'` one level deeper. A loop keys its iterations by index, kept
+ * as a string. Only a loop builds its children's paths; nothing else
+ * concatenates them.
  */
 export type NodePath = string
 

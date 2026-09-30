@@ -75,10 +75,6 @@ function printAnalysis(analysis: ReturnType<typeof analyzeTemplateUpdate>): void
   } else {
     console.info("Updated nodes: 0")
   }
-  if (analysis.retypedNodes.length > 0) {
-    console.info(`Nodes changing kind (${analysis.retypedNodes.length}) — what they produced is kept:`)
-    for (const n of analysis.retypedNodes) console.info(`  - ${n.title}: ${n.from} → ${n.to}`)
-  }
   for (const n of analysis.retypeBlocked) {
     console.info(`Cannot change the kind of ${n.title} (${n.from} → ${n.to}): ${n.reason}`)
   }
@@ -121,7 +117,6 @@ async function main(): Promise<void> {
   const removableEdges = args.removeMissingEdges ? analysis.removedEdges.length : 0
   if (
     analysis.updatedNodes.length === 0 &&
-    analysis.retypedNodes.length === 0 &&
     analysis.newNodes.length === 0 &&
     analysis.newEdges.length === 0 &&
     removableEdges === 0 &&
@@ -135,7 +130,7 @@ async function main(): Promise<void> {
   console.info("\nApplying…")
   const result = await applyTemplateUpdate({ removeMissingEdges: args.removeMissingEdges, parameters: changes })
   console.info(
-    `Applied at ${result.appliedAt}: ${result.retypedNodeCount} change(s) of kind, ` +
+    `Applied at ${result.appliedAt}: ` +
       `${result.updatedNodeCount} instruction rewrite(s), ` +
       `${result.newNodeCount} new node(s), ${result.newEdgeCount} new edge(s), ` +
       `${result.removedEdgeCount} edge(s) removed.`,

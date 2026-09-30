@@ -89,11 +89,10 @@ export interface PlanNodeStateBrief
 /**
  * A node in one iteration, as an editor opens it. `current` is false while the
  * loop does not have that iteration — it has not run yet, or the element is
- * gone; `movedTo` names the iteration it became when a parallel loop's key grew.
+ * gone.
  */
 export interface PlanNodeInIteration extends PlanNodeRow {
   current: boolean
-  movedTo: string | null
 }
 
 export interface PlanEdgeRow {

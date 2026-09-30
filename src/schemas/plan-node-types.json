@@ -5,7 +5,7 @@
   "definitions": {
     "PlanContainerNodeType": {
       "type": "string",
-      "enum": ["for-each", "parallel"]
+      "enum": ["for-each"]
     },
     "PlanNonContainerNodeType": {
       "type": "string",

@@ -43,6 +43,7 @@ import migration031 from "./migrations/031.js"
 import migration032 from "./migrations/032.js"
 import migration033 from "./migrations/033.js"
 import migration034 from "./migrations/034.js"
+import migration035 from "./migrations/035.js"
 
 // Each entry migrates the DB from version N to N+1.
 // Index 0: 0 → 1, index 1: 1 → 2, etc.
@@ -114,9 +115,11 @@ const MIGRATIONS: Array<(db: Database) => void> = [
   migration033,
   // version 33 → 34: telemetry names the node and the iteration of each call
   migration034,
+  // version 34 → 35: the parallel loop folds back into the for-each; its iterations move to indices
+  migration035,
 ]
 
-export const CURRENT_VERSION = 34
+export const CURRENT_VERSION = 35
 
 function loadSchemaFromFile(db: Database): void {
   for (const candidate of [

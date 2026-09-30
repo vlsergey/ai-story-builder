@@ -1,4 +1,3 @@
-import type { PlanNodeType } from "@shared/plan-node-types"
 import { describe, expect, it, vi } from "vitest"
 
 vi.mock("@/ipcClient", () => {
@@ -21,23 +20,16 @@ vi.mock("@/ipcClient", () => {
 
 describe("an iteration's label", async () => {
   const { iterationLabel } = await import("../plan/iteration-selection")
-  const types = (id: number): PlanNodeType => (id === 27 ? "parallel" : "for-each")
 
-  it("counts a sequential loop's iterations from one", () => {
-    expect(iterationLabel("5:2", types)).toBe("#3")
-  })
-
-  it("names a parallel loop's iteration by its key, digits only or not", () => {
-    expect(iterationLabel("27:a3f9c1", types)).toBe("#a3f9c1")
-    expect(iterationLabel("27:042137", types)).toBe("#042137")
+  it("counts a loop's iterations from one", () => {
+    expect(iterationLabel("5:2")).toBe("#3")
   })
 
   it("labels nested iterations outermost first", () => {
-    expect(iterationLabel("5:0/27:042137", types)).toBe("#1/#042137")
+    expect(iterationLabel("5:0/27:11")).toBe("#1/#12")
   })
 
-  it("tells a key from an index by its length when the loop's kind is not known", () => {
-    expect(iterationLabel("27:042137")).toBe("#042137")
-    expect(iterationLabel("5:2")).toBe("#3")
+  it("keeps a key that is not an index as it is", () => {
+    expect(iterationLabel("27:a3f9c1")).toBe("#a3f9c1")
   })
 })

@@ -120,6 +120,33 @@ describe("a loop", () => {
     expect(s.status("Профиль", 1)).toBe("ERROR")
   })
 
+  it("that fails finishes the elements already being written, then reports the failure", async () => {
+    const s = characters(["Аня", "Боря", "Вера"])
+    s.setEngineConcurrency(3)
+    s.engine.on((call) => {
+      if (call.node === "Профиль" && call.userPrompt.includes("Боря")) throw new Error("model is down")
+      return undefined
+    })
+
+    await expect(s.run()).rejects.toThrow("model is down")
+
+    expect(s.failure()?.node).toBe("Профиль")
+    expect(profileCalls(s).filter((c) => c.response !== undefined)).toHaveLength(2)
+  })
+
+  it("tells the progress panel what runs, not what it wrote", async () => {
+    const s = characters(["Аня", "Боря"])
+    await s.run()
+    const texts = profileCalls(s).map((c) => c.response ?? "")
+
+    await s.setPrompt("Профиль", "Короткий профиль:\n{{[Персонаж]}}")
+    await s.run()
+
+    const events = JSON.stringify(s.statusEvents)
+    for (const text of texts) expect(events).not.toContain(text)
+    expect(s.shownInProgress()).toContain("Профиль")
+  })
+
   it("lets the user type into an iteration it reached during its very first run", async () => {
     const s = characters(["Аня", "Боря"])
     s.engine.on(async (call) => {

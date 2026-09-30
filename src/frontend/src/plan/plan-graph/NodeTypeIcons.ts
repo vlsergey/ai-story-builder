@@ -1,7 +1,6 @@
 import type { PlanNodeType } from "@shared/plan-node-types"
 import {
   BookOpenCheckIcon,
-  Columns3Icon,
   FileCheck2Icon,
   FileTextIcon,
   HashIcon,
@@ -31,7 +30,6 @@ const NodeTypeIcons: Record<
   "for-each-prev-outputs": SquareArrowRightRepeatIcon,
   lore: BookOpenCheckIcon,
   merge: MergeIcon,
-  parallel: Columns3Icon,
   split: SplitIcon,
   text: FileTextIcon,
 }

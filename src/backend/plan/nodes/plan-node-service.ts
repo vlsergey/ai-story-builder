@@ -1,7 +1,6 @@
 import { promises as fs } from "node:fs"
 import type { Observable } from "@trpc/server/observable"
 import type { ResponseStreamEvent } from "openai/resources/responses/responses.js"
-import { loopLength } from "../../../shared/for-each-plan-node.js"
 import { iterationKeys, LOOP_TYPES, loopsAround as loopsAroundIn } from "../../../shared/loop-iterations.js"
 import {
   type EdgeTypeToOutputTypeMap,
@@ -9,7 +8,6 @@ import {
   isValidNodeType,
   NODE_TYPES,
 } from "../../../shared/node-edge-dictionary.js"
-import { expandParallel, MIN_KEY_LENGTH } from "../../../shared/parallel-plan-node.js"
 import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
 import {
   PLAN_NODE_DEFINITION_KEYS,
@@ -25,7 +23,6 @@ import {
   type PlanNodeUpdate,
 } from "../../../shared/plan-graph.js"
 import {
-  childPath,
   lastSegment,
   type NodePath,
   parentPath,
@@ -50,11 +47,9 @@ import { ForEachOutputProcessor } from "./graph/for-each-output-processor.js"
 import { ForEachPrevOutputsProcessor } from "./graph/for-each-prev-outputs-processor.js"
 import { ForEachProcessor } from "./graph/for-each-processor.js"
 import { FormatProcessor } from "./graph/format-processor.js"
-import { loopChild } from "./graph/loop-input.js"
 import { LoreProcessor } from "./graph/lore-processor.js"
 import { MergeProcessor } from "./graph/merge-processor.js"
 import type { NodeProcessor } from "./graph/node-processor.js"
-import { elementHash, ParallelProcessor } from "./graph/parallel-processor.js"
 import { ScriptProcessor } from "./graph/script-processor.js"
 import { mergeNodeSettings } from "./graph/settings-helper.js"
 import { SplitProcessor } from "./graph/split-processor.js"
@@ -78,7 +73,6 @@ export const NODE_PROCESSORS: Record<PlanNodeType, NodeProcessor> = {
   merge: new MergeProcessor(),
   script: new ScriptProcessor(),
   format: new FormatProcessor(),
-  parallel: new ParallelProcessor(),
 }
 
 /**
@@ -246,36 +240,6 @@ export class PlanNodeService {
       const title = this.repo.findById(nodeId)?.title
       throw makeErrorWithStatus(`«${title}» has no iteration "${path}"`, 404)
     }
-  }
-
-  /**
-   * The current path of an iteration an editor holds under an older name: a
-   * parallel loop's key that grew is a prefix of the key it grew into. Null
-   * when no iteration — or more than one — answers to it.
-   */
-  currentPathFor(nodeId: number, path: NodePath): NodePath | null {
-    const loops = this.loopsAround(nodeId)
-    let segments: ReturnType<typeof parsePath>
-    try {
-      segments = parsePath(path)
-    } catch {
-      return null
-    }
-    if (segments.length !== loops.length) return null
-    let current = ROOT_PATH
-    for (const [depth, segment] of segments.entries()) {
-      const loop = this.repo.findById(loops[depth])
-      if (!loop || segment.containerId !== loop.id) return null
-      const keys = iterationKeys(loop.type, this.states.find(loop.id, current)?.content)
-      const matches = keys.includes(segment.key)
-        ? [segment.key]
-        : loop.type === "parallel"
-          ? keys.filter((key) => key.startsWith(segment.key))
-          : []
-      if (matches.length !== 1) return null
-      current = childPath(current, loop.id, matches[0])
-    }
-    return current
   }
 
   /** Whether `path` names an iteration the node's loops have now, in the form they name it. */
@@ -614,63 +578,6 @@ export class PlanNodeService {
         await this.patchState(previous.id, state.path, false, { status: "OUTDATED" })
       }
     }
-  }
-
-  // ─── Changing a loop's kind ──────────────────────────────────────────────────
-
-  /**
-   * Children a parallel loop cannot hold: the memory of earlier iterations
-   * and an iteration's index mean nothing when iterations run side by side.
-   */
-  childrenBlockingParallel(loopId: number): PlanNodeDefinition[] {
-    return this.findByParentId(loopId).filter((child) => {
-      const allowed = getNodeTypeDefinition(child.type)?.allowedContainers
-      return allowed !== undefined && !allowed.includes("parallel")
-    })
-  }
-
-  /**
-   * Turns a sequential loop into a parallel one, keeping what every iteration
-   * produced: each iteration moves from its index to its element's key, in
-   * every iteration of the loops around it. Of identical elements the first
-   * iteration is kept; an iteration without an element is dropped, and will
-   * be run as a new one.
-   */
-  retypeToParallel(loopId: number): void {
-    const loop = this.getDefinition(loopId)
-    if (loop.type !== "for-each") throw makeErrorWithStatus(`«${loop.title}» is not a sequential loop`, 400)
-    const blocking = this.childrenBlockingParallel(loopId)
-    if (blocking.length > 0) {
-      const titles = blocking.map((c) => `«${c.title}»`).join(", ")
-      throw makeErrorWithStatus(`«${loop.title}» cannot run in parallel: it holds ${titles}`, 400)
-    }
-    const input = loopChild(this, loopId, "for-each-input")
-    withDbTransaction(() => {
-      for (const instance of this.states.findForNode(loopId)) {
-        const keyed = Array.from({ length: loopLength(instance.content) }, (_, index) => ({
-          index,
-          element: this.states.find(input.id, childPath(instance.path, loopId, index))?.content ?? null,
-        })).filter((iteration): iteration is { index: number; element: string } => iteration.element !== null)
-        const { content } = expandParallel(
-          { keyLength: MIN_KEY_LENGTH, hashes: {}, order: [] },
-          keyed.map((iteration) => iteration.element),
-          elementHash,
-        )
-        const kept = new Set<string>()
-        keyed.forEach(({ index }, position) => {
-          const key = content.order[position]
-          if (kept.has(key)) return
-          kept.add(key)
-          this.states.renameIteration(loopId, instance.path, String(index), key)
-        })
-        // Repeated elements and iterations without one go, with what is nested in them.
-        this.states.deleteIterationsWhere(loopId, instance.path, (key) => !kept.has(key))
-        this.states.upsert(loopId, instance.path, { content: JSON.stringify(content) })
-      }
-      this.repo.setType(loopId, "parallel")
-    })
-    this.loopsCache.clear()
-    planNodeEventManager.emitUpdate(loopId, "now a parallel loop")
   }
 
   // ─── Create and delete ───────────────────────────────────────────────────────

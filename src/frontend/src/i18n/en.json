@@ -148,7 +148,6 @@
   "planGraph.addNode.format": "Format",
   "planGraph.addNode.lore": "Lore",
   "planGraph.addNode.merge": "Merge",
-  "planGraph.addNode.parallel": "Parallel loop",
   "planGraph.addNode.script": "Script",
   "planGraph.addNode.split": "Split",
   "planGraph.addNode.text": "Text",

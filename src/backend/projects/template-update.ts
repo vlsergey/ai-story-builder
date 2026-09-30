@@ -65,12 +65,9 @@ export interface TemplateUpdateAnalysis {
    */
   removedEdges: NewEdge[]
   /**
-   * Nodes whose type the template changed, and the project can follow:
-   * today only a sequential loop becoming parallel. Their iterations keep
-   * what they produced.
+   * Nodes whose type the template changed. An update does not change a
+   * node's type: the project keeps its own, and the reason says why.
    */
-  retypedNodes: RetypedNode[]
-  /** Type changes the project cannot follow, with the reason. */
   retypeBlocked: (RetypedNode & { reason: string })[]
   /**
    * The template's parameters an update may change — the wizard fields it
@@ -326,9 +323,7 @@ export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): T
   let unchangedCount = 0
   const updatedNodes: UpdatedNode[] = []
   const newNodes: UpdatedNode[] = []
-  const retypedNodes: RetypedNode[] = []
   const retypeBlocked: (RetypedNode & { reason: string })[] = []
-  const nodeService = new PlanNodeService()
 
   for (const tNode of templateNodes) {
     const projectNode = projectByTitle.get(tNode.title)
@@ -337,17 +332,12 @@ export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): T
       continue
     }
     if (tNode.type !== projectNode.type) {
-      const change = { title: tNode.title, from: projectNode.type, to: tNode.type }
-      if (projectNode.type !== "for-each" || tNode.type !== "parallel") {
-        retypeBlocked.push({ ...change, reason: "only a sequential loop can become a parallel one" })
-      } else {
-        const blocking = nodeService.childrenBlockingParallel(projectNode.id)
-        if (blocking.length > 0) {
-          retypeBlocked.push({ ...change, reason: `it holds ${blocking.map((c) => `«${c.title}»`).join(", ")}` })
-        } else {
-          retypedNodes.push(change)
-        }
-      }
+      retypeBlocked.push({
+        title: tNode.title,
+        from: projectNode.type,
+        to: tNode.type,
+        reason: "an update does not change a node's type",
+      })
     }
     const templateSettings = buildTemplateInstructionSettings(tNode, substitutions)
     const projectSettings = parseProjectSettings(projectNode.node_type_settings)
@@ -392,7 +382,6 @@ export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): T
     newNodes,
     newEdges,
     removedEdges,
-    retypedNodes,
     retypeBlocked,
     parameters: editableFields(template).map(({ page, field }) => ({
       page,
@@ -404,7 +393,6 @@ export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): T
 
 export interface TemplateUpdateApplyResult {
   appliedAt: string
-  retypedNodeCount: number
   updatedNodeCount: number
   newNodeCount: number
   newEdgeCount: number
@@ -443,17 +431,10 @@ export async function applyTemplateUpdate(
     return new Map(nodeRepo.findAll().map((n) => [n.title, n]))
   }
 
-  // 0. Change the types the template changed, keeping what the nodes produced.
-  let projectMap = projectByTitleNow()
-  for (const { title } of analysis.retypedNodes) {
-    const pNode = projectMap.get(title)
-    if (pNode) nodeService.retypeToParallel(pNode.id)
-  }
-
   // 1. Rewrite instruction fields on changed nodes.
   const templateNodes = walkTemplate(template.plan?.nodes)
   const templateByTitle = new Map(templateNodes.map((n) => [n.title, n]))
-  projectMap = projectByTitleNow()
+  let projectMap = projectByTitleNow()
   for (const { title } of analysis.updatedNodes) {
     const tNode = templateByTitle.get(title)
     const pNode = projectMap.get(title)
@@ -554,7 +535,6 @@ export async function applyTemplateUpdate(
 
   return {
     appliedAt: new Date().toISOString(),
-    retypedNodeCount: analysis.retypedNodes.length,
     updatedNodeCount: analysis.updatedNodes.length,
     newNodeCount: analysis.newNodes.length,
     newEdgeCount: analysis.newEdges.length,

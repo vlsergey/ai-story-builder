@@ -32,9 +32,7 @@ export default function PlanNodeEditor({ nodeId, path: boundPath, panelApi }: Pl
   useEffect(() => {
     if (resolvedPath === undefined && ready) setResolvedPath(displayPath(nodeId))
   }, [resolvedPath, ready, displayPath, nodeId])
-  // A parallel loop's key that grew: the tab follows its iteration to the new key.
-  const [followed, setFollowed] = useState<NodePath | undefined>()
-  const path = followed ?? boundPath ?? resolvedPath
+  const path = boundPath ?? resolvedPath
   useEffect(() => {
     if (path !== undefined && path !== boundPath) panelApi.updateParameters?.({ nodeId, path })
   }, [boundPath, path, nodeId, panelApi])
@@ -44,9 +42,6 @@ export default function PlanNodeEditor({ nodeId, path: boundPath, panelApi }: Pl
     { enabled: path !== undefined },
   )
   const node = planNodeQuery.data
-  useEffect(() => {
-    if (node?.movedTo) setFollowed(node.movedTo)
-  }, [node?.movedTo])
 
   useEffect(() => {
     if (node?.title) panelApi.setTitle(path ? `${node.title} ${labelOf(path)}` : node.title)

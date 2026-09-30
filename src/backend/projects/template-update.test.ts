@@ -368,46 +368,19 @@ describe("template-update", () => {
     return { template, loop, input, profile }
   }
 
-  it("turns a loop the template made parallel into one, keeping what each element produced", async () => {
+  it("reports a node whose type the template changed, and keeps the project's own", async () => {
     const { template, loop, profile } = sequentialCast()
-    const parallel = JSON.parse(JSON.stringify(template)) as ProjectTemplate
-    ;(parallel.plan as any).nodes[1].type = "parallel"
-    writeTemplate("cast.json", parallel)
+    const retyped = JSON.parse(JSON.stringify(template)) as ProjectTemplate
+    ;(retyped.plan as any).nodes[0].type = "text"
+    writeTemplate("cast.json", retyped)
 
-    expect(analyzeTemplateUpdate().retypedNodes).toEqual([{ title: "Loop", from: "for-each", to: "parallel" }])
+    expect(analyzeTemplateUpdate().retypeBlocked).toEqual([
+      { title: "Cast", from: "split", to: "text", reason: "an update does not change a node's type" },
+    ])
     await applyTemplateUpdate()
 
-    expect(new PlanNodeRepository().findById(loop)?.type).toBe("parallel")
-    const { createHash } = await import("node:crypto")
-    const key = (name: string) => createHash("sha256").update(name, "utf8").digest("hex").slice(0, 6)
-    expect(stateAt(profile, `${loop}:${key("Аня")}`)?.content, "the first of identical elements").toBe(
-      "profile of Аня #0",
-    )
-    expect(stateAt(profile, `${loop}:${key("Боря")}`)).toMatchObject({
-      content: "profile of Боря #1",
-      status: "MANUAL",
-    })
-    expect(stateAt(profile, `${loop}:0`), "no row stays under an index").toBeUndefined()
-    expect(stateAt(profile, `${loop}:2`)).toBeUndefined()
-    const content = JSON.parse(stateAt(loop)?.content ?? "{}")
-    expect(content.order).toEqual([key("Аня"), key("Боря"), key("Аня")])
-    // Nothing is stale: the next run has nothing to redo.
-    expect(propagateStaleStatus().marked).toEqual([])
-  })
-
-  it("leaves a sequential loop alone when it holds what a parallel loop cannot", async () => {
-    const { template, loop } = sequentialCast()
-    new PlanNodeRepository().insert({ title: "Earlier", type: "for-each-prev-outputs", parent_id: loop })
-    const parallel = JSON.parse(JSON.stringify(template)) as ProjectTemplate
-    ;(parallel.plan as any).nodes[1].type = "parallel"
-    writeTemplate("cast.json", parallel)
-
-    const analysis = analyzeTemplateUpdate()
-    expect(analysis.retypedNodes).toEqual([])
-    expect(analysis.retypeBlocked.map((n) => n.title)).toEqual(["Loop"])
-    await applyTemplateUpdate()
-
-    expect(new PlanNodeRepository().findById(loop)?.type).toBe("for-each")
+    expect(new PlanNodeRepository().findAll().find((n) => n.title === "Cast")?.type).toBe("split")
+    expect(stateAt(profile, `${loop}:1`)).toMatchObject({ content: "profile of Боря #1", status: "MANUAL" })
   })
 
   it("demotes the target of a removed edge — its inputs changed", async () => {

@@ -65,20 +65,6 @@ describe("PlanNodeStateRepository", () => {
     expect(paths(states.findAll())).toEqual(["", "27:0", "27:1", "27:1/40:3", "2:5", "3:0/27:4"])
   })
 
-  it("moves an iteration to a new key, with everything nested in it, and leaves a longer key alone", () => {
-    const states = new PlanNodeStateRepository()
-    const id = node("A")
-    const before = states.upsert(id, "27:abc123/40:0", { content: "nested" })
-    for (const path of ["27:abc123", "27:abc1234", "27:def456"]) states.upsert(id, path, {})
-
-    states.renameIteration(27, "", "abc123", "abc123f")
-
-    expect(paths(states.findAll())).toEqual(["27:abc1234", "27:abc123f", "27:abc123f/40:0", "27:def456"])
-    const moved = states.find(id, "27:abc123f/40:0")
-    expect(moved?.content).toBe("nested")
-    expect(moved?.rev, "a moved row is a new row to anyone holding the old one").not.toBe(before.rev)
-  })
-
   it("creates a row without a status as pending, not as answered", () => {
     const states = new PlanNodeStateRepository()
     const id = node("A")

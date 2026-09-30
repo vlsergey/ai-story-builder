@@ -4,9 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 /** The row the editor opens: a loop child in an iteration the loop does not have. */
 const rows: Record<string, ReturnType<typeof rowAt>> = {}
 const patchCalls: { data: Record<string, unknown> }[] = []
-const updatedParameters: unknown[] = []
 
-function rowAt(path: string, current: boolean, movedTo: string | null = null) {
+function rowAt(path: string, current: boolean) {
   return {
     id: 12,
     title: "Профиль",
@@ -19,7 +18,6 @@ function rowAt(path: string, current: boolean, movedTo: string | null = null) {
     status: "OUTDATED",
     rev: "",
     current,
-    movedTo,
   }
 }
 
@@ -85,7 +83,6 @@ describe("the editor of a loop child", async () => {
 
   beforeEach(() => {
     patchCalls.length = 0
-    updatedParameters.length = 0
   })
 
   it("saves the prompt, but not a text, in an iteration the loop does not have yet", async () => {
@@ -102,23 +99,5 @@ describe("the editor of a loop child", async () => {
 
     expect(getByText("save").getAttribute("data-missing")).toBe("true")
     expect(patchCalls.map((call) => Object.keys(call.data))).toEqual([["node_type_settings"]])
-  })
-
-  it("follows its iteration when the loop's key for it grew", async () => {
-    rows["10:abc123"] = rowAt("10:abc123", false, "10:abc1234")
-    rows["10:abc1234"] = rowAt("10:abc1234", true)
-    render(
-      <IterationSelectionProvider>
-        <PlanNodeEditor
-          nodeId={12}
-          path="10:abc123"
-          panelApi={{ setTitle: () => {}, updateParameters: (params) => updatedParameters.push(params) }}
-        />
-      </IterationSelectionProvider>,
-    )
-
-    await act(async () => {})
-
-    expect(updatedParameters).toEqual([{ nodeId: 12, path: "10:abc1234" }])
   })
 })

@@ -833,7 +833,7 @@
       },
       {
         "title": "Per-character loop",
-        "type": "parallel",
+        "type": "for-each",
         "x": 2065,
         "y": 464,
         "width": 1120,

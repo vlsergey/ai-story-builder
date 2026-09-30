@@ -149,7 +149,7 @@ function resolvePath(service: PlanNodeService, nodeId: number, args: CliArgs): N
   }
   if (loops.length > 1) throw new Error(`Node #${nodeId} is in nested loops; pass its iteration as --path`)
   if (args.iteration === undefined) throw new Error(`Node #${nodeId} is inside a loop; pass --iteration or --path`)
-  // The n-th iteration the loop has: an index, or a parallel loop's element key.
+  // The n-th iteration the loop has.
   const loop = service.getRow(loops[0], ROOT_PATH)
   const key = iterationKeys(loop.type, loop.content)[args.iteration]
   if (key === undefined) throw new Error(`«${loop.title}» has no iteration ${args.iteration}`)

@@ -27,7 +27,6 @@ const DETERMINISTIC_TYPES = new Set<PlanNodeDefinition["type"]>([
   "format",
   // A loop is EMPTY only when its list is: over the same list it stays empty.
   "for-each",
-  "parallel",
   "for-each-input",
   "for-each-output",
   "for-each-index",

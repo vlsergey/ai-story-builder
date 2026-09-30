@@ -833,7 +833,7 @@
       },
       {
         "title": "Цикл по персонажам",
-        "type": "parallel",
+        "type": "for-each",
         "x": 2065,
         "y": 464,
         "width": 1120,

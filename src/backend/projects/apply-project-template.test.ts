@@ -81,7 +81,7 @@ describe("applyProjectTemplate — where nodes may go", () => {
   beforeEach(() => setUpTestDb())
   afterEach(() => tearDownTestDb())
 
-  it("refuses the memory of earlier iterations inside a parallel loop", () => {
+  it("refuses the memory of earlier iterations outside a loop", () => {
     const template = {
       label: "t",
       description: "t",
@@ -89,16 +89,7 @@ describe("applyProjectTemplate — where nodes may go", () => {
       plan: {
         nodes: [
           { title: "List", type: "split", aiUserInstructions: ["List."], inputs: [] },
-          {
-            title: "Loop",
-            type: "parallel",
-            inputs: [{ sourceNodeTitle: "List", type: "textArray" }],
-            children: [
-              { title: "Element", type: "for-each-input" },
-              { title: "Earlier", type: "for-each-prev-outputs" },
-              { title: "Result", type: "for-each-output" },
-            ],
-          },
+          { title: "Earlier", type: "for-each-prev-outputs" },
         ],
       },
     } as unknown as ProjectTemplate

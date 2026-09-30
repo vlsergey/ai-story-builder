@@ -2,21 +2,18 @@ import { trpc } from "@/ipcClient"
 import { LOOP_TYPES, loopsAround } from "@shared/loop-iterations"
 import type { PlanNodeStateBrief } from "@shared/plan-graph"
 import { childPath, type NodePath, parsePath, ROOT_PATH } from "@shared/plan-node-path"
-import type { PlanNodeType } from "@shared/plan-node-types"
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef, useState } from "react"
 
 /**
  * Which iteration of each loop the user looks at. It is view state only:
  * choosing one writes nothing, and works while the loop is generating. A loop
  * is keyed with its own path, so an inner loop remembers its page separately
- * in every iteration of the outer one. An iteration is named by its key — a
- * for-each's index, a parallel loop's element hash — so a parallel loop's page
- * stays on its element when others are inserted before it.
+ * in every iteration of the outer one. An iteration is named by its key, the
+ * element's index.
  *
- * Until the user picks an iteration, the display follows a sequential loop to
- * the earliest of its iterations not done yet — iterations that do not read
- * the ones before them run side by side; a new run follows again. A parallel
- * loop is not followed: it has no order to follow.
+ * Until the user picks an iteration, the display follows a loop to the
+ * earliest of its iterations not done yet — iterations that do not read the
+ * ones before them run side by side; a new run follows again.
  */
 interface IterationSelection {
   /** Whether the node definitions are loaded: until then a display path is not known. */
@@ -31,7 +28,7 @@ interface IterationSelection {
   showKeys(loopId: number, loopPath: NodePath, keys: string[]): void
   /** Where the node is shown: in every loop around it, the iteration on display. */
   displayPath(nodeId: number): NodePath
-  /** The iteration as people name it — see `iterationLabel` — knowing each loop's kind. */
+  /** The iteration as people name it: see `iterationLabel`. */
   labelOf(path: NodePath): string
 }
 
@@ -51,15 +48,8 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
 
   trpc.plan.nodes.aiGenerate.subscribeToStatusEvents.useSubscription(undefined, {
     onData(event) {
-      // A new run follows the iterations of sequential loops again; a
-      // parallel loop is never followed, so its page stays where it was.
-      if (event.inProcess && !wasRunning.current) {
-        setPicked((previous) =>
-          Object.fromEntries(
-            Object.entries(previous).filter(([loop]) => typeOf(Number.parseInt(loop, 10)) !== "for-each"),
-          ),
-        )
-      }
+      // A new run follows the loops' iterations again.
+      if (event.inProcess && !wasRunning.current) setPicked({})
       wasRunning.current = event.inProcess
       // The iterations that run now, per loop, read off the paths of the nodes being written.
       const allRunning: Record<string, string[]> = {}
@@ -72,12 +62,10 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
           loopPath = childPath(loopPath, segment.containerId, segment.key)
         }
       }
-      // A sequential loop is followed at the earliest of its iterations not
-      // done yet: it stays put while that iteration's nodes take turns.
+      // A loop is followed at the earliest of its iterations not done yet: it
+      // stays put while that iteration's nodes take turns.
       const running: Record<string, string> = {}
-      for (const loop of event.loops) {
-        if (loop.node.type === "for-each") running[keyOf(loop.node.id, loop.node.path)] = loop.current
-      }
+      for (const loop of event.loops) running[keyOf(loop.node.id, loop.node.path)] = loop.current
       setRunningKeys((previous) => (JSON.stringify(previous) === JSON.stringify(allRunning) ? previous : allRunning))
       setFollowed((previous) =>
         Object.entries(running).every(([key, value]) => previous[key] === value)
@@ -88,7 +76,6 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
   })
 
   const byId = useMemo(() => new Map((definitions ?? []).map((n) => [n.id, n])), [definitions])
-  const typeOf = useCallback((id: number): PlanNodeType | undefined => byId.get(id)?.type, [byId])
   const loopsOf = useMemo(() => {
     const cache = new Map<number, number[]>()
     return (nodeId: number): number[] => {
@@ -105,13 +92,8 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
     (loopId: number, loopPath: NodePath) => {
       const loop = keyOf(loopId, loopPath)
       const keys = known[loop]
-      // A key the loop no longer names may have grown: a parallel loop's
-      // longer key starts with it.
-      const named = (key: string | undefined) => {
-        if (key === undefined || !keys || keys.includes(key)) return key
-        const grown = keys.filter((known) => known.startsWith(key))
-        return grown.length === 1 ? grown[0] : undefined
-      }
+      // A key the loop no longer names is no longer on display.
+      const named = (key: string | undefined) => (key === undefined || !keys || keys.includes(key) ? key : undefined)
       return named(picked[loop]) ?? named(followed[loop]) ?? keys?.[0] ?? "0"
     },
     [picked, followed, known],
@@ -145,11 +127,17 @@ export function IterationSelectionProvider({ children }: { children: ReactNode }
     [runningKeys],
   )
 
-  const labelOf = useCallback((path: NodePath) => iterationLabel(path, typeOf), [typeOf])
-
   const value = useMemo(
-    () => ({ ready: definitions !== undefined, selected, select, running, showKeys, displayPath, labelOf }),
-    [definitions, selected, select, running, showKeys, displayPath, labelOf],
+    () => ({
+      ready: definitions !== undefined,
+      selected,
+      select,
+      running,
+      showKeys,
+      displayPath,
+      labelOf: iterationLabel,
+    }),
+    [definitions, selected, select, running, showKeys, displayPath],
   )
   return <IterationSelectionContext.Provider value={value}>{children}</IterationSelectionContext.Provider>
 }
@@ -172,19 +160,13 @@ export function useNodeDisplayState(nodeId: number): { path: NodePath; state: Pl
 }
 
 /**
- * An iteration as people name it: a sequential loop's by its number, from one
- * (`#3`); a parallel loop's by the start of its key (`#a3f9c1`); `#2/#a3f9c1`
- * inside nested loops. Empty outside loops. Without `typeOf` a key is told
- * from an index by its length: a key has six characters at least, and no
- * sequential loop runs a hundred thousand times.
+ * An iteration as people name it: by its number, from one (`#3`); `#2/#1`
+ * inside nested loops. Empty outside loops. A key that is not an index — a
+ * tab opened before the project moved to indices — is shown as it is.
  */
-export function iterationLabel(path: NodePath, typeOf?: (containerId: number) => PlanNodeType | undefined): string {
+export function iterationLabel(path: NodePath): string {
   return parsePath(path)
-    .map((segment) => {
-      const type = typeOf?.(segment.containerId)
-      const isIndex = type ? type === "for-each" : /^\d{1,5}$/.test(segment.key)
-      return isIndex ? `#${Number(segment.key) + 1}` : `#${segment.key.slice(0, 6)}`
-    })
+    .map(({ key }) => (/^\d+$/.test(key) ? `#${Number(key) + 1}` : `#${key.slice(0, 6)}`))
     .join("/")
 }
 

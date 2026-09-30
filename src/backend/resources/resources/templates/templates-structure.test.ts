@@ -87,7 +87,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   function insideForEach(n: TemplateProjectPlanNode): boolean {
     let cur: TemplateProjectPlanNode | null = parentOf.get(n) ?? null
     while (cur != null) {
-      if (cur.type === "for-each" || cur.type === "parallel") return true
+      if (cur.type === "for-each") return true
       cur = parentOf.get(cur) ?? null
     }
     return false
@@ -339,7 +339,7 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
   })
 
   describe("every loop has a for-each-input child", () => {
-    const forEachNodes = allNodes.filter(({ node }) => node.type === "for-each" || node.type === "parallel")
+    const forEachNodes = allNodes.filter(({ node }) => node.type === "for-each")
     if (forEachNodes.length === 0) {
       it.skip("no for-each nodes in this template", () => {})
     }

@@ -119,30 +119,6 @@ export class GraphBuilder {
     body(new LoopBuilder(id, spec.result))
   }
 
-  /**
-   * A loop over the list `over` whose iterations are keyed by their element,
-   * each element once: `element` holds an element, whatever is wired into
-   * `result` is its output.
-   */
-  parallel(
-    title: string,
-    spec: { over: string; element: string; result: string },
-    body: (b: LoopBuilder) => void,
-  ): void {
-    const service = new PlanNodeService()
-    const repo = new PlanNodeRepository()
-    const { id } = service.create({
-      title,
-      type: "parallel",
-      parent_id: this.parentId,
-      node_type_settings: JSON.stringify({}),
-    })
-    repo.patch(repo.findByParentIdAndType(id, "for-each-input")[0].id, { title: spec.element })
-    repo.patch(repo.findByParentIdAndType(id, "for-each-output")[0].id, { title: spec.result })
-    this.edge(spec.over, title, "textArray")
-    body(new LoopBuilder(id, spec.result))
-  }
-
   /** Adds to a loop that already exists. */
   inside(loop: string): LoopBuilder {
     const id = nodeId(loop)
@@ -477,10 +453,7 @@ export class PlanScenario {
     return path
   }
 
-  /**
-   * The path of the loop's iteration at `position`, the way the user counts
-   * them: a for-each's index, a parallel loop's n-th distinct element.
-   */
+  /** The path of the loop's iteration at `position`, the way the user counts them. */
   private iterationPath(loop: number, loopPath: NodePath, position: number): NodePath {
     const row = new PlanNodeService().getRow(loop, loopPath)
     const keys = iterationKeys(row.type, row.content)

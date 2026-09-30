@@ -2,7 +2,7 @@
 // DO NOT EDIT MANUALLY
 // Run `npm run generate-code` to update.
 
-export const PLAN_CONTAINER_NODE_TYPE_VALUES = ["for-each", "parallel"] as const
+export const PLAN_CONTAINER_NODE_TYPE_VALUES = ["for-each"] as const
 
 export type PlanContainerNodeType = (typeof PLAN_CONTAINER_NODE_TYPE_VALUES)[number]
 
