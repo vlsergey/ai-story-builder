@@ -31,8 +31,39 @@
           "name": "synopsis",
           "type": "textarea",
           "label": "Story synopsis",
-          "description": "Describe the story freely: what it is about, who the characters are, what happens, what matters for atmosphere. The template derives theme, style, characters and plot outline itself.",
+          "description": "Describe the story freely: what it is about, who the characters are, what happens, what matters for atmosphere. The template derives theme, characters and plot outline itself; how to set the style is the next step.",
           "placeholder": "A young cartographer finds a map that shouldn't exist..."
+        }
+      ]
+    },
+    {
+      "id": "style",
+      "title": "Style",
+      "fields": [
+        {
+          "name": "styleMode",
+          "type": "select",
+          "label": "Style description",
+          "description": "How the template sets the prose style. «Fix» — the AI spells out the style rules (point of view, tense, rhythm, vocabulary, bans) and all the prose keeps to them. «Brief» — one or two sentences of general direction. «Leave it to the LLM» — the style is not described at all and is up to the AI that writes the text.",
+          "defaultValue": "full",
+          "editableOnUpdate": true,
+          "options": [
+            {
+              "value": "full",
+              "label": "Fix",
+              "text": "Formulate the style rules for the story: point of view (POV: first / third person, limited / omniscient), narrative tense, typical sentence length, rhythm, character of the vocabulary (everyday, poetic, technical), taboos (what NOT to do: officialese, profanity clichés, direct address to the reader, etc.).\n\nProse, no padding, upper bound 1500 words. Don't print a word count in the output. In English."
+            },
+            {
+              "value": "brief",
+              "label": "Brief",
+              "text": "State the style requirement very briefly: one or two sentences — the general direction of the prose, with no rules, lists or bans.\n\nDon't print a word count in the output. In English."
+            },
+            {
+              "value": "llm",
+              "label": "Leave it to the LLM",
+              "text": "Do not describe the style: whoever writes the text will choose it. Output exactly one line and nothing else:\n\nNo style is set: there are no style rules, the style is up to whoever writes the text."
+            }
+          ]
         }
       ]
     },
@@ -543,9 +574,7 @@
           "",
           "## What to do",
           "",
-          "Formulate the style rules for the story: point of view (POV: first / third person, limited / omniscient), narrative tense, typical sentence length, rhythm, character of the vocabulary (everyday, poetic, technical), taboos (what NOT to do: officialese, profanity clichés, direct address to the reader, etc.).",
-          "",
-          "Prose, no padding, upper bound 1500 words. Don't print a word count in the output. In English."
+          "${styleMode}"
         ],
         "inputs": [
           {

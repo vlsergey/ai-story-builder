@@ -438,6 +438,17 @@ describe.each(TEMPLATE_FILES)("template %s — structural checks", (file) => {
     expect(missing, `wizard variables used but not declared: ${missing.join(", ")}`).toEqual([])
   })
 
+  // A wizard field the plan never substitutes asks the user a question whose
+  // answer changes nothing. An advice field only helps fill the others.
+  it("every wizard field changes something in the plan", () => {
+    const plan = JSON.stringify(template.plan ?? {})
+    const unused = (template.wizardPages ?? [])
+      .flatMap((page) => page.fields)
+      .filter((field) => field.type !== "advice" && !plan.includes(`\${${field.name}}`))
+      .map((field) => field.name)
+    expect(unused).toEqual([])
+  })
+
   describe("wizard fields are fully populated", () => {
     const fields = (template.wizardPages ?? []).flatMap((p) => p.fields.map((f) => ({ ...f, page: p.id })))
     if (fields.length === 0) {
