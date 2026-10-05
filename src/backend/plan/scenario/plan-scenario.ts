@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { iterationKeys, LOOP_TYPES } from "../../../shared/loop-iterations.js"
+import type { FormatSettings } from "../../../shared/node-settings.js"
 import type { PlanEdgeType } from "../../../shared/plan-edge-types.js"
 import type { PlanNodeDefinition, PlanNodeRow, PlanNodeStatus } from "../../../shared/plan-graph.js"
 import {
@@ -15,6 +16,8 @@ import {
 import type { PlanNodeType } from "../../../shared/plan-node-types.js"
 import type { ProjectTemplate } from "../../../shared/project-template.js"
 import type { RegenerateStatusEvent } from "../../../shared/RegenerateEvent.js"
+import { migrateDatabase } from "../../db/migrations.js"
+import { getCurrentDb, setCurrentDbPath } from "../../db/state.js"
 import { setUpTestDb } from "../../db/test-db-utils.js"
 import { applyProjectTemplate } from "../../projects/apply-project-template.js"
 import { SettingsRepository } from "../../settings/settings-repository.js"
@@ -78,8 +81,8 @@ export class GraphBuilder {
   }
 
   /** Renders its inputs through a Handlebars layout. */
-  format(title: string, template: string, from: string[]): void {
-    this.add(title, "format", { template })
+  format(title: string, template: string, from: string[], settings: Omit<FormatSettings, "template"> = {}): void {
+    this.add(title, "format", { template, ...settings })
     for (const source of from) this.edge(source, title)
   }
 
@@ -187,6 +190,8 @@ function nodeId(title: string): number {
 export interface ScenarioOptions {
   /** Summaries after every generation; off unless a scenario is about them. */
   autoSummary?: boolean
+  /** The project lives in this file rather than in memory: for what is saved next to it. */
+  projectFile?: string
 }
 
 export class PlanScenario {
@@ -217,7 +222,13 @@ export class PlanScenario {
   }
 
   private static open(options: ScenarioOptions): PlanScenario {
-    setUpTestDb()
+    if (options.projectFile) {
+      setCurrentDbPath(null)
+      setCurrentDbPath(options.projectFile)
+      migrateDatabase(getCurrentDb())
+    } else {
+      setUpTestDb()
+    }
     fakeEngine.reset()
     SettingsRepository.setCurrentBackend("grok")
     SettingsRepository.setAllAiEnginesConfig({

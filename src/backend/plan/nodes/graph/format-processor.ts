@@ -1,10 +1,13 @@
+import { promises as fs } from "node:fs"
 import type { FormatSettings } from "../../../../shared/node-settings.js"
 import type { PlanNodeRow, PlanNodeStateUpdate } from "../../../../shared/plan-graph.js"
+import { ROOT_PATH } from "../../../../shared/plan-node-path.js"
 import { renderFormatTemplate } from "../../../ai/replaceTemplates.js"
 import { SettingsRepository } from "../../../settings/settings-repository.js"
 import type { RegenerationNodeContext } from "../generate/RegenerationContext.js"
 import type { NodeInputs } from "../NodeInput.js"
 import type { PlanNodeService } from "../plan-node-service.js"
+import { DEFAULT_FILE_NAME, savedPagePath } from "./format-file.js"
 import type { NodeProcessor } from "./node-processor.js"
 
 /**
@@ -16,9 +19,12 @@ import type { NodeProcessor } from "./node-processor.js"
  *
  * Unlike prompt rendering, HTML escaping is ON: `{{x}}` is safe, `{{{x}}}`
  * is the deliberate opt-out.
+ *
+ * With `saveNextToProject`, every rebuild of the page also writes it into the
+ * project's folder, under the name its mask gives — see `format-file.ts`.
  */
 export class FormatProcessor implements NodeProcessor<FormatSettings> {
-  readonly defaultSettings: FormatSettings = { template: "" }
+  readonly defaultSettings: FormatSettings = { template: "", saveNextToProject: false, fileName: DEFAULT_FILE_NAME }
 
   getOutput(_context: PlanNodeService, nodeData: PlanNodeRow): unknown {
     return nodeData.content ?? ""
@@ -43,6 +49,16 @@ export class FormatProcessor implements NodeProcessor<FormatSettings> {
       // indistinguishable from "the template produced nothing".
       return { content: err instanceof Error ? err.message : String(err), status: "ERROR" }
     }
+  }
+
+  /** Writes the page next to the project file, when the settings ask for it. */
+  async afterRegeneration(_service: PlanNodeService, row: PlanNodeRow, settings: FormatSettings): Promise<void> {
+    // Inside a loop every iteration would overwrite the same file.
+    if (!settings.saveNextToProject || row.path !== ROOT_PATH || row.status !== "GENERATED") return
+    const file = savedPagePath(settings.fileName ?? DEFAULT_FILE_NAME, row.title)
+    if (!file) return
+    await fs.writeFile(file, row.content ?? "", "utf8")
+    console.info(`[FormatProcessor] node ${row.id} saved to ${file}`)
   }
 }
 

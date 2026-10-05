@@ -24,6 +24,7 @@ import { planEdgeEventManager } from "./plan/edges/plan-edge-event-manager.js"
 import { PlanEdgeRepository } from "./plan/edges/plan-edge-repository.js"
 import { createGraphEdge, deleteGraphEdge, patchGraphEdge } from "./plan/edges/plan-edge-routes.js"
 import { buildRoutes as buildPlanRegenerateRoutes } from "./plan/nodes/generate/regenerate-routes.js"
+import { savedPageTarget } from "./plan/nodes/graph/format-file.js"
 import { planNodeEventManager } from "./plan/nodes/plan-node-event-manager.js"
 import { PlanNodeRepository } from "./plan/nodes/plan-node-repository.js"
 import { aiGenerateAndReview } from "./plan/nodes/plan-node-routes.js"
@@ -153,6 +154,15 @@ export const appRouter = t.router({
       saveContentToFile: t.procedure
         .input(z.object({ nodeId: z.int(), path: z.string(), filePath: z.string() }))
         .mutation(({ input }) => new PlanNodeService().saveContentToFile(input.nodeId, input.path, input.filePath)),
+      // Where a page would be saved under a mask, for the editor to show while it is typed.
+      savedPageTarget: t.procedure.input(z.object({ id: z.int(), fileName: z.string() })).query(({ input }) => {
+        const { title } = new PlanNodeService().getDefinition(input.id)
+        try {
+          return { ...savedPageTarget(input.fileName, title), error: null }
+        } catch (e) {
+          return { folder: null, name: "", error: e instanceof Error ? e.message : String(e) }
+        }
+      }),
       startReview: t.procedure
         .input(z.object({ id: z.number(), path: z.string(), options: z.any().optional() }))
         .mutation(({ input }) => new PlanNodeService().startReview(input.id, input.path, input.options)),

@@ -43,4 +43,11 @@ export interface NodeProcessor<S = unknown> {
     row: PlanNodeRow,
     settings: S,
   ): Promise<PlanNodeStateUpdate | null>
+
+  /**
+   * Called once a regeneration has landed; `row` is the node at its path as
+   * stored now. For what leaves the project, such as a file written next to
+   * it. A throw fails the regeneration, so that the run reports it.
+   */
+  afterRegeneration?(service: PlanNodeService, row: PlanNodeRow, settings: S): Promise<void>
 }

@@ -383,6 +383,70 @@ describe("template-update", () => {
     expect(stateAt(profile, `${loop}:1`)).toMatchObject({ content: "profile of Боря #1", status: "MANUAL" })
   })
 
+  /** A template laying out a page from a text, the page's settings as given. */
+  function pageTemplate(settings: Record<string, unknown>): ProjectTemplate {
+    return {
+      label: "page",
+      description: "page",
+      wizardPages: [],
+      plan: {
+        nodes: [
+          { title: "Text", type: "text", aiUserInstructions: ["Write."], inputs: [] },
+          {
+            title: "Page",
+            type: "format",
+            nodeTypeSettings: settings,
+            inputs: [{ sourceNodeTitle: "Text", type: "text" }],
+          },
+        ],
+      },
+    } as unknown as ProjectTemplate
+  }
+
+  /** A project made from `page.json` with the page's settings as given; reads the page's settings now. */
+  function pageProject(settings: Record<string, unknown>): { pageSettings: () => Record<string, unknown> } {
+    const template = pageTemplate(settings)
+    writeTemplate("page.json", template)
+    applyProjectTemplate(template, {})
+    SettingsRepository.setAppliedTemplateFile("page.json")
+    SettingsRepository.setAppliedTemplateWizardData({})
+    const page = () => new PlanNodeRepository().findAll().find((n) => n.title === "Page")!
+    return { pageSettings: () => JSON.parse(page().node_type_settings ?? "{}") }
+  }
+
+  /** The template `page.json` now lays out its page with `settings`. */
+  const retemplatePage = (settings: Record<string, unknown>) => writeTemplate("page.json", pageTemplate(settings))
+
+  it("rewrites a page's layout when the template changed it", async () => {
+    const { pageSettings } = pageProject({ template: "<p>{{[Text]}}</p>" })
+    retemplatePage({ template: "<article>{{[Text]}}</article>" })
+
+    expect(analyzeTemplateUpdate().updatedNodes.map((n) => n.title)).toEqual(["Page"])
+    await applyTemplateUpdate()
+
+    expect(pageSettings().template).toBe("<article>{{[Text]}}</article>")
+  })
+
+  it("suggests where a page is saved once, and keeps what the project chose since", async () => {
+    const { pageSettings } = pageProject({ template: "<p>{{[Text]}}</p>" })
+    const suggested = { template: "<p>{{[Text]}}</p>", saveNextToProject: true, fileName: "{{projectFile}}.html" }
+    retemplatePage(suggested)
+
+    expect(analyzeTemplateUpdate().updatedNodes.map((n) => n.title)).toEqual(["Page"])
+    await applyTemplateUpdate()
+    expect(pageSettings()).toMatchObject({ saveNextToProject: true, fileName: "{{projectFile}}.html" })
+
+    // The user stops saving it and renames the file; the template still suggests otherwise.
+    const page = new PlanNodeRepository().findAll().find((n) => n.title === "Page")!
+    new PlanNodeRepository().patch(page.id, {
+      node_type_settings: JSON.stringify({ ...pageSettings(), saveNextToProject: false, fileName: "page.html" }),
+    })
+
+    expect(analyzeTemplateUpdate().updatedNodes, "nothing to update: the choice is the project's").toEqual([])
+    await applyTemplateUpdate()
+    expect(pageSettings()).toMatchObject({ saveNextToProject: false, fileName: "page.html" })
+  })
+
   it("demotes the target of a removed edge — its inputs changed", async () => {
     const initial = baseTemplate()
     applyProjectTemplate(initial, {})

@@ -679,7 +679,9 @@ export class PlanNodeService {
     const node = await this.beginRegeneration(context)
     try {
       const patch = await this.produce(node, context)
-      return await this.finishRegeneration(node, patch, context)
+      const landed = await this.finishRegeneration(node, patch, context)
+      await this.getProcessor(landed.type).afterRegeneration?.(this, landed, this.getNodeSettings(landed))
+      return landed
     } catch (e) {
       return await this.failRegeneration(node, context, e)
     }

@@ -64,6 +64,14 @@ export interface FormatSettings {
    * HTML escaping is on; `{{{x}}}` opts out.
    */
   template?: string
+  /** Write the page into the project's folder each time it is rebuilt. Not from inside a loop. */
+  saveNextToProject?: boolean
+  /**
+   * The saved page's file name: a mustache mask over `projectFile` (the
+   * project file's name without its extension), `projectName` (the project's
+   * title) and `title` (the node's). What a file name cannot hold becomes `_`.
+   */
+  fileName?: string
 }
 
 export interface TextSettings extends LlmCallPrompts {}

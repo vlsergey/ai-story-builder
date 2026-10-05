@@ -121,6 +121,36 @@ const INSTRUCTION_KEYS_FIXPROBLEMS = [
   "minSeverityToFix",
   "foundProblemsTemplate",
 ] as const
+const INSTRUCTION_KEYS_FORMAT = ["template"] as const
+
+/** The settings of a node type the template owns: an update rewrites them. */
+function instructionKeys(type: string): readonly string[] {
+  if (type === "fix-problems") return INSTRUCTION_KEYS_FIXPROBLEMS
+  if (type === "format") return INSTRUCTION_KEYS_FORMAT
+  return INSTRUCTION_KEYS_TEXTLIKE
+}
+
+/**
+ * Settings the template only suggests: an update fills them in where the
+ * project lacks them, and never overwrites them — from then on they are the
+ * user's choice.
+ */
+const PREFERENCE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  format: ["saveNextToProject", "fileName"],
+}
+
+/** The preferences the template suggests and the project does not have yet. */
+function missingPreferences(
+  type: string,
+  templateSettings: Record<string, unknown>,
+  projectSettings: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const k of PREFERENCE_KEYS[type] ?? []) {
+    if (k in templateSettings && !(k in projectSettings)) out[k] = templateSettings[k]
+  }
+  return out
+}
 
 function locateTemplateFile(filename: string): string {
   const folders = getTemplateFolders()
@@ -226,9 +256,8 @@ function buildTemplateInstructionSettings(
  */
 function pickInstructionFields(type: string, settings: Record<string, unknown> | null): Record<string, unknown> {
   if (!settings) return {}
-  const keys: readonly string[] = type === "fix-problems" ? INSTRUCTION_KEYS_FIXPROBLEMS : INSTRUCTION_KEYS_TEXTLIKE
   const out: Record<string, unknown> = {}
-  for (const k of keys) {
+  for (const k of instructionKeys(type)) {
     if (k in settings) out[k] = settings[k]
   }
   return out
@@ -343,7 +372,8 @@ export function analyzeTemplateUpdate(changes: TemplateParameterChanges = {}): T
     const projectSettings = parseProjectSettings(projectNode.node_type_settings)
     const templateAiSettingsJson = tNode.aiSettings ? JSON.stringify(tNode.aiSettings) : null
     const aiSettingsDiff = templateAiSettingsJson !== (projectNode.ai_settings ?? null)
-    if (instructionsDiffer(tNode.type, templateSettings, projectSettings) || aiSettingsDiff) {
+    const suggested = Object.keys(missingPreferences(tNode.type, templateSettings, projectSettings)).length > 0
+    if (instructionsDiffer(tNode.type, templateSettings, projectSettings) || aiSettingsDiff || suggested) {
       updatedNodes.push({ title: tNode.title, type: tNode.type })
     } else {
       unchangedCount += 1
@@ -442,10 +472,8 @@ export async function applyTemplateUpdate(
     const fresh = buildTemplateInstructionSettings(tNode, substitutions)
     // Preserve any unrelated keys we don't manage.
     const current = parseProjectSettings(pNode.node_type_settings)
-    const keys: readonly string[] =
-      tNode.type === "fix-problems" ? INSTRUCTION_KEYS_FIXPROBLEMS : INSTRUCTION_KEYS_TEXTLIKE
-    const merged: Record<string, unknown> = { ...current }
-    for (const k of keys) {
+    const merged: Record<string, unknown> = { ...current, ...missingPreferences(tNode.type, fresh, current) }
+    for (const k of instructionKeys(tNode.type)) {
       if (k in fresh) merged[k] = fresh[k]
       else delete merged[k]
     }
