@@ -14,14 +14,14 @@
     "@types/node": "^25.9.1",
     "better-sqlite3": "^12.10.0",
     "cross-env": "^10.1.0",
-    "electron": "^41.6.1",
+    "electron": "^41.10.7",
     "electron-devtools-installer": "^4.0.0",
     "nodemon": "^3.0.1",
     "openai": "^6.38.0",
     "tsup": "^8.5.1",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6",
+    "vitest": "^5.0.5",
     "zod": "^4.4.3"
   },
   "dependencies": {

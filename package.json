@@ -65,7 +65,7 @@
     "semantic-release": "^25.0.3",
     "tsx": "^4.22.3",
     "vite": "^8.0.13",
-    "vitest": "^4.1.6",
+    "vitest": "^5.0.5",
     "wait-on": "^9.0.10"
   },
   "build": {
